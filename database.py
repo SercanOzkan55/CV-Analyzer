@@ -1,0 +1,71 @@
+import os
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+ENV = os.getenv("ENV", "development")
+
+if not DATABASE_URL and ENV != "test":
+    raise ValueError("DATABASE_URL environment variable not set")
+
+# Clean up SQLAlchemy prefix if present (for psycopg2 compatibility)
+if DATABASE_URL and DATABASE_URL.startswith("postgresql+psycopg2://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql+psycopg2://", "postgresql://", 1)
+
+# Warn if the URL appears to point at a Supabase-managed database.
+if DATABASE_URL and "supabase.com" in DATABASE_URL:
+    import warnings
+    warnings.warn(
+        "DATABASE_URL is pointed at a Supabase host; confirm that this is the "
+        "intended database. For local development consider running a "
+        "standalone PostgreSQL instance and updating .env accordingly.",
+        UserWarning,
+    )
+
+# Environment-based engine configuration
+from sqlalchemy.pool import StaticPool
+if ENV == "test":
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool
+    )
+elif DATABASE_URL and DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False}
+    )
+else:
+    engine = create_engine(
+        DATABASE_URL,
+        pool_size=10,
+        max_overflow=20,
+        pool_pre_ping=True,  # Test connections before use
+        pool_recycle=3600,   # Recycle connections after 1 hour
+        echo=False,          # Set to True for SQL debugging
+    )
+
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine,
+    expire_on_commit=False
+)
+
+Base = declarative_base()
+
+
+def get_db():
+    """Yield a new SQLAlchemy Session and ensure it is closed after use.
+
+    Use this function as a FastAPI dependency so that every request gets
+    a fresh session that is cleaned up automatically.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

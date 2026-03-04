@@ -1,0 +1,36 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Supabase Google Login</title>
+</head>
+<body style="background:#111;color:white;text-align:center;margin-top:100px;font-family:Arial;">
+
+<h2>Google Login Test</h2>
+<button id="loginBtn" style="padding:15px 30px;font-size:16px;cursor:pointer;">
+Login with Google
+</button>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+const supabaseUrl = "https://oanidolrgdukiqxvvbzd.supabase.co";
+const supabaseKey = "sb_publishable_jtUrR1fRO7YbWwecyeGcVQ_00jbDGfo";
+
+const client = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+document.getElementById("loginBtn").addEventListener("click", async () => {
+  const { error } = await client.auth.signInWithOAuth({
+    provider: "google"
+  });
+
+  if (error) {
+    console.error(error);
+    alert(error.message);
+  }
+});
+</script>
+
+</body>
+</html>
