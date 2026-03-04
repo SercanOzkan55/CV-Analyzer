@@ -1,0 +1,2 @@
+pgvector
+pytest-cov
