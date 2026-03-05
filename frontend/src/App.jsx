@@ -1,55 +1,55 @@
-import React, { useState } from 'react'
-import UploadForm from './components/UploadForm'
-import Dashboard from './components/Dashboard'
+import React from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { LanguageProvider } from './i18n/LanguageContext'
+import { ThemeProvider } from './context/ThemeContext'
+import { AuthProvider, useAuth } from './context/AuthContext'
+import { ToastProvider } from './components/Toast'
+import LandingPage from './pages/LandingPage'
+import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import DashboardPage from './pages/DashboardPage'
+import AnalyzePage from './pages/AnalyzePage'
+import HistoryPage from './pages/HistoryPage'
+import SettingsPage from './pages/SettingsPage'
+import RecruiterPage from './pages/RecruiterPage'
+import PricingPage from './pages/PricingPage'
+
+function PrivateRoute({ children }) {
+  const { user, loading } = useAuth()
+  if (loading) return <div className="loading">Loading...</div>
+  return user ? children : <Navigate to="/login" />
+}
+
+function PublicRoute({ children }) {
+  const { user, loading } = useAuth()
+  if (loading) return <div className="loading">Loading...</div>
+  return user ? <Navigate to="/dashboard" /> : children
+}
 
 export default function App() {
-  const [result, setResult] = useState(null)
-  const [token, setToken] = useState('')
-
   return (
-    <div className="container">
-      <h1>CV Analyzer</h1>
-
-      <section className="card">
-        <h2>CV Upload</h2>
-        <UploadForm setResult={setResult} token={token} />
-      </section>
-
-      <section className="card">
-        <h2>Job Description</h2>
-        <p>Use the form above to paste the job description and upload a PDF CV.</p>
-      </section>
-
-      <section className="card">
-        <h2>API Token</h2>
-        <input
-          placeholder="Bearer token"
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-        />
-      </section>
-
-      <section className="card">
-        <h2>Result</h2>
-        {result ? (
-          <div>
-            <p><strong>Score:</strong> {result.score ?? '—'}%</p>
-            <p><strong>Matched skills:</strong></p>
-            <ul>
-              {(result.matched_skills || []).map((s) => (
-                <li key={s}>{s}</li>
-              ))}
-            </ul>
-          </div>
-        ) : (
-          <p>No result yet. Click Analyze to get a score.</p>
-        )}
-      </section>
-
-      <section className="card">
-        <h2>Recruiter Dashboard</h2>
-        <Dashboard token={token} />
-      </section>
-    </div>
+    <LanguageProvider>
+      <ThemeProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            <ToastProvider>
+              <Routes>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+                <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+                <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
+                <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
+                <Route path="/analyze" element={<PrivateRoute><AnalyzePage /></PrivateRoute>} />
+                <Route path="/history" element={<PrivateRoute><HistoryPage /></PrivateRoute>} />
+                <Route path="/settings" element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
+                <Route path="/recruiter" element={<PrivateRoute><RecruiterPage /></PrivateRoute>} />
+                <Route path="/pricing" element={<PricingPage />} />
+              </Routes>
+            </ToastProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </ThemeProvider>
+    </LanguageProvider>
   )
 }
