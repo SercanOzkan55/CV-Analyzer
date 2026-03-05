@@ -1,4 +1,4 @@
-const BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8001'
+const BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8002'
 
 function authHeaderFrom(token) {
   if (!token) return undefined

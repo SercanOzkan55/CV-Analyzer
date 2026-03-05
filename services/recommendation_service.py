@@ -1,33 +1,29 @@
-def generate_recommendations(missing_skills, semantic_score, keyword_score):
+from .language_service import get_recommendation
 
+
+def generate_recommendations(missing_skills, semantic_score, keyword_score, lang="en"):
+    """
+    Generate prioritized, multi-dimensional recommendations.
+    Returns up to 5 recommendations covering all weak areas.
+    """
     recommendations = []
 
-    # Öncelik 1: Semantic çok düşükse
+    # Semantic alignment problem
     if semantic_score < 40:
-        recommendations.append(
-            "Your CV structure does not align well with this job description. Rewrite your experience section using similar terminology."
-        )
-        return recommendations
+        recommendations.append(get_recommendation("semantic_low", lang))
 
-    # Öncelik 2: Teknik skill eksikliği
+    # Missing skills (show top 3)
     if missing_skills:
-        top_skills = missing_skills[:2]
-        for skill in top_skills:
-            recommendations.append(
-                f"Add measurable project experience demonstrating {skill}."
-            )
-        return recommendations
+        for skill in missing_skills[:3]:
+            recommendations.append(get_recommendation("add_skill", lang, skill))
 
-    # Öncelik 3: Keyword problemi
+    # Keyword matching problem
     if keyword_score < 50:
-        recommendations.append(
-            "Improve keyword matching by explicitly mentioning required technologies."
-        )
-        return recommendations
+        recommendations.append(get_recommendation("keyword_low", lang))
 
-    # Eğer her şey iyiyse
-    recommendations.append(
-        "Your CV is generally aligned. Focus on adding quantified achievements."
-    )
+    # If everything looks good
+    if not recommendations:
+        recommendations.append(get_recommendation("all_good", lang))
 
-    return recommendations
+    # Cap at 5 to avoid overwhelming
+    return recommendations[:5]
