@@ -12,6 +12,7 @@ import hashlib
 from datetime import datetime
 
 from fastapi import FastAPI, Depends, Request, UploadFile, File, Header, HTTPException
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 try:
@@ -67,6 +68,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
+
+# Serve repository files under /static for debugging (e.g. /static/main.py)
+# Note: in production you may want to disable this or protect it behind an env var.
+app.mount("/static", StaticFiles(directory=os.path.dirname(__file__)), name="static")
 
 # Security headers middleware
 @app.middleware("http")
@@ -672,8 +677,18 @@ async def analyze_pdf(
         if extracted:
             text += extracted
 
-    # Queue the analysis job
+    # Queue the analysis job (or run synchronously in LocalTask fallback)
     task = analyze_pdf_task.delay(text, job_description)
+
+    # If the task ran synchronously (LocalTask), the wrapper returns a
+    # DummyResult with `.status` and `.result` attributes — return the
+    # actual analysis result immediately in that case for a better UX.
+    try:
+        if getattr(task, "status", None) == "SUCCESS" and hasattr(task, "result"):
+            return task.result
+    except Exception:
+        pass
+
     return {"task_id": task.id, "status": "queued"}
 
 
