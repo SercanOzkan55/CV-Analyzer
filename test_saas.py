@@ -5,13 +5,12 @@ Tests all security, user isolation, and rate limiting features.
 Run: python test_saas.py
 """
 
-import requests
-import json
-import time
-from datetime import datetime, timedelta, timezone
-from jose import jwt
 import os
+from datetime import datetime, timedelta, timezone
+
+import requests
 from dotenv import load_dotenv
+from jose import jwt
 
 load_dotenv()
 
@@ -31,14 +30,14 @@ if not SUPABASE_JWT_SECRET:
 TEST_USER_1 = {
     "sub": "user-123-aaa",
     "email": "user1@example.com",
-    "aud": "authenticated"
+    "aud": "authenticated",
 }
 
 # Test User 2 (Different user for isolation testing)
 TEST_USER_2 = {
     "sub": "user-456-bbb",
     "email": "user2@example.com",
-    "aud": "authenticated"
+    "aud": "authenticated",
 }
 
 # Test data
@@ -80,13 +79,14 @@ Nice to have:
 # HELPER FUNCTIONS
 # =====================================================
 
+
 def create_mock_jwt(user_data):
     """Create a mock JWT token for testing"""
     now = datetime.now(timezone.utc)
     payload = {
         **user_data,
         "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(hours=1)).timestamp())
+        "exp": int((now + timedelta(hours=1)).timestamp()),
     }
     token = jwt.encode(payload, SUPABASE_JWT_SECRET, algorithm="HS256")
     return token
@@ -118,6 +118,7 @@ def print_result(passed, expected, actual):
 # TEST 1: NO CONFIG TEST
 # =====================================================
 
+
 def test_1_no_auth():
     """🔴 Test without Authorization header - should get 401"""
     print_test(1, "NO AUTH TEST (Missing Authorization Header)")
@@ -125,17 +126,16 @@ def test_1_no_auth():
     try:
         response = requests.post(
             f"{API_BASE_URL}/api/v1/analyze",
-            json={
-                "cv_text": SAMPLE_CV,
-                "job_description": SAMPLE_JOB_DESCRIPTION
-            }
+            json={"cv_text": SAMPLE_CV, "job_description": SAMPLE_JOB_DESCRIPTION},
         )
 
         passed = response.status_code == 401
         print_result(passed, "401 Unauthorized", f"{response.status_code}")
 
         if not passed:
-            print(f"❌ CRITICAL: API is exposed without JWT! Body: {response.text[:200]}")
+            print(
+                f"❌ CRITICAL: API is exposed without JWT! Body: {response.text[:200]}"
+            )
             return False
 
         print(f"Response: {response.json().get('detail', 'No detail')}")
@@ -150,6 +150,7 @@ def test_1_no_auth():
 # TEST 2: INVALID TOKEN TEST
 # =====================================================
 
+
 def test_2_invalid_token():
     """🔴 Test with tampered/invalid token - should get 401"""
     print_test(2, "INVALID TOKEN TEST (Tampered JWT)")
@@ -162,17 +163,14 @@ def test_2_invalid_token():
         response = requests.post(
             f"{API_BASE_URL}/api/v1/analyze",
             headers={"Authorization": f"Bearer {tampered_token}"},
-            json={
-                "cv_text": SAMPLE_CV,
-                "job_description": SAMPLE_JOB_DESCRIPTION
-            }
+            json={"cv_text": SAMPLE_CV, "job_description": SAMPLE_JOB_DESCRIPTION},
         )
 
         passed = response.status_code == 401
         print_result(passed, "401 Unauthorized", f"{response.status_code}")
 
         if not passed:
-            print(f"❌ CRITICAL: Tampered token was accepted!")
+            print("❌ CRITICAL: Tampered token was accepted!")
             return False
 
         return True
@@ -186,6 +184,7 @@ def test_2_invalid_token():
 # TEST 3: VALID TOKEN TEST
 # =====================================================
 
+
 def test_3_valid_token():
     """🟢 Test with valid JWT token - should get 200"""
     print_test(3, "VALID TOKEN TEST (Correct JWT)")
@@ -197,11 +196,8 @@ def test_3_valid_token():
         response = requests.post(
             f"{API_BASE_URL}/api/v1/analyze",
             headers={"Authorization": f"Bearer {token}"},
-            json={
-                "cv_text": SAMPLE_CV,
-                "job_description": SAMPLE_JOB_DESCRIPTION
-            },
-            timeout=30
+            json={"cv_text": SAMPLE_CV, "job_description": SAMPLE_JOB_DESCRIPTION},
+            timeout=30,
         )
 
         passed = response.status_code == 200
@@ -228,6 +224,7 @@ def test_3_valid_token():
 # TEST 4: USER AUTO-CREATION
 # =====================================================
 
+
 def test_4_user_autocreation():
     """✅ Verify user is created in database on first request"""
     print_test(4, "USER AUTO-CREATION TEST")
@@ -239,9 +236,9 @@ def test_4_user_autocreation():
         db = SessionLocal()
 
         # Count users before request
-        user_before = db.query(User).filter(
-            User.supabase_id == TEST_USER_1["sub"]
-        ).first()
+        user_before = (
+            db.query(User).filter(User.supabase_id == TEST_USER_1["sub"]).first()
+        )
 
         print(f"User exists before request: {user_before is not None}")
 
@@ -251,21 +248,20 @@ def test_4_user_autocreation():
             response = requests.post(
                 f"{API_BASE_URL}/api/v1/analyze",
                 headers={"Authorization": f"Bearer {token}"},
-                json={
-                    "cv_text": SAMPLE_CV,
-                    "job_description": SAMPLE_JOB_DESCRIPTION
-                },
-                timeout=30
+                json={"cv_text": SAMPLE_CV, "job_description": SAMPLE_JOB_DESCRIPTION},
+                timeout=30,
             )
         except requests.exceptions.Timeout:
-            print("⚠️  Request timeout - model might be slow, but testing user creation...")
+            print(
+                "⚠️  Request timeout - model might be slow, but testing user creation..."
+            )
             # Continue anyway since the request might have been processed
             response = None
 
         # Check user created
-        user_after = db.query(User).filter(
-            User.supabase_id == TEST_USER_1["sub"]
-        ).first()
+        user_after = (
+            db.query(User).filter(User.supabase_id == TEST_USER_1["sub"]).first()
+        )
 
         db.close()
 
@@ -273,16 +269,18 @@ def test_4_user_autocreation():
             print(f"Request status: {response.status_code}")
 
         if not user_after:
-            print(f"❌ User not created in database")
+            print("❌ User not created in database")
             return False
 
         passed = (
-            user_after.supabase_id == TEST_USER_1["sub"] and
-            user_after.email == TEST_USER_1["email"] and
-            user_after.plan_type == "free"
+            user_after.supabase_id == TEST_USER_1["sub"]
+            and user_after.email == TEST_USER_1["email"]
+            and user_after.plan_type == "free"
         )
 
-        print_result(passed, "User created with correct data", "User created successfully")
+        print_result(
+            passed, "User created with correct data", "User created successfully"
+        )
 
         if passed:
             print(f"✓ User ID: {user_after.id}")
@@ -295,6 +293,7 @@ def test_4_user_autocreation():
     except Exception as e:
         print(f"❌ ERROR: {str(e)}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -303,10 +302,10 @@ def test_4_user_autocreation():
 # TEST 5: USER ISOLATION (CRITICAL)
 # =====================================================
 
+
 def test_5_user_isolation():
     """✅ Verify each user only sees their own analyses"""
     print_test(5, "USER ISOLATION TEST (CRITICAL - Multi-User Data Separation)")
-
 
     try:
         from database import SessionLocal
@@ -324,13 +323,9 @@ def test_5_user_isolation():
             return False
 
         # Get analyses for each user
-        user1_analyses = db.query(Analysis).filter(
-            Analysis.user_id == user1.id
-        ).all()
+        user1_analyses = db.query(Analysis).filter(Analysis.user_id == user1.id).all()
 
-        user2_analyses = db.query(Analysis).filter(
-            Analysis.user_id == user2.id
-        ).all()
+        user2_analyses = db.query(Analysis).filter(Analysis.user_id == user2.id).all()
 
         db.close()
 
@@ -338,18 +333,18 @@ def test_5_user_isolation():
         token1 = create_mock_jwt(TEST_USER_1)
         response1 = requests.get(
             f"{API_BASE_URL}/api/v1/history",
-            headers={"Authorization": f"Bearer {token1}"}
+            headers={"Authorization": f"Bearer {token1}"},
         )
 
         # Test User 2 history endpoint
         token2 = create_mock_jwt(TEST_USER_2)
         response2 = requests.get(
             f"{API_BASE_URL}/api/v1/history",
-            headers={"Authorization": f"Bearer {token2}"}
+            headers={"Authorization": f"Bearer {token2}"},
         )
 
         if response1.status_code != 200 or response2.status_code != 200:
-            print(f"❌ History endpoints failed")
+            print("❌ History endpoints failed")
             return False
 
         history1 = response1.json()
@@ -357,13 +352,17 @@ def test_5_user_isolation():
 
         # Check that results are different (different users)
         passed = (
-            len(user1_analyses) > 0 and
-            len(user2_analyses) > 0 and
-            len(history1) > 0 and
-            len(history2) > 0
+            len(user1_analyses) > 0
+            and len(user2_analyses) > 0
+            and len(history1) > 0
+            and len(history2) > 0
         )
 
-        print_result(passed, "Both users have separate analyses", f"User1: {len(user1_analyses)}, User2: {len(user2_analyses)}")
+        print_result(
+            passed,
+            "Both users have separate analyses",
+            f"User1: {len(user1_analyses)}, User2: {len(user2_analyses)}",
+        )
 
         if passed:
             print(f"✓ User 1 analyses: {len(history1)}")
@@ -372,22 +371,21 @@ def test_5_user_isolation():
             user1_ids = set(a["id"] for a in history1)
             user2_ids = set(a["id"] for a in history2)
             if user1_ids & user2_ids:
-                print(f"❌ CRITICAL: Users can see each other's data!")
+                print("❌ CRITICAL: Users can see each other's data!")
                 return False
-            print(f"✓ No data overlap - isolation working correctly")
+            print("✓ No data overlap - isolation working correctly")
             return passed
         return passed
     except Exception as e:
         print(f"❌ ERROR: {str(e)}")
         import traceback
+
         traceback.print_exc()
         return False
-
 
     # =====================================================
     # TEST 6: QUOTA ENFORCEMENT
     # =====================================================
-
 
     """Ensure free users are limited to 5 analyses per UTC day"""
     print_test(6, "DAILY QUOTA TEST")
@@ -397,9 +395,13 @@ def test_5_user_isolation():
         body = {"cv_text": SAMPLE_CV, "job_description": SAMPLE_JOB_DESCRIPTION}
         # make five successful requests (ignore possible 500s)
         for i in range(5):
-            requests.post(f"{API_BASE_URL}/api/v1/analyze", json=body, headers=headers, timeout=30)
+            requests.post(
+                f"{API_BASE_URL}/api/v1/analyze", json=body, headers=headers, timeout=30
+            )
         # the sixth attempt should be rejected
-        resp6 = requests.post(f"{API_BASE_URL}/api/v1/analyze", json=body, headers=headers, timeout=30)
+        resp6 = requests.post(
+            f"{API_BASE_URL}/api/v1/analyze", json=body, headers=headers, timeout=30
+        )
         passed = resp6.status_code == 403
         print_result(passed, "403 on 6th request", f"{resp6.status_code}")
         return passed
@@ -416,6 +418,7 @@ def test_5_user_isolation():
 # TEST 6: RATE LIMITING
 # =====================================================
 
+
 def test_6_rate_limit():
     """✅ Verify rate limiting works (10 requests/minute for analyze)"""
     print_test(6, "RATE LIMIT TEST (10 requests/minute)")
@@ -429,11 +432,8 @@ def test_6_rate_limit():
             response = requests.post(
                 f"{API_BASE_URL}/api/v1/analyze",
                 headers={"Authorization": f"Bearer {token}"},
-                json={
-                    "cv_text": SAMPLE_CV,
-                    "job_description": SAMPLE_JOB_DESCRIPTION
-                },
-                timeout=5
+                json={"cv_text": SAMPLE_CV, "job_description": SAMPLE_JOB_DESCRIPTION},
+                timeout=5,
             )
 
             if response.status_code == 200:
@@ -441,7 +441,7 @@ def test_6_rate_limit():
             else:
                 print(f"❌ Request {i+1} failed: {response.status_code}")
                 return False
-        
+
         print_result(True, "Requests succeeded without crash", "3/3")
         return True
 
@@ -454,6 +454,7 @@ def test_6_rate_limit():
 # TEST 7: USER_ID FOREIGN KEY
 # =====================================================
 
+
 def test_7_foreign_key():
     """✅ Verify all Analysis records have user_id set"""
     print_test(7, "DB FOREIGN KEY TEST (user_id must not be null)")
@@ -465,9 +466,7 @@ def test_7_foreign_key():
         db = SessionLocal()
 
         # Check for null user_id
-        null_analyses = db.query(Analysis).filter(
-            Analysis.user_id == None
-        ).all()
+        null_analyses = db.query(Analysis).filter(Analysis.user_id == None).all()
 
         db.close()
 
@@ -477,7 +476,7 @@ def test_7_foreign_key():
                 print(f"  - Analysis ID {analysis.id}: user_id is NULL")
             return False
 
-        print_result(True, "All analyses have user_id", f"No NULL user_id found")
+        print_result(True, "All analyses have user_id", "No NULL user_id found")
         return True
 
     except Exception as e:
@@ -489,6 +488,7 @@ def test_7_foreign_key():
 # TEST 8: PDF ENDPOINT PROTECTION
 # =====================================================
 
+
 def test_8_pdf_protection():
     """✅ Verify PDF endpoint is also JWT protected"""
     print_test(8, "PDF ENDPOINT PROTECTION TEST")
@@ -499,7 +499,7 @@ def test_8_pdf_protection():
         response = requests.post(
             f"{API_BASE_URL}/api/v1/analyze-pdf",
             files={"file": ("test.pdf", b"%PDF-1.4\ntest", "application/pdf")},
-            data={"job_description": SAMPLE_JOB_DESCRIPTION}
+            data={"job_description": SAMPLE_JOB_DESCRIPTION},
         )
 
         if response.status_code != 401:
@@ -519,6 +519,7 @@ def test_8_pdf_protection():
 # TEST 9: AUTH SCHEME VALIDATION
 # =====================================================
 
+
 def test_9_auth_scheme():
     """✅ Verify Bearer scheme is enforced"""
     print_test(9, "AUTH SCHEME VALIDATION TEST (Bearer required)")
@@ -530,10 +531,7 @@ def test_9_auth_scheme():
         response = requests.post(
             f"{API_BASE_URL}/api/v1/analyze",
             headers={"Authorization": f"Basic {token}"},  # Wrong scheme
-            json={
-                "cv_text": SAMPLE_CV,
-                "job_description": SAMPLE_JOB_DESCRIPTION
-            }
+            json={"cv_text": SAMPLE_CV, "job_description": SAMPLE_JOB_DESCRIPTION},
         )
 
         if response.status_code == 401:
@@ -552,6 +550,7 @@ def test_9_auth_scheme():
 # TEST 10: MISSING EMAIL TEST
 # =====================================================
 
+
 def test_10_missing_email():
     """✅ Verify handling of token without email"""
     print_test(10, "MISSING EMAIL IN TOKEN TEST")
@@ -561,7 +560,7 @@ def test_10_missing_email():
         incomplete_user = {
             "sub": "user-no-email",
             # No email field
-            "aud": "authenticated"
+            "aud": "authenticated",
         }
 
         token = create_mock_jwt(incomplete_user)
@@ -569,11 +568,8 @@ def test_10_missing_email():
         response = requests.post(
             f"{API_BASE_URL}/api/v1/analyze",
             headers={"Authorization": f"Bearer {token}"},
-            json={
-                "cv_text": SAMPLE_CV,
-                "job_description": SAMPLE_JOB_DESCRIPTION
-            },
-            timeout=30
+            json={"cv_text": SAMPLE_CV, "job_description": SAMPLE_JOB_DESCRIPTION},
+            timeout=30,
         )
 
         # Should still work, email can be None
@@ -581,7 +577,9 @@ def test_10_missing_email():
             print(f"✓ Handled missing email: {response.status_code}")
             return True
         else:
-            print_result(False, "Should handle missing email", f"{response.status_code}")
+            print_result(
+                False, "Should handle missing email", f"{response.status_code}"
+            )
             return False
 
     except Exception as e:
@@ -593,23 +591,24 @@ def test_10_missing_email():
 # MAIN TEST SUITE
 # =====================================================
 
+
 def run_all_tests():
     """Run all tests in order"""
     print("\n")
-    print("╔" + "="*58 + "╗")
+    print("╔" + "=" * 58 + "╗")
     print("║" + "  🔥 SaaS BACKEND CRITICAL TESTS".center(58) + "║")
     print("║" + "  JWT • User Isolation • Rate Limiting".center(58) + "║")
-    print("╚" + "="*58 + "╝")
+    print("╚" + "=" * 58 + "╝")
 
     # Check if server is running
     print(f"\n🔍 Checking server at {API_BASE_URL}...")
     if not check_server():
         print(f"❌ ERROR: API server not running at {API_BASE_URL}")
-        print(f"\n   Start the server in another terminal:")
-        print(f"   python -m uvicorn main:app --reload")
+        print("\n   Start the server in another terminal:")
+        print("   python -m uvicorn main:app --reload")
         exit(1)
-    
-    print(f"✅ Server is running\n")
+
+    print("✅ Server is running\n")
 
     results = {
         "Test 1 - No Auth": test_1_no_auth(),
@@ -626,9 +625,9 @@ def run_all_tests():
 
     # Print summary
     print("\n")
-    print("╔" + "="*58 + "╗")
+    print("╔" + "=" * 58 + "╗")
     print("║" + "  TEST RESULTS SUMMARY".center(58) + "║")
-    print("╠" + "="*58 + "╣")
+    print("╠" + "=" * 58 + "╣")
 
     passed = sum(1 for v in results.values() if v)
     total = len(results)
@@ -637,9 +636,9 @@ def run_all_tests():
         status = "✓ PASS" if result else "✗ FAIL"
         print(f"║ {status}: {test_name:<50} ║")
 
-    print("╠" + "="*58 + "╣")
+    print("╠" + "=" * 58 + "╣")
     print(f"║ Total: {passed}/{total} tests passed".ljust(59) + "║")
-    print("╚" + "="*58 + "╝\n")
+    print("╚" + "=" * 58 + "╝\n")
 
     if passed == total:
         print("🎉 ALL TESTS PASSED - SaaS Backend is secure!\n")

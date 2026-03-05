@@ -3,6 +3,7 @@
 Usage:
   python scripts/convert_to_onnx.py resume_model.pkl model.onnx N_FEATURES
 """
+
 import sys
 from pathlib import Path
 

@@ -4,7 +4,7 @@ def build_feature_vector(
     skill_score,
     exp_score,
     missing_skills,
-    total_required_skills
+    total_required_skills,
 ):
     missing_count = len(missing_skills)
 
@@ -26,5 +26,5 @@ def build_feature_vector(
         missing_ratio,
         semantic_skill_interaction,
         keyword_skill_interaction,
-        balance_score
+        balance_score,
     ]

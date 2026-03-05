@@ -1,6 +1,7 @@
-import pytest
 from fastapi.testclient import TestClient
+
 from main import app
+
 
 def test_cors_headers():
     """CORS preflight with valid Origin should return CORS headers."""

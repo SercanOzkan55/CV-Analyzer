@@ -1,8 +1,11 @@
 import os
-import pytest
+
 from sqlalchemy import create_engine, text
 
-POSTGRES_URL = os.getenv("DATABASE_URL", "postgresql+psycopg2://testuser:testpass@localhost:5433/testdb")
+POSTGRES_URL = os.getenv(
+    "DATABASE_URL", "postgresql+psycopg2://testuser:testpass@localhost:5433/testdb"
+)
+
 
 def test_postgres_connection():
     engine = create_engine(POSTGRES_URL)

@@ -1,6 +1,7 @@
-import pytest
 from fastapi.testclient import TestClient
+
 from main import app
+
 
 def test_security_headers_present():
     """Security headers should be present on all responses."""

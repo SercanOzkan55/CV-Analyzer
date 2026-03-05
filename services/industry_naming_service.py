@@ -1,7 +1,9 @@
-from openai import OpenAI
 import os
 
+from openai import OpenAI
+
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 
 def generate_industry_name(job_text):
 
@@ -25,10 +27,13 @@ def generate_industry_name(job_text):
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "You classify job descriptions into industry names."},
-            {"role": "user", "content": prompt}
+            {
+                "role": "system",
+                "content": "You classify job descriptions into industry names.",
+            },
+            {"role": "user", "content": prompt},
         ],
-        temperature=0.2
+        temperature=0.2,
     )
 
     industry_name = response.choices[0].message.content.strip()

@@ -2,11 +2,12 @@
 Debug JWT token generation and validation
 """
 
-from datetime import datetime, timedelta, timezone
-from jose import jwt
 import os
-from dotenv import load_dotenv
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+from dotenv import load_dotenv
+from jose import jwt
 
 # Load .env from current directory
 env_path = Path(".env")
@@ -20,7 +21,7 @@ SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
 if not SUPABASE_JWT_SECRET:
     print("❌ SUPABASE_JWT_SECRET not set in .env")
     print(f"   Checked: {env_path.resolve()}")
-    print(f"\n   Available environment variables:")
+    print("\n   Available environment variables:")
     print(f"   {list(os.environ.keys())[:5]}...")
     exit(1)
 
@@ -30,7 +31,7 @@ print(f"✅ JWT Secret loaded: {SUPABASE_JWT_SECRET[:20]}...")
 test_user = {
     "sub": "user-123-aaa",
     "email": "user1@example.com",
-    "aud": "authenticated"
+    "aud": "authenticated",
 }
 
 # Create token with new datetime method
@@ -38,7 +39,7 @@ now = datetime.now(timezone.utc)
 payload = {
     **test_user,
     "iat": int(now.timestamp()),
-    "exp": int((now + timedelta(hours=1)).timestamp())
+    "exp": int((now + timedelta(hours=1)).timestamp()),
 }
 
 print("\n📝 Payload to encode:")
@@ -48,23 +49,23 @@ for k, v in payload.items():
 # Encode
 try:
     token = jwt.encode(payload, SUPABASE_JWT_SECRET, algorithm="HS256")
-    print(f"\n✅ Token created successfully!")
+    print("\n✅ Token created successfully!")
     print(f"   Token (first 50 chars): {token[:50]}...")
     print(f"   Full token length: {len(token)} chars")
 except Exception as e:
     print(f"\n❌ Error encoding token: {e}")
     exit(1)
 
-# Decode 
+# Decode
 try:
     decoded = jwt.decode(
         token,
         SUPABASE_JWT_SECRET,
         algorithms=["HS256"],
-        options={"verify_aud": False}  # Don't verify audience for this test
+        options={"verify_aud": False},  # Don't verify audience for this test
     )
-    print(f"\n✅ Token decoded successfully!")
-    print(f"   Decoded payload:")
+    print("\n✅ Token decoded successfully!")
+    print("   Decoded payload:")
     for k, v in decoded.items():
         print(f"     {k}: {v}")
 except Exception as e:
@@ -72,10 +73,13 @@ except Exception as e:
     exit(1)
 
 # Verify sub and email
-if decoded.get("sub") == test_user["sub"] and decoded.get("email") == test_user["email"]:
-    print(f"\n✅ Token validation PASSED - sub and email match")
+if (
+    decoded.get("sub") == test_user["sub"]
+    and decoded.get("email") == test_user["email"]
+):
+    print("\n✅ Token validation PASSED - sub and email match")
 else:
-    print(f"\n❌ Token validation FAILED")
+    print("\n❌ Token validation FAILED")
     print(f"   Expected sub: {test_user['sub']}, Got: {decoded.get('sub')}")
     print(f"   Expected email: {test_user['email']}, Got: {decoded.get('email')}")
 

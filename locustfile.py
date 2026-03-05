@@ -1,7 +1,9 @@
-from locust import HttpUser, task, between
 import os
 
+from locust import HttpUser, between, task
+
 JWT = os.getenv("LOCUST_JWT", "testtoken")
+
 
 class AnalyzeUser(HttpUser):
     wait_time = between(1, 2)
@@ -12,7 +14,7 @@ class AnalyzeUser(HttpUser):
             "/api/v1/analyze",
             json={
                 "cv_text": "John Doe\nSkills: Python, SQL",
-                "job_description": "Software engineer with Python"
+                "job_description": "Software engineer with Python",
             },
-            headers={"Authorization": f"Bearer {JWT}"}
+            headers={"Authorization": f"Bearer {JWT}"},
         )

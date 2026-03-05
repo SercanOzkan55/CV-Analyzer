@@ -1,7 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
-from main import app
+
 from auth import verify_supabase_jwt
+from main import app
+
 
 # JWT tamper test: invalid signature
 @pytest.fixture
@@ -11,17 +13,20 @@ def tampered_jwt():
             "user_id": "test-user-123",
             "email": "testuser@example.com",
             "payload": {"sub": "test-user-123", "exp": 9999999999},
-            "signature": "invalidsig"
+            "signature": "invalidsig",
         }
+
     app.dependency_overrides[verify_supabase_jwt] = _tampered_jwt
     yield
     app.dependency_overrides.pop(verify_supabase_jwt, None)
+
 
 @pytest.mark.usefixtures("tampered_jwt")
 def test_jwt_tampered_rejected():
     client = TestClient(app)
     resp = client.post("/api/v1/analyze", json={"cv_text": "foo", "job_text": "bar"})
     assert resp.status_code in (401, 403)
+
 
 # Org privilege escalation: recruiter tries to access another org
 @pytest.mark.parametrize("org_id", [9999, 1, 2])
@@ -31,8 +36,11 @@ def test_org_privilege_escalation(client, org_id):
     assert resp.status_code in (200, 400, 403)
     # Should not allow recruiter to analyze for arbitrary org_id
 
+
 # SQL injection in job_text
-@pytest.mark.parametrize("malicious", ["Robert'); DROP TABLE organizations;--", "' OR TRUE --"])
+@pytest.mark.parametrize(
+    "malicious", ["Robert'); DROP TABLE organizations;--", "' OR TRUE --"]
+)
 def test_sql_injection_job_text(client, malicious):
     payload = {"cv_text": "foo", "job_text": malicious}
     resp = client.post("/api/v1/analyze", json=payload)

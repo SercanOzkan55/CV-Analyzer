@@ -1,5 +1,5 @@
 import os
-import json
+
 from fastapi import Header, HTTPException
 from jose import jwt
 
@@ -49,7 +49,9 @@ def verify_supabase_jwt(authorization: str = Header(None)):
         if scheme.lower() != "bearer":
             raise HTTPException(status_code=401, detail="Invalid auth scheme")
     except ValueError:
-        raise HTTPException(status_code=401, detail="Invalid Authorization header format")
+        raise HTTPException(
+            status_code=401, detail="Invalid Authorization header format"
+        )
 
     # Inspect header to determine algorithm/kid
     try:
@@ -61,9 +63,17 @@ def verify_supabase_jwt(authorization: str = Header(None)):
     # If algorithm is HMAC (HS*), use SUPABASE_JWT_SECRET
     if alg and alg.upper().startswith("HS"):
         if not SUPABASE_JWT_SECRET:
-            raise HTTPException(status_code=500, detail="Server misconfiguration: SUPABASE_JWT_SECRET not set")
+            raise HTTPException(
+                status_code=500,
+                detail="Server misconfiguration: SUPABASE_JWT_SECRET not set",
+            )
         try:
-            payload = jwt.decode(token, SUPABASE_JWT_SECRET, algorithms=[alg], options={"verify_aud": False})
+            payload = jwt.decode(
+                token,
+                SUPABASE_JWT_SECRET,
+                algorithms=[alg],
+                options={"verify_aud": False},
+            )
         except Exception:
             raise HTTPException(status_code=401, detail="Invalid or expired token")
 
@@ -71,7 +81,10 @@ def verify_supabase_jwt(authorization: str = Header(None)):
         # Asymmetric algorithm (RS/ES) - fetch JWKS and verify using the key with matching kid
         jwks = _fetch_jwks(SUPABASE_URL)
         if not jwks or "keys" not in jwks:
-            raise HTTPException(status_code=500, detail="Unable to fetch JWKS for token verification; set SUPABASE_URL and install requests")
+            raise HTTPException(
+                status_code=500,
+                detail="Unable to fetch JWKS for token verification; set SUPABASE_URL and install requests",
+            )
 
         kid = header.get("kid")
         key_obj = None
@@ -89,9 +102,14 @@ def verify_supabase_jwt(authorization: str = Header(None)):
             # jwcrypto accepts JSON string; ensure key is serializable
             jwk_key = jwk_mod.JWK(**key_obj)
             pem = jwk_key.export_to_pem(public_key=True, password=None)
-            payload = jwt.decode(token, pem, algorithms=[alg], options={"verify_aud": False})
+            payload = jwt.decode(
+                token, pem, algorithms=[alg], options={"verify_aud": False}
+            )
         except Exception:
-            raise HTTPException(status_code=500, detail="Server missing jwcrypto dependency to verify Supabase JWT (pip install jwcrypto)")
+            raise HTTPException(
+                status_code=500,
+                detail="Server missing jwcrypto dependency to verify Supabase JWT (pip install jwcrypto)",
+            )
 
     user_id = payload.get("sub")
     email = payload.get("email")

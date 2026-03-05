@@ -1,4 +1,3 @@
-import pytest
 
 
 def test_unicode_payload(client):

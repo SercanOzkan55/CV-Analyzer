@@ -1,14 +1,18 @@
-from openai import OpenAI
 import os
+
 from dotenv import load_dotenv
+from openai import OpenAI
+
 try:
     from loguru import logger
 except Exception:
     import logging
+
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger("app.embedding")
-import sys
 import json
+import sys
+
 try:
     import redis
 except Exception:
@@ -16,7 +20,7 @@ except Exception:
 
 # Redis connection (adjust host/port/db as needed)
 if redis:
-    redis_client = redis.Redis(host='localhost', port=6379, db=0)
+    redis_client = redis.Redis(host="localhost", port=6379, db=0)
 else:
     redis_client = None
 
@@ -41,7 +45,9 @@ def get_embedding(text: str, max_length: int = 20000):
 
     if not client:
         if hasattr(logger, "bind"):
-            logger.bind(event="openai_client_not_configured").warning(json.dumps({"event": "openai_client_not_configured"}))
+            logger.bind(event="openai_client_not_configured").warning(
+                json.dumps({"event": "openai_client_not_configured"})
+            )
         else:
             logger.warning(json.dumps({"event": "openai_client_not_configured"}))
         return None
@@ -67,24 +73,35 @@ def get_embedding(text: str, max_length: int = 20000):
             pass
 
     try:
-        response = client.embeddings.create(
-            model="text-embedding-3-small",
-            input=text
-        )
+        response = client.embeddings.create(model="text-embedding-3-small", input=text)
         embedding = response.data[0].embedding
         # Cache the embedding
         if redis_client:
             try:
-                redis_client.set(cache_key, json.dumps(embedding), ex=60*60*24)  # 1 day expiry
+                redis_client.set(
+                    cache_key, json.dumps(embedding), ex=60 * 60 * 24
+                )  # 1 day expiry
             except Exception:
                 pass
         return embedding
     except Exception as e:
         if hasattr(logger, "bind"):
-            logger.bind(event="embedding_fail", text_len=len(text)).exception(json.dumps({"event": "embedding_fail", "error": str(e), "text_len": len(text)}))
+            logger.bind(event="embedding_fail", text_len=len(text)).exception(
+                json.dumps(
+                    {"event": "embedding_fail", "error": str(e), "text_len": len(text)}
+                )
+            )
         else:
             try:
-                logger.exception(json.dumps({"event": "embedding_fail", "error": str(e), "text_len": len(text)}))
+                logger.exception(
+                    json.dumps(
+                        {
+                            "event": "embedding_fail",
+                            "error": str(e),
+                            "text_len": len(text),
+                        }
+                    )
+                )
             except Exception:
                 logger.error(f"embedding_fail: {str(e)}")
         return None
@@ -98,6 +115,7 @@ def save_candidate_embedding(db, candidate_id: int, embedding: list):
     try:
         # Import inside function to avoid circular imports
         from models import Candidate
+
         cand = db.query(Candidate).filter(Candidate.id == candidate_id).one_or_none()
         if not cand:
             return False
@@ -118,6 +136,7 @@ def save_job_embedding(db, job_id: int, embedding: list):
     """Save a job embedding (expects a SQLAlchemy `Session`)."""
     try:
         from models import Job
+
         job = db.query(Job).filter(Job.id == job_id).one_or_none()
         if not job:
             return False
@@ -144,12 +163,15 @@ def find_similar_candidates(db, job_embedding: list, k: int = 10):
     """
     try:
         from sqlalchemy import text
+
         # Build a literal vector representation. We explicitly cast both the
         # stored column and the literal to `vector` to avoid driver/typing
         # coercion issues where parameters are treated as text.
         vec_literal = "[" + ",".join([str(float(x)) for x in job_embedding]) + "]"
         sql = text(
-            "SELECT id, (cv_embedding::vector <#> '" + vec_literal + "'::vector) AS score "
+            "SELECT id, (cv_embedding::vector <#> '"
+            + vec_literal
+            + "'::vector) AS score "
             "FROM candidates WHERE cv_embedding IS NOT NULL ORDER BY score LIMIT :k"
         )
         res = db.execute(sql, {"k": k}).fetchall()

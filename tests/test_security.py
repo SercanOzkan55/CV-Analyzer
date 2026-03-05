@@ -1,7 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
-from main import app
+
 from auth import verify_supabase_jwt
+from main import app
+
 
 # JWT expiration test
 @pytest.fixture
@@ -12,9 +14,11 @@ def expired_jwt():
             "email": "testuser@example.com",
             "payload": {"sub": "test-user-123", "exp": 1},  # expired
         }
+
     app.dependency_overrides[verify_supabase_jwt] = _expired_jwt
     yield
     app.dependency_overrides.pop(verify_supabase_jwt, None)
+
 
 # Organization escalation test
 @pytest.mark.usefixtures("expired_jwt")
@@ -23,12 +27,14 @@ def test_jwt_expired_rejected():
     resp = client.post("/api/v1/analyze", json={"cv_text": "foo", "job_text": "bar"})
     assert resp.status_code == 401 or resp.status_code == 403
 
+
 # Mass assignment test
 def test_mass_assignment_org_id(client):
     # Try to set organization_id directly
     payload = {"cv_text": "foo", "job_text": "bar", "organization_id": 9999}
     resp = client.post("/api/v1/analyze", json=payload)
     assert resp.status_code in (200, 400, 403)  # Should not allow arbitrary org_id
+
 
 # Query injection test
 @pytest.mark.parametrize("malicious", ["1; DROP TABLE app_users;--", "' OR 1=1 --"])

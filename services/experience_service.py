@@ -26,7 +26,7 @@ def extract_years(text: str) -> int:
     # Match year ranges like (1995-2020), (2018 - present), (2020 – current), "2018 to 2023"
     year_ranges = re.findall(
         r"((?:19|20)\d{2})\s*(?:[-–—]|to)\s*((?:19|20)\d{2}|present|current|now|günümüz|halen|devam)",
-        text_lower
+        text_lower,
     )
 
     if not year_ranges:

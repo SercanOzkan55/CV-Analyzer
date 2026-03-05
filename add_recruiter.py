@@ -5,9 +5,11 @@ Usage:
 
 This uses the project's SQLAlchemy `SessionLocal` and models.
 """
+
 import argparse
+
 from database import SessionLocal, engine
-from models import Organization, User, Base
+from models import Base, Organization, User
 
 
 def ensure_tables():
@@ -17,17 +19,21 @@ def ensure_tables():
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument('--supabase-id', required=True)
-    p.add_argument('--email', required=True)
-    p.add_argument('--org-name', default='Test Org')
-    p.add_argument('--org-domain', default='testorg.local')
+    p.add_argument("--supabase-id", required=True)
+    p.add_argument("--email", required=True)
+    p.add_argument("--org-name", default="Test Org")
+    p.add_argument("--org-domain", default="testorg.local")
     args = p.parse_args()
 
     ensure_tables()
 
     db = SessionLocal()
     try:
-        org = db.query(Organization).filter(Organization.domain == args.org_domain).first()
+        org = (
+            db.query(Organization)
+            .filter(Organization.domain == args.org_domain)
+            .first()
+        )
         if not org:
             org = Organization(name=args.org_name, domain=args.org_domain)
             db.add(org)
@@ -39,7 +45,12 @@ def main():
 
         user = db.query(User).filter(User.supabase_id == args.supabase_id).first()
         if not user:
-            user = User(supabase_id=args.supabase_id, email=args.email, role='recruiter', organization_id=org.id)
+            user = User(
+                supabase_id=args.supabase_id,
+                email=args.email,
+                role="recruiter",
+                organization_id=org.id,
+            )
             db.add(user)
             db.commit()
             db.refresh(user)
@@ -51,5 +62,5 @@ def main():
         db.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

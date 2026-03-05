@@ -3,17 +3,31 @@ CV language detection and localized string maps for analysis results.
 Uses langdetect for automatic language identification from CV text.
 """
 
-import re
 
 try:
-    from langdetect import detect as _detect_lang
     from langdetect import LangDetectException
+    from langdetect import detect as _detect_lang
+
     HAS_LANGDETECT = True
 except ImportError:
     HAS_LANGDETECT = False
 
 # Supported languages for result localization
-SUPPORTED_LANGS = {"en", "tr", "fr", "de", "es", "ar", "pt", "it", "nl", "ru", "ja", "ko", "zh"}
+SUPPORTED_LANGS = {
+    "en",
+    "tr",
+    "fr",
+    "de",
+    "es",
+    "ar",
+    "pt",
+    "it",
+    "nl",
+    "ru",
+    "ja",
+    "ko",
+    "zh",
+}
 DEFAULT_LANG = "en"
 
 
@@ -99,22 +113,49 @@ def interpret_score_localized(score: float, lang: str = "en") -> str:
 
 RISK_LEVELS = {
     "Low Risk": {
-        "en": "Low Risk", "tr": "Düşük Risk", "fr": "Risque Faible",
-        "de": "Geringes Risiko", "es": "Riesgo Bajo", "ar": "مخاطر منخفضة",
-        "pt": "Risco Baixo", "it": "Rischio Basso", "nl": "Laag Risico",
-        "ru": "Низкий риск", "ja": "低リスク", "ko": "낮은 위험", "zh": "低风险",
+        "en": "Low Risk",
+        "tr": "Düşük Risk",
+        "fr": "Risque Faible",
+        "de": "Geringes Risiko",
+        "es": "Riesgo Bajo",
+        "ar": "مخاطر منخفضة",
+        "pt": "Risco Baixo",
+        "it": "Rischio Basso",
+        "nl": "Laag Risico",
+        "ru": "Низкий риск",
+        "ja": "低リスク",
+        "ko": "낮은 위험",
+        "zh": "低风险",
     },
     "Medium Risk": {
-        "en": "Medium Risk", "tr": "Orta Risk", "fr": "Risque Moyen",
-        "de": "Mittleres Risiko", "es": "Riesgo Medio", "ar": "مخاطر متوسطة",
-        "pt": "Risco Médio", "it": "Rischio Medio", "nl": "Gemiddeld Risico",
-        "ru": "Средний риск", "ja": "中リスク", "ko": "중간 위험", "zh": "中风险",
+        "en": "Medium Risk",
+        "tr": "Orta Risk",
+        "fr": "Risque Moyen",
+        "de": "Mittleres Risiko",
+        "es": "Riesgo Medio",
+        "ar": "مخاطر متوسطة",
+        "pt": "Risco Médio",
+        "it": "Rischio Medio",
+        "nl": "Gemiddeld Risico",
+        "ru": "Средний риск",
+        "ja": "中リスク",
+        "ko": "중간 위험",
+        "zh": "中风险",
     },
     "High Risk": {
-        "en": "High Risk", "tr": "Yüksek Risk", "fr": "Risque Élevé",
-        "de": "Hohes Risiko", "es": "Riesgo Alto", "ar": "مخاطر عالية",
-        "pt": "Risco Alto", "it": "Rischio Alto", "nl": "Hoog Risico",
-        "ru": "Высокий риск", "ja": "高リスク", "ko": "높은 위험", "zh": "高风险",
+        "en": "High Risk",
+        "tr": "Yüksek Risk",
+        "fr": "Risque Élevé",
+        "de": "Hohes Risiko",
+        "es": "Riesgo Alto",
+        "ar": "مخاطر عالية",
+        "pt": "Risco Alto",
+        "it": "Rischio Alto",
+        "nl": "Hoog Risico",
+        "ru": "Высокий риск",
+        "ja": "高リスク",
+        "ko": "높은 위험",
+        "zh": "高风险",
     },
 }
 
@@ -188,6 +229,7 @@ RECOMMENDATIONS = {
         "zh": "您的简历总体上是匹配的。专注于添加量化的成就。",
     },
 }
+
 
 def get_recommendation(key: str, lang: str = "en", skill: str = "") -> str:
     template = RECOMMENDATIONS.get(key, {})
