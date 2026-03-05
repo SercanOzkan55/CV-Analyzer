@@ -1,0 +1,9 @@
+body { font-family: Arial, Helvetica, sans-serif; background:#f7f7f8; color:#111; padding:20px }
+.container { max-width:900px; margin:0 auto }
+.card { background: #fff; padding:16px; margin:12px 0; border-radius:8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08) }
+.upload-form label { display:block; margin:8px 0 }
+.upload-form input[type="file"] { display:block; margin-top:6px }
+.upload-form textarea { width:100%; margin-top:6px }
+.row { display:flex; align-items:center; gap:12px; margin-top:8px }
+button { padding:8px 12px }
+.error { color:#b00020 }
