@@ -1,4 +1,4 @@
-import pytest
+
 from services import ats_service as ats
 
 

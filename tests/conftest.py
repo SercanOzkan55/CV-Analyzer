@@ -5,47 +5,76 @@ Professional test conftest.py
 - PyPDF2 mock (DummyPdfReader)
 - Service stubs (model, embedding, domain, industry)
 """
+
 import os
 import sys
 import types
-import alembic.config
+
 import alembic.command
+import alembic.config
+
 # Ensure tests always have an API key for header-based tests
 os.environ.setdefault("API_KEY", "test-key")
 # Ensure MOCK_SERVICES is disabled so quota/rate-limit logic runs in tests
 os.environ.setdefault("MOCK_SERVICES", "0")
 # Disable background model worker during tests to avoid concurrency issues
 os.environ.setdefault("MODEL_WORKER_DISABLED", "1")
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-from fastapi.testclient import TestClient
-
-from models import User, Analysis, Organization  # ensure models are registered with Base
 
 
 # ─── Stub heavy/external services BEFORE importing app ───
 _service_stubs = [
-    ("services.model_service", {
-        "predict_match": lambda features: (80.0, 90.0, "Low Risk", {"note": "stub"}),
-    }),
-    ("services.embedding_service", {
-        "get_embedding": lambda text: [0.01] * 1536,
-        # Basic stub that returns candidate ids already present in DB (simple fallback for tests)
-        "find_similar_candidates": (lambda db, vec, k=10: [(row[0], 0.1) for row in db.execute(text("SELECT id FROM candidates LIMIT :k"), {"k": k}).fetchall()]),
-        "save_job_embedding": lambda db, jid, vec: True,
-        "save_candidate_embedding": lambda db, cid, vec: True,
-    }),
-    ("services.domain_service", {
-        "detect_or_create_domain": lambda j, e=None: {"domain_id": 1, "domain_name": "Other"},
-        "get_domain_similarity": lambda i, e: 0.0,
-    }),
-    ("services.industry_service", {
-        "detect_industry_and_specialization": lambda j, e=None: {
-            "industry_id": 1, "industry_name": "Other",
-            "specialization_id": 1, "specialization_name": "General",
+    (
+        "services.model_service",
+        {
+            "predict_match": lambda features: (
+                80.0,
+                90.0,
+                "Low Risk",
+                {"note": "stub"},
+            ),
         },
-    }),
+    ),
+    (
+        "services.embedding_service",
+        {
+            "get_embedding": lambda text: [0.01] * 1536,
+            # Basic stub that returns candidate ids already present in DB (simple fallback for tests)
+            "find_similar_candidates": (
+                lambda db, vec, k=10: [
+                    (row[0], 0.1)
+                    for row in db.execute(
+                        text("SELECT id FROM candidates LIMIT :k"), {"k": k}
+                    ).fetchall()
+                ]
+            ),
+            "save_job_embedding": lambda db, jid, vec: True,
+            "save_candidate_embedding": lambda db, cid, vec: True,
+        },
+    ),
+    (
+        "services.domain_service",
+        {
+            "detect_or_create_domain": lambda j, e=None: {
+                "domain_id": 1,
+                "domain_name": "Other",
+            },
+            "get_domain_similarity": lambda i, e: 0.0,
+        },
+    ),
+    (
+        "services.industry_service",
+        {
+            "detect_industry_and_specialization": lambda j, e=None: {
+                "industry_id": 1,
+                "industry_name": "Other",
+                "specialization_id": 1,
+                "specialization_name": "General",
+            },
+        },
+    ),
 ]
 
 for mod_name, attrs in _service_stubs:
@@ -65,6 +94,7 @@ for mod_name, attrs in _service_stubs:
 
 try:
     import importlib as _il
+
     _pkg = _il.import_module("services")
     for _mn, _ in _service_stubs:
         _p = _mn.split(".")
@@ -76,28 +106,26 @@ except Exception:
 # ─── PyPDF2 mock ───
 _dummy_pypdf2 = types.ModuleType("PyPDF2")
 
+
 class _DummyPage:
     def extract_text(self):
         return "Managed projects and increased revenue by 20%"
 
+
 class _DummyPdfReader:
     def __init__(self, stream):
         self.pages = [_DummyPage()]
+
 
 _dummy_pypdf2.PdfReader = _DummyPdfReader
 sys.modules["PyPDF2"] = _dummy_pypdf2
 
 # ─── Now safe to import app / DB ───
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-from fastapi.testclient import TestClient
 
+from auth import verify_supabase_jwt
 from database import Base, get_db
 from main import app
-from auth import verify_supabase_jwt
-from models import User, Analysis, Organization  # ensure models are registered with Base
 
 
 # ─── Mock JWT ───
@@ -110,7 +138,9 @@ def _mock_verify_jwt(authorization: str = None):
 
 
 # ─── DB URL used by all fixtures ───
-_TEST_DB_URL = os.getenv("DATABASE_URL", "postgresql+psycopg2://testuser:testpass@localhost:5433/testdb")
+_TEST_DB_URL = os.getenv(
+    "DATABASE_URL", "postgresql+psycopg2://testuser:testpass@localhost:5433/testdb"
+)
 
 
 # ─── Session-scoped: create DB tables ONCE for the entire test session ───
@@ -119,6 +149,7 @@ def _ensure_test_db_ready():
     """Create enum types and tables once; they persist for the whole session."""
     _engine = create_engine(_TEST_DB_URL)
     from sqlalchemy import text
+
     # Postgres ENUM types
     try:
         with _engine.begin() as conn:
@@ -137,12 +168,20 @@ def _ensure_test_db_ready():
     # Try Alembic first
     try:
         alembic_cfg = alembic.config.Config("alembic.ini")
-        safe_url = _TEST_DB_URL.replace('%', '%%')
+        safe_url = _TEST_DB_URL.replace("%", "%%")
         alembic_cfg.set_main_option("sqlalchemy.url", safe_url)
         with _engine.begin() as conn:
-            conn.execute(text("CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(255) NOT NULL)"))
+            conn.execute(
+                text(
+                    "CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(255) NOT NULL)"
+                )
+            )
             try:
-                conn.execute(text("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(255)"))
+                conn.execute(
+                    text(
+                        "ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(255)"
+                    )
+                )
             except Exception:
                 pass
         alembic.command.upgrade(alembic_cfg, "heads")
@@ -160,16 +199,22 @@ def _ensure_test_db_ready():
 
 # ─── Per-function fixtures ───
 
+
 @pytest.fixture(scope="function")
 def db_session():
     """Fresh Postgres DB session for every test (tables already exist from session fixture)."""
     engine = create_engine(_TEST_DB_URL)
     Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     from sqlalchemy import text
+
     # Clean data for a fresh slate
     try:
         with engine.begin() as conn:
-            conn.execute(text("TRUNCATE TABLE analysis, app_users, organizations RESTART IDENTITY CASCADE"))
+            conn.execute(
+                text(
+                    "TRUNCATE TABLE analysis, app_users, organizations RESTART IDENTITY CASCADE"
+                )
+            )
     except Exception:
         pass
     db = Session()
@@ -180,7 +225,11 @@ def db_session():
         # Clean data but keep tables for other tests
         try:
             with engine.begin() as conn:
-                conn.execute(text("TRUNCATE TABLE analysis, app_users, organizations RESTART IDENTITY CASCADE"))
+                conn.execute(
+                    text(
+                        "TRUNCATE TABLE analysis, app_users, organizations RESTART IDENTITY CASCADE"
+                    )
+                )
         except Exception:
             pass
 
@@ -188,6 +237,7 @@ def db_session():
 @pytest.fixture(scope="function")
 def client(db_session):
     """TestClient with DB + JWT overrides."""
+
     def _override_get_db():
         try:
             yield db_session

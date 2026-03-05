@@ -25,3 +25,13 @@ All rights reserved.
 ## License
 
 This project is currently distributed as proprietary software unless a separate written license agreement is provided by the copyright holder.
+
+## Documentation
+
+Detailed developer and deployment documentation lives in the `docs/` directory. See `docs/README.md` for how to run the project locally, run tests, and contribute.
+
+If you'd like, run the helper script to generate pinned requirements:
+
+```bash
+./scripts/pin_requirements.sh
+```

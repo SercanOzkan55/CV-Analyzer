@@ -1,59 +1,89 @@
 import logging
+
 from dotenv import load_dotenv
+
 load_dotenv()
 import os
+
 MOCK_SERVICES_ON = os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes")
-import time
-import os
+import hashlib
+import hmac
 import io
 import json
-import hmac
-import hashlib
+import os
+import time
 from datetime import datetime
 
-from fastapi import FastAPI, Depends, Request, UploadFile, File, Header, HTTPException
-from fastapi.staticfiles import StaticFiles
+from fastapi import (Depends, FastAPI, File, HTTPException, Request,
+                     UploadFile)
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
 try:
     from prometheus_fastapi_instrumentator import Instrumentator
 except Exception:
     Instrumentator = None
 
-from sqlalchemy import text, select
 from alembic.config import Config
 from alembic.script import ScriptDirectory
-
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from sqlalchemy import select, text
+
 try:
     from redis import Redis
 except Exception:
     Redis = None
 from limits.storage import RedisStorage
 
-from services.embedding_service import get_embedding, find_similar_candidates, save_job_embedding, save_candidate_embedding
-from services.scoring_service import calculate_similarity
-from services.keyword_service import keyword_match_score
-from services.skill_service import skill_coverage_score
+from auth import verify_supabase_jwt
+from database import SessionLocal, get_db
+from models import Analysis, Candidate, Job, Organization, User
+from services.ats_service import analyze_cv
+from services.domain_service import (detect_or_create_domain,
+                                     get_domain_similarity)
+from services.embedding_service import (find_similar_candidates, get_embedding,
+                                        save_candidate_embedding,
+                                        save_job_embedding)
 from services.experience_service import experience_score
+from services.industry_service import detect_industry_and_specialization
+from services.keyword_service import keyword_match_score
+from services.language_service import (detect_language,
+                                       interpret_score_localized,
+                                       localize_risk_level)
 from services.model_service import predict_match
 from services.recommendation_service import generate_recommendations
-from services.industry_service import detect_industry_and_specialization
-from services.language_service import detect_language, interpret_score_localized, localize_risk_level
-from services.domain_service import detect_or_create_domain, get_domain_similarity
-from services.ats_service import analyze_cv
-from services.tasks import celery_app, analyze_pdf_task
-
-from database import engine, SessionLocal, get_db
-from models import Analysis, User, Base, Organization, Candidate, Job
-from auth import verify_supabase_jwt
+from services.scoring_service import calculate_similarity
+from services.skill_service import skill_coverage_score
+from services.tasks import analyze_pdf_task, celery_app
 
 # FastAPI docs hardening for production
 if os.getenv("ENV", "dev") == "prod":
     app = FastAPI(docs_url=None, redoc_url=None)
 else:
     app = FastAPI()
+
+# Optional Sentry integration: initialize if `SENTRY_DSN` is present in env
+try:
+    SENTRY_DSN = os.getenv("SENTRY_DSN", "")
+    if SENTRY_DSN:
+        try:
+            import sentry_sdk
+            from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+
+            sentry_sdk.init(
+                dsn=SENTRY_DSN,
+                environment=os.getenv("SENTRY_ENV", "dev"),
+                traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.0")),
+            )
+            # Wrap the ASGI app so errors are captured
+            app = SentryAsgiMiddleware(app)
+        except Exception:
+            # Don't fail startup if Sentry is not available
+            pass
+except Exception:
+    pass
 
 if Instrumentator:
     try:
@@ -69,29 +99,34 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "http://localhost:5174",
         "http://127.0.0.1:5174",
-        os.getenv("CORS_ORIGINS", "https://yourdomain.com")
+        os.getenv("CORS_ORIGINS", "https://yourdomain.com"),
     ],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
 # Serve repository files under /static for debugging (e.g. /static/main.py)
 # Note: in production you may want to disable this or protect it behind an env var.
 app.mount("/static", StaticFiles(directory=os.path.dirname(__file__)), name="static")
 
+
 # Security headers middleware
 @app.middleware("http")
 async def add_security_headers(request, call_next):
     response = await call_next(request)
-    response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+    response.headers["Strict-Transport-Security"] = (
+        "max-age=63072000; includeSubDomains"
+    )
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Cache-Control"] = "no-store"
     response.headers["Referrer-Policy"] = "no-referrer"
     return response
 
+
 logger = logging.getLogger("app.access")
+
 
 # Structured logging middleware
 @app.middleware("http")
@@ -110,7 +145,9 @@ async def log_requests(request, call_next):
     plan_type = None
     if user:
         user_id = getattr(user, "id", None) or user.get("user_id")
-        organization_id = getattr(user, "organization_id", None) or user.get("organization_id")
+        organization_id = getattr(user, "organization_id", None) or user.get(
+            "organization_id"
+        )
         plan_type = getattr(user, "plan_type", None) or user.get("plan_type")
     log_payload = {
         "request_id": request.headers.get("X-Request-ID"),
@@ -124,14 +161,15 @@ async def log_requests(request, call_next):
     logger.info("%s", json.dumps(log_payload, ensure_ascii=False))
     return response
 
+
 # Health check endpoint
 @app.get("/health")
 def health_check():
     if MOCK_SERVICES_ON:
         return {"status": "ok", "mode": "mock"}
-    
+
     # Only use database dependency in non-mock mode
-    from database import SessionLocal
+
     db = SessionLocal()
     try:
         db.execute(text("SELECT 1"))
@@ -140,6 +178,7 @@ def health_check():
         return {"status": "fail"}, 503
     finally:
         db.close()
+
 
 # Readiness check endpoint
 @app.get("/ready")
@@ -151,6 +190,7 @@ def readiness_check():
         return {"migration_head": head, "status": "ready"}
     except Exception as e:
         return {"status": "fail", "error": str(e)}, 503
+
 
 # NOTE: we used to call ``Base.metadata.create_all`` here to ensure the
 # schema matched the models. With Alembic migrations in place that is no
@@ -167,6 +207,7 @@ def start_model_worker():
         if os.getenv("MODEL_WORKER_DISABLED"):
             return
         from services import model_worker
+
         model_worker.start()
     except Exception:
         pass
@@ -176,15 +217,17 @@ def start_model_worker():
 def stop_model_worker():
     try:
         from services import model_worker
+
         model_worker.stop()
     except Exception:
         pass
+
 
 # Redis connection for rate limiting
 # Use a Redis URI string for limits.storage.RedisStorage (it expects a URI)
 redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/1")
 if Redis:
-    redis_rate = Redis(host='localhost', port=6379, db=1)
+    redis_rate = Redis(host="localhost", port=6379, db=1)
 else:
     redis_rate = None
 
@@ -192,14 +235,18 @@ else:
 try:
     limiter = Limiter(key_func=get_remote_address, storage=RedisStorage(redis_url))
 except Exception:
+
     class NoopLimiter:
         def limit(self, limit_string):
             def decorator(func):
                 return func
+
             return decorator
+
     limiter = NoopLimiter()
 
 app.state.limiter = limiter
+
 
 # When mocking (testing), allow unlimited requests; otherwise apply rate limits
 def rate_limit(limit_string):
@@ -208,10 +255,12 @@ def rate_limit(limit_string):
         # Return a no-op decorator that does nothing
         def noop_decorator(func):
             return func
+
         return noop_decorator
     else:
         # Return the real limiter
         return limiter.limit(limit_string)
+
 
 MODEL_WEIGHT = float(os.getenv("MODEL_WEIGHT", 0.85))
 ATS_WEIGHT = float(os.getenv("ATS_WEIGHT", 0.15))
@@ -241,6 +290,7 @@ ORG_PLAN_LIMITS_MONTHLY = {
     "enterprise": int(os.getenv("ORG_ENTERPRISE_MONTHLY", "50000")),
 }
 
+
 class AnalyzeRequest(BaseModel):
     cv_text: str
     job_description: str = ""
@@ -255,6 +305,7 @@ class AnalyzeRequest(BaseModel):
 # USER MANAGEMENT
 # =====================================================
 
+
 def get_or_create_user(db, supabase_id: str, email: str):
     """
     Get existing user or create new one.
@@ -263,11 +314,7 @@ def get_or_create_user(db, supabase_id: str, email: str):
     user = db.query(User).filter(User.supabase_id == supabase_id).first()
 
     if not user:
-        user = User(
-            supabase_id=supabase_id,
-            email=email,
-            plan_type="free"
-        )
+        user = User(supabase_id=supabase_id, email=email, plan_type="free")
         db.add(user)
         db.commit()
         db.refresh(user)
@@ -314,6 +361,7 @@ def _ensure_not_expired(user_payload: dict):
 # HELPERS
 # =====================================================
 
+
 def interpret_score(score):
     if score > 75:
         return "High Match"
@@ -323,13 +371,7 @@ def interpret_score(score):
 
 
 def build_features(
-    semantic,
-    keyword,
-    skill,
-    exp,
-    missing_skills,
-    domain_similarity,
-    ats_score
+    semantic, keyword, skill, exp, missing_skills, domain_similarity, ats_score
 ):
     missing_count = len(missing_skills)
     total_required_skills = missing_count + max(1, int(skill / 20))
@@ -387,34 +429,23 @@ def run_pipeline(cv_text: str, job_description: str):
             semantic_score = 0.0
     keyword_score = keyword_match_score(cv_text, job_description)
 
-    skill_score, missing_skills = skill_coverage_score(
-        cv_text,
-        job_description
-    )
+    skill_score, missing_skills = skill_coverage_score(cv_text, job_description)
 
     # Also extract detected skills from the CV for display
     from services.skill_service import extract_skills
+
     cv_skill_data = extract_skills(cv_text)
     detected_skills = sorted(cv_skill_data["found"])
 
     exp_score = experience_score(cv_text, job_description)
 
     # DOMAIN CREATE / FETCH
-    domain_data = detect_or_create_domain(
-        job_description,
-        job_embedding
-    )
+    domain_data = detect_or_create_domain(job_description, job_embedding)
 
-    domain_similarity = get_domain_similarity(
-        domain_data["domain_id"],
-        job_embedding
-    )
+    domain_similarity = get_domain_similarity(domain_data["domain_id"], job_embedding)
 
     # INDUSTRY + SPECIALIZATION
-    industry_data = detect_industry_and_specialization(
-        job_description,
-        job_embedding
-    )
+    industry_data = detect_industry_and_specialization(job_description, job_embedding)
 
     # ATS DETAILS (detailed breakdown)
     ats_details = analyze_cv(cv_text, job_description, lang=detected_lang)
@@ -428,7 +459,7 @@ def run_pipeline(cv_text: str, job_description: str):
         exp_score,
         missing_skills,
         domain_similarity,
-        ats_score
+        ats_score,
     )
 
     try:
@@ -436,13 +467,15 @@ def run_pipeline(cv_text: str, job_description: str):
     except Exception as e:
         # If model runner failed, log and return conservative defaults
         print("Model prediction error:", str(e))
-        prediction, confidence, risk_level, explanation = 50.0, 50.0, "High Risk", {"error": str(e)}
+        prediction, confidence, risk_level, explanation = (
+            50.0,
+            50.0,
+            "High Risk",
+            {"error": str(e)},
+        )
 
     recommendations = generate_recommendations(
-        missing_skills,
-        semantic_score,
-        keyword_score,
-        lang=detected_lang
+        missing_skills, semantic_score, keyword_score, lang=detected_lang
     )
 
     final_score = (prediction * MODEL_WEIGHT) + (ats_score * ATS_WEIGHT)
@@ -459,7 +492,6 @@ def run_pipeline(cv_text: str, job_description: str):
         if capped != final_score:
             final_score = capped
             interpretation = interpret_score_localized(final_score, detected_lang)
-
 
     return {
         "semantic_score": round(semantic_score, 2),
@@ -482,8 +514,8 @@ def run_pipeline(cv_text: str, job_description: str):
         "industry": industry_data,
         "specialization": {
             "id": industry_data["specialization_id"],
-            "name": industry_data["specialization_name"]
-        }
+            "name": industry_data["specialization_name"],
+        },
     }
 
 
@@ -491,13 +523,14 @@ def run_pipeline(cv_text: str, job_description: str):
 # TEXT ANALYZE
 # =====================================================
 
+
 @app.post("/api/v1/analyze")
 @rate_limit("10/minute")
 def analyze(
     request: Request,
     body: AnalyzeRequest,
     user=Depends(verify_supabase_jwt),
-    db=Depends(get_db)
+    db=Depends(get_db),
 ):
     """
     Analyze CV against job description with JWT authentication.
@@ -528,19 +561,35 @@ def analyze(
     if db_user.role == "recruiter":
         org = None
         if db_user.organization_id:
-            org = db.query(Organization).filter(Organization.id == db_user.organization_id).first()
+            org = (
+                db.query(Organization)
+                .filter(Organization.id == db_user.organization_id)
+                .first()
+            )
         # organization daily/monthly quota based on org.plan_type
         if org:
-            org_daily_limit = ORG_PLAN_LIMITS_DAILY.get(org.plan_type or "free", ORG_PLAN_LIMITS_DAILY["free"])
-            org_monthly_limit = ORG_PLAN_LIMITS_MONTHLY.get(org.plan_type or "free", ORG_PLAN_LIMITS_MONTHLY["free"])
+            org_daily_limit = ORG_PLAN_LIMITS_DAILY.get(
+                org.plan_type or "free", ORG_PLAN_LIMITS_DAILY["free"]
+            )
+            org_monthly_limit = ORG_PLAN_LIMITS_MONTHLY.get(
+                org.plan_type or "free", ORG_PLAN_LIMITS_MONTHLY["free"]
+            )
             if (org.daily_usage or 0) >= org_daily_limit:
-                raise HTTPException(status_code=403, detail="Organization daily limit reached")
+                raise HTTPException(
+                    status_code=403, detail="Organization daily limit reached"
+                )
             if (org.monthly_usage or 0) >= org_monthly_limit:
-                raise HTTPException(status_code=403, detail="Organization monthly limit reached")
+                raise HTTPException(
+                    status_code=403, detail="Organization monthly limit reached"
+                )
     else:
         # individual user quota using plan mapping
-        user_daily_limit = USER_PLAN_LIMITS_DAILY.get(db_user.plan_type or "free", USER_PLAN_LIMITS_DAILY["free"])
-        user_monthly_limit = USER_PLAN_LIMITS_MONTHLY.get(db_user.plan_type or "free", USER_PLAN_LIMITS_MONTHLY["free"])
+        user_daily_limit = USER_PLAN_LIMITS_DAILY.get(
+            db_user.plan_type or "free", USER_PLAN_LIMITS_DAILY["free"]
+        )
+        user_monthly_limit = USER_PLAN_LIMITS_MONTHLY.get(
+            db_user.plan_type or "free", USER_PLAN_LIMITS_MONTHLY["free"]
+        )
         if (db_user.daily_usage or 0) >= user_daily_limit:
             raise HTTPException(status_code=403, detail="Daily limit reached")
         if (db_user.monthly_usage or 0) >= user_monthly_limit:
@@ -559,13 +608,17 @@ def analyze(
         risk_level=result["risk_level"],
         domain_id=int(result["domain"]["domain_id"]),
         industry_id=int(result["industry"]["industry_id"]),
-        specialization_id=int(result["specialization"]["id"])
+        specialization_id=int(result["specialization"]["id"]),
     )
 
     try:
         # increment counters now that the request is allowed
         if db_user.role == "recruiter" and db_user.organization_id:
-            org = db.query(Organization).filter(Organization.id == db_user.organization_id).first()
+            org = (
+                db.query(Organization)
+                .filter(Organization.id == db_user.organization_id)
+                .first()
+            )
             if org:
                 org.daily_usage = (org.daily_usage or 0) + 1
                 org.monthly_usage = (org.monthly_usage or 0) + 1
@@ -612,6 +665,7 @@ def analyze(
 # PDF ANALYZE
 # =====================================================
 
+
 @app.post("/api/v1/analyze-pdf")
 @rate_limit("5/minute")
 async def analyze_pdf(
@@ -619,7 +673,7 @@ async def analyze_pdf(
     file: UploadFile = File(...),
     job_description: str = "",
     user=Depends(verify_supabase_jwt),
-    db=Depends(get_db)
+    db=Depends(get_db),
 ):
     """
     Analyze PDF CV against job description with JWT authentication.
@@ -628,7 +682,6 @@ async def analyze_pdf(
     from fastapi import HTTPException
 
     _ensure_not_expired(user)
-
 
     # In MOCK_SERVICES mode skip DB user creation and quota checks
     # Use the normalized boolean `MOCK_SERVICES_ON` so values like "0" don't
@@ -643,6 +696,7 @@ async def analyze_pdf(
             raise HTTPException(status_code=400, detail="Invalid PDF file")
         try:
             import PyPDF2
+
             pdf_reader = PyPDF2.PdfReader(io.BytesIO(contents))
         except Exception:
             raise HTTPException(status_code=400, detail="Invalid PDF file")
@@ -660,18 +714,30 @@ async def analyze_pdf(
     db_user = get_or_create_user(db, supabase_id, email)
 
     # reset daily counter if a new day has started
-    if db_user.last_reset is None or db_user.last_reset.date() < datetime.utcnow().date():
+    if (
+        db_user.last_reset is None
+        or db_user.last_reset.date() < datetime.utcnow().date()
+    ):
         db_user.daily_usage = 0
         db_user.last_reset = datetime.utcnow()
-
 
     # enforce limits: individual users use personal quota; recruiters use org monthly quota
     if db_user.role == "recruiter":
         org = None
         if db_user.organization_id:
-            org = db.query(Organization).filter(Organization.id == db_user.organization_id).first()
-        if org and org.plan_type == "free" and org.monthly_usage >= ORG_PLAN_LIMITS_MONTHLY["free"]:
-            raise HTTPException(status_code=429, detail="Organization monthly limit reached")
+            org = (
+                db.query(Organization)
+                .filter(Organization.id == db_user.organization_id)
+                .first()
+            )
+        if (
+            org
+            and org.plan_type == "free"
+            and org.monthly_usage >= ORG_PLAN_LIMITS_MONTHLY["free"]
+        ):
+            raise HTTPException(
+                status_code=429, detail="Organization monthly limit reached"
+            )
         # usage increment BEFORE parse
         if org:
             org.daily_usage = (org.daily_usage or 0) + 1
@@ -697,6 +763,7 @@ async def analyze_pdf(
         raise HTTPException(status_code=400, detail="Invalid PDF file")
     try:
         import PyPDF2
+
         pdf_reader = PyPDF2.PdfReader(io.BytesIO(contents))
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid PDF file")
@@ -725,6 +792,7 @@ async def analyze_pdf(
 # HISTORY
 # =====================================================
 
+
 @app.get("/api/v1/history")
 def get_history(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
     """
@@ -735,12 +803,15 @@ def get_history(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
     supabase_id = user.get("user_id")
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
-    
+
     # Return user's analysis records
-    records = db.query(Analysis).filter(
-        Analysis.user_id == db_user.id
-    ).order_by(Analysis.id.desc()).all()
-    
+    records = (
+        db.query(Analysis)
+        .filter(Analysis.user_id == db_user.id)
+        .order_by(Analysis.id.desc())
+        .all()
+    )
+
     return records
 
 
@@ -759,9 +830,7 @@ class SemanticSearchRequest(BaseModel):
 @app.post("/api/v1/semantic-search")
 @rate_limit("20/minute")
 def semantic_search(
-    body: SemanticSearchRequest,
-    user=Depends(verify_supabase_jwt),
-    db=Depends(get_db)
+    body: SemanticSearchRequest, user=Depends(verify_supabase_jwt), db=Depends(get_db)
 ):
     _ensure_not_expired(user)
 
@@ -812,18 +881,26 @@ def semantic_search(
         for cid, score in matches:
             r = rows_map.get(cid)
             if r:
-                candidates.append({
-                    "id": r.id,
-                    "cv_text": (r.cv_text[:200] + '...') if r.cv_text and len(r.cv_text) > 200 else r.cv_text,
-                    "organization_id": r.organization_id,
-                    "score": float(score)
-                })
+                candidates.append(
+                    {
+                        "id": r.id,
+                        "cv_text": (
+                            (r.cv_text[:200] + "...")
+                            if r.cv_text and len(r.cv_text) > 200
+                            else r.cv_text
+                        ),
+                        "organization_id": r.organization_id,
+                        "score": float(score),
+                    }
+                )
 
     return {"matches": candidates}
+
 
 # =====================================================
 # STRIPE WEBHOOK ENDPOINT
 # =====================================================
+
 
 @app.post("/stripe/webhook")
 async def stripe_webhook(request: Request, db=Depends(get_db)):
@@ -834,10 +911,10 @@ async def stripe_webhook(request: Request, db=Depends(get_db)):
     """
     STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "test_secret")
     IS_TEST_MODE = MOCK_SERVICES_ON
-    
+
     payload = await request.body()
     sig_header = request.headers.get("Stripe-Signature", "")
-    
+
     try:
         event = json.loads(payload)
     except Exception as e:
@@ -857,23 +934,31 @@ async def stripe_webhook(request: Request, db=Depends(get_db)):
     # Process event type
     event_type = event.get("type", "")
     data = event.get("data", {})
-    
+
     if event_type == "customer.subscription.updated":
         # Extract Stripe customer ID and subscription details
         obj = data.get("object", {})
         customer_id = obj.get("customer")
         status = obj.get("status")  # active, past_due, canceled, trialing
-        
+
         if customer_id:
             # Update user or organization billing_status and stripe_customer_id
             try:
-                user = db.query(User).filter(User.stripe_customer_id == customer_id).first()
+                user = (
+                    db.query(User)
+                    .filter(User.stripe_customer_id == customer_id)
+                    .first()
+                )
                 if user:
                     user.billing_status = status or "active"
                     db.add(user)
                     db.commit()
                 else:
-                    org = db.query(Organization).filter(Organization.stripe_customer_id == customer_id).first()
+                    org = (
+                        db.query(Organization)
+                        .filter(Organization.stripe_customer_id == customer_id)
+                        .first()
+                    )
                     if org:
                         org.billing_status = status or "active"
                         db.add(org)
@@ -887,13 +972,21 @@ async def stripe_webhook(request: Request, db=Depends(get_db)):
         customer_id = obj.get("customer")
         if customer_id:
             try:
-                user = db.query(User).filter(User.stripe_customer_id == customer_id).first()
+                user = (
+                    db.query(User)
+                    .filter(User.stripe_customer_id == customer_id)
+                    .first()
+                )
                 if user:
                     user.billing_status = "canceled"
                     db.add(user)
                     db.commit()
                 else:
-                    org = db.query(Organization).filter(Organization.stripe_customer_id == customer_id).first()
+                    org = (
+                        db.query(Organization)
+                        .filter(Organization.stripe_customer_id == customer_id)
+                        .first()
+                    )
                     if org:
                         org.billing_status = "canceled"
                         db.add(org)
@@ -905,11 +998,10 @@ async def stripe_webhook(request: Request, db=Depends(get_db)):
     return {"status": "success", "event_type": event_type}
 
 
-
-
 # =====================================================
 # RECRUITER DASHBOARD ENDPOINTS
 # =====================================================
+
 
 def recruiter_required(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
     """Dependency: verify caller is a recruiter by checking DB record."""
@@ -924,7 +1016,9 @@ def recruiter_required(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
 
 
 @app.get("/api/v1/recruiter/candidates")
-def recruiter_candidates(limit: int = 20, db=Depends(get_db), recruiter=Depends(recruiter_required)):
+def recruiter_candidates(
+    limit: int = 20, db=Depends(get_db), recruiter=Depends(recruiter_required)
+):
     """Return recent candidate analyses for the recruiter's organization."""
     org_id = recruiter.organization_id
     if not org_id:
@@ -942,18 +1036,20 @@ def recruiter_candidates(limit: int = 20, db=Depends(get_db), recruiter=Depends(
 
     result = []
     for r in records:
-        result.append({
-            "analysis_id": getattr(r, "id", None),
-            "user_id": getattr(r, "user_id", None),
-            "similarity_score": getattr(r, "similarity_score", None),
-            "interpretation": getattr(r, "interpretation", None),
-            "confidence": getattr(r, "confidence", None),
-            "risk_level": getattr(r, "risk_level", None),
-            "domain_id": getattr(r, "domain_id", None),
-            "industry_id": getattr(r, "industry_id", None),
-            "specialization_id": getattr(r, "specialization_id", None),
-            "created_at": getattr(r, "created_at", None),
-        })
+        result.append(
+            {
+                "analysis_id": getattr(r, "id", None),
+                "user_id": getattr(r, "user_id", None),
+                "similarity_score": getattr(r, "similarity_score", None),
+                "interpretation": getattr(r, "interpretation", None),
+                "confidence": getattr(r, "confidence", None),
+                "risk_level": getattr(r, "risk_level", None),
+                "domain_id": getattr(r, "domain_id", None),
+                "industry_id": getattr(r, "industry_id", None),
+                "specialization_id": getattr(r, "specialization_id", None),
+                "created_at": getattr(r, "created_at", None),
+            }
+        )
 
     return {"candidates": result}
 
@@ -994,32 +1090,40 @@ def recruiter_top_candidates(
             sd = _dt.fromisoformat(start_date)
             query = query.filter(Analysis.created_at >= sd)
         except Exception:
-            raise HTTPException(status_code=400, detail="Invalid start_date format; expected ISO-8601")
+            raise HTTPException(
+                status_code=400, detail="Invalid start_date format; expected ISO-8601"
+            )
 
     if end_date:
         try:
             ed = _dt.fromisoformat(end_date)
             query = query.filter(Analysis.created_at <= ed)
         except Exception:
-            raise HTTPException(status_code=400, detail="Invalid end_date format; expected ISO-8601")
+            raise HTTPException(
+                status_code=400, detail="Invalid end_date format; expected ISO-8601"
+            )
 
     records = query.order_by(Analysis.similarity_score.desc()).limit(limit).all()
 
     result = []
     for r in records:
-        result.append({
-            "analysis_id": getattr(r, "id", None),
-            "user_id": getattr(r, "user_id", None),
-            "final_score": getattr(r, "similarity_score", None),
-            "interpretation": getattr(r, "interpretation", None),
-            "created_at": getattr(r, "created_at", None),
-        })
+        result.append(
+            {
+                "analysis_id": getattr(r, "id", None),
+                "user_id": getattr(r, "user_id", None),
+                "final_score": getattr(r, "similarity_score", None),
+                "interpretation": getattr(r, "interpretation", None),
+                "created_at": getattr(r, "created_at", None),
+            }
+        )
 
     return {"top_candidates": result}
 
 
 @app.get("/api/v1/recruiter/candidate/{analysis_id}")
-def recruiter_candidate_detail(analysis_id: int, db=Depends(get_db), recruiter=Depends(recruiter_required)):
+def recruiter_candidate_detail(
+    analysis_id: int, db=Depends(get_db), recruiter=Depends(recruiter_required)
+):
     """Return full analysis detail for a single candidate (scoped to org)."""
     org_id = recruiter.organization_id
     if not org_id:
@@ -1046,10 +1150,11 @@ def recruiter_candidate_detail(analysis_id: int, db=Depends(get_db), recruiter=D
         "industry_id": getattr(analysis, "industry_id", None),
         "specialization_id": getattr(analysis, "specialization_id", None),
         "created_at": getattr(analysis, "created_at", None),
-        "raw": {"ats": getattr(analysis, "ats", None)}
+        "raw": {"ats": getattr(analysis, "ats", None)},
     }
 
     return payload
+
 
 @app.get("/api/v1/task-status/{task_id}")
 def get_task_status(task_id: str):
@@ -1057,10 +1162,18 @@ def get_task_status(task_id: str):
     try:
         from celery.result import AsyncResult
     except Exception:
-        return {"task_id": task_id, "status": "unavailable", "note": "Celery not configured"}
+        return {
+            "task_id": task_id,
+            "status": "unavailable",
+            "note": "Celery not configured",
+        }
 
     if not celery_app:
-        return {"task_id": task_id, "status": "unavailable", "note": "Celery backend not configured"}
+        return {
+            "task_id": task_id,
+            "status": "unavailable",
+            "note": "Celery backend not configured",
+        }
 
     result = AsyncResult(task_id, app=celery_app)
     response = {"task_id": task_id, "status": result.status}

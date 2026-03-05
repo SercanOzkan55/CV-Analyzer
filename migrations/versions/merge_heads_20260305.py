@@ -8,14 +8,16 @@ This is an auto-generated merge revision to combine two heads so Alembic
 can apply a single linear head. The revision intentionally performs no
 schema changes; it only stitches the history together.
 """
+
 from typing import Sequence, Union
 
-from alembic import op
-import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision: str = 'merge_heads_20260305'
-down_revision: Union[str, Sequence[str], None] = ('e3f347de40ef', 'af3b9c_pgvector_embeddings')
+revision: str = "merge_heads_20260305"
+down_revision: Union[str, Sequence[str], None] = (
+    "e3f347de40ef",
+    "af3b9c_pgvector_embeddings",
+)
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

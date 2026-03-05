@@ -1,4 +1,3 @@
-import pytest
 
 
 def test_file_type_enforcement(client):

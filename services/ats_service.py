@@ -3,21 +3,39 @@ from typing import Dict, List
 
 from .keyword_service import keyword_match_score
 
-
 # ── Section detection ────────────────────────────────────────────────
 
 COMMON_SECTIONS = [
-    "contact", "contact information",
-    "summary", "professional summary", "profile", "objective",
-    "experience", "work experience", "professional experience", "employment",
-    "education", "academic background",
-    "skills", "technical skills", "core competencies", "competencies",
-    "projects", "key projects",
-    "certifications", "certificates", "licenses",
-    "achievements", "awards", "honors",
-    "languages", "language skills",
-    "publications", "research",
-    "volunteer", "volunteering",
+    "contact",
+    "contact information",
+    "summary",
+    "professional summary",
+    "profile",
+    "objective",
+    "experience",
+    "work experience",
+    "professional experience",
+    "employment",
+    "education",
+    "academic background",
+    "skills",
+    "technical skills",
+    "core competencies",
+    "competencies",
+    "projects",
+    "key projects",
+    "certifications",
+    "certificates",
+    "licenses",
+    "achievements",
+    "awards",
+    "honors",
+    "languages",
+    "language skills",
+    "publications",
+    "research",
+    "volunteer",
+    "volunteering",
     "references",
 ]
 
@@ -32,45 +50,114 @@ MIN_REQUIRED_SECTIONS = [
 
 ACTION_VERBS = [
     # Leadership
-    "led", "managed", "directed", "supervised", "coordinated", "oversaw",
-    "spearheaded", "orchestrated", "mentored", "coached",
+    "led",
+    "managed",
+    "directed",
+    "supervised",
+    "coordinated",
+    "oversaw",
+    "spearheaded",
+    "orchestrated",
+    "mentored",
+    "coached",
     # Achievement
-    "achieved", "exceeded", "surpassed", "earned", "won", "awarded",
+    "achieved",
+    "exceeded",
+    "surpassed",
+    "earned",
+    "won",
+    "awarded",
     # Creation
-    "created", "built", "designed", "developed", "established", "founded",
-    "launched", "initiated", "introduced", "pioneered",
+    "created",
+    "built",
+    "designed",
+    "developed",
+    "established",
+    "founded",
+    "launched",
+    "initiated",
+    "introduced",
+    "pioneered",
     # Improvement
-    "improved", "enhanced", "optimized", "streamlined", "upgraded",
-    "refactored", "modernized", "revamped", "transformed", "accelerated",
+    "improved",
+    "enhanced",
+    "optimized",
+    "streamlined",
+    "upgraded",
+    "refactored",
+    "modernized",
+    "revamped",
+    "transformed",
+    "accelerated",
     # Analysis
-    "analyzed", "assessed", "evaluated", "researched", "investigated",
-    "identified", "diagnosed", "audited", "reviewed", "benchmarked",
+    "analyzed",
+    "assessed",
+    "evaluated",
+    "researched",
+    "investigated",
+    "identified",
+    "diagnosed",
+    "audited",
+    "reviewed",
+    "benchmarked",
     # Delivery
-    "delivered", "implemented", "executed", "deployed", "shipped",
-    "completed", "resolved", "configured", "maintained",
+    "delivered",
+    "implemented",
+    "executed",
+    "deployed",
+    "shipped",
+    "completed",
+    "resolved",
+    "configured",
+    "maintained",
     # Growth
-    "increased", "expanded", "scaled", "grew", "generated", "boosted",
+    "increased",
+    "expanded",
+    "scaled",
+    "grew",
+    "generated",
+    "boosted",
     # Reduction
-    "reduced", "decreased", "minimized", "eliminated", "consolidated",
-    "cut", "saved",
+    "reduced",
+    "decreased",
+    "minimized",
+    "eliminated",
+    "consolidated",
+    "cut",
+    "saved",
     # Communication
-    "presented", "communicated", "negotiated", "collaborated", "facilitated",
-    "documented", "reported", "trained", "taught", "educated",
+    "presented",
+    "communicated",
+    "negotiated",
+    "collaborated",
+    "facilitated",
+    "documented",
+    "reported",
+    "trained",
+    "taught",
+    "educated",
     # Technical
-    "engineered", "architected", "programmed", "automated", "integrated",
-    "migrated", "containerized", "provisioned", "instrumented",
+    "engineered",
+    "architected",
+    "programmed",
+    "automated",
+    "integrated",
+    "migrated",
+    "containerized",
+    "provisioned",
+    "instrumented",
 ]
 
 
 # ── Quantification patterns (numbers, percentages, metrics) ──────────
 
 QUANTIFICATION_PATTERNS = [
-    r'\b\d+%',                              # 25%, 150%
-    r'\$[\d,]+(?:\.\d+)?[KkMmBb]?\b',     # $50K, $1.2M
-    r'\b\d+(?:,\d{3})+\b',                 # 1,000  10,000
-    r'\b\d+[KkMm]\+?',                      # 50K, 2M, 2M+
-    r'\b(?:top|first)\s+\d+',              # top 10, first 3
-    r'\b\d+x\b',                            # 3x, 10x
+    r"\b\d+%",  # 25%, 150%
+    r"\$[\d,]+(?:\.\d+)?[KkMmBb]?\b",  # $50K, $1.2M
+    r"\b\d+(?:,\d{3})+\b",  # 1,000  10,000
+    r"\b\d+[KkMm]\+?",  # 50K, 2M, 2M+
+    r"\b(?:top|first)\s+\d+",  # top 10, first 3
+    r"\b\d+x\b",  # 3x, 10x
 ]
 
 
@@ -150,7 +237,9 @@ def _action_verb_score(cv_text: str) -> float:
             total_hits += hits
 
     # Score based on both diversity and frequency
-    diversity_score = min(100.0, (len(found_verbs) / 10.0) * 100)  # 10+ unique verbs = 100
+    diversity_score = min(
+        100.0, (len(found_verbs) / 10.0) * 100
+    )  # 10+ unique verbs = 100
     frequency_score = min(100.0, (total_hits / 15.0) * 100)  # 15+ uses = 100
 
     score = 0.6 * diversity_score + 0.4 * frequency_score
@@ -187,7 +276,9 @@ def _formatting_consistency_score(cv_text: str) -> float:
 
     # 1) Date format consistency — penalize mixing "Jan 2020" and "01/2020" etc.
     date_formats_found = set()
-    if re.search(r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{4}", cv_text):
+    if re.search(
+        r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{4}", cv_text
+    ):
         date_formats_found.add("month_word")
     if re.search(r"\b\d{1,2}/\d{4}\b", cv_text):
         date_formats_found.add("mm_yyyy")
@@ -257,7 +348,12 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
     for pattern in QUANTIFICATION_PATTERNS:
         quant_hits += len(re.findall(pattern, cv_text))
     # Also count simple numbers followed by context words
-    quant_hits += len(re.findall(r'\b\d+\s+(?:users|clients|customers|projects|team members|employees|servers|applications|features|releases|deployments|endpoints|repositories|databases|microservices)\b', cv_text.lower()))
+    quant_hits += len(
+        re.findall(
+            r"\b\d+\s+(?:users|clients|customers|projects|team members|employees|servers|applications|features|releases|deployments|endpoints|repositories|databases|microservices)\b",
+            cv_text.lower(),
+        )
+    )
     achievement_score = float(min(100.0, quant_hits * 12))
 
     # Layout / structure
@@ -302,7 +398,9 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
 
     # Apply content-level scoring. If no job_text, rely more on action/achievement.
     if job_text and job_text.strip():
-        content_score = (0.6 * keyword_score) + (0.2 * action_score) + (0.2 * achievement_score)
+        content_score = (
+            (0.6 * keyword_score) + (0.2 * action_score) + (0.2 * achievement_score)
+        )
         content_score += penalty
     else:
         content_score = (0.5 * action_score) + (0.5 * achievement_score)
@@ -315,8 +413,7 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
 
     # Weighted overall: content 55%, layout 25%, formatting 20%
     overall = round(
-        0.55 * content_score + 0.25 * layout_score + 0.20 * formatting_score,
-        2
+        0.55 * content_score + 0.25 * layout_score + 0.20 * formatting_score, 2
     )
 
     from .language_service import get_ats_suggestion

@@ -1,7 +1,8 @@
+import hashlib
+import json
 import os
 import sys
-import json
-import hashlib
+
 import joblib
 import numpy as np
 
@@ -41,7 +42,7 @@ def explain_prediction(model, features):
         "missing_ratio",
         "semantic_skill_interaction",
         "keyword_skill_interaction",
-        "balance_score"
+        "balance_score",
     ]
     importances = getattr(model, "feature_importances_", None)
     if importances is None:
@@ -60,7 +61,7 @@ def explain_prediction(model, features):
     return {
         "strong_areas": strong,
         "weak_areas": weak,
-        "key_driver": FEATURE_LABELS[contributions[0][0]]
+        "key_driver": FEATURE_LABELS[contributions[0][0]],
     }
 
 
@@ -104,7 +105,7 @@ def main():
             "prediction": pred,
             "confidence": confidence,
             "risk_level": risk,
-            "explanation": explanation
+            "explanation": explanation,
         }
         sys.stdout.write(json.dumps(out))
     except Exception as e:

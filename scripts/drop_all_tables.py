@@ -1,9 +1,11 @@
-import os, sys
+import os
+import sys
+
 # ensure project root is on path
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
-from database import engine, Base
+from database import Base, engine
 
 # WARNING: This will drop ALL tables in the configured database.
 # Only run on development/test databases!

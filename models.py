@@ -1,8 +1,12 @@
-from sqlalchemy import Column, Integer, Float, Text, TIMESTAMP, String, DateTime, ForeignKey, Enum
+from datetime import datetime
+
+from sqlalchemy import (TIMESTAMP, Column, DateTime, Enum, Float, ForeignKey,
+                        Integer, String, Text)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from datetime import datetime
+
 from database import Base
+
 try:
     from pgvector.sqlalchemy import Vector
 except Exception:
@@ -18,14 +22,22 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     supabase_id = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, index=True, nullable=False)
-    plan_type = Column(Enum(*PLAN_TYPES, name="plan_type_enum"), default="free", nullable=False)
-    billing_status = Column(Enum(*BILLING_STATUSES, name="billing_status_enum"), default="trialing", nullable=False)
+    plan_type = Column(
+        Enum(*PLAN_TYPES, name="plan_type_enum"), default="free", nullable=False
+    )
+    billing_status = Column(
+        Enum(*BILLING_STATUSES, name="billing_status_enum"),
+        default="trialing",
+        nullable=False,
+    )
     stripe_customer_id = Column(String, nullable=True, index=True)
     daily_usage = Column(Integer, default=0)
     monthly_usage = Column(Integer, default=0)
     last_reset = Column(DateTime, nullable=True)
     role = Column(String, default="individual")
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
+    organization_id = Column(
+        Integer, ForeignKey("organizations.id"), nullable=True, index=True
+    )
     organization = relationship("Organization", back_populates="users")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -47,7 +59,9 @@ class Analysis(Base):
     industry_id = Column(Integer)
     specialization_id = Column(Integer)
 
-    created_at = Column(TIMESTAMP(timezone=False), server_default=func.now(), index=True)
+    created_at = Column(
+        TIMESTAMP(timezone=False), server_default=func.now(), index=True
+    )
 
 
 class Organization(Base):
@@ -59,8 +73,14 @@ class Organization(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
     domain = Column(String, nullable=False, unique=True, index=True)
-    plan_type = Column(Enum(*PLAN_TYPES, name="org_plan_type_enum"), default="free", nullable=False)
-    billing_status = Column(Enum(*BILLING_STATUSES, name="org_billing_status_enum"), default="trialing", nullable=False)
+    plan_type = Column(
+        Enum(*PLAN_TYPES, name="org_plan_type_enum"), default="free", nullable=False
+    )
+    billing_status = Column(
+        Enum(*BILLING_STATUSES, name="org_billing_status_enum"),
+        default="trialing",
+        nullable=False,
+    )
     stripe_customer_id = Column(String, nullable=True, index=True)
     daily_usage = Column(Integer, default=0)
     monthly_usage = Column(Integer, default=0)
@@ -73,7 +93,9 @@ class Candidate(Base):
     __tablename__ = "candidates"
 
     id = Column(Integer, primary_key=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
+    organization_id = Column(
+        Integer, ForeignKey("organizations.id"), nullable=True, index=True
+    )
     cv_text = Column(Text, nullable=True)
     # cv_embedding will be `vector(1536)` in Postgres when pgvector is installed
     if Vector is not None:
@@ -87,7 +109,9 @@ class Job(Base):
     __tablename__ = "jobs"
 
     id = Column(Integer, primary_key=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
+    organization_id = Column(
+        Integer, ForeignKey("organizations.id"), nullable=True, index=True
+    )
     raw_text = Column(Text, nullable=True)
     if Vector is not None:
         job_embedding = Column(Vector(1536), nullable=True)

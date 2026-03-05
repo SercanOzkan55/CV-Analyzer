@@ -5,12 +5,12 @@ Revises: add_billing_status_to_organizations
 Create Date: 2026-03-04 12:00:00
 
 """
+
 from alembic import op
-import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = 'af3b9c_pgvector_embeddings'
-down_revision = 'add_billing_status_to_organizations'
+revision = "af3b9c_pgvector_embeddings"
+down_revision = "add_billing_status_to_organizations"
 branch_labels = None
 depends_on = None
 
@@ -31,9 +31,7 @@ def upgrade():
     )
 
     # Add job_embedding column to existing jobs table if missing
-    op.execute(
-        "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS job_embedding vector(1536);"
-    )
+    op.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS job_embedding vector(1536);")
 
     # Create ivfflat indexes for efficient similarity search
     op.execute(

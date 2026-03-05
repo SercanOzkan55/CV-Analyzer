@@ -1,6 +1,6 @@
 import importlib
-import pytest
 import sys
+
 
 
 def test_run_pipeline_happy_path(sample_texts):
@@ -13,6 +13,7 @@ def test_run_pipeline_happy_path(sample_texts):
 def test_run_pipeline_embedding_none(monkeypatch, sample_texts):
     # Simulate embedding service returning None
     import importlib
+
     # ensure the submodule is importable so monkeypatch.resolve can find it
     importlib.import_module("services.embedding_service")
     monkeypatch.setattr("services.embedding_service.get_embedding", lambda text: None)

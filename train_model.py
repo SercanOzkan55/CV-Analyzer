@@ -1,9 +1,9 @@
-import numpy as np
 import joblib
+import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.model_selection import train_test_split
 
 X = []
 y = []
@@ -23,26 +23,28 @@ for _ in range(1000):
     noise = np.random.normal(0, 5)
 
     weighted_score = (
-        semantic * 0.35 +
-        keyword * 0.2 +
-        skill * 0.25 +
-        exp * 0.1 -
-        missing_ratio * 30 +
-        (semantic * skill / 200) +
-        noise
+        semantic * 0.35
+        + keyword * 0.2
+        + skill * 0.25
+        + exp * 0.1
+        - missing_ratio * 30
+        + (semantic * skill / 200)
+        + noise
     )
 
-    X.append([
-        semantic,
-        keyword,
-        skill,
-        exp,
-        missing_count,
-        missing_ratio,
-        semantic * skill / 100,
-        keyword * skill / 100,
-        abs(semantic - skill)
-    ])
+    X.append(
+        [
+            semantic,
+            keyword,
+            skill,
+            exp,
+            missing_count,
+            missing_ratio,
+            semantic * skill / 100,
+            keyword * skill / 100,
+            abs(semantic - skill),
+        ]
+    )
 
     y.append(weighted_score)
 
@@ -76,15 +78,14 @@ feature_names = [
     "missing_ratio",
     "semantic_skill_interaction",
     "keyword_skill_interaction",
-    "balance_score"
+    "balance_score",
 ]
 
 importances = model.feature_importances_
 
-importance_df = pd.DataFrame({
-    "feature": feature_names,
-    "importance": importances
-}).sort_values(by="importance", ascending=False)
+importance_df = pd.DataFrame(
+    {"feature": feature_names, "importance": importances}
+).sort_values(by="importance", ascending=False)
 
 print("\nFeature Importance:")
 print(importance_df)

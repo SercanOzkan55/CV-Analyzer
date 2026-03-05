@@ -1,4 +1,3 @@
-import pytest
 
 
 def test_path_traversal_upload(client):

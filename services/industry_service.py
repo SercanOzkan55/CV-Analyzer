@@ -1,9 +1,11 @@
-import os
-import psycopg2
 import ast
+import os
+
+import psycopg2
 from dotenv import load_dotenv
-from .embedding_service import get_embedding
+
 from .domain_service import detect_or_create_domain
+from .embedding_service import get_embedding
 from .naming_service import generate_primary_name, generate_specialization_name
 
 load_dotenv()
@@ -12,10 +14,12 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 # helper to adapt for psycopg2
 
+
 def _clean_psycopg2_url(url):
     if url and url.startswith("postgresql+psycopg2://"):
         return url.replace("postgresql+psycopg2://", "postgresql://", 1)
     return url
+
 
 CLEAN_DB_URL = _clean_psycopg2_url(DATABASE_URL)
 
@@ -33,7 +37,7 @@ def detect_industry_and_specialization(job_text, embedding=None):
             "industry_id": 1,
             "industry_name": "Technology",
             "specialization_id": 1,
-            "specialization_name": "Software Development"
+            "specialization_name": "Software Development",
         }
 
     if embedding is None:
@@ -48,13 +52,16 @@ def detect_industry_and_specialization(job_text, embedding=None):
     domain_name = domain_data.get("domain_name")
 
     # ===================== 2️⃣ INDUSTRY =====================
-    cur.execute("""
+    cur.execute(
+        """
         SELECT id, name, 1 - (centroid <=> %s::vector) AS similarity
         FROM industries
         WHERE domain_id = %s
         ORDER BY centroid <=> %s::vector
         LIMIT 1;
-    """, (embedding, domain_id, embedding))
+    """,
+        (embedding, domain_id, embedding),
+    )
 
     industry = cur.fetchone()
 
@@ -65,22 +72,28 @@ def detect_industry_and_specialization(job_text, embedding=None):
     else:
         industry_name = generate_primary_name(job_text)
 
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO industries (domain_id, name, centroid)
             VALUES (%s, %s, %s)
             RETURNING id;
-        """, (domain_id, industry_name, embedding))
+        """,
+            (domain_id, industry_name, embedding),
+        )
 
         industry_id = cur.fetchone()[0]
 
     # ===================== 3️⃣ SPECIALIZATION =====================
-    cur.execute("""
+    cur.execute(
+        """
         SELECT id, name, 1 - (centroid <=> %s::vector) AS similarity
         FROM specializations
         WHERE industry_id = %s
         ORDER BY centroid <=> %s::vector
         LIMIT 1;
-    """, (embedding, industry_id, embedding))
+    """,
+        (embedding, industry_id, embedding),
+    )
 
     spec = cur.fetchone()
 
@@ -91,11 +104,14 @@ def detect_industry_and_specialization(job_text, embedding=None):
     else:
         specialization_name = generate_specialization_name(job_text)
 
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO specializations (industry_id, name, centroid)
             VALUES (%s, %s, %s)
             RETURNING id;
-        """, (industry_id, specialization_name, embedding))
+        """,
+            (industry_id, specialization_name, embedding),
+        )
 
         specialization_id = cur.fetchone()[0]
 
@@ -108,7 +124,7 @@ def detect_industry_and_specialization(job_text, embedding=None):
         "industry_id": industry_id,
         "industry_name": industry_name,
         "specialization_id": specialization_id,
-        "specialization_name": specialization_name
+        "specialization_name": specialization_name,
     }
 
 
@@ -118,8 +134,7 @@ def detect_industry_and_specialization(job_text, embedding=None):
 def update_industry_centroid(cur, industry_id, embedding):
 
     cur.execute(
-        "SELECT centroid, sample_count FROM industries WHERE id = %s;",
-        (industry_id,)
+        "SELECT centroid, sample_count FROM industries WHERE id = %s;", (industry_id,)
     )
 
     row = cur.fetchone()
@@ -133,23 +148,25 @@ def update_industry_centroid(cur, industry_id, embedding):
     centroid = list(centroid)
 
     updated = [
-        (float(c) * count + float(e)) / (count + 1)
-        for c, e in zip(centroid, embedding)
+        (float(c) * count + float(e)) / (count + 1) for c, e in zip(centroid, embedding)
     ]
 
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE industries
         SET centroid = %s,
             sample_count = sample_count + 1
         WHERE id = %s;
-    """, (updated, industry_id))
+    """,
+        (updated, industry_id),
+    )
 
 
 def update_specialization_centroid(cur, specialization_id, embedding):
 
     cur.execute(
         "SELECT centroid, sample_count FROM specializations WHERE id = %s;",
-        (specialization_id,)
+        (specialization_id,),
     )
 
     row = cur.fetchone()
@@ -162,13 +179,15 @@ def update_specialization_centroid(cur, specialization_id, embedding):
     centroid = list(centroid)
 
     updated = [
-        (float(c) * count + float(e)) / (count + 1)
-        for c, e in zip(centroid, embedding)
+        (float(c) * count + float(e)) / (count + 1) for c, e in zip(centroid, embedding)
     ]
 
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE specializations
         SET centroid = %s,
             sample_count = sample_count + 1
         WHERE id = %s;
-    """, (updated, specialization_id))
+    """,
+        (updated, specialization_id),
+    )
