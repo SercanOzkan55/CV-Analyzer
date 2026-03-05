@@ -12,6 +12,7 @@ import hashlib
 from datetime import datetime
 
 from fastapi import FastAPI, Depends, Request, UploadFile, File, Header, HTTPException
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 try:
@@ -39,6 +40,7 @@ from services.experience_service import experience_score
 from services.model_service import predict_match
 from services.recommendation_service import generate_recommendations
 from services.industry_service import detect_industry_and_specialization
+from services.language_service import detect_language, interpret_score_localized, localize_risk_level
 from services.domain_service import detect_or_create_domain, get_domain_similarity
 from services.ats_service import analyze_cv
 from services.tasks import celery_app, analyze_pdf_task
@@ -62,11 +64,21 @@ if Instrumentator:
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("CORS_ORIGINS", "https://yourdomain.com")],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        os.getenv("CORS_ORIGINS", "https://yourdomain.com")
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
 )
+
+# Serve repository files under /static for debugging (e.g. /static/main.py)
+# Note: in production you may want to disable this or protect it behind an env var.
+app.mount("/static", StaticFiles(directory=os.path.dirname(__file__)), name="static")
 
 # Security headers middleware
 @app.middleware("http")
@@ -114,12 +126,20 @@ async def log_requests(request, call_next):
 
 # Health check endpoint
 @app.get("/health")
-def health_check(db=Depends(get_db)):
+def health_check():
+    if MOCK_SERVICES_ON:
+        return {"status": "ok", "mode": "mock"}
+    
+    # Only use database dependency in non-mock mode
+    from database import SessionLocal
+    db = SessionLocal()
     try:
         db.execute(text("SELECT 1"))
         return {"status": "ok"}
     except Exception:
         return {"status": "fail"}, 503
+    finally:
+        db.close()
 
 # Readiness check endpoint
 @app.get("/ready")
@@ -341,6 +361,9 @@ def run_pipeline(cv_text: str, job_description: str):
     if not isinstance(job_description, str):
         job_description = ""
 
+    # Detect the language of the CV text for localized results
+    detected_lang = detect_language(cv_text)
+
     # Truncate extremely large inputs to avoid resource exhaustion
     MAX_CV_LEN = 200_000
     MAX_JOB_LEN = 100_000
@@ -369,6 +392,11 @@ def run_pipeline(cv_text: str, job_description: str):
         job_description
     )
 
+    # Also extract detected skills from the CV for display
+    from services.skill_service import extract_skills
+    cv_skill_data = extract_skills(cv_text)
+    detected_skills = sorted(cv_skill_data["found"])
+
     exp_score = experience_score(cv_text, job_description)
 
     # DOMAIN CREATE / FETCH
@@ -389,7 +417,7 @@ def run_pipeline(cv_text: str, job_description: str):
     )
 
     # ATS DETAILS (detailed breakdown)
-    ats_details = analyze_cv(cv_text, job_description)
+    ats_details = analyze_cv(cv_text, job_description, lang=detected_lang)
     ats_score = ats_details.get("overall_score", 0)
 
     # FEATURES
@@ -413,12 +441,16 @@ def run_pipeline(cv_text: str, job_description: str):
     recommendations = generate_recommendations(
         missing_skills,
         semantic_score,
-        keyword_score
+        keyword_score,
+        lang=detected_lang
     )
 
     final_score = (prediction * MODEL_WEIGHT) + (ats_score * ATS_WEIGHT)
     final_score = round(float(final_score), 2)
-    interpretation = interpret_score(final_score)
+    interpretation = interpret_score_localized(final_score, detected_lang)
+
+    # Localize risk level
+    risk_level = localize_risk_level(risk_level, detected_lang)
 
     # If embeddings failed for this request, apply conservative cap to avoid
     # manipulation via embedding failures. Also expose a flag for observability.
@@ -426,7 +458,7 @@ def run_pipeline(cv_text: str, job_description: str):
         capped = min(final_score, 40.0)
         if capped != final_score:
             final_score = capped
-            interpretation = interpret_score(final_score)
+            interpretation = interpret_score_localized(final_score, detected_lang)
 
 
     return {
@@ -437,11 +469,13 @@ def run_pipeline(cv_text: str, job_description: str):
         "ats_score": ats_score,
         "ats": ats_details,
         "domain_similarity": round(domain_similarity, 2),
+        "detected_skills": detected_skills,
         "missing_skills": missing_skills,
         "final_score": final_score,
         "interpretation": interpretation,
         "confidence": float(confidence),
         "risk_level": risk_level,
+        "detected_language": detected_lang,
         "explanation": explanation,
         "recommendations": recommendations,
         "domain": domain_data,
@@ -672,8 +706,18 @@ async def analyze_pdf(
         if extracted:
             text += extracted
 
-    # Queue the analysis job
+    # Queue the analysis job (or run synchronously in LocalTask fallback)
     task = analyze_pdf_task.delay(text, job_description)
+
+    # If the task ran synchronously (LocalTask), the wrapper returns a
+    # DummyResult with `.status` and `.result` attributes — return the
+    # actual analysis result immediately in that case for a better UX.
+    try:
+        if getattr(task, "status", None) == "SUCCESS" and hasattr(task, "result"):
+            return task.result
+    except Exception:
+        pass
+
     return {"task_id": task.id, "status": "queued"}
 
 
