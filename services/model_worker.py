@@ -61,9 +61,9 @@ def _worker_loop(task_q: Queue, res_q: Queue, model_path: str, onnx_path: str):
                     res = {"prediction": pred_val, "confidence": 50.0, "risk_level": "Low Risk", "explanation": {}}
             else:
                 res = {"error": "model not loaded"}
-            except Exception as e:
-                logger.exception(json.dumps({"event": "prediction_error", "error": str(e)}))
-                res = {"error": str(e)}
+        except Exception as e:
+            logger.exception(json.dumps({"event": "prediction_error", "error": str(e)}))
+            res = {"error": str(e)}
 
         res_q.put((req_id, res))
 

@@ -27,7 +27,16 @@ if DATABASE_URL and "supabase.com" in DATABASE_URL:
 
 # Environment-based engine configuration
 from sqlalchemy.pool import StaticPool
-if ENV == "test":
+
+# Skip database engine creation in mock mode to avoid connection attempts
+if os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes"):
+    # Create a dummy engine for mock mode
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool
+    )
+elif ENV == "test":
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -64,6 +73,30 @@ def get_db():
     Use this function as a FastAPI dependency so that every request gets
     a fresh session that is cleaned up automatically.
     """
+    # In mock mode, return a fake session to avoid database connections
+    if os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes"):
+        class MockSession:
+            def add(self, obj): pass
+            def commit(self): pass
+            def rollback(self): pass
+            def refresh(self, obj): pass
+            def query(self, model): return MockQuery()
+            def execute(self, statement): return MockResult()
+            def close(self): pass
+            
+        class MockQuery:
+            def filter(self, *args): return self
+            def first(self): return None
+            def all(self): return []
+            def order_by(self, *args): return self
+            
+        class MockResult:
+            def fetchone(self): return None
+            def fetchall(self): return []
+        
+        yield MockSession()
+        return
+    
     db = SessionLocal()
     try:
         yield db
