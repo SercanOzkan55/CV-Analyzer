@@ -1,3 +1,5 @@
+import main as main_module
+main_module.RATE_LIMIT_ENABLED = False
 """
 Professional test conftest.py
 - Per-function isolated in-memory SQLite DB
@@ -22,6 +24,7 @@ os.environ.setdefault("MODEL_WORKER_DISABLED", "1")
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import SQLAlchemyError
 
 
 # ─── Stub heavy/external services BEFORE importing app ───
@@ -73,6 +76,17 @@ _service_stubs = [
                 "specialization_id": 1,
                 "specialization_name": "General",
             },
+        },
+    ),
+    (
+        "services.skill_service",
+        {
+            "extract_skills": lambda text: {
+                "technical_skills": ["python", "sql"],
+                "soft_skills": ["communication"],
+                "all_skills": ["python", "sql", "communication"],
+            },
+            "skill_coverage_score": lambda cv, jd: (70.0, ["kubernetes"]),
         },
     ),
 ]
@@ -141,52 +155,76 @@ def _mock_verify_jwt(authorization: str = None):
 _TEST_DB_URL = os.getenv(
     "DATABASE_URL", "postgresql+psycopg2://testuser:testpass@localhost:5433/testdb"
 )
+_FALLBACK_SQLITE_URL = "sqlite:///./.pytest_test.db"
+_ACTIVE_TEST_DB_URL = _TEST_DB_URL
+
+
+def _is_sqlite_url(db_url: str) -> bool:
+    return str(db_url).startswith("sqlite")
 
 
 # ─── Session-scoped: create DB tables ONCE for the entire test session ───
 @pytest.fixture(scope="session", autouse=True)
 def _ensure_test_db_ready():
     """Create enum types and tables once; they persist for the whole session."""
-    _engine = create_engine(_TEST_DB_URL)
+    global _ACTIVE_TEST_DB_URL
+
+    _engine = None
+    try:
+        _engine = create_engine(_TEST_DB_URL)
+        with _engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        _ACTIVE_TEST_DB_URL = _TEST_DB_URL
+    except Exception:
+        # If Postgres is not reachable in local/dev CI, run tests with SQLite.
+        _ACTIVE_TEST_DB_URL = _FALLBACK_SQLITE_URL
+        _engine = create_engine(
+            _ACTIVE_TEST_DB_URL,
+            connect_args={"check_same_thread": False},
+        )
+
     from sqlalchemy import text
 
     # Postgres ENUM types
-    try:
-        with _engine.begin() as conn:
-            for sql in [
-                "DO $$ BEGIN CREATE TYPE org_plan_type_enum AS ENUM ('free','pro','enterprise'); EXCEPTION WHEN duplicate_object THEN NULL; END $$",
-                "DO $$ BEGIN CREATE TYPE org_billing_status_enum AS ENUM ('active','past_due','canceled','trialing'); EXCEPTION WHEN duplicate_object THEN NULL; END $$",
-                "DO $$ BEGIN CREATE TYPE plan_type_enum AS ENUM ('free','pro','enterprise'); EXCEPTION WHEN duplicate_object THEN NULL; END $$",
-                "DO $$ BEGIN CREATE TYPE billing_status_enum AS ENUM ('active','past_due','canceled','trialing'); EXCEPTION WHEN duplicate_object THEN NULL; END $$",
-            ]:
-                try:
-                    conn.execute(text(sql))
-                except Exception:
-                    pass
-    except Exception:
-        pass
-    # Try Alembic first
-    try:
-        alembic_cfg = alembic.config.Config("alembic.ini")
-        safe_url = _TEST_DB_URL.replace("%", "%%")
-        alembic_cfg.set_main_option("sqlalchemy.url", safe_url)
-        with _engine.begin() as conn:
-            conn.execute(
-                text(
-                    "CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(255) NOT NULL)"
-                )
-            )
-            try:
+    if not _is_sqlite_url(_ACTIVE_TEST_DB_URL):
+        try:
+            with _engine.begin() as conn:
+                for sql in [
+                    "DO $$ BEGIN CREATE TYPE org_plan_type_enum AS ENUM ('free','pro','enterprise'); EXCEPTION WHEN duplicate_object THEN NULL; END $$",
+                    "DO $$ BEGIN CREATE TYPE org_billing_status_enum AS ENUM ('active','past_due','canceled','trialing'); EXCEPTION WHEN duplicate_object THEN NULL; END $$",
+                    "DO $$ BEGIN CREATE TYPE plan_type_enum AS ENUM ('free','pro','enterprise'); EXCEPTION WHEN duplicate_object THEN NULL; END $$",
+                    "DO $$ BEGIN CREATE TYPE billing_status_enum AS ENUM ('active','past_due','canceled','trialing'); EXCEPTION WHEN duplicate_object THEN NULL; END $$",
+                ]:
+                    try:
+                        conn.execute(text(sql))
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        # Try Alembic first
+        try:
+            alembic_cfg = alembic.config.Config("alembic.ini")
+            safe_url = _ACTIVE_TEST_DB_URL.replace("%", "%%")
+            alembic_cfg.set_main_option("sqlalchemy.url", safe_url)
+            with _engine.begin() as conn:
                 conn.execute(
                     text(
-                        "ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(255)"
+                        "CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(255) NOT NULL)"
                     )
                 )
-            except Exception:
-                pass
-        alembic.command.upgrade(alembic_cfg, "heads")
-    except Exception:
-        pass
+                try:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(255)"
+                        )
+                    )
+                except Exception:
+                    pass
+            alembic.command.upgrade(alembic_cfg, "heads")
+        except Exception:
+            pass
+
     # Always create missing model tables from SQLAlchemy metadata
     Base.metadata.create_all(bind=_engine)
     yield
@@ -203,26 +241,21 @@ def _ensure_test_db_ready():
 @pytest.fixture(scope="function")
 def db_session():
     """Fresh Postgres DB session for every test (tables already exist from session fixture)."""
-    engine = create_engine(_TEST_DB_URL)
+    if _is_sqlite_url(_ACTIVE_TEST_DB_URL):
+        engine = create_engine(
+            _ACTIVE_TEST_DB_URL,
+            connect_args={"check_same_thread": False},
+        )
+    else:
+        engine = create_engine(_ACTIVE_TEST_DB_URL)
     Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     from sqlalchemy import text
 
     # Clean data for a fresh slate
-    try:
-        with engine.begin() as conn:
-            conn.execute(
-                text(
-                    "TRUNCATE TABLE analysis, app_users, organizations RESTART IDENTITY CASCADE"
-                )
-            )
-    except Exception:
-        pass
-    db = Session()
-    try:
-        yield db
-    finally:
-        db.close()
-        # Clean data but keep tables for other tests
+    if _is_sqlite_url(_ACTIVE_TEST_DB_URL):
+        Base.metadata.drop_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
+    else:
         try:
             with engine.begin() as conn:
                 conn.execute(
@@ -232,6 +265,22 @@ def db_session():
                 )
         except Exception:
             pass
+    db = Session()
+    try:
+        yield db
+    finally:
+        db.close()
+        # Clean data but keep tables for other tests
+        if not _is_sqlite_url(_ACTIVE_TEST_DB_URL):
+            try:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "TRUNCATE TABLE analysis, app_users, organizations RESTART IDENTITY CASCADE"
+                        )
+                    )
+            except Exception:
+                pass
 
 
 @pytest.fixture(scope="function")

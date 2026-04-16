@@ -1,3 +1,5 @@
 pgvector
 pytest-cov
 langdetect
+python-docx
+fpdf2

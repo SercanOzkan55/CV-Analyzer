@@ -362,6 +362,110 @@ Before production, verify:
 
 ---
 
+## 🛡️ SaaS Hardening: Rate Limit, Abuse & Audit (Prod)
+
+Before **production** deployment, additionally verify:
+
+- [ ] **Rate limiting** tuned for SaaS:
+  - `RATE_LIMIT_IP_ANALYZE_PER_MIN=10`
+  - `RATE_LIMIT_IP_ANALYZE_PDF_PER_MIN=10`
+  - `RATE_LIMIT_USER_ANALYZE_PER_MIN=10`
+  - `RATE_LIMIT_USER_ANALYZE_PDF_PER_MIN=10`
+- [ ] **IP abuse protection** enabled (basic layer):
+  - `BLOCKED_IPS` set for known bad IPs (comma-separated)
+  - Cloudflare / WAF rules configured for bot traffic
+- [ ] **CAPTCHA** enabled for heavy endpoints (bot prevention):
+  - `CAPTCHA_ENABLED=1`
+  - `CAPTCHA_PROVIDER=recaptcha` **or** `hcaptcha`
+  - `CAPTCHA_SECRET=...` (server-side secret key)
+  - Frontend sends `X-Captcha-Token` header for:
+    - `POST /api/v1/analyze`
+    - `POST /api/v1/analyze-async`
+    - `POST /api/v1/analyze-pdf`
+    - `POST /api/v1/cv-builder/generate`
+- [ ] **File upload safety** (CV PDF):
+  - Max size: 5MB (hard-coded in backend)
+  - Content-Type must be `application/pdf`
+  - Magic byte check enforced: file starts with `%PDF-`
+  - Optional antivirus:
+    - `CLAMAV_ENABLED=1`
+    - `CLAMAV_HOST` / `CLAMAV_PORT` point to running `clamd`
+- [ ] **Secrets management** uses Docker/K8s secrets in prod:
+  - Database: `DATABASE_URL_FILE=/run/secrets/db_url`
+  - Supabase JWT: `SUPABASE_JWT_SECRET_FILE=/run/secrets/jwt_secret`
+  - Stripe:
+    - `STRIPE_SECRET_KEY_FILE=/run/secrets/stripe_secret`
+    - `STRIPE_WEBHOOK_SECRET_FILE=/run/secrets/stripe_webhook_secret`
+- [ ] **Audit logging** wired to central log sink:
+  - Logger `app.audit` shipped to logging system
+  - Events captured (JSON):
+    - `cv_analysis` (text & PDF)
+    - `cv_builder_generate`
+    - `billing_checkout_session_created`
+    - `billing_portal_session_created`
+    - `billing_contact_sales`
+    - `billing_trial_activated`
+    - `billing_webhook_event`
+
+---
+
+## 📈 ATS Intelligence & Config
+
+- API response (e.g. `POST /api/v1/analyze`) artık aşağıdaki ATS alanlarını da içerir:
+  - `missing_skills` → skill coverage analizinden eksik görünen yetkinlikler
+  - `keyword_gap.missing_words` → iş ilanında geçen ama CV’de olmayan anlamlı kelimeler
+  - `keyword_gap.missing_phrases` → iş ilanındaki 2-3 kelimelik önemli ifadeler (bigrams/trigrams)
+  - `recommendations` → semantic + skill + keyword sinyallerine göre en fazla 5 aksiyon önerisi
+  - `score_breakdown` → `skills / keywords / format / experience` bazında skor kırılımı (0–100)
+  - `ats_weights` → bu kırılımdaki ağırlıklar (normalize edilmiş, toplam ≈ 1.0)
+  - `ats_weighted_score` → `score_breakdown` + `ats_weights` ile hesaplanan kompozit ATS skoru (0–100)
+
+- ATS ağırlıklarını değiştirmek için kök dizindeki `ats_config.yaml` dosyasını düzenleyin:
+
+```yaml
+weights:
+  skills: 0.35
+  keywords: 0.25
+  format: 0.15
+  experience: 0.25
+```
+
+- Opsiyonel env:
+  - `ATS_CONFIG_PATH` → default `ats_config.yaml` (farklı path kullanmak için)
+
+Config okunamazsa veya eksikse, kod içindeki güvenli default ağırlıklar kullanılır.
+
+---
+
+## 👔 Recruiter Search (Postgres FTS)
+
+- Yeni endpoint: `GET /api/v1/recruiter/search?q=...&limit=20`
+  - Auth: JWT (`Depends(verify_supabase_jwt)`) + `recruiter_required`
+  - Scope: sadece recruiter’ın `organization_id`’sine bağlı `candidates` satırları
+  - Postgres’te ise tam metin arama kullanır:
+    - `to_tsvector('english', coalesce(cv_text, ''))`
+    - `plainto_tsquery(:q)`
+    - `ts_rank_cd(...)` ile skor, `ORDER BY rank DESC`
+  - Diğer veritabanlarında (ör. SQLite test ortamı) basit `LIKE`/`ILIKE` fallback kullanılır.
+
+- Önerilen Postgres index & generated column (prod için):
+
+```sql
+ALTER TABLE candidates
+  ADD COLUMN IF NOT EXISTS search_vector tsvector
+  GENERATED ALWAYS AS (
+    to_tsvector('english', coalesce(cv_text, ''))
+  ) STORED;
+
+CREATE INDEX IF NOT EXISTS idx_candidates_search_vector_gin
+  ON candidates USING GIN (search_vector);
+```
+
+- Uygulama tarafındaki sorgu, bu generated column yerine expression da kullanabildiği için
+  index opsiyoneldir; ancak gerçek SaaS yükünde GIN index şiddetle tavsiye edilir.
+
+---
+
 ## 🧪 Testing Workflow
 
 ### Day 1: Local Testing

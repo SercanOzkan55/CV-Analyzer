@@ -23,15 +23,15 @@ export default function Footer() {
 
         <div className="footer-col">
           <h4>{t('landing.footer_company')}</h4>
-          <a href="#">{t('landing.footer_about')}</a>
-          <a href="#">{t('landing.footer_contact')}</a>
-          <a href="#">{t('landing.footer_blog')}</a>
+          <Link to="/">{t('landing.footer_about')}</Link>
+          <a href="mailto:support@cvanalyzer.app">{t('landing.footer_contact')}</a>
+          <Link to="/">{t('landing.footer_blog')}</Link>
         </div>
 
         <div className="footer-col">
           <h4>{t('landing.footer_legal')}</h4>
-          <a href="#">{t('landing.footer_privacy')}</a>
-          <a href="#">{t('landing.footer_terms')}</a>
+          <Link to="/privacy">{t('landing.footer_privacy')}</Link>
+          <Link to="/terms">{t('landing.footer_terms')}</Link>
         </div>
       </div>
 

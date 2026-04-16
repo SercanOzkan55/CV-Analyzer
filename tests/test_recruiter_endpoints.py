@@ -5,9 +5,22 @@ Uses db_session and client fixtures from conftest.py (per-function isolation).
 
 from datetime import datetime, timedelta
 
+import pytest
 
 from auth import verify_supabase_jwt
+import main as main_module
 from models import Analysis, Organization, User
+
+@pytest.fixture(autouse=True)
+def _stable_recruiter_runtime(monkeypatch):
+    # Keep recruiter endpoint tests independent from local Redis availability.
+    monkeypatch.setattr(main_module, "redis_rate", None)
+    try:
+        main_module._LOCAL_ABUSE_COUNTERS.clear()
+        main_module._LOCAL_ABUSE_BANS.clear()
+    except Exception:
+        pass
+
 
 # ── Helpers ──
 
@@ -270,3 +283,147 @@ def test_top_candidates_filters(client, db_session):
         f"/api/v1/recruiter/top_candidates?start_date={start}&end_date={end}"
     )
     assert resp.status_code == 200
+
+
+def _as_pdf_bytes(text: str = "sample") -> bytes:
+    # Minimal prefix for server-side magic-byte check; PyPDF2 is mocked in tests.
+    return b"%PDF-1.4\n" + text.encode("utf-8", errors="ignore")
+
+
+def _mock_pipeline(cv_text: str, job_description: str):
+    score = 82.0 if "python" in (cv_text or "").lower() else 68.0
+    return {
+        "final_score": score,
+        "ats_score": 74.0,
+        "skill_score": 70.0,
+        "detected_skills": ["python", "sql"],
+        "missing_skills": ["kubernetes"],
+        "keyword_gap": {"missing_words": ["microservices"], "missing_phrases": []},
+        "score_breakdown": {
+            "skills": 70.0,
+            "keywords": 65.0,
+            "format": 80.0,
+            "experience": 72.0,
+        },
+        "recommendations": ["Add measurable impact"],
+        "interpretation": "Moderate Match",
+        "semantic_score": 75.0,
+        "keyword_score": 65.0,
+        "experience_score": 72.0,
+    }
+
+
+def test_recruiter_batch_rank_success(client, db_session, monkeypatch):
+    monkeypatch.setattr(main_module, "run_pipeline", _mock_pipeline)
+    monkeypatch.setattr(main_module, "CLAMAV_ENABLED", False)
+    org_a, _, recruiter, _, _ = _setup_two_orgs(db_session)
+
+    client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
+        "user_id": recruiter.supabase_id,
+        "email": recruiter.email,
+    }
+
+    files = [
+        (
+            "files",
+            ("candidate_1.pdf", _as_pdf_bytes("python sql"), "application/pdf"),
+        ),
+        (
+            "files",
+            ("candidate_2.pdf", _as_pdf_bytes("team lead"), "application/pdf"),
+        ),
+    ]
+
+    resp = client.post(
+        "/api/v1/recruiter/batch-rank",
+        data={"job_description": "Looking for Python and SQL skills"},
+        files=files,
+    )
+    assert resp.status_code == 200
+
+    payload = resp.json()
+    assert payload["total_candidates"] == 2
+    assert "ranking" in payload and len(payload["ranking"]) == 2
+    assert "analytics" in payload
+    assert "avg_score" in payload["analytics"]
+    assert "top_skills" in payload["analytics"]
+    assert "candidate_distribution" in payload["analytics"]
+
+    # Ranking should be sorted descending by final_score.
+    scores = [row["final_score"] for row in payload["ranking"]]
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_recruiter_batch_rank_limit_50(client, db_session, monkeypatch):
+    monkeypatch.setattr(main_module, "run_pipeline", _mock_pipeline)
+    monkeypatch.setattr(main_module, "CLAMAV_ENABLED", False)
+    org_a, _, recruiter, _, _ = _setup_two_orgs(db_session)
+
+    client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
+        "user_id": recruiter.supabase_id,
+        "email": recruiter.email,
+    }
+
+    files = [
+        (
+            "files",
+            (f"candidate_{i}.pdf", _as_pdf_bytes(f"candidate-{i}"), "application/pdf"),
+        )
+        for i in range(51)
+    ]
+
+    resp = client.post(
+        "/api/v1/recruiter/batch-rank",
+        data={"job_description": "Backend engineer"},
+        files=files,
+    )
+    assert resp.status_code == 400
+    assert "Maximum 50 CV files allowed" in resp.json().get("detail", "")
+
+
+def test_recruiter_batch_rank_requires_jd_text_or_file(client, db_session, monkeypatch):
+    monkeypatch.setattr(main_module, "run_pipeline", _mock_pipeline)
+    monkeypatch.setattr(main_module, "CLAMAV_ENABLED", False)
+    org_a, _, recruiter, _, _ = _setup_two_orgs(db_session)
+
+    client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
+        "user_id": recruiter.supabase_id,
+        "email": recruiter.email,
+    }
+
+    files = [
+        (
+            "files",
+            ("candidate_1.pdf", _as_pdf_bytes("python"), "application/pdf"),
+        )
+    ]
+
+    resp = client.post("/api/v1/recruiter/batch-rank", files=files)
+    assert resp.status_code == 400
+    assert "Job description is required" in resp.json().get("detail", "")
+
+
+def test_recruiter_batch_rank_rejects_non_pdf_cv(client, db_session, monkeypatch):
+    monkeypatch.setattr(main_module, "run_pipeline", _mock_pipeline)
+    monkeypatch.setattr(main_module, "CLAMAV_ENABLED", False)
+    org_a, _, recruiter, _, _ = _setup_two_orgs(db_session)
+
+    client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
+        "user_id": recruiter.supabase_id,
+        "email": recruiter.email,
+    }
+
+    files = [
+        (
+            "files",
+            ("candidate_1.txt", b"plain text", "text/plain"),
+        )
+    ]
+
+    resp = client.post(
+        "/api/v1/recruiter/batch-rank",
+        data={"job_description": "Python"},
+        files=files,
+    )
+    assert resp.status_code == 400
+    assert "Only PDF files are allowed" in resp.json().get("detail", "")

@@ -19,6 +19,9 @@ def make_vec(val, dim=1536):
     reason="Postgres DB required for pgvector tests",
 )
 def test_pgvector_similarity(db_session):
+    # Skip if using SQLite (pgvector syntax not supported)
+    if "sqlite" in str(db_session.bind.url):
+        pytest.skip("pgvector only for postgres")
     # Insert two candidates with simple repeated-value vectors
     v1 = make_vec(0.01)
     v2 = make_vec(0.02)

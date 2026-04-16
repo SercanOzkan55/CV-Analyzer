@@ -6,7 +6,26 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+
+def _read_secret_file(path: str | None) -> str | None:
+    """Read a connection URL from a Docker/OS-level secret file if provided.
+
+    This lets production use DATABASE_URL_FILE while local dev/test can
+    continue to rely on a plain .env DATABASE_URL.
+    """
+
+    if not path:
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except Exception:
+        return None
+
+
+DATABASE_URL = os.getenv("DATABASE_URL") or _read_secret_file(
+    os.getenv("DATABASE_URL_FILE")
+)
 ENV = os.getenv("ENV", "development")
 
 if not DATABASE_URL and ENV != "test":

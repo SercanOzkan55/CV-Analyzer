@@ -1,29 +1,99 @@
+import json
+import os
 import time
 
 try:
-    from celery import Celery
+    from celery import Celery, Task
 
     # Prefer Celery only if Redis broker/backend are reachable. If Redis is
     # not available (e.g. in CI), fall back to a synchronous LocalTask so the
     # app and tests don't fail at runtime trying to reconnect to Redis.
-    redis_url = "redis://localhost:6379/0"
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     _use_celery = True
     try:
         import redis as _redis_pkg
 
-        _r = _redis_pkg.Redis.from_url(redis_url)
+        ping_timeout = float(os.getenv("REDIS_PING_TIMEOUT_SECONDS", "1.0") or "1.0")
+        _r = _redis_pkg.Redis.from_url(
+            redis_url,
+            socket_connect_timeout=ping_timeout,
+            socket_timeout=ping_timeout,
+            retry_on_timeout=False,
+        )
         _r.ping()
+        try:
+            _r.close()
+        except Exception:
+            pass
     except Exception:
         _use_celery = False
 
     if _use_celery:
-        celery_app = Celery("cv_analyzer", broker=redis_url, backend=redis_url)
+        from database import SessionLocal
+        from models import FailedTask
 
-        @celery_app.task
-        def analyze_pdf_task(cv_text, job_description):
-            from services.ats_service import analyze_cv
+        class DBLoggingTask(Task):
+            """Base Celery Task with sane defaults and dead-letter logging.
 
-            return analyze_cv(cv_text, job_description)
+            - Retries up to 3 times with exponential backoff for exceptions
+            - Enforces hard/soft time limits to prevent stuck CV parsing
+            - On final failure, writes an entry to the FailedTask table
+            """
+
+            autoretry_for = (Exception,)
+            retry_backoff = True
+            max_retries = 3
+            time_limit = 60
+            soft_time_limit = 45
+
+            def on_failure(self, exc, task_id, args, kwargs, einfo):
+                try:
+                    session = SessionLocal()
+                    payload = None
+                    try:
+                        payload = json.dumps({"args": args, "kwargs": kwargs}, default=str)
+                    except Exception:
+                        payload = None
+                    record = FailedTask(
+                        task_name=self.name or type(self).__name__,
+                        task_id=str(task_id),
+                        payload=payload,
+                        error=str(exc),
+                    )
+                    session.add(record)
+                    session.commit()
+                except Exception:
+                    try:
+                        session.rollback()
+                    except Exception:
+                        pass
+                finally:
+                    try:
+                        session.close()
+                    except Exception:
+                        pass
+
+        celery_app = Celery(
+            "cv_analyzer",
+            broker=redis_url,
+            backend=redis_url,
+            task_default_queue="default",
+        )
+        celery_app.Task = DBLoggingTask
+
+        @celery_app.task(bind=True, name="analyze_pdf_task", queue="pdf_processing")
+        def analyze_pdf_task(self, cv_text, job_description, lang="en"):
+            # Keep PDF and text analysis responses consistent.
+            from main import run_pipeline
+
+            return run_pipeline(cv_text, job_description, lang)
+
+        @celery_app.task(bind=True, name="analyze_text_task", queue="ai_tasks")
+        def analyze_text_task(self, cv_text, job_description, lang="en"):
+            # Import locally to avoid hard dependency at module import time.
+            from main import run_pipeline
+
+            return run_pipeline(cv_text, job_description, lang)
 
     else:
         raise RuntimeError("Redis unavailable; fallback to LocalTask")
@@ -52,9 +122,16 @@ except Exception:
                 res = e
             return DummyResult(res)
 
-    def _analyze_pdf(cv_text, job_description):
-        from services.ats_service import analyze_cv
+    def _analyze_pdf(cv_text, job_description, lang="en"):
+        from main import run_pipeline
 
-        return analyze_cv(cv_text, job_description)
+        return run_pipeline(cv_text, job_description, lang)
 
     analyze_pdf_task = LocalTask(_analyze_pdf)
+
+    def _analyze_text(cv_text, job_description, lang="en"):
+        from main import run_pipeline
+
+        return run_pipeline(cv_text, job_description, lang)
+
+    analyze_text_task = LocalTask(_analyze_text)

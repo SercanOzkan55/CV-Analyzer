@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/LanguageContext'
@@ -11,6 +11,10 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [sent, setSent] = useState(false)
+
+  useEffect(() => {
+    document.title = `${t('auth.forgot_title')} — CV Analyzer`
+  }, [t])
 
   async function handleSubmit(e) {
     e.preventDefault()

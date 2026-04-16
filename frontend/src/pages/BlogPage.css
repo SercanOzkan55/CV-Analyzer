@@ -1,0 +1,122 @@
+/* BlogPage.css - Modern chat/blog tasarımı */
+
+.blog-page {
+  max-width: 700px;
+  margin: 40px auto;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  padding: 32px 24px;
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+.blog-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.blog-header h1 {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #2a2a2a;
+}
+
+.blog-subtitle {
+  font-size: 1.1rem;
+  color: #666;
+  margin-top: 8px;
+}
+
+.chat-box {
+  background: #f7f7fa;
+  border-radius: 12px;
+  padding: 24px 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.chat-messages {
+  max-height: 320px;
+  overflow-y: auto;
+  margin-bottom: 18px;
+}
+
+.chat-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+  padding: 12px 10px;
+  margin-bottom: 10px;
+  position: relative;
+}
+
+.chat-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 120px;
+}
+
+.chat-user {
+  font-weight: 600;
+  color: #3a3a3a;
+}
+
+.chat-text {
+  flex: 1;
+  color: #222;
+  font-size: 1rem;
+}
+
+.chat-delete-btn {
+  background: none;
+  border: none;
+  color: #d32f2f;
+  font-size: 1.2rem;
+  cursor: pointer;
+  margin-left: 8px;
+  transition: color 0.2s;
+}
+
+.chat-delete-btn:hover {
+  color: #b71c1c;
+}
+
+.chat-form {
+  display: flex;
+  gap: 10px;
+}
+
+.chat-form input[type="text"] {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+  background: #fff;
+  transition: border-color 0.2s;
+}
+
+.chat-form input[type="text"]:focus {
+  border-color: #1976d2;
+  outline: none;
+}
+
+.chat-form button[type="submit"] {
+  padding: 10px 18px;
+  border-radius: 6px;
+  border: none;
+  background: #1976d2;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.chat-form button[type="submit"]:disabled {
+  background: #bdbdbd;
+  cursor: not-allowed;
+}

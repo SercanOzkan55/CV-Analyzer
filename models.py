@@ -58,6 +58,7 @@ class Analysis(Base):
     domain_id = Column(Integer)
     industry_id = Column(Integer)
     specialization_id = Column(Integer)
+    job_title = Column(String, nullable=True, index=True)
 
     created_at = Column(
         TIMESTAMP(timezone=False), server_default=func.now(), index=True
@@ -118,3 +119,20 @@ class Job(Base):
     else:
         job_embedding = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class FailedTask(Base):
+    """Dead-letter table for failed async tasks.
+
+    Records Celery task failures after retries are exhausted so that
+    operations can inspect and replay or debug problematic jobs.
+    """
+
+    __tablename__ = "failed_tasks"
+
+    id = Column(Integer, primary_key=True)
+    task_name = Column(String, nullable=False, index=True)
+    task_id = Column(String, nullable=False, index=True)
+    payload = Column(Text, nullable=True)
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)

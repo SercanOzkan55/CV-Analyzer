@@ -1,4 +1,36 @@
 import re
+import os
+import json
+import hashlib
+
+try:
+    from redis import Redis as _RedisClient
+except Exception:
+    _RedisClient = None
+
+# Optional Redis cache for skill extraction. If Redis is unavailable the
+# extraction logic will still work normally without caching.
+_skills_redis = None
+if _RedisClient is not None:
+    try:
+        _skills_redis = _RedisClient.from_url(
+            os.getenv("REDIS_URL", "redis://localhost:6379/3"),
+            decode_responses=True,
+            socket_connect_timeout=1,
+            socket_timeout=1,
+        )
+        _skills_redis.ping()
+    except Exception:
+        _skills_redis = None
+
+SKILLS_CACHE_TTL = int(os.getenv("SKILLS_CACHE_TTL", "86400"))
+
+
+def _hash_text(text: str) -> str:
+    if not isinstance(text, str):
+        text = str(text or "")
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
 
 # ── Comprehensive skill database organized by category ──────────────
 
@@ -377,11 +409,32 @@ _COMPILED_SKILLS = [
 
 
 def extract_skills(text: str) -> dict:
-    """
-    Extract skills from text. Returns dict with:
+    """Extract skills from text with optional Redis caching.
+
+    Returns dict with:
       - found: set of canonical skill names
       - by_category: dict[category] -> set of skills
     """
+
+    cache_key = None
+    if _skills_redis is not None:
+        try:
+            cache_key = f"skills:{_hash_text(text or '')}"
+            cached = _skills_redis.get(cache_key)
+        except Exception:
+            cached = None
+        if cached:
+            try:
+                data = json.loads(cached)
+                found = set(data.get("found", []))
+                by_category = {
+                    k: set(v) for k, v in (data.get("by_category", {}) or {}).items()
+                }
+                return {"found": found, "by_category": by_category}
+            except Exception:
+                # Ignore cache decode errors and fall back to fresh computation
+                pass
+
     found = set()
     by_category = {}
 
@@ -390,7 +443,19 @@ def extract_skills(text: str) -> dict:
             found.add(canonical)
             by_category.setdefault(category, set()).add(canonical)
 
-    return {"found": found, "by_category": by_category}
+    result = {"found": found, "by_category": by_category}
+
+    if cache_key and _skills_redis is not None:
+        try:
+            serializable = {
+                "found": sorted(found),
+                "by_category": {k: sorted(list(v)) for k, v in by_category.items()},
+            }
+            _skills_redis.setex(cache_key, SKILLS_CACHE_TTL, json.dumps(serializable))
+        except Exception:
+            pass
+
+    return result
 
 
 def skill_coverage_score(cv_text: str, job_text: str):

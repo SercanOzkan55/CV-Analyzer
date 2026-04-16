@@ -172,6 +172,31 @@ def _extract_phrases(text: str, max_len: int = 3) -> set:
     return phrases
 
 
+def compute_keyword_gap(cv_text: str, job_description: str) -> dict:
+    """Return which job keywords/phrases are missing from the CV.
+
+    This uses the same tokenization and stop-word filtering as
+    `keyword_match_score` so that the gap aligns with the score.
+    """
+
+    if not job_description or not job_description.strip():
+        return {"missing_words": [], "missing_phrases": []}
+
+    cv_words = _extract_meaningful_words(cv_text)
+    job_words = _extract_meaningful_words(job_description)
+
+    missing_words = sorted(w for w in job_words if w not in cv_words)
+
+    cv_phrases = _extract_phrases(cv_text)
+    job_phrases = _extract_phrases(job_description)
+    missing_phrases = sorted(p for p in job_phrases if p not in cv_phrases)
+
+    return {
+        "missing_words": missing_words,
+        "missing_phrases": missing_phrases,
+    }
+
+
 def keyword_match_score(cv_text: str, job_description: str) -> float:
     """
     Calculate keyword match score between CV and job description.
