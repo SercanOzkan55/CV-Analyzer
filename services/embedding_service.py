@@ -1,4 +1,7 @@
 import os
+import json
+import sys
+import hashlib
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -10,21 +13,32 @@ except Exception:
 
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger("app.embedding")
-import json
-import sys
 
 try:
     import redis
 except Exception:
     redis = None
 
-# Redis connection (adjust host/port/db as needed)
+load_dotenv()
+
+# Redis connection (adjust host/port/db as needed). Use REDIS_URL when
+# available to stay consistent with the rest of the app.
 if redis:
-    redis_client = redis.Redis(host="localhost", port=6379, db=0)
+    _redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    try:
+        from redis import Redis as _RedisClient
+
+        redis_client = _RedisClient.from_url(
+            _redis_url,
+            decode_responses=True,
+            socket_connect_timeout=1,
+            socket_timeout=1,
+        )
+        redis_client.ping()
+    except Exception:
+        redis_client = None
 else:
     redis_client = None
-
-load_dotenv()
 
 # Configure loguru for JSON structured logging when available
 if hasattr(logger, "remove") and hasattr(logger, "add"):
@@ -32,6 +46,21 @@ if hasattr(logger, "remove") and hasattr(logger, "add"):
     logger.add(sys.stdout, format="{message}", serialize=True, level="INFO")
 _OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=_OPENAI_KEY) if _OPENAI_KEY else None
+
+# Embedding cache TTL (seconds). Defaults to 7 days.
+EMBEDDING_CACHE_TTL = int(os.getenv("EMBEDDING_CACHE_TTL", "604800"))
+
+
+def _text_hash(text: str) -> str:
+    """Stable SHA-256 hash for cache keys.
+
+    Python's built-in hash() is process-dependent; SHA-256 ensures
+    deterministic keys across restarts and workers.
+    """
+
+    if not isinstance(text, str):
+        text = str(text or "")
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def get_embedding(text: str, max_length: int = 20000):
@@ -58,8 +87,8 @@ def get_embedding(text: str, max_length: int = 20000):
     if len(text) > max_length:
         text = text[:max_length]
 
-    # Redis cache key
-    cache_key = f"embedding:{hash(text)}"
+    # Redis cache key based on stable SHA-256 hash of the text
+    cache_key = f"embedding:{_text_hash(text)}"
     cached = None
     if redis_client:
         try:
@@ -70,6 +99,7 @@ def get_embedding(text: str, max_length: int = 20000):
         try:
             return json.loads(cached)
         except Exception:
+            # If cache is corrupted, ignore and compute a fresh embedding
             pass
 
     try:
@@ -78,10 +108,9 @@ def get_embedding(text: str, max_length: int = 20000):
         # Cache the embedding
         if redis_client:
             try:
-                redis_client.set(
-                    cache_key, json.dumps(embedding), ex=60 * 60 * 24
-                )  # 1 day expiry
+                redis_client.setex(cache_key, EMBEDDING_CACHE_TTL, json.dumps(embedding))
             except Exception:
+                # Cache failures must not break the main flow
                 pass
         return embedding
     except Exception as e:

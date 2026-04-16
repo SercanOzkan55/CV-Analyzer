@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/LanguageContext'
@@ -14,6 +14,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+
+  useEffect(() => {
+    document.title = `${t('auth.login_title')} — CV Analyzer`
+  }, [t])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -32,9 +36,12 @@ export default function LoginPage() {
 
   async function handleGoogle() {
     try {
+      setLoading(true)
       await signInWithGoogle()
     } catch (err) {
       setError(err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -56,11 +63,11 @@ export default function LoginPage() {
           <form className="auth-form" onSubmit={handleSubmit}>
             <div className="form-group">
               <label>{t('auth.email')}</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus autoComplete="email" />
             </div>
             <div className="form-group">
               <label>{t('auth.password')}</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete="current-password" />
             </div>
 
             <div className="form-row">

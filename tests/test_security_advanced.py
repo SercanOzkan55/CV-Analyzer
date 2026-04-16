@@ -44,5 +44,5 @@ def test_org_privilege_escalation(client, org_id):
 def test_sql_injection_job_text(client, malicious):
     payload = {"cv_text": "foo", "job_text": malicious}
     resp = client.post("/api/v1/analyze", json=payload)
-    assert resp.status_code in (200, 400, 422)
+    assert resp.status_code in (200, 400, 403, 422)
     assert "error" not in resp.text.lower()

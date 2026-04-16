@@ -3,7 +3,28 @@ import os
 from fastapi import Header, HTTPException
 from jose import jwt
 
+
+def _read_secret_file(path: str | None) -> str | None:
+    """Best-effort helper to read a secret from a Docker/OS-level file.
+
+    Returns None if the file can't be read. This allows production
+    deployments to mount Supabase secrets via Docker/Kubernetes secrets
+    while keeping local .env workflows unchanged.
+    """
+
+    if not path:
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except Exception:
+        return None
+
+
 SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
+if not SUPABASE_JWT_SECRET:
+    SUPABASE_JWT_SECRET = _read_secret_file(os.getenv("SUPABASE_JWT_SECRET_FILE"))
+
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 
 
@@ -37,9 +58,36 @@ def verify_supabase_jwt(authorization: str = Header(None)):
 
     Returns: dict with user_id (sub) and email from JWT payload
     """
-    # In development/testing mode, return a mock user when MOCK_SERVICES is set
-    if os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes"):
-        return {"user_id": "mock-user", "email": "dev@example.com", "plan_type": "free"}
+    # In development/testing mode, return a mock user when MOCK_SERVICES is set.
+    # GUARD: never allow mock auth when ENV is production.
+    _env_mode = os.getenv("ENV", "development").lower()
+    if (
+        os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes")
+        and _env_mode not in ("production", "prod")
+    ):
+        # Try to preserve per-user identity in mock mode by reading unverified
+        # claims from the bearer token. This keeps quota/rate-limit behavior
+        # meaningful across different accounts during local testing.
+        if authorization:
+            try:
+                scheme, token = authorization.split()
+                if scheme.lower() == "bearer":
+                    claims = jwt.get_unverified_claims(token)
+                    user_id = claims.get("sub") or "mock-user"
+                    email = claims.get("email") or "dev@example.com"
+                    return {
+                        "user_id": user_id,
+                        "email": email,
+                        "plan_type": "free",
+                        "payload": claims,
+                    }
+            except Exception:
+                pass
+        return {
+            "user_id": "mock-user",
+            "email": "dev@example.com",
+            "plan_type": "free",
+        }
 
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing Authorization header")

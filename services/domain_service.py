@@ -1,4 +1,4 @@
-import ast
+import json
 import os
 
 import psycopg2
@@ -20,7 +20,15 @@ def _clean_psycopg2_url(url):
 
 
 CLEAN_DB_URL = _clean_psycopg2_url(DATABASE_URL)
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# Initialize OpenAI client conditionally
+MOCK_SERVICES_ON = os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes")
+_OPENAI_KEY = os.getenv("OPENAI_API_KEY")
+
+if MOCK_SERVICES_ON or not _OPENAI_KEY:
+    client = None  # Will be checked in functions
+else:
+    client = OpenAI(api_key=_OPENAI_KEY)
 
 DOMAIN_THRESHOLD = 0.70
 
@@ -127,7 +135,7 @@ def update_domain_centroid(cur, domain_id, embedding):
 
     # Fix string centroid issue
     if isinstance(centroid, str):
-        centroid = ast.literal_eval(centroid)
+        centroid = json.loads(centroid)
 
     centroid = list(centroid)
 
@@ -150,6 +158,9 @@ def update_domain_centroid(cur, domain_id, embedding):
 # LLM DOMAIN CLASSIFICATION
 # ==========================================================
 def classify_domain_llm(job_text):
+    # Allow mocking for testing without OpenAI API
+    if MOCK_SERVICES_ON or not client:
+        return "Engineering & Technology"  # Default mock domain
 
     prompt = f"""
 You are a strict job domain classifier.

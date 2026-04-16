@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/LanguageContext'
@@ -16,6 +16,10 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
+
+  useEffect(() => {
+    document.title = `${t('auth.register_title')} — CV Analyzer`
+  }, [t])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -40,9 +44,12 @@ export default function RegisterPage() {
 
   async function handleGoogle() {
     try {
+      setLoading(true)
       await signInWithGoogle()
     } catch (err) {
       setError(err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -64,15 +71,15 @@ export default function RegisterPage() {
           <form className="auth-form" onSubmit={handleSubmit}>
             <div className="form-group">
               <label>{t('auth.email')}</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus autoComplete="email" />
             </div>
             <div className="form-group">
               <label>{t('auth.password')}</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete="new-password" />
             </div>
             <div className="form-group">
               <label>{t('auth.confirm_password')}</label>
-              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={6} />
+              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={6} autoComplete="new-password" />
             </div>
 
             {error && <p className="error">{error}</p>}

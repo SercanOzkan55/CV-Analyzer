@@ -1,4 +1,4 @@
-import ast
+import json
 import os
 
 import psycopg2
@@ -144,7 +144,7 @@ def update_industry_centroid(cur, industry_id, embedding):
     centroid, count = row
     # Fix string centroid issue (some DB rows may store centroid as text)
     if isinstance(centroid, str):
-        centroid = ast.literal_eval(centroid)
+        centroid = json.loads(centroid)
     centroid = list(centroid)
 
     updated = [
@@ -175,7 +175,7 @@ def update_specialization_centroid(cur, specialization_id, embedding):
 
     centroid, count = row
     if isinstance(centroid, str):
-        centroid = ast.literal_eval(centroid)
+        centroid = json.loads(centroid)
     centroid = list(centroid)
 
     updated = [

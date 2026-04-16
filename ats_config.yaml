@@ -1,0 +1,9 @@
+# ATS scoring configuration
+# Adjust these weights to tune how much each dimension contributes
+# to the composite ATS score exposed in the API.
+
+weights:
+  skills: 0.35
+  keywords: 0.25
+  format: 0.15
+  experience: 0.25

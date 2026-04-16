@@ -1,11 +1,17 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useLanguage } from '../i18n/LanguageContext'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import AnimatedBackground from '../components/AnimatedBackground'
 
 export default function LandingPage() {
   const { t } = useLanguage()
+
+  useEffect(() => {
+    document.title = 'CV Analyzer — AI-Powered CV Analysis'
+    return () => { document.title = 'CV Analyzer' }
+  }, [])
 
   const features = [
     { icon: '🤖', title: t('landing.feature_ai_title'), desc: t('landing.feature_ai_desc') },
@@ -32,10 +38,11 @@ export default function LandingPage() {
 
   return (
     <div className="landing">
+      <AnimatedBackground />
       <Navbar />
 
       {/* Hero */}
-      <section className="hero">
+      <section className="hero" id="main-content">
         <div className="hero-badge">AI-Powered Resume Analysis</div>
         <h1>{t('landing.hero_title')}</h1>
         <p className="hero-subtitle">{t('landing.hero_subtitle')}</p>
@@ -44,6 +51,24 @@ export default function LandingPage() {
           <a href="#pricing" className="btn-ghost btn-lg">{t('landing.view_pricing')}</a>
         </div>
         <p className="hero-note">{t('landing.trusted_by')}</p>
+
+        {/* Stats Row */}
+        <div className="hero-stats">
+          <div className="hero-stat">
+            <span className="hero-stat-num">10K+</span>
+            <span className="hero-stat-label">{t('landing.stat_cvs') || 'CVs Analyzed'}</span>
+          </div>
+          <div className="hero-stat-divider" />
+          <div className="hero-stat">
+            <span className="hero-stat-num">95%</span>
+            <span className="hero-stat-label">{t('landing.stat_accuracy') || 'Accuracy Rate'}</span>
+          </div>
+          <div className="hero-stat-divider" />
+          <div className="hero-stat">
+            <span className="hero-stat-num">50+</span>
+            <span className="hero-stat-label">{t('landing.stat_skills') || 'Skills Tracked'}</span>
+          </div>
+        </div>
 
         {/* Demo Preview */}
         <div className="demo-card">
@@ -155,7 +180,7 @@ export default function LandingPage() {
               <li>{t('pricing.enterprise_f4')}</li>
               <li>{t('pricing.enterprise_f5')}</li>
             </ul>
-            <a href="#" className="btn-outline btn-full">{t('pricing.enterprise_cta')}</a>
+            <a href="mailto:sales@cvanalyzer.app" className="btn-outline btn-full">{t('pricing.enterprise_cta')}</a>
           </div>
         </div>
       </section>

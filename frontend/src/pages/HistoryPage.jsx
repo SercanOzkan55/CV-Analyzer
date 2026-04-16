@@ -1,38 +1,40 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useLanguage } from '../i18n/LanguageContext'
+import { useAuth } from '../context/AuthContext'
 import { useToast } from '../components/Toast'
 import Navbar from '../components/Navbar'
 import Modal from '../components/Modal'
 import ScoreCircle from '../components/ScoreCircle'
 import ScoreBars from '../components/ScoreBars'
 import SkillTags from '../components/SkillTags'
-
-function getHistory() {
-  try { return JSON.parse(localStorage.getItem('cv-analyzer-history') || '[]') }
-  catch { return [] }
-}
-
-function setHistory(h) {
-  localStorage.setItem('cv-analyzer-history', JSON.stringify(h))
-}
+import { getHistory, removeHistoryItem, clearHistory } from '../utils/historyStorage'
 
 export default function HistoryPage() {
+  const { user } = useAuth()
   const { t } = useLanguage()
   const { addToast } = useToast()
-  const [history, setHistoryState] = useState(getHistory)
+  const [history, setHistoryState] = useState(() => getHistory(user))
   const [selected, setSelected] = useState(null)
 
+  useEffect(() => {
+    document.title = `${t('nav.history')} — CV Analyzer`
+  }, [t])
+
+  useEffect(() => {
+    setHistoryState(getHistory(user))
+    setSelected(null)
+  }, [user])
+
   function handleDelete(id) {
-    const updated = history.filter((h) => h.id !== id)
-    setHistory(updated)
+    const updated = removeHistoryItem(user, id)
     setHistoryState(updated)
     addToast(t('toast.analysis_deleted'), 'info')
     if (selected?.id === id) setSelected(null)
   }
 
   function handleClearAll() {
-    setHistory([])
+    clearHistory(user)
     setHistoryState([])
     setSelected(null)
     addToast(t('toast.history_cleared'), 'info')
@@ -47,7 +49,7 @@ export default function HistoryPage() {
   return (
     <div className="app-layout">
       <Navbar />
-      <main className="main-content">
+      <main className="main-content" id="main-content">
         <div className="page-header">
           <div>
             <h1>{t('history.title')}</h1>

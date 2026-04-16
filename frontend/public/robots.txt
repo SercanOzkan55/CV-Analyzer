@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /analyze
+Disallow: /history
+Disallow: /settings
+Disallow: /recruiter
+Disallow: /premium
+Disallow: /cv-builder
+
+Sitemap: https://cvanalyzer.app/sitemap.xml

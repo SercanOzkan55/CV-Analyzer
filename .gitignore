@@ -5,3 +5,4 @@ frontend/dist/
 __pycache__/
 .vscode/
 .DS_Store
+.local_quota.json
