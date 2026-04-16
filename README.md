@@ -935,8 +935,8 @@ Bu proje aşağıdaki harika open-source projelerden yararlanmaktadır:
 
 **⭐ Eğer bu proje faydalı olduysa, lütfen yıldız verin!**
 
-[GitHub'da Yıldız Ver](https://github.com/yourusername/cv-analyzer) • [Sorun Bildir](https://github.com/yourusername/cv-analyzer/issues) • [Feature İste](https://github.com/yourusername/cv-analyzer/discussions)
+[GitHub'da Yıldız Ver](https://github.com/SercanOzkan55/CV-Analyzer) • [Sorun Bildir](https://github.com/SercanOzkan55/CV-Analyzer) • [Feature İste](https://github.com/SercanOzkan55/CV-Analyzer)
 
-Made with ❤️ by [Your Name](https://github.com/yourusername)
+Made with ❤️ by [Sercan Özkan](https://github.com/SercanOzkan55)
 
 </div>
