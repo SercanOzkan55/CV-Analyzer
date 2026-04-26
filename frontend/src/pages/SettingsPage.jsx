@@ -133,7 +133,7 @@ export default function SettingsPage() {
                 </label>
                 <label className={`radio-option ${lang === 'tr' ? 'active' : ''}`}>
                   <input type="radio" name="lang" value="tr" checked={lang === 'tr'} onChange={() => setLang('tr')} />
-                  �🇷 Türkçe
+                  🇹🇷 Türkçe
                 </label>
               </div>
             </div>

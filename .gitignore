@@ -1,8 +1,49 @@
+# Environment
 .env
-frontend/node_modules/
-frontend/dist/
+.env.*
+!.env.example
+
+# Python
 *.pyc
 __pycache__/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Testing & Coverage
+.pytest_cache/
+coverage.xml
+.coverage
+htmlcov/
+*.pytest_test.db
+
+# Linting
+.ruff_cache/
+.mypy_cache/
+
+# IDE
 .vscode/
+.idea/
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Project artifacts
 .local_quota.json
+*.pkl
+*.onnx
+model_metadata.json
+feedback_records.jsonl
+requirements_full.txt
+
+# Logs
+*.log
+
+# Dev scratch files
+_dev_scratch/

@@ -2,6 +2,8 @@ import os
 import json
 import sys
 import hashlib
+import threading
+import time
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -44,11 +46,35 @@ else:
 if hasattr(logger, "remove") and hasattr(logger, "add"):
     logger.remove()
     logger.add(sys.stdout, format="{message}", serialize=True, level="INFO")
+
 _OPENAI_KEY = os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=_OPENAI_KEY) if _OPENAI_KEY else None
+_OPENAI_BASE = os.getenv("OPENAI_API_BASE")
+client = OpenAI(api_key=_OPENAI_KEY, base_url=_OPENAI_BASE) if _OPENAI_KEY else None
+
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
 # Embedding cache TTL (seconds). Defaults to 7 days.
 EMBEDDING_CACHE_TTL = int(os.getenv("EMBEDDING_CACHE_TTL", "604800"))
+
+# ── Embedding rate limiting (process-local token bucket) ──────────────────
+_EMBED_MAX_CALLS_PER_MIN = int(os.getenv("EMBED_MAX_CALLS_PER_MIN", "60"))
+_EMBED_MAX_TOKENS_PER_REQ = int(os.getenv("EMBED_MAX_TOKENS_PER_REQ", "8000"))
+_embed_call_times: list[float] = []
+_embed_lock = threading.Lock()
+
+
+def _embed_rate_ok() -> bool:
+    """Return True if we haven't exceeded the per-minute call budget."""
+    now = time.time()
+    cutoff = now - 60
+    with _embed_lock:
+        # Prune old entries
+        while _embed_call_times and _embed_call_times[0] < cutoff:
+            _embed_call_times.pop(0)
+        if len(_embed_call_times) >= _EMBED_MAX_CALLS_PER_MIN:
+            return False
+        _embed_call_times.append(now)
+        return True
 
 
 def _text_hash(text: str) -> str:
@@ -71,6 +97,26 @@ def get_embedding(text: str, max_length: int = 20000):
     # Allow mocking for testing without OpenAI API
     if os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes"):
         return [0.01] * 1536  # mock embedding vector
+
+    # SAFE_MODE: skip embeddings entirely to reduce load
+    if os.getenv("SAFE_MODE", "").lower() in ("1", "true", "yes"):
+        logger.warning(json.dumps({"event": "embedding_skipped_safe_mode"}))
+        return None
+
+    # Circuit breaker: skip if OpenAI service is in open state
+    try:
+        from shared import _cb_is_open, _cb_record_failure, _cb_record_success
+        if _cb_is_open("openai_embedding"):
+            logger.warning(json.dumps({"event": "embedding_circuit_open"}))
+            return None
+        _cb_available = True
+    except Exception:
+        _cb_available = False
+
+    # Security: rate limit embedding calls
+    if not _embed_rate_ok():
+        logger.warning(json.dumps({"event": "embedding_rate_limited"}))
+        return None
 
     if not client:
         if hasattr(logger, "bind"):
@@ -103,8 +149,14 @@ def get_embedding(text: str, max_length: int = 20000):
             pass
 
     try:
-        response = client.embeddings.create(model="text-embedding-3-small", input=text)
+        response = client.embeddings.create(model=EMBEDDING_MODEL, input=text)
         embedding = response.data[0].embedding
+        # Record success for circuit breaker
+        if _cb_available:
+            try:
+                _cb_record_success("openai_embedding")
+            except Exception:
+                pass
         # Cache the embedding
         if redis_client:
             try:
@@ -114,6 +166,12 @@ def get_embedding(text: str, max_length: int = 20000):
                 pass
         return embedding
     except Exception as e:
+        # Record failure for circuit breaker
+        if _cb_available:
+            try:
+                _cb_record_failure("openai_embedding")
+            except Exception:
+                pass
         if hasattr(logger, "bind"):
             logger.bind(event="embedding_fail", text_len=len(text)).exception(
                 json.dumps(
@@ -193,18 +251,61 @@ def find_similar_candidates(db, job_embedding: list, k: int = 10):
     try:
         from sqlalchemy import text
 
-        # Build a literal vector representation. We explicitly cast both the
-        # stored column and the literal to `vector` to avoid driver/typing
-        # coercion issues where parameters are treated as text.
-        vec_literal = "[" + ",".join([str(float(x)) for x in job_embedding]) + "]"
+        # Validate all elements are numeric to prevent injection
+        floats = [float(x) for x in job_embedding]
+        vec_literal = "[" + ",".join(str(f) for f in floats) + "]"
         sql = text(
-            "SELECT id, (cv_embedding::vector <#> '"
-            + vec_literal
-            + "'::vector) AS score "
+            "SELECT id, (cv_embedding::vector <#> :vec::vector) AS score "
             "FROM candidates WHERE cv_embedding IS NOT NULL ORDER BY score LIMIT :k"
         )
-        res = db.execute(sql, {"k": k}).fetchall()
+        res = db.execute(sql, {"vec": vec_literal, "k": k}).fetchall()
         return [(row[0], row[1]) for row in res]
     except Exception as e:
         logger.error(f"find_similar_candidates error: {e}")
         return []
+
+
+def find_best_jobs_for_cv(db, cv_embedding: list, k: int = 10):
+    """Return top-k most relevant jobs for a given CV embedding.
+
+    Uses pgvector negative inner product operator (<#>).
+    Returns list of tuples (job_id, score).
+    """
+    try:
+        from sqlalchemy import text
+
+        floats = [float(x) for x in cv_embedding]
+        vec_literal = "[" + ",".join(str(f) for f in floats) + "]"
+        sql = text(
+            "SELECT id, (job_embedding::vector <#> :vec::vector) AS score "
+            "FROM jobs WHERE job_embedding IS NOT NULL ORDER BY score LIMIT :k"
+        )
+        res = db.execute(sql, {"vec": vec_literal, "k": k}).fetchall()
+        return [(row[0], row[1]) for row in res]
+    except Exception as e:
+        logger.error(f"find_best_jobs_for_cv error: {e}")
+        return []
+
+
+def index_cv(db, candidate_id: int, cv_text: str) -> bool:
+    """Compute embedding for CV text and store it on the candidate record.
+
+    Convenience wrapper: get_embedding → save_candidate_embedding.
+    Returns True on success, False otherwise.
+    """
+    embedding = get_embedding(cv_text)
+    if embedding is None:
+        return False
+    return save_candidate_embedding(db, candidate_id, embedding)
+
+
+def index_job(db, job_id: int, job_text: str) -> bool:
+    """Compute embedding for job description and store it on the job record.
+
+    Convenience wrapper: get_embedding → save_job_embedding.
+    Returns True on success, False otherwise.
+    """
+    embedding = get_embedding(job_text)
+    if embedding is None:
+        return False
+    return save_job_embedding(db, job_id, embedding)

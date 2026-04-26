@@ -290,7 +290,7 @@ def _as_pdf_bytes(text: str = "sample") -> bytes:
     return b"%PDF-1.4\n" + text.encode("utf-8", errors="ignore")
 
 
-def _mock_pipeline(cv_text: str, job_description: str):
+def _mock_pipeline(cv_text: str, job_description: str, lang: str = "en"):
     score = 82.0 if "python" in (cv_text or "").lower() else 68.0
     return {
         "final_score": score,

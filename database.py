@@ -50,7 +50,19 @@ if DATABASE_URL and "supabase.com" in DATABASE_URL:
 from sqlalchemy.pool import StaticPool
 
 # Skip database engine creation in mock mode to avoid connection attempts
-if os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes"):
+_mock_mode = os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes")
+if _mock_mode and DATABASE_URL and not DATABASE_URL.startswith("sqlite"):
+    # MOCK_SERVICES is on but a real DB URL exists — use the real DB
+    # so that recruiter/admin features that need org/user persistence work.
+    engine = create_engine(
+        DATABASE_URL,
+        pool_size=5,
+        max_overflow=10,
+        pool_pre_ping=True,
+        pool_recycle=3600,
+        echo=False,
+    )
+elif _mock_mode:
     # Create a dummy engine for mock mode
     engine = create_engine(
         "sqlite:///:memory:",
@@ -86,8 +98,11 @@ def get_db():
     Use this function as a FastAPI dependency so that every request gets
     a fresh session that is cleaned up automatically.
     """
-    # In mock mode, return a fake session to avoid database connections
-    if os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes"):
+    # In mock mode WITHOUT a real DB, return a fake session
+    if (
+        os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes")
+        and not (DATABASE_URL and not DATABASE_URL.startswith("sqlite"))
+    ):
 
         class MockSession:
             def add(self, obj):

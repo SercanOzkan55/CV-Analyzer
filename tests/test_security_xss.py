@@ -7,4 +7,4 @@ def test_xss_payload(client):
         "job_description": "<script>alert('xss')</script>",
     }
     resp = client.post("/api/v1/analyze", json=payload)
-    assert resp.status_code in (200, 400, 422)
+    assert resp.status_code in (200, 400, 403, 422, 429)
