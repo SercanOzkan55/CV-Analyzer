@@ -1,0 +1,64 @@
+[project]
+name = "cv-analyzer"
+version = "0.2.0"
+requires-python = ">=3.12"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+exclude = [
+    "migrations/",
+    "frontend/",
+    "mobile/",
+    "venv/",
+    ".venv/",
+    "__pycache__/",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "S",    # flake8-bandit
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+    "PIE",  # flake8-pie
+    "T20",  # flake8-print (no print() leak)
+    "RET",  # flake8-return
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "S101",   # assert usage (OK in tests)
+    "S105",   # hardcoded password (false positives on test fixtures)
+    "S106",   # hardcoded password argument
+    "B008",   # function call in default argument (FastAPI Depends)
+    "RET504", # unnecessary assignment before return
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "T20"]
+"_test_*" = ["S101", "S105", "S106", "T20"]
+"conftest.py" = ["S101", "S105", "S106"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+ignore_missing_imports = true
+exclude = [
+    "migrations/",
+    "frontend/",
+    "mobile/",
+    "venv/",
+    "tests/",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests", "venv", ".venv", "frontend", "mobile"]
+skips = ["B101"]
+

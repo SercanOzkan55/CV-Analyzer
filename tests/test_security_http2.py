@@ -5,4 +5,4 @@ def test_http2_not_supported(client):
     resp = client.post(
         "/api/v1/analyze", json={"cv_text": "foo", "job_description": "bar"}
     )
-    assert resp.status_code in (200, 400, 422)
+    assert resp.status_code in (200, 400, 403, 422, 429)

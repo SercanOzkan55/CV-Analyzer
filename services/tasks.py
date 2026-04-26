@@ -1,9 +1,13 @@
 import json
+import logging
 import os
 import time
 
+_task_logger = logging.getLogger("celery.tasks")
+
 try:
     from celery import Celery, Task
+    from celery.exceptions import SoftTimeLimitExceeded
 
     # Prefer Celery only if Redis broker/backend are reachable. If Redis is
     # not available (e.g. in CI), fall back to a synchronous LocalTask so the
@@ -38,6 +42,7 @@ try:
             - Retries up to 3 times with exponential backoff for exceptions
             - Enforces hard/soft time limits to prevent stuck CV parsing
             - On final failure, writes an entry to the FailedTask table
+            - Logs retries and crashes for operational visibility
             """
 
             autoretry_for = (Exception,)
@@ -46,7 +51,17 @@ try:
             time_limit = 60
             soft_time_limit = 45
 
+            def on_retry(self, exc, task_id, args, kwargs, einfo):
+                _task_logger.warning(
+                    "task:retry task=%s id=%s attempt=%d/%d error=%s",
+                    self.name, task_id, self.request.retries, self.max_retries, exc,
+                )
+
             def on_failure(self, exc, task_id, args, kwargs, einfo):
+                _task_logger.error(
+                    "task:failed task=%s id=%s error=%s",
+                    self.name, task_id, exc,
+                )
                 try:
                     session = SessionLocal()
                     payload = None
@@ -81,12 +96,35 @@ try:
         )
         celery_app.Task = DBLoggingTask
 
+        # ── Worker safety limits ──
+        celery_app.conf.update(
+            worker_max_memory_per_child=512_000,   # 512 MB → recycle worker
+            worker_max_tasks_per_child=200,        # recycle after 200 tasks
+            task_default_rate_limit="30/m",         # max 30 tasks/min per worker
+            task_acks_late=True,                    # ack after execution
+            task_reject_on_worker_lost=True,        # re-queue if worker dies
+            worker_prefetch_multiplier=1,           # one task at a time
+            broker_connection_retry_on_startup=True,
+            task_soft_time_limit=45,                # soft limit → SoftTimeLimitExceeded
+            task_time_limit=60,                     # hard kill after 60s
+            worker_hijack_root_logger=False,        # keep app logging config
+        )
+
         @celery_app.task(bind=True, name="analyze_pdf_task", queue="pdf_processing")
         def analyze_pdf_task(self, cv_text, job_description, lang="en"):
             # Keep PDF and text analysis responses consistent.
             from main import run_pipeline
+            from services.cv_autofix_service import auto_fix_cv_text
 
-            return run_pipeline(cv_text, job_description, lang)
+            autofix = auto_fix_cv_text(
+                cv_text=cv_text,
+                job_description=job_description,
+                lang=lang,
+                use_ai=False,
+                mode="safe",
+            )
+            normalized_text = autofix.get("optimized_cv_text") or cv_text
+            return run_pipeline(normalized_text, job_description, lang)
 
         @celery_app.task(bind=True, name="analyze_text_task", queue="ai_tasks")
         def analyze_text_task(self, cv_text, job_description, lang="en"):
@@ -94,6 +132,54 @@ try:
             from main import run_pipeline
 
             return run_pipeline(cv_text, job_description, lang)
+
+        @celery_app.task(bind=True, name="batch_recruiter_task", queue="pdf_processing")
+        def batch_recruiter_task(self, cv_list, job_id, job_description, org_id, recruiter_id):
+            """Process multiple CVs, analyze against a job, and save results."""
+            from main import run_pipeline
+            from services.cv_autofix_service import auto_fix_cv_text
+            from services.recruiter_service import save_candidate_action
+            from agents.extract_agent import extract_structured
+            from database import SessionLocal
+
+            db = SessionLocal()
+            results = []
+            try:
+                for cv_data in cv_list:
+                    cv_text = cv_data.get("text", "")
+                    filename = cv_data.get("filename", "unknown.pdf")
+                    candidate_name = cv_data.get("candidate_name")
+                    
+                    # 1. Autofix & Structure
+                    autofix = auto_fix_cv_text(cv_text=cv_text, job_description=job_description, use_ai=False)
+                    normalized_text = autofix.get("optimized_cv_text") or cv_text
+                    
+                    # 2. Match Pipeline
+                    analysis = run_pipeline(normalized_text, job_description)
+                    
+                    # 3. Extract metadata if name is missing
+                    if not candidate_name:
+                        structured = extract_structured(cv_text)
+                        candidate_name = structured.get("full_name") or filename
+                    
+                    # 4. Save to Recruiter Dashboard
+                    action = save_candidate_action(
+                        db=db,
+                        org_id=org_id,
+                        job_id=job_id,
+                        recruiter_id=recruiter_id,
+                        candidate_name=candidate_name,
+                        candidate_email=analysis.get("candidate_email"),
+                        cv_text=cv_text,
+                        final_score=analysis.get("final_score"),
+                        ats_score=analysis.get("ats_score"),
+                        action="pending",
+                        analysis_snapshot=analysis
+                    )
+                    results.append({"id": action.id, "name": candidate_name, "status": "success"})
+            finally:
+                db.close()
+            return results
 
     else:
         raise RuntimeError("Redis unavailable; fallback to LocalTask")
@@ -124,8 +210,17 @@ except Exception:
 
     def _analyze_pdf(cv_text, job_description, lang="en"):
         from main import run_pipeline
+        from services.cv_autofix_service import auto_fix_cv_text
 
-        return run_pipeline(cv_text, job_description, lang)
+        autofix = auto_fix_cv_text(
+            cv_text=cv_text,
+            job_description=job_description,
+            lang=lang,
+            use_ai=False,
+            mode="safe",
+        )
+        normalized_text = autofix.get("optimized_cv_text") or cv_text
+        return run_pipeline(normalized_text, job_description, lang)
 
     analyze_pdf_task = LocalTask(_analyze_pdf)
 
@@ -135,3 +230,37 @@ except Exception:
         return run_pipeline(cv_text, job_description, lang)
 
     analyze_text_task = LocalTask(_analyze_text)
+
+    def _batch_recruiter(cv_list, job_id, job_description, org_id, recruiter_id):
+        # Synchronous fallback for local testing
+        from main import run_pipeline
+        from services.cv_autofix_service import auto_fix_cv_text
+        from services.recruiter_service import save_candidate_action
+        from agents.extract_agent import extract_structured
+        from database import SessionLocal
+
+        db = SessionLocal()
+        results = []
+        try:
+            for cv_data in cv_list:
+                cv_text = cv_data.get("text", "")
+                filename = cv_data.get("filename", "unknown.pdf")
+                autofix = auto_fix_cv_text(cv_text=cv_text, job_description=job_description)
+                normalized_text = autofix.get("optimized_cv_text") or cv_text
+                analysis = run_pipeline(normalized_text, job_description)
+                
+                structured = extract_structured(cv_text)
+                name = structured.get("full_name") or filename
+                
+                action = save_candidate_action(
+                    db, org_id, job_id, recruiter_id, name,
+                    analysis.get("candidate_email"), cv_text, 
+                    analysis.get("final_score"), analysis.get("ats_score"), "pending",
+                    analysis
+                )
+                results.append({"id": action.id, "name": name, "status": "success"})
+        finally:
+            db.close()
+        return results
+
+    batch_recruiter_task = LocalTask(_batch_recruiter)

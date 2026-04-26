@@ -61,6 +61,7 @@ def _worker_loop(task_q: Queue, res_q: Queue, model_path: str, onnx_path: str):
             elif model is not None:
                 trees = getattr(model, "estimators_", None)
                 if trees:
+                    # RandomForest: per-tree prediction
                     preds = [tree.predict([features])[0] for tree in trees]
                     import numpy as np
 
@@ -79,11 +80,39 @@ def _worker_loop(task_q: Queue, res_q: Queue, model_path: str, onnx_path: str):
                         "explanation": {},
                     }
                 else:
+                    # XGBoost or other model
                     pred_val = float(model.predict([features])[0])
+                    std = 0.0
+                    # Try to estimate confidence for XGBoost
+                    if hasattr(model, "get_booster"):
+                        try:
+                            import xgboost as xgb
+                            import numpy as np
+
+                            dmat = xgb.DMatrix([features])
+                            n_trees = model.get_booster().num_boosted_rounds()
+                            if n_trees > 10:
+                                early_pred = float(
+                                    model.get_booster().predict(
+                                        dmat, iteration_range=(0, n_trees // 2)
+                                    )[0]
+                                )
+                                std = abs(pred_val - early_pred) * 0.5
+                        except Exception:
+                            pass
+
+                    import numpy as np
+
+                    confidence = float(round(float(np.exp(-std / 10) * 100), 2))
+                    risk = (
+                        "High Risk"
+                        if confidence < 60
+                        else ("Medium Risk" if pred_val < 50 else "Low Risk")
+                    )
                     res = {
                         "prediction": pred_val,
-                        "confidence": 50.0,
-                        "risk_level": "Low Risk",
+                        "confidence": confidence,
+                        "risk_level": risk,
                         "explanation": {},
                     }
             else:
@@ -126,11 +155,59 @@ def stop():
     _proc = None
 
 
+# ── Worker safety: crash recovery ────────────────────────────────────────
+_MAX_WORKER_RESTARTS = int(os.getenv("MAX_WORKER_RESTARTS", "3"))
+_WORKER_RESTART_DECAY_SECONDS = float(os.getenv("WORKER_RESTART_DECAY_SECONDS", "3600"))
+_worker_restart_count = 0
+_worker_last_restart: float = 0.0
+_worker_lock = __import__("threading").Lock()
+
+
+def _ensure_worker_alive():
+    """Auto-restart the model worker if it has crashed (up to limit)."""
+    global _proc, _task_q, _res_q, _worker_restart_count, _worker_last_restart
+    if _proc is not None and _proc.is_alive():
+        return True
+    with _worker_lock:
+        # Double-check after acquiring lock
+        if _proc is not None and _proc.is_alive():
+            return True
+        # Decay restart counter after a quiet period
+        now = time.time()
+        if _worker_last_restart and (now - _worker_last_restart) > _WORKER_RESTART_DECAY_SECONDS:
+            _worker_restart_count = 0
+        if _worker_restart_count >= _MAX_WORKER_RESTARTS:
+            logger.error(
+                json.dumps({"event": "worker_restart_limit", "restarts": _worker_restart_count})
+            )
+            return False
+        _worker_restart_count += 1
+        _worker_last_restart = now
+        logger.warning(
+            json.dumps({"event": "worker_auto_restart", "attempt": _worker_restart_count})
+        )
+        try:
+            from shared import WORKER_RESTARTS_TOTAL, _alert
+            WORKER_RESTARTS_TOTAL.inc()
+            _alert("worker_crash", f"Model worker auto-restart attempt {_worker_restart_count}")
+        except Exception:
+            pass
+        try:
+            start()
+            return _proc is not None and _proc.is_alive()
+        except Exception as e:
+            logger.exception(
+                json.dumps({"event": "worker_restart_failed", "error": str(e)})
+            )
+            return False
+
+
 def predict_sync(features, timeout: float = 5.0):
     """Send features to the worker and wait for response."""
     global _task_q, _res_q, _proc
     if _proc is None or not _proc.is_alive():
-        raise RuntimeError("model worker not running")
+        if not _ensure_worker_alive():
+            raise RuntimeError("model worker not running and cannot be restarted")
     req_id = str(uuid.uuid4())
     _task_q.put((req_id, features))
     start_t = time.time()

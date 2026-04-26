@@ -1,0 +1,1736 @@
+{
+  "version": "4.0.0",
+  "description": "Benchmark dataset for CV Analyzer scoring validation. Each entry contains a synthetic CV text, job description, and expected score ranges (ground truth) derived from human evaluation. Expanded to 30 entries in v2.",
+  "entries": [
+    {
+      "id": "B001",
+      "name": "Senior Python Dev - Perfect Match",
+      "category": "high_match",
+      "cv_text": "John Smith\nSenior Python Developer\n\nContact:\nEmail: john.smith@email.com\nPhone: +1 (555) 123-4567\nLocation: San Francisco, CA\nLinkedIn: linkedin.com/in/johnsmith\n\nProfessional Summary:\nExperienced Python developer with 8+ years in web development, machine learning, and data engineering. Strong background in Django, Flask, React, and cloud technologies. Passionate about building scalable applications and mentoring junior developers.\n\nWork Experience:\n\nSenior Python Developer\nTechCorp Inc., San Francisco, CA\nJanuary 2020 - Present\n- Led development of microservices architecture serving 1M+ users\n- Built ML pipelines processing 100TB+ data monthly using Python, TensorFlow, and AWS\n- Mentored 5 junior developers and established coding standards\n- Reduced deployment time by 60% through CI/CD improvements\n- Technologies: Python, Django, React, PostgreSQL, Redis, Docker, Kubernetes\n\nPython Developer\nStartupXYZ, San Francisco, CA\nMarch 2017 - December 2019\n- Developed REST APIs serving 500K users with 99.9% uptime\n- Implemented real-time chat system using WebSockets and Redis\n- Built data visualization dashboards with React and D3.js\n- Optimized database queries reducing response time by 40%\n\nJunior Developer\nCodeCompany, New York, NY\nJune 2015 - February 2017\n- Maintained legacy PHP applications and migrated to Python/Django\n- Built automated testing suite increasing code coverage to 85%\n- Technologies: Python, Django, PHP, MySQL, Git\n\nSkills:\n- Programming: Python, JavaScript, SQL, R\n- Frameworks: Django, Flask, React, Node.js\n- Databases: PostgreSQL, MongoDB, Redis, Elasticsearch\n- Cloud: AWS, Docker, Kubernetes, Terraform\n- Tools: Git, Jenkins, Jira, Linux\n\nEducation:\nMaster of Science in Computer Science\nStanford University, 2015\n- GPA: 3.8/4.0\n\nBachelor of Science in Computer Science\nUC Berkeley, 2013\n- GPA: 3.6/4.0\n\nCertifications:\n- AWS Certified Solutions Architect (2022)\n- Google Cloud Professional Developer (2021)",
+      "job_description": "We are looking for a Senior Python Developer with 5+ years of experience. Requirements: Python, Django, REST APIs, PostgreSQL, Docker, Kubernetes, AWS. Experience with microservices architecture and CI/CD pipelines. Strong problem-solving skills and ability to mentor junior developers.",
+      "expected": {
+        "keyword_score": {
+          "min": 60,
+          "max": 100
+        },
+        "ats_score": {
+          "min": 75,
+          "max": 100
+        },
+        "final_score": {
+          "min": 75,
+          "max": 100
+        }
+      },
+      "notes": "Strong CV perfectly aligned with JD. Should produce high scores across all dimensions."
+    },
+    {
+      "id": "B002",
+      "name": "Junior Frontend Dev - Role Mismatch",
+      "category": "low_match",
+      "cv_text": "Alice Johnson\nJunior Frontend Developer\n\nContact:\nEmail: alice.j@email.com\nPhone: +44 7911 123456\nLocation: London, UK\n\nSummary:\nRecent graduate with 1 year of experience in frontend development. Skilled in HTML, CSS, JavaScript, and React. Looking for opportunities to grow in web development.\n\nExperience:\nJunior Frontend Developer\nWebAgency Ltd., London, UK\nJuly 2024 - Present\n- Built responsive landing pages using HTML, CSS, and JavaScript\n- Developed React components for client dashboards\n- Participated in code reviews and sprint planning\n\nIntern - Web Development\nDigitalCo, London, UK\nJanuary 2024 - June 2024\n- Assisted in building company website redesign\n- Created interactive prototypes in Figma\n- Learned Git version control and agile methodology\n\nSkills:\nHTML, CSS, JavaScript, React, Git, Figma, Photoshop\n\nEducation:\nBSc Computer Science\nUniversity of London, 2024\n- GPA: 3.2/4.0",
+      "job_description": "Senior Backend Engineer needed. 7+ years experience with Java, Spring Boot, microservices, Kafka, PostgreSQL, Docker, Kubernetes. Must have experience leading teams and designing distributed systems. Strong knowledge of system design and database optimization required.",
+      "expected": {
+        "keyword_score": {
+          "min": 0,
+          "max": 25
+        },
+        "ats_score": {
+          "min": 50,
+          "max": 85
+        },
+        "final_score": {
+          "min": 30,
+          "max": 65
+        }
+      },
+      "notes": "Frontend junior CV vs Backend senior JD. Very low keyword match expected. ATS structure should be decent but overall mismatch."
+    },
+    {
+      "id": "B003",
+      "name": "Data Scientist - Moderate Match",
+      "category": "medium_match",
+      "cv_text": "Dr. Maria Garcia\nData Scientist\n\nContact:\nEmail: maria.garcia@email.com\nPhone: +1 (555) 987-6543\nLocation: New York, NY\nLinkedIn: linkedin.com/in/mariagarcia\nGitHub: github.com/mgarcia\n\nProfessional Summary:\nPhD Data Scientist with 4 years of experience in machine learning, statistical modeling, and natural language processing. Published researcher with expertise in deep learning frameworks.\n\nWork Experience:\nData Scientist\nAI Solutions Corp., New York, NY\nMarch 2022 - Present\n- Developed NLP models for sentiment analysis achieving 92% accuracy\n- Built recommendation engine increasing user engagement by 35%\n- Designed A/B testing frameworks for product experiments\n- Collaborated with engineering teams to deploy ML models to production\n- Technologies: Python, TensorFlow, PyTorch, scikit-learn, AWS SageMaker\n\nResearch Assistant\nMIT, Cambridge, MA\nSeptember 2019 - February 2022\n- Published 3 papers in top-tier ML conferences (NeurIPS, ICML)\n- Developed novel attention mechanisms for transformer models\n- Managed computing cluster with 50+ GPUs\n\nSkills:\n- Languages: Python, R, SQL, Julia\n- ML/DL: TensorFlow, PyTorch, scikit-learn, Keras, Hugging Face\n- Data: Pandas, NumPy, Spark, Airflow\n- Cloud: AWS, GCP, Azure\n- Visualization: Matplotlib, Seaborn, Tableau, Power BI\n\nEducation:\nPhD in Computer Science (Machine Learning)\nMIT, 2022\n\nMSc in Applied Mathematics\nColumbia University, 2019\n\nBSc in Mathematics\nUniversidad de Barcelona, 2017\n\nPublications:\n- \"Efficient Attention Mechanisms for Large-Scale NLP\" - NeurIPS 2021\n- \"Transfer Learning in Low-Resource Languages\" - ICML 2020",
+      "job_description": "Machine Learning Engineer needed to build production ML systems. Requirements: Python, TensorFlow or PyTorch, experience deploying models at scale, Docker, Kubernetes, CI/CD. Experience with recommendation systems, A/B testing, and data pipelines (Spark/Airflow). Strong software engineering fundamentals required.",
+      "expected": {
+        "keyword_score": {
+          "min": 40,
+          "max": 75
+        },
+        "ats_score": {
+          "min": 70,
+          "max": 95
+        },
+        "final_score": {
+          "min": 65,
+          "max": 90
+        }
+      },
+      "notes": "Data scientist applying for ML engineer role. Good overlap in ML skills but missing some infra keywords (Docker, K8s, CI/CD). Should score medium-high."
+    },
+    {
+      "id": "B004",
+      "name": "Fresh Graduate - No Experience",
+      "category": "entry_level",
+      "cv_text": "Mehmet Yilmaz\n\nIletisim:\nE-posta: mehmet.y@gmail.com\nTelefon: +90 536 123 4567\nKonum: Istanbul, Turkiye\n\nEgitim:\nBilgisayar Muhendisligi Lisans\nIstanbul Teknik Universitesi, 2025\n- GPA: 3.5/4.0\n\nBeceriler:\nPython, Java, C++, SQL, Git\n\nProjeler:\nE-Ticaret Sitesi (2024)\n- Django ile backend gelistirdim\n- React ile frontend olusturdim\n- PostgreSQL veritabani kullandim\n\nDiller:\nTurkce (Anadil), Ingilizce (B2), Almanca (A2)",
+      "job_description": "Junior Software Developer position. Requirements: Computer Science degree, Python or Java, SQL basics, Git. Nice to have: Django, React, cloud experience. Willingness to learn and grow.",
+      "expected": {
+        "keyword_score": {
+          "min": 15,
+          "max": 55
+        },
+        "ats_score": {
+          "min": 35,
+          "max": 75
+        },
+        "final_score": {
+          "min": 25,
+          "max": 65
+        }
+      },
+      "notes": "Fresh grad with relevant education and project experience. Turkish CV text with ASCII-folded chars. Should match junior JD reasonably well."
+    },
+    {
+      "id": "B005",
+      "name": "Overqualified Manager - Mismatch Level",
+      "category": "overqualified",
+      "cv_text": "Robert Chen\nVP of Engineering\n\nContact:\nEmail: robert.chen@email.com\nPhone: +1 (415) 555-0199\nLocation: Palo Alto, CA\nLinkedIn: linkedin.com/in/robertchen\n\nProfessional Summary:\nTechnology executive with 15+ years of experience leading engineering organizations of 100+ engineers. Track record of scaling systems from startup to IPO. Board advisor for 3 AI startups.\n\nWork Experience:\nVP of Engineering\nMegaTech Corp (NASDAQ: MEGA), Palo Alto, CA\n2019 - Present\n- Led organization of 120 engineers across 8 teams\n- Drove architecture migration to cloud-native, reducing infra costs by $4M/year\n- Established engineering culture: blameless postmortems, RFC process, design docs\n- Managed $15M annual engineering budget\n- Grew team from 40 to 120 engineers through structured hiring program\n\nSenior Director of Engineering\nScaleUp Inc., San Francisco, CA\n2015 - 2019\n- Built and managed 60-person engineering team\n- Led migration from monolith to microservices serving 50M users\n- Implemented OKR framework achieving 95% goal completion rate\n- Technologies oversight: Python, Go, Kafka, PostgreSQL, AWS, Kubernetes\n\nEngineering Manager\nStartupABC, San Francisco, CA\n2012 - 2015\n- Managed team of 15 engineers building payment processing platform\n- Achieved PCI-DSS compliance and SOC 2 Type II certification\n- Reduced mean time to recovery (MTTR) from 4 hours to 15 minutes\n\nSenior Software Engineer\nBigCo, Mountain View, CA\n2008 - 2012\n- Built distributed search infrastructure processing 1B+ queries/day\n- Designed and implemented real-time recommendation engine\n- Mentored 10+ junior engineers\n\nSkills:\nLeadership, Strategic Planning, Architecture Design, Python, Go, Java,\nAWS, Kubernetes, Team Building, Budget Management, M&A Due Diligence,\nAgile/Scrum, OKRs, Board Presentations\n\nEducation:\nMBA\nStanford Graduate School of Business, 2012\n\nBS Computer Science\nCarnegie Mellon University, 2008\n- Summa Cum Laude",
+      "job_description": "Junior Python Developer internship. 0-1 years experience. Must know Python basics, HTML/CSS, and Git. Willingness to learn Django and React. Part-time position, 20 hours/week.",
+      "expected": {
+        "keyword_score": {
+          "min": 10,
+          "max": 40
+        },
+        "ats_score": {
+          "min": 70,
+          "max": 95
+        },
+        "final_score": {
+          "min": 40,
+          "max": 85
+        }
+      },
+      "notes": "VP of Engineering applying for junior internship. ATS structure should be excellent but keyword match very low due to level mismatch."
+    },
+    {
+      "id": "B006",
+      "name": "Career Changer - Non-Tech to Tech",
+      "category": "career_change",
+      "cv_text": "Sarah Williams\nAspiring Software Developer\n\nContact:\nEmail: sarah.w@email.com\nPhone: +1 (212) 555-0123\nLocation: New York, NY\n\nSummary:\nFormer marketing manager transitioning to software development. Completed intensive bootcamp and built several projects. Bringing 5 years of project management and team collaboration experience.\n\nWork Experience:\nMarketing Manager\nBrandCorp, New York, NY\n2019 - 2024\n- Managed team of 8 marketing specialists\n- Led digital campaigns generating $2M in revenue\n- Analyzed customer data using Excel and Google Analytics\n- Managed project timelines and cross-functional collaboration\n\nMarketing Coordinator\nAdAgency, New York, NY\n2017 - 2019\n- Created content for social media platforms\n- Coordinated events and product launches\n- Built email marketing campaigns with Mailchimp\n\nEducation:\nFull Stack Web Development Bootcamp\nGeneral Assembly, 2024\n- 12-week intensive program\n- Projects: React apps, Node.js APIs, PostgreSQL databases\n\nBA Communications\nNYU, 2017\n\nTechnical Projects:\nTask Management App (2024)\n- Built with React, Node.js, Express, MongoDB\n- Implemented user authentication with JWT\n- Deployed on Heroku with CI/CD pipeline\n\nWeather Dashboard (2024)\n- React frontend consuming OpenWeather API\n- Responsive design with CSS Grid and Flexbox\n\nSkills:\nJavaScript, React, Node.js, Express, MongoDB, PostgreSQL, HTML, CSS, Git, Python basics",
+      "job_description": "Full Stack Developer position. 2+ years experience with JavaScript, React, Node.js, Express, MongoDB or PostgreSQL. Experience with REST APIs and Git required. Bonus: Python, Docker, AWS.",
+      "expected": {
+        "keyword_score": {
+          "min": 40,
+          "max": 75
+        },
+        "ats_score": {
+          "min": 55,
+          "max": 85
+        },
+        "final_score": {
+          "min": 50,
+          "max": 90
+        }
+      },
+      "notes": "Career changer with bootcamp. Tech skills match reasonably but work experience is non-tech. Should score medium."
+    },
+    {
+      "id": "B007",
+      "name": "Keyword Stuffed CV - Spam Detection",
+      "category": "spam",
+      "cv_text": "Expert Developer\n\nSkills:\nPython Python Python Python Python Python Python Python Django Django Django Django Django Django Django REST API REST API REST API REST API REST API PostgreSQL PostgreSQL PostgreSQL PostgreSQL Docker Docker Docker Docker Kubernetes Kubernetes Kubernetes Kubernetes AWS AWS AWS AWS AWS AWS\n\nExperience:\nDeveloper at Company\n2020 - Present\nPython Python Python Python Django Django Django Django",
+      "job_description": "Senior Python Developer with experience in Django, REST APIs, PostgreSQL, Docker, Kubernetes, AWS.",
+      "expected": {
+        "keyword_score": {
+          "min": 50,
+          "max": 100
+        },
+        "ats_score": {
+          "min": 20,
+          "max": 55
+        },
+        "final_score": {
+          "min": 25,
+          "max": 58
+        }
+      },
+      "notes": "Keyword-stuffed CV. High keyword match expected but very low ATS structure score. Spam penalty should kick in."
+    },
+    {
+      "id": "B008",
+      "name": "Minimal CV - Missing Sections",
+      "category": "minimal",
+      "cv_text": "Jane Doe\njane@email.com\n\nI have experience with Python and Java.\nI worked at a company for 2 years.",
+      "job_description": "Software Developer needed. Python, Java, SQL, Git required. 3+ years experience preferred.",
+      "expected": {
+        "keyword_score": {
+          "min": 15,
+          "max": 50
+        },
+        "ats_score": {
+          "min": 15,
+          "max": 45
+        },
+        "final_score": {
+          "min": 15,
+          "max": 50
+        }
+      },
+      "notes": "Extremely minimal CV missing key sections. Should score very low on structure/ATS despite some keyword matches."
+    },
+    {
+      "id": "B009",
+      "name": "No JD - Standalone CV Analysis",
+      "category": "no_jd",
+      "cv_text": "Michael Brown\nSoftware Engineer\n\nContact:\nEmail: m.brown@email.com\nPhone: +1 (555) 000-1111\nLocation: Austin, TX\nLinkedIn: linkedin.com/in/mbrown\n\nSummary:\nSoftware engineer with 5 years of experience building web applications and distributed systems.\n\nExperience:\nSoftware Engineer\nTechStartup Inc., Austin, TX\n2021 - Present\n- Designed and built RESTful APIs using Python and FastAPI\n- Managed deployments on AWS ECS with Terraform\n- Led migration from PostgreSQL to DynamoDB for write-heavy workloads\n- Reduced API latency by 45% through caching strategies\n\nSoftware Engineer\nWebCo, Austin, TX\n2019 - 2021\n- Built internal tools using React and TypeScript\n- Implemented automated testing with pytest achieving 90% coverage\n- Contributed to open-source monitoring tools\n\nSkills:\nPython, JavaScript, TypeScript, React, FastAPI, Django, PostgreSQL, DynamoDB,\nAWS, Docker, Terraform, Git, CI/CD, Linux\n\nEducation:\nBS Computer Science\nUT Austin, 2019\n- GPA: 3.7/4.0",
+      "job_description": "",
+      "expected": {
+        "keyword_score": {
+          "min": 0,
+          "max": 0
+        },
+        "ats_score": {
+          "min": 70,
+          "max": 95
+        },
+        "final_score": {
+          "min": 65,
+          "max": 95
+        }
+      },
+      "notes": "Well-structured CV without job description. Keyword score should be 0 (no JD). ATS/final should reflect structural quality only."
+    },
+    {
+      "id": "B010",
+      "name": "Turkish CV - Backend Developer JD",
+      "category": "multilingual",
+      "cv_text": "Sercan Ozkan\nYazilim Muhendisi\n\nIletisim:\nE-posta: sercan@email.com\nTelefon: +90 546 123 4567\nKonum: Istanbul, Turkiye\nGitHub: github.com/sercanozkan\n\nProfil:\nGercek zamanli sistemler ve istemci-sunucu mimarileri uzerine odaklanan yazilim muhendisligi ogrencisi. Dusuk gecikmeli sistemler ve aglar konusunda deneyimli.\n\nIs Deneyimi:\nYazilim Muhendisi Stajyeri\nTeknoFirma A.S., Istanbul\nHaziran 2024 - Agustos 2024\n- Gercek zamanli video islemleri icin backend gelistirdim\n- TCP soketleri ile istemci-sunucu uygulamalari olusturdum\n- RTSP ve RTP protokolleriyle video akisi optimize ettim\n- Gecikme sorunlarini arastirdim ve performans iyilestirme stratejileri gelistirdim\n- Teknolojiler: Java, Python, C, TCP/IP, RTSP, RTP\n\nProjeler:\nFoodApp - Yemek Siparis Uygulamasi (2024)\n- Django backend ve React frontend ile full-stack uygulama\n- PostgreSQL veritabani ve RESTful API\n\nJavaMiniOyun - Ciftlik Oyunu (2023)\n- Java ile nesne yonelimli programlama projesi\n- Oyun mantigi, yapay zeka davranisi ve gercek zamanli etkilesimler\n\nBeceriler:\nJava, Python, C, JavaScript, HTML, CSS, Git, MySQL, TCP/IP, RTSP, RTP\n\nEgitim:\nBilgisayar Muhendisligi Lisans\nIstanbul Teknik Universitesi, 2022 - 2025\n- GPA: 3.89/4.00\n\nDiller:\nTurkce (Anadil), Ingilizce (C1), Almanca (B1)",
+      "job_description": "Backend Developer Job Description: Worked as a software engineer intern / junior backend developer focusing on real-time systems, backend development and performance optimization. Responsibilities: Developed and optimized real-time video streaming, network communication and scalable application design. Gained hands-on experience in building efficient low-latency systems and developing client-server architectures. Technologies used: Java, Python, C, JavaScript, HTML, CSS, TCP/IP, RTSP, RTP, Git, OOP, data structures and algorithms.",
+      "expected": {
+        "keyword_score": {
+          "min": 15,
+          "max": 50
+        },
+        "ats_score": {
+          "min": 35,
+          "max": 65
+        },
+        "final_score": {
+          "min": 25,
+          "max": 55
+        }
+      },
+      "notes": "Turkish CV text (ASCII-folded) matched against English JD with long phrase-heavy JD. Phrase dilution causes lower scores than short JD. Calibrated from actual run: kw=23.45, ats=47.24, final=35.20."
+    },
+    {
+      "id": "B011",
+      "name": "Bad English CV - Grammar Errors",
+      "category": "bad_english",
+      "cv_text": "Experinced sofware devloper with 3 yers of experiense in Pyhton and Jva. I was working at company for make web aplicatons. I have knowlege of SQL and Git. I am good team playr and fast lerner.\n\nSkils:\nPyhton, Jva, SQL, Git, HTML\n\nEducasion:\nBachelor Computar Sciens\nUniversity 2022",
+      "job_description": "Python Developer needed. Requirements: Python, SQL, Git, teamwork skills.",
+      "expected": {
+        "keyword_score": {
+          "min": 15,
+          "max": 60
+        },
+        "ats_score": {
+          "min": 15,
+          "max": 50
+        },
+        "final_score": {
+          "min": 15,
+          "max": 55
+        }
+      },
+      "notes": "CV full of typos/misspellings. Fuzzy matching should catch some but ATS structure very weak."
+    },
+    {
+      "id": "B012",
+      "name": "Typo Heavy CV - Technical Terms",
+      "category": "typo_heavy",
+      "cv_text": "Alex Dev\nSoftware Engineer\n\nContact: alex@email.com\n\nSummary:\n3 years building web apps with Pythn, Djnago, and PostgrSQL.\n\nExperience:\nSoftware Engineer\nTechCo, 2022 - Present\n- Built REST APis using Djnago REST Framwork\n- Managed Dockerr containers and Kuberntes deployments\n- Used Jenknins for CI/CD pipelnes\n\nSkills:\nPythn, Djnago, PostgrSQL, Dockerr, Kuberntes, Git, AWS",
+      "job_description": "Python Developer with Django, PostgreSQL, Docker, Kubernetes experience.",
+      "expected": {
+        "keyword_score": {
+          "min": 55,
+          "max": 80
+        },
+        "ats_score": {
+          "min": 50,
+          "max": 80
+        },
+        "final_score": {
+          "min": 45,
+          "max": 75
+        }
+      },
+      "notes": "Technical terms misspelled. Tests fuzzy matching on common typos."
+    },
+    {
+      "id": "B013",
+      "name": "AI-Generated CV - Verbose",
+      "category": "ai_generated",
+      "cv_text": "Innovative and results-driven software engineering professional with a proven track record of delivering cutting-edge solutions leveraging state-of-the-art technologies. Adept at collaborating with cross-functional teams to drive digital transformation initiatives and optimize business processes through strategic technology implementation.\n\nCore Competencies:\nStrategic Technology Leadership | Agile Methodologies | Full-Stack Development | Cloud Architecture | Data-Driven Decision Making | Stakeholder Management\n\nProfessional Experience:\nSenior Software Engineer\nInnovaTech Solutions, 2021 - Present\n- Spearheaded the development of a next-generation microservices platform\n- Orchestrated seamless migration of legacy systems to cloud-native architecture\n- Championed best practices in code quality and automated testing\n\nSkills:\nPython, JavaScript, React, Node.js, AWS, Docker, Kubernetes, PostgreSQL, MongoDB, Redis, GraphQL, TypeScript, CI/CD, Agile, Scrum",
+      "job_description": "Senior Full Stack Developer. Python, React, Node.js, AWS, Docker required.",
+      "expected": {
+        "keyword_score": {
+          "min": 50,
+          "max": 90
+        },
+        "ats_score": {
+          "min": 55,
+          "max": 90
+        },
+        "final_score": {
+          "min": 55,
+          "max": 90
+        }
+      },
+      "notes": "AI-generated verbose CV. High keyword match but buzzword-heavy content."
+    },
+    {
+      "id": "B014",
+      "name": "Finance Analyst CV vs Finance JD",
+      "category": "finance",
+      "cv_text": "Emma Chen\nFinancial Analyst\n\nContact: emma.chen@email.com | +1 555-0142\n\nSummary:\n5 years in financial analysis, risk modeling, and portfolio management at top-tier investment banks.\n\nExperience:\nSenior Financial Analyst\nGoldman Sachs, New York, 2021 - Present\n- Built DCF and LBO models for M&A transactions worth $2B+\n- Led quarterly earnings analysis for 15 portfolio companies\n- Developed risk assessment frameworks using VBA and Python\n\nFinancial Analyst\nJP Morgan, New York, 2019 - 2021\n- Created financial reports and dashboards using Excel and Tableau\n- Performed variance analysis and budget forecasting\n\nSkills:\nFinancial Modeling, DCF, LBO, Excel, VBA, Python, SQL, Tableau, Bloomberg Terminal, Risk Analysis\n\nEducation:\nMBA Finance, Wharton, 2019\nBS Economics, NYU, 2017\n\nCertifications:\nCFA Level III, FRM",
+      "job_description": "Financial Analyst needed. Requirements: Financial modeling, DCF/LBO analysis, Excel, VBA, Python, SQL. Experience with Bloomberg Terminal and risk management. CFA preferred.",
+      "expected": {
+        "keyword_score": {
+          "min": 55,
+          "max": 95
+        },
+        "ats_score": {
+          "min": 70,
+          "max": 95
+        },
+        "final_score": {
+          "min": 65,
+          "max": 95
+        }
+      },
+      "notes": "Finance domain CV vs matching Finance JD. Good keyword overlap."
+    },
+    {
+      "id": "B015",
+      "name": "Marketing Manager vs Dev JD",
+      "category": "cross_sector",
+      "cv_text": "Lisa Park\nDigital Marketing Manager\n\nContact: lisa@email.com\n\nSummary:\n7 years in digital marketing, SEO, and brand strategy.\n\nExperience:\nDigital Marketing Manager, BrandCo, 2020-Present\n- Managed $5M annual ad budget across Google, Facebook, LinkedIn\n- Increased organic traffic by 200% through SEO optimization\n- Led team of 6 content creators and designers\n\nSkills:\nSEO, SEM, Google Analytics, Facebook Ads, Content Strategy, Copywriting, HubSpot, Salesforce, A/B Testing, Email Marketing\n\nEducation:\nBA Marketing, UCLA, 2017",
+      "job_description": "Backend Python Developer. Requirements: Python, Django, PostgreSQL, Docker, REST APIs, microservices.",
+      "expected": {
+        "keyword_score": {
+          "min": 0,
+          "max": 15
+        },
+        "ats_score": {
+          "min": 45,
+          "max": 80
+        },
+        "final_score": {
+          "min": 55,
+          "max": 85
+        }
+      },
+      "notes": "Complete sector mismatch. Marketing vs Backend Dev. Near-zero keyword overlap."
+    },
+    {
+      "id": "B016",
+      "name": "Same CV Different JD - DevOps",
+      "category": "same_cv_diff_jd",
+      "cv_text": "John Smith\nSenior Python Developer\n\nContact:\nEmail: john.smith@email.com\nPhone: +1 (555) 123-4567\n\nSkills:\nPython, JavaScript, SQL, Django, Flask, React, Node.js, PostgreSQL, MongoDB, Redis, AWS, Docker, Kubernetes, Terraform, Git, Jenkins, Linux\n\nExperience:\nSenior Python Developer, TechCorp, 2020 - Present\n- Led microservices architecture serving 1M+ users\n- Built ML pipelines using Python, TensorFlow, AWS\n- Reduced deployment time by 60% through CI/CD\n\nEducation:\nMS Computer Science, Stanford, 2015",
+      "job_description": "DevOps Engineer needed. Requirements: Terraform, Kubernetes, Docker, AWS, CI/CD pipelines, Jenkins, Linux, monitoring (Prometheus/Grafana), infrastructure as code. 5+ years experience.",
+      "expected": {
+        "keyword_score": {
+          "min": 25,
+          "max": 65
+        },
+        "ats_score": {
+          "min": 55,
+          "max": 85
+        },
+        "final_score": {
+          "min": 40,
+          "max": 80
+        }
+      },
+      "notes": "B001 CV against DevOps JD. Partial overlap (Docker/K8s/AWS/Jenkins) but missing monitoring/IaC focus."
+    },
+    {
+      "id": "B017",
+      "name": "Same CV Different JD - Data Science",
+      "category": "same_cv_diff_jd",
+      "cv_text": "John Smith\nSenior Python Developer\n\nContact:\nEmail: john.smith@email.com\nPhone: +1 (555) 123-4567\n\nSkills:\nPython, JavaScript, SQL, Django, Flask, React, Node.js, PostgreSQL, MongoDB, Redis, AWS, Docker, Kubernetes, Terraform, Git, Jenkins, Linux\n\nExperience:\nSenior Python Developer, TechCorp, 2020 - Present\n- Led microservices architecture serving 1M+ users\n- Built ML pipelines using Python, TensorFlow, AWS\n\nEducation:\nMS Computer Science, Stanford, 2015",
+      "job_description": "Data Scientist needed. Requirements: Python, R, statistical modeling, machine learning, TensorFlow/PyTorch, pandas, numpy, scikit-learn, data visualization, Jupyter notebooks, A/B testing, SQL.",
+      "expected": {
+        "keyword_score": {
+          "min": 5,
+          "max": 30
+        },
+        "ats_score": {
+          "min": 50,
+          "max": 80
+        },
+        "final_score": {
+          "min": 45,
+          "max": 75
+        }
+      },
+      "notes": "B001 CV against Data Science JD. Python/SQL/TensorFlow overlap but missing R, stats, viz tools."
+    },
+    {
+      "id": "B018",
+      "name": "Completely Irrelevant - Chef vs Developer",
+      "category": "irrelevant",
+      "cv_text": "Marco Rossi\nExecutive Chef\n\nContact: marco@email.com\n\nSummary:\n15 years in fine dining, menu creation, and kitchen management.\n\nExperience:\nExecutive Chef, La Bella Vita, 2018 - Present\n- Managed kitchen staff of 20\n- Created seasonal menus reducing food costs by 15%\n- Maintained 4.8 star rating on Yelp\n\nSkills:\nMenu Planning, Kitchen Management, Food Safety, HACCP, Budgeting, Team Leadership, French Cuisine, Italian Cuisine\n\nEducation:\nCulinary Arts Diploma, Le Cordon Bleu, 2009",
+      "job_description": "Senior Python Developer with Django, REST APIs, PostgreSQL, Docker, Kubernetes, AWS experience required.",
+      "expected": {
+        "keyword_score": {
+          "min": 0,
+          "max": 10
+        },
+        "ats_score": {
+          "min": 45,
+          "max": 75
+        },
+        "final_score": {
+          "min": 55,
+          "max": 85
+        }
+      },
+      "notes": "Zero domain overlap. Chef CV vs Python dev JD. Tests complete mismatch handling."
+    },
+    {
+      "id": "B019",
+      "name": "German CV - Multilingual Test",
+      "category": "multilingual",
+      "cv_text": "Maximilian Weber\nSoftwareentwickler\n\nKontakt:\nE-Mail: max.weber@email.de\nTelefon: +49 176 12345678\nStandort: Berlin, Deutschland\n\nBerufserfahrung:\nSenior Softwareentwickler\nTechGmbH, Berlin, 2020 - Heute\n- Entwicklung von Microservices mit Java und Spring Boot\n- Implementierung von REST APIs und GraphQL Schnittstellen\n- Containerisierung mit Docker und Kubernetes\n\nKenntnisse:\nJava, Spring Boot, Python, Docker, Kubernetes, PostgreSQL, MongoDB, Git, CI/CD, Agile\n\nAusbildung:\nMaster Informatik, TU Berlin, 2020",
+      "job_description": "Java Developer needed. Spring Boot, Docker, Kubernetes, PostgreSQL, REST APIs, microservices experience required.",
+      "expected": {
+        "keyword_score": {
+          "min": 55,
+          "max": 85
+        },
+        "ats_score": {
+          "min": 35,
+          "max": 60
+        },
+        "final_score": {
+          "min": 25,
+          "max": 50
+        }
+      },
+      "notes": "German CV text against English JD. Technical terms should match despite language difference."
+    },
+    {
+      "id": "B020",
+      "name": "Empty Skills Section",
+      "category": "edge_case",
+      "cv_text": "Tom Baker\nDeveloper\n\nContact: tom@email.com\n\nExperience:\nDeveloper, SomeCo, 2023 - Present\n- Worked on various projects\n- Used different technologies\n\nSkills:\n\nEducation:\nBS Computer Science, 2023",
+      "job_description": "Python Developer needed. Python, Django, PostgreSQL required.",
+      "expected": {
+        "keyword_score": {
+          "min": 0,
+          "max": 25
+        },
+        "ats_score": {
+          "min": 40,
+          "max": 70
+        },
+        "final_score": {
+          "min": 35,
+          "max": 65
+        }
+      },
+      "notes": "CV with empty skills section and vague experience. Very low scores expected."
+    },
+    {
+      "id": "B021",
+      "name": "Keyword Variant - JS vs JavaScript",
+      "category": "fuzzy_test",
+      "cv_text": "Dev User\n\nSkills:\nJS, Node, React, TS, Mongo, Postgres, k8s, AWS\n\nExperience:\nDeveloper, Co, 2022 - Present\n- Built web apps with JS and React\n- Used Node for backend services\n- Deployed on k8s with Docker",
+      "job_description": "JavaScript Developer. Requirements: JavaScript, Node.js, React, TypeScript, MongoDB, PostgreSQL, Kubernetes, Docker, AWS.",
+      "expected": {
+        "keyword_score": {
+          "min": 20,
+          "max": 70
+        },
+        "ats_score": {
+          "min": 25,
+          "max": 60
+        },
+        "final_score": {
+          "min": 20,
+          "max": 60
+        }
+      },
+      "notes": "Tests abbreviation matching: JS→JavaScript, TS→TypeScript, k8s→Kubernetes, Mongo→MongoDB."
+    },
+    {
+      "id": "B022",
+      "name": "Nurse CV vs Healthcare IT JD",
+      "category": "cross_sector",
+      "cv_text": "Sarah Johnson RN\nRegistered Nurse\n\nContact: sarah.j@email.com\n\nExperience:\nICU Nurse, City Hospital, 2019 - Present\n- Managed patient care for 8-10 patients per shift\n- Implemented electronic health records (EHR) system training\n- Used Epic and Cerner healthcare software\n\nSkills:\nPatient Care, EHR, Epic, Cerner, HIPAA, Team Collaboration, Critical Thinking\n\nEducation:\nBSN, State University, 2019\n\nCertifications:\nBLS, ACLS, PALS",
+      "job_description": "Healthcare IT Developer. Requirements: Python, HL7/FHIR, EHR integration, Epic API, SQL, REST APIs, HIPAA compliance, Docker.",
+      "expected": {
+        "keyword_score": {
+          "min": 5,
+          "max": 35
+        },
+        "ats_score": {
+          "min": 45,
+          "max": 80
+        },
+        "final_score": {
+          "min": 25,
+          "max": 60
+        }
+      },
+      "notes": "Nurse with EHR experience vs Healthcare IT dev. Small overlap (Epic, HIPAA, EHR) but mostly mismatch."
+    },
+    {
+      "id": "B023",
+      "name": "Intern CV - Very Short",
+      "category": "minimal",
+      "cv_text": "Ali Yilmaz\nStudent\n\nEmail: ali@email.com\n\nEducation:\nComputer Engineering, ITU, 2023-2027\nGPA: 3.5\n\nSkills: Python, Java, C",
+      "job_description": "Intern wanted. Python basics, willingness to learn.",
+      "expected": {
+        "keyword_score": {
+          "min": 5,
+          "max": 30
+        },
+        "ats_score": {
+          "min": 35,
+          "max": 60
+        },
+        "final_score": {
+          "min": 25,
+          "max": 55
+        }
+      },
+      "notes": "Very short student CV for intern role. Minimal but matching content."
+    },
+    {
+      "id": "B024",
+      "name": "Senior CV - Multiple Pages Worth",
+      "category": "long_cv",
+      "cv_text": "Dr. James Wilson\nPrincipal Engineer\n\nContact:\nEmail: james.wilson@email.com\nPhone: +1 (555) 999-0001\nLinkedIn: linkedin.com/in/jameswilson\nGitHub: github.com/jwilson\n\nSummary:\n20+ years building distributed systems, leading engineering teams, and architecting cloud infrastructure.\n\nExperience:\n\nPrincipal Engineer, MegaCorp, 2018 - Present\n- Architected event-driven microservices processing 10B events/day\n- Led migration from on-premise to AWS saving $10M/year\n- Designed API gateway handling 100K requests/second\n- Mentored 30+ engineers across 4 teams\n- Technologies: Java, Python, Go, Kafka, Redis, PostgreSQL, DynamoDB, AWS, Kubernetes, Terraform\n\nSenior Staff Engineer, BigTech, 2014 - 2018\n- Built real-time data pipeline processing 500TB/day\n- Designed distributed caching layer reducing latency by 80%\n- Led adoption of containerization across 200+ services\n- Technologies: Java, Scala, Spark, Cassandra, Docker, Kubernetes\n\nStaff Engineer, StartupCo, 2010 - 2014\n- Built payment processing system handling $1B/year\n- Achieved PCI-DSS and SOC2 compliance\n- Implemented blue-green deployments and canary releases\n- Technologies: Python, Django, PostgreSQL, RabbitMQ, AWS\n\nSenior Engineer, WebCorp, 2006 - 2010\n- Developed search engine indexing 1B+ documents\n- Built recommendation system increasing CTR by 40%\n- Technologies: Java, Lucene, MySQL, Linux\n\nSoftware Engineer, TechStart, 2003 - 2006\n- Full-stack web development\n- Technologies: PHP, MySQL, JavaScript, HTML, CSS\n\nSkills:\nJava, Python, Go, Scala, Kafka, Redis, PostgreSQL, DynamoDB, Cassandra, AWS, GCP, Kubernetes, Terraform, Docker, CI/CD, System Design, Distributed Systems, API Design, Microservices, Event-Driven Architecture\n\nEducation:\nPhD Computer Science, MIT, 2003\nMS Computer Science, Stanford, 2000\nBS Computer Science, UC Berkeley, 1998\n\nPublications:\n- 12 papers in distributed systems conferences\n- 3 patents in data processing\n\nCertifications:\nAWS Solutions Architect Professional, GCP Professional Cloud Architect, Kubernetes CKA",
+      "job_description": "Staff Engineer needed. Requirements: Java or Python, distributed systems, Kafka, AWS, Kubernetes, system design, 10+ years experience.",
+      "expected": {
+        "keyword_score": {
+          "min": 55,
+          "max": 95
+        },
+        "ats_score": {
+          "min": 75,
+          "max": 100
+        },
+        "final_score": {
+          "min": 70,
+          "max": 100
+        }
+      },
+      "notes": "Very long senior CV with extensive experience. Strong match to staff engineer JD."
+    },
+    {
+      "id": "B025",
+      "name": "Duplicate Skills Listed",
+      "category": "edge_case",
+      "cv_text": "Test User\nDeveloper\n\nSkills:\nPython Python Python Django Django Django REST REST API API PostgreSQL PostgreSQL Docker Docker\nPython, Django, REST API, PostgreSQL, Docker\nProgramming: Python\nFrameworks: Django\nDatabases: PostgreSQL\n\nExperience:\nDeveloper, Co, 2023 - Present\n- Built Python Django applications\n- Used PostgreSQL databases\n- Deployed with Docker",
+      "job_description": "Python Developer. Django, REST APIs, PostgreSQL, Docker required.",
+      "expected": {
+        "keyword_score": {
+          "min": 70,
+          "max": 100
+        },
+        "ats_score": {
+          "min": 50,
+          "max": 80
+        },
+        "final_score": {
+          "min": 50,
+          "max": 75
+        }
+      },
+      "notes": "CV with duplicate skills listed multiple times. Should not inflate keyword score beyond 100. ATS structure weak."
+    },
+    {
+      "id": "B026",
+      "name": "Remote Work CV - Soft Skills Focus",
+      "category": "soft_skills",
+      "cv_text": "Emily Rodriguez\nProject Manager\n\nContact: emily.r@email.com\n\nSummary:\nCertified PMP with 6 years managing remote engineering teams. Expert in agile methodologies, stakeholder communication, and cross-cultural collaboration.\n\nExperience:\nSenior Project Manager, RemoteCo, 2021 - Present\n- Managed 3 distributed engineering teams (15 developers)\n- Delivered 12 projects on time and under budget\n- Implemented Jira workflows improving team velocity by 30%\n- Facilitated daily standups, sprint planning, and retrospectives\n\nSkills:\nProject Management, Agile, Scrum, Kanban, Jira, Confluence, Slack, MS Project, Stakeholder Management, Risk Management, Budget Planning, Team Leadership\n\nCertifications:\nPMP, CSM, SAFe Agilist",
+      "job_description": "Engineering Manager needed. Requirements: Technical background, Agile/Scrum, team leadership, project management, Jira. Nice to have: Python, system design experience.",
+      "expected": {
+        "keyword_score": {
+          "min": 25,
+          "max": 65
+        },
+        "ats_score": {
+          "min": 55,
+          "max": 85
+        },
+        "final_score": {
+          "min": 40,
+          "max": 80
+        }
+      },
+      "notes": "PM CV vs Engineering Manager JD. Good soft skill overlap but weak technical match."
+    },
+    {
+      "id": "B027",
+      "name": "Freelancer CV - No Company Names",
+      "category": "edge_case",
+      "cv_text": "Mike Chen\nFreelance Developer\n\nContact: mike@freelance.dev\n\nExperience:\nFreelance Full-Stack Developer, 2020 - Present\n- Built 20+ client websites using React and Node.js\n- Developed mobile apps with React Native\n- Set up cloud infrastructure on AWS and DigitalOcean\n\nFreelance Backend Developer, 2018 - 2020\n- Created REST APIs for various startups\n- Database design with PostgreSQL and MongoDB\n\nSkills:\nReact, Node.js, React Native, Python, Django, PostgreSQL, MongoDB, AWS, Docker, Git\n\nEducation:\nSelf-taught developer\nfreeCodeCamp, Udemy, Coursera certifications",
+      "job_description": "Full Stack Developer. React, Node.js, PostgreSQL, AWS, Docker, Git required. 3+ years experience.",
+      "expected": {
+        "keyword_score": {
+          "min": 60,
+          "max": 90
+        },
+        "ats_score": {
+          "min": 60,
+          "max": 90
+        },
+        "final_score": {
+          "min": 65,
+          "max": 90
+        }
+      },
+      "notes": "Freelancer without formal company names. Good skill match but unconventional format."
+    },
+    {
+      "id": "B028",
+      "name": "Bootcamp Grad with Projects Only",
+      "category": "entry_level",
+      "cv_text": "Jordan Lee\nJunior Developer\n\nContact: jordan@email.com | github.com/jordanlee\n\nProjects:\nE-Commerce Platform (2024)\n- React frontend, Node.js backend, PostgreSQL database\n- Stripe payment integration, JWT authentication\n- Deployed on Heroku with CI/CD\n\nChat Application (2024)\n- Real-time messaging with Socket.io\n- React, Express, MongoDB\n\nWeather App (2024)\n- React, OpenWeather API, responsive design\n\nEducation:\nFull Stack Bootcamp, Codecademy Pro, 2024\nBA English Literature, Boston University, 2022\n\nSkills:\nJavaScript, React, Node.js, Express, PostgreSQL, MongoDB, HTML, CSS, Git, Docker basics",
+      "job_description": "Junior Full Stack Developer. JavaScript, React, Node.js required. Portfolio projects valued. Bootcamp grads welcome.",
+      "expected": {
+        "keyword_score": {
+          "min": 40,
+          "max": 80
+        },
+        "ats_score": {
+          "min": 45,
+          "max": 80
+        },
+        "final_score": {
+          "min": 40,
+          "max": 80
+        }
+      },
+      "notes": "Bootcamp grad with projects but no work experience. JD is bootcamp-friendly."
+    },
+    {
+      "id": "B029",
+      "name": "PhD Researcher - Too Academic",
+      "category": "academic",
+      "cv_text": "Dr. Anna Petrova\nResearch Scientist\n\nContact: anna.petrova@university.edu\n\nResearch Interests:\nReinforcement learning, multi-agent systems, game theory, optimization\n\nPublications:\n- 15 peer-reviewed papers (h-index: 12)\n- 2 best paper awards at AAAI and IJCAI\n- 500+ citations\n\nExperience:\nAssistant Professor, University, 2021 - Present\n- Teaching: Machine Learning, Algorithms, AI Ethics\n- Supervised 8 PhD students\n- $2M in research grants\n\nPostdoc, Research Lab, 2019 - 2021\n- Developed novel RL algorithms\n- Published 5 papers\n\nSkills:\nPython, PyTorch, TensorFlow, MATLAB, LaTeX, statistical analysis, research methodology\n\nEducation:\nPhD Computer Science, ETH Zurich, 2019",
+      "job_description": "Machine Learning Engineer. Production ML systems, Python, PyTorch, Docker, Kubernetes, CI/CD, REST APIs, monitoring, A/B testing required. Move fast, ship often.",
+      "expected": {
+        "keyword_score": {
+          "min": 15,
+          "max": 50
+        },
+        "ats_score": {
+          "min": 50,
+          "max": 85
+        },
+        "final_score": {
+          "min": 35,
+          "max": 70
+        }
+      },
+      "notes": "Academic researcher vs industry ML engineer. Python/PyTorch overlap but missing production infra skills."
+    },
+    {
+      "id": "B030",
+      "name": "Tightened Range Test - B001 Narrow",
+      "category": "tight_range",
+      "cv_text": "John Smith\nSenior Python Developer\n\nContact:\nEmail: john.smith@email.com\nPhone: +1 (555) 123-4567\nLocation: San Francisco, CA\nLinkedIn: linkedin.com/in/johnsmith\n\nProfessional Summary:\nExperienced Python developer with 8+ years in web development, machine learning, and data engineering. Strong background in Django, Flask, React, and cloud technologies.\n\nWork Experience:\nSenior Python Developer\nTechCorp Inc., San Francisco, CA\nJanuary 2020 - Present\n- Led development of microservices architecture serving 1M+ users\n- Built ML pipelines processing 100TB+ data monthly using Python, TensorFlow, and AWS\n- Mentored 5 junior developers and established coding standards\n- Technologies: Python, Django, React, PostgreSQL, Redis, Docker, Kubernetes\n\nSkills:\nPython, JavaScript, SQL, Django, Flask, React, Node.js, PostgreSQL, MongoDB, Redis, AWS, Docker, Kubernetes, Terraform, Git, Jenkins\n\nEducation:\nMS Computer Science, Stanford, 2015\nBS Computer Science, UC Berkeley, 2013\n\nCertifications:\nAWS Certified Solutions Architect (2022)",
+      "job_description": "Senior Python Developer with 5+ years. Python, Django, REST APIs, PostgreSQL, Docker, Kubernetes, AWS required.",
+      "expected": {
+        "keyword_score": {
+          "min": 68,
+          "max": 88
+        },
+        "ats_score": {
+          "min": 75,
+          "max": 92
+        },
+        "final_score": {
+          "min": 75,
+          "max": 92
+        }
+      },
+      "notes": "TIGHTENED RANGE TEST. Same as B001 but with narrow expected ranges to test system sensitivity."
+    },
+    {
+      "id": "B031",
+      "name": "Same CV - Frontend React JD",
+      "category": "same_cv_diff_jd",
+      "cv_text": "John Smith\nSenior Python Developer\n\nContact: john.smith@email.com | +1 555-1234\n\nSkills:\nPython, JavaScript, SQL, Django, Flask, React, Node.js, PostgreSQL, MongoDB, Redis, AWS, Docker, Kubernetes, Terraform, Git, Jenkins, Linux\n\nExperience:\nSenior Python Developer, TechCorp, 2020 - Present\n- Led microservices architecture serving 1M+ users\n- Built ML pipelines using Python, TensorFlow, AWS\n- Mentored 5 junior developers\n- Reduced deployment time by 60% through CI/CD\n\nPython Developer, StartupXYZ, 2017 - 2019\n- Developed REST APIs serving 500K users\n- Built data visualization dashboards with React and D3.js\n\nEducation:\nMS Computer Science, Stanford, 2015\nBS Computer Science, UC Berkeley, 2013\n\nCertifications:\nAWS Certified Solutions Architect (2022)",
+      "job_description": "Senior React Developer needed. 5+ years React, Redux, TypeScript, Next.js, GraphQL, CSS-in-JS, testing (Jest/Cypress). Experience with design systems and accessibility.",
+      "expected": {
+        "keyword_score": {
+          "min": 10,
+          "max": 45
+        },
+        "ats_score": {
+          "min": 55,
+          "max": 85
+        },
+        "final_score": {
+          "min": 40,
+          "max": 75
+        }
+      },
+      "notes": "Python dev CV vs React JD. React mentioned but missing Redux/TS/Next.js/GraphQL."
+    },
+    {
+      "id": "B032",
+      "name": "Same CV - Security Engineer JD",
+      "category": "same_cv_diff_jd",
+      "cv_text": "John Smith\nSenior Python Developer\n\nContact: john.smith@email.com | +1 555-1234\n\nSkills:\nPython, JavaScript, SQL, Django, Flask, React, Node.js, PostgreSQL, MongoDB, Redis, AWS, Docker, Kubernetes, Terraform, Git, Jenkins, Linux\n\nExperience:\nSenior Python Developer, TechCorp, 2020 - Present\n- Led microservices architecture serving 1M+ users\n- Built ML pipelines using Python, TensorFlow, AWS\n- Mentored 5 junior developers\n- Reduced deployment time by 60% through CI/CD\n\nPython Developer, StartupXYZ, 2017 - 2019\n- Developed REST APIs serving 500K users\n- Built data visualization dashboards with React and D3.js\n\nEducation:\nMS Computer Science, Stanford, 2015\nBS Computer Science, UC Berkeley, 2013\n\nCertifications:\nAWS Certified Solutions Architect (2022)",
+      "job_description": "Security Engineer needed. Requirements: penetration testing, OWASP, vulnerability assessment, SIEM, IDS/IPS, compliance (SOC2/ISO27001), Python scripting, network security.",
+      "expected": {
+        "keyword_score": {
+          "min": 0,
+          "max": 30
+        },
+        "ats_score": {
+          "min": 55,
+          "max": 85
+        },
+        "final_score": {
+          "min": 35,
+          "max": 70
+        }
+      },
+      "notes": "Python overlap but missing all security-specific skills."
+    },
+    {
+      "id": "B033",
+      "name": "Same CV - Junior Python JD",
+      "category": "same_cv_diff_jd",
+      "cv_text": "John Smith\nSenior Python Developer\n\nContact: john.smith@email.com | +1 555-1234\n\nSkills:\nPython, JavaScript, SQL, Django, Flask, React, Node.js, PostgreSQL, MongoDB, Redis, AWS, Docker, Kubernetes, Terraform, Git, Jenkins, Linux\n\nExperience:\nSenior Python Developer, TechCorp, 2020 - Present\n- Led microservices architecture serving 1M+ users\n- Built ML pipelines using Python, TensorFlow, AWS\n- Mentored 5 junior developers\n- Reduced deployment time by 60% through CI/CD\n\nPython Developer, StartupXYZ, 2017 - 2019\n- Developed REST APIs serving 500K users\n- Built data visualization dashboards with React and D3.js\n\nEducation:\nMS Computer Science, Stanford, 2015\nBS Computer Science, UC Berkeley, 2013\n\nCertifications:\nAWS Certified Solutions Architect (2022)",
+      "job_description": "Junior Python Developer. 0-2 years experience. Python basics, Git, willingness to learn. Nice to have: Django, SQL.",
+      "expected": {
+        "keyword_score": {
+          "min": 30,
+          "max": 80
+        },
+        "ats_score": {
+          "min": 55,
+          "max": 90
+        },
+        "final_score": {
+          "min": 50,
+          "max": 85
+        }
+      },
+      "notes": "Senior CV vs Junior JD. Keywords match but overqualified."
+    },
+    {
+      "id": "B034",
+      "name": "Borderline - QA to Dev",
+      "category": "borderline",
+      "cv_text": "Sarah Kim\nQA Engineer\n\nContact: sarah.kim@email.com\n\nExperience:\nSenior QA Engineer, TestCo, 2020 - Present\n- Automated test suites using Python and Selenium\n- Built CI/CD pipelines with Jenkins and Docker\n- Wrote API tests with Postman and pytest\n- SQL queries for test data management\n\nSkills:\nPython, Selenium, pytest, Jenkins, Docker, SQL, Git, Jira, Postman, API Testing\n\nEducation:\nBS Computer Science, 2020",
+      "job_description": "Python Developer needed. Python, Django, REST APIs, PostgreSQL, Docker, Git required. Testing experience is a plus.",
+      "expected": {
+        "keyword_score": {
+          "min": 20,
+          "max": 55
+        },
+        "ats_score": {
+          "min": 50,
+          "max": 80
+        },
+        "final_score": {
+          "min": 35,
+          "max": 70
+        }
+      },
+      "notes": "QA with Python/Docker/Git overlap but missing Django/REST/PostgreSQL. Classic borderline."
+    },
+    {
+      "id": "B035",
+      "name": "Borderline - Data Analyst to Data Eng",
+      "category": "borderline",
+      "cv_text": "Mike Torres\nData Analyst\n\nContact: mike.t@email.com\n\nExperience:\nSenior Data Analyst, AnalyticsCo, 2021 - Present\n- SQL queries and data modeling in BigQuery\n- Python scripts for data cleaning with pandas\n- Built Tableau dashboards for stakeholders\n- Basic ETL pipelines with Python\n\nSkills:\nSQL, Python, pandas, Tableau, BigQuery, Excel, Git, basic Spark\n\nEducation:\nMS Statistics, 2021",
+      "job_description": "Data Engineer needed. Python, SQL, Spark, Airflow, dbt, Kafka, AWS (S3/Redshift/Glue). Experience building data pipelines at scale. Docker, Kubernetes.",
+      "expected": {
+        "keyword_score": {
+          "min": 10,
+          "max": 45
+        },
+        "ats_score": {
+          "min": 45,
+          "max": 80
+        },
+        "final_score": {
+          "min": 30,
+          "max": 65
+        }
+      },
+      "notes": "Analyst with Python/SQL overlap but missing Spark/Airflow/dbt/Kafka. Borderline transition."
+    },
+    {
+      "id": "B036",
+      "name": "Borderline - Mobile to Web Dev",
+      "category": "borderline",
+      "cv_text": "Chris Park\niOS Developer\n\nContact: chris.p@email.com\n\nExperience:\niOS Developer, AppCo, 2021 - Present\n- Built iOS apps using Swift and SwiftUI\n- REST API integration and JSON parsing\n- Git, CI/CD with Fastlane\n- Unit testing with XCTest\n\nSkills:\nSwift, SwiftUI, Objective-C, Xcode, REST APIs, Git, Firebase, CocoaPods\n\nEducation:\nBS Computer Science, 2021",
+      "job_description": "Full Stack Web Developer. React, Node.js, TypeScript, PostgreSQL, Docker, AWS, REST APIs, Git required.",
+      "expected": {
+        "keyword_score": {
+          "min": 5,
+          "max": 40
+        },
+        "ats_score": {
+          "min": 40,
+          "max": 80
+        },
+        "final_score": {
+          "min": 25,
+          "max": 65
+        }
+      },
+      "notes": "iOS dev vs Web dev. REST/Git overlap but entirely different tech stack."
+    },
+    {
+      "id": "B037",
+      "name": "TR+EN Mixed CV",
+      "category": "multilingual",
+      "cv_text": "Ahmet Demir\nYazilim Gelistirici / Software Developer\n\nIletisim: ahmet@email.com | Istanbul\n\nDeneyim:\nSoftware Developer, TeknoFirma, 2021 - Present\n- Python ve Django ile REST API gelistirme\n- PostgreSQL veritabani yonetimi\n- Docker containerization\n- Git version control\n\nBeceriler / Skills:\nPython, Django, PostgreSQL, Docker, Git, Linux, REST APIs, JavaScript\n\nEgitim:\nBilgisayar Muhendisligi, ITU, 2021",
+      "job_description": "Python Developer needed. Python, Django, PostgreSQL, Docker, REST APIs, Git required.",
+      "expected": {
+        "keyword_score": {
+          "min": 40,
+          "max": 85
+        },
+        "ats_score": {
+          "min": 40,
+          "max": 80
+        },
+        "final_score": {
+          "min": 40,
+          "max": 80
+        }
+      },
+      "notes": "Mixed TR+EN CV. Technical terms in English should match despite Turkish prose."
+    },
+    {
+      "id": "B038",
+      "name": "Ultra Short JD",
+      "category": "short_jd",
+      "cv_text": "Alex Rivera\nFull Stack Developer\n\nContact: alex@email.com\n\nExperience:\nFull Stack Developer, WebCo, 2020 - Present\n- Built React/Node.js apps serving 200K users\n- PostgreSQL database design and optimization\n- AWS deployment (EC2, S3, Lambda)\n- CI/CD with GitHub Actions\n\nSkills:\nReact, Node.js, TypeScript, PostgreSQL, AWS, Docker, Git, Python\n\nEducation:\nBS Computer Science, 2020",
+      "job_description": "Looking for a developer. Python required.",
+      "expected": {
+        "keyword_score": {
+          "min": 5,
+          "max": 75
+        },
+        "ats_score": {
+          "min": 45,
+          "max": 80
+        },
+        "final_score": {
+          "min": 25,
+          "max": 75
+        }
+      },
+      "notes": "Ultra short JD (1 line). System should still produce meaningful score without crashing."
+    },
+    {
+      "id": "B039",
+      "name": "Very Long JD - Enterprise Architect",
+      "category": "long_jd",
+      "cv_text": "Marcus Chen\nSenior Software Engineer\n\nContact: marcus.chen@email.com\n\nExperience:\nSenior Software Engineer, BigTech, 2019 - Present\n- Led migration of monolith to microservices architecture\n- Python, Java, Go backend services\n- AWS (ECS, RDS, SQS, SNS, Lambda, CloudFormation)\n- Kafka event-driven architecture\n- Terraform infrastructure as code\n- Led team of 8 engineers\n\nSoftware Engineer, StartupABC, 2016 - 2019\n- Full stack development with Python/Django and React\n- PostgreSQL, Redis, Elasticsearch\n- Docker, Kubernetes deployments\n\nSkills:\nPython, Java, Go, AWS, Terraform, Kafka, Docker, Kubernetes, PostgreSQL, Redis, React, Django\n\nEducation:\nMS Computer Science, MIT, 2016\nBS Computer Science, Georgia Tech, 2014",
+      "job_description": "Enterprise Solutions Architect needed for global fintech platform. Requirements: 10+ years experience in distributed systems design and implementation. Deep expertise in cloud architecture (AWS preferred: ECS, EKS, Lambda, Step Functions, CloudFormation, CDK). Strong background in microservices architecture, event-driven design patterns, CQRS, and domain-driven design. Experience with multiple programming languages (Java, Python, Go, Kotlin). Database expertise spanning SQL (PostgreSQL, Aurora) and NoSQL (DynamoDB, MongoDB, Cassandra). Message broker experience (Kafka, RabbitMQ, SQS/SNS). Infrastructure as Code (Terraform, CloudFormation, Pulumi). Container orchestration (Kubernetes, ECS). CI/CD pipeline design (Jenkins, GitHub Actions, ArgoCD). Security best practices (IAM, VPC design, encryption at rest/transit, SOC2 compliance). Performance optimization and capacity planning. Team leadership and mentoring experience. Excellent communication for C-suite stakeholder management. Nice to have: Financial services experience, real-time trading systems, regulatory compliance (PCI-DSS, GDPR).",
+      "expected": {
+        "keyword_score": {
+          "min": 15,
+          "max": 55
+        },
+        "ats_score": {
+          "min": 55,
+          "max": 90
+        },
+        "final_score": {
+          "min": 40,
+          "max": 75
+        }
+      },
+      "notes": "Very long JD (200+ words). Tests phrase dilution cap and keyword normalization."
+    },
+    {
+      "id": "B040",
+      "name": "Employment Gap - 3 Years",
+      "category": "employment_gap",
+      "cv_text": "Lisa Park\nWeb Developer\n\nContact: lisa.park@email.com\n\nExperience:\nFrontend Developer, DigitalCo, 2023 - Present\n- React and TypeScript development\n- REST API integration\n- Git version control\n\n[Career Break: 2020 - 2023 - Family caregiving]\n\nJunior Developer, WebAgency, 2018 - 2020\n- HTML, CSS, JavaScript development\n- jQuery and Bootstrap projects\n- Basic PHP backend work\n\nSkills:\nReact, TypeScript, JavaScript, HTML, CSS, Git, REST APIs\n\nEducation:\nBS Information Technology, 2018",
+      "job_description": "Frontend Developer needed. 3+ years React experience. TypeScript, Next.js, testing (Jest/RTL), CSS-in-JS, accessibility required.",
+      "expected": {
+        "keyword_score": {
+          "min": 10,
+          "max": 45
+        },
+        "ats_score": {
+          "min": 40,
+          "max": 75
+        },
+        "final_score": {
+          "min": 30,
+          "max": 75
+        }
+      },
+      "notes": "3-year employment gap. React experience exists but interrupted. Missing Next.js, testing, a11y."
+    },
+    {
+      "id": "B041",
+      "name": "Contractor - Many Short Roles",
+      "category": "contractor",
+      "cv_text": "Jake Morrison\nSoftware Contractor\n\nContact: jake@email.com\n\nExperience:\nPython Developer, ClientA (Contract), Jan 2024 - Mar 2024\n- FastAPI microservice development\n- PostgreSQL query optimization\n\nReact Developer, ClientB (Contract), Sep 2023 - Dec 2023\n- Next.js e-commerce frontend\n- Stripe payment integration\n\nDevOps Engineer, ClientC (Contract), May 2023 - Aug 2023\n- AWS infrastructure setup\n- Docker/Kubernetes deployment\n- Terraform IaC\n\nBackend Developer, ClientD (Contract), Jan 2023 - Apr 2023\n- Node.js REST API development\n- MongoDB data modeling\n\nFull Stack Developer, ClientE (Contract), 2022\n- Django + React application\n- CI/CD pipeline setup\n\nSkills:\nPython, FastAPI, Django, React, Next.js, Node.js, AWS, Docker, Kubernetes, Terraform, PostgreSQL, MongoDB, Git\n\nEducation:\nBS Computer Science, 2021",
+      "job_description": "Senior Python Developer. 5+ years Python. Django or FastAPI. PostgreSQL. Docker. AWS. CI/CD. Team leadership preferred.",
+      "expected": {
+        "keyword_score": {
+          "min": 30,
+          "max": 70
+        },
+        "ats_score": {
+          "min": 50,
+          "max": 85
+        },
+        "final_score": {
+          "min": 40,
+          "max": 80
+        }
+      },
+      "notes": "Contractor with many short roles. Skills match but tenure at each role is short."
+    },
+    {
+      "id": "B042",
+      "name": "Full Turkish JD + Turkish CV",
+      "category": "multilingual",
+      "cv_text": "Elif Yilmaz\nYazilim Muhendisi\n\nIletisim: elif.yilmaz@email.com | Ankara\n\nDeneyim:\nKidemli Yazilim Muhendisi, TeknoCo, 2021 - Halen\n- Python ve Django ile web uygulamalari gelistirme\n- PostgreSQL veritabani tasarimi ve optimizasyonu\n- Docker ve Kubernetes ile konteyner yonetimi\n- REST API tasarimi ve dokumantasyonu\n- Git ve CI/CD surec yonetimi\n\nYazilim Muhendisi, StartupTR, 2019 - 2021\n- Flask ile mikroservis mimarisi\n- Redis cache implementasyonu\n- AWS altyapi yonetimi\n\nBeceriler:\nPython, Django, Flask, PostgreSQL, Docker, Kubernetes, AWS, Redis, Git, Linux, REST API\n\nEgitim:\nBilgisayar Muhendisligi Lisans, ODTU, 2019",
+      "job_description": "Kidemli Python Gelistirici ariyoruz. Gereksinimler: 4+ yil Python deneyimi. Django veya Flask framework bilgisi. PostgreSQL veritabani yonetimi. Docker ve konteyner teknolojileri. AWS bulut servisleri. CI/CD pipeline kurulumu. REST API tasarimi. Takim calismasina yatkinlik.",
+      "expected": {
+        "keyword_score": {
+          "min": 35,
+          "max": 80
+        },
+        "ats_score": {
+          "min": 40,
+          "max": 80
+        },
+        "final_score": {
+          "min": 40,
+          "max": 80
+        }
+      },
+      "notes": "Both CV and JD fully in Turkish. Technical keywords should still match."
+    },
+    {
+      "id": "B043",
+      "name": "UI Designer to Frontend Dev",
+      "category": "career_change",
+      "cv_text": "Maria Santos\nUI/UX Designer\n\nContact: maria@email.com\n\nExperience:\nSenior UI/UX Designer, DesignStudio, 2020 - Present\n- Designed mobile and web interfaces for 15+ clients\n- Figma, Sketch, Adobe XD prototyping\n- User research and usability testing\n- Design system creation and maintenance\n- Basic HTML/CSS for design handoff\n- Collaborated with development teams\n\nJunior Designer, AgencyCo, 2018 - 2020\n- Visual design for marketing materials\n- Brand identity projects\n- Basic WordPress customization\n\nSkills:\nFigma, Sketch, Adobe XD, HTML, CSS, Design Systems, User Research, Prototyping, WordPress\n\nEducation:\nBA Graphic Design, 2018",
+      "job_description": "Frontend Developer. React, TypeScript, CSS-in-JS, responsive design, accessibility, Git, npm, REST APIs. Design background is a plus.",
+      "expected": {
+        "keyword_score": {
+          "min": 5,
+          "max": 30
+        },
+        "ats_score": {
+          "min": 35,
+          "max": 75
+        },
+        "final_score": {
+          "min": 25,
+          "max": 70
+        }
+      },
+      "notes": "Designer transitioning to dev. CSS/design overlap but missing React/TypeScript/Git core skills."
+    },
+    {
+      "id": "B044",
+      "name": "Certification Heavy CV",
+      "category": "certification_heavy",
+      "cv_text": "David Kim\nCloud Solutions Architect\n\nContact: david.kim@email.com\n\nCertifications:\nAWS Solutions Architect Professional (2024)\nAWS DevOps Engineer Professional (2023)\nAWS Security Specialty (2023)\nGoogle Cloud Professional Architect (2023)\nAzure Solutions Architect Expert (2022)\nKubernetes Administrator (CKA) (2022)\nTerraform Associate (2022)\nCISSP (2021)\n\nExperience:\nCloud Architect, CloudCorp, 2021 - Present\n- Multi-cloud architecture design\n- Infrastructure as Code with Terraform\n- Kubernetes cluster management\n\nSkills:\nAWS, GCP, Azure, Terraform, Kubernetes, Docker, Python, Linux\n\nEducation:\nBS Computer Science, 2020",
+      "job_description": "Cloud Engineer needed. AWS experience required. Terraform, Docker, Kubernetes. Python scripting. CI/CD. Linux administration.",
+      "expected": {
+        "keyword_score": {
+          "min": 35,
+          "max": 75
+        },
+        "ats_score": {
+          "min": 50,
+          "max": 85
+        },
+        "final_score": {
+          "min": 45,
+          "max": 80
+        }
+      },
+      "notes": "Heavy on certifications, lighter on experience details. Should still score well on keyword match."
+    },
+    {
+      "id": "B045",
+      "name": "Student - Projects Only",
+      "category": "entry_level",
+      "cv_text": "Emma Wilson\nComputer Science Student\n\nContact: emma.w@email.com | GitHub: github.com/emmaw\n\nProjects:\nE-Commerce Platform (2024)\n- Full-stack app with React frontend and Node.js/Express backend\n- MongoDB database, JWT authentication\n- Stripe payment integration\n- Deployed on AWS EC2\n\nChat Application (2024)\n- Real-time messaging with Socket.io\n- React frontend with TypeScript\n- PostgreSQL database\n\nWeather Dashboard (2023)\n- React app consuming OpenWeather API\n- Chart.js data visualization\n- Responsive design\n\nSkills:\nJavaScript, TypeScript, React, Node.js, Express, MongoDB, PostgreSQL, AWS, Docker, Git\n\nEducation:\nBS Computer Science (Expected 2025), State University\nGPA: 3.7/4.0",
+      "job_description": "Junior Full Stack Developer. JavaScript, React, Node.js required. MongoDB or PostgreSQL. Git. Docker is a plus.",
+      "expected": {
+        "keyword_score": {
+          "min": 35,
+          "max": 75
+        },
+        "ats_score": {
+          "min": 35,
+          "max": 75
+        },
+        "final_score": {
+          "min": 35,
+          "max": 75
+        }
+      },
+      "notes": "Student with strong projects but no work experience. Skills match the JD well."
+    },
+    {
+      "id": "B046",
+      "name": "Sparse CV - Only Name and Skills",
+      "category": "minimal",
+      "cv_text": "Tom Brown\n\nSkills: Python, SQL, Excel\n\nEmail: tom@email.com",
+      "job_description": "Data Analyst. Python, SQL, Tableau, Excel, statistics, data visualization required.",
+      "expected": {
+        "keyword_score": {
+          "min": 10,
+          "max": 50
+        },
+        "ats_score": {
+          "min": 10,
+          "max": 40
+        },
+        "final_score": {
+          "min": 10,
+          "max": 45
+        }
+      },
+      "notes": "Extremely sparse CV with no experience or education. ATS should flag heavily."
+    },
+    {
+      "id": "B047",
+      "name": "Engineering Manager vs IC Dev",
+      "category": "seniority_mismatch",
+      "cv_text": "Robert Zhang\nEngineering Manager\n\nContact: robert.z@email.com\n\nExperience:\nEngineering Manager, BigCorp, 2021 - Present\n- Managing 3 teams (15 engineers total)\n- Roadmap planning and OKR setting\n- Budget management ($2M annual)\n- Hiring: conducted 100+ interviews\n- Stakeholder management with C-suite\n- Sprint planning and retrospectives\n\nSenior Software Engineer, MidCorp, 2018 - 2021\n- Python/Django backend development\n- AWS infrastructure\n- Code reviews and mentoring\n\nSkills:\nPeople Management, Strategic Planning, Python, Django, AWS, Agile, Scrum\n\nEducation:\nMS Computer Science, 2018",
+      "job_description": "Senior Python Developer. Hands-on coding daily. Python, FastAPI, PostgreSQL, Docker, Kubernetes, microservices. Must write production code.",
+      "expected": {
+        "keyword_score": {
+          "min": 10,
+          "max": 40
+        },
+        "ats_score": {
+          "min": 45,
+          "max": 80
+        },
+        "final_score": {
+          "min": 30,
+          "max": 72
+        }
+      },
+      "notes": "Manager applying for IC role. Python/Django overlap but missing hands-on tech stack."
+    },
+    {
+      "id": "B048",
+      "name": "Backend Dev vs Frontend JD",
+      "category": "role_mismatch",
+      "cv_text": "Sarah Lee\nBackend Developer\n\nContact: sarah.lee@email.com\n\nExperience:\nSenior Backend Developer, APICorp, 2020 - Present\n- Python/FastAPI microservices\n- PostgreSQL and Redis\n- Kafka event streaming\n- Docker/Kubernetes\n- AWS (ECS, RDS, SQS)\n\nSkills:\nPython, FastAPI, PostgreSQL, Redis, Kafka, Docker, Kubernetes, AWS, Git, Linux\n\nEducation:\nBS Computer Science, 2019",
+      "job_description": "Senior Frontend Developer. React, TypeScript, Next.js, CSS-in-JS, testing (Jest/Cypress), accessibility, responsive design, GraphQL, state management (Redux/Zustand).",
+      "expected": {
+        "keyword_score": {
+          "min": 0,
+          "max": 20
+        },
+        "ats_score": {
+          "min": 45,
+          "max": 80
+        },
+        "final_score": {
+          "min": 25,
+          "max": 60
+        }
+      },
+      "notes": "Backend dev vs Frontend JD. Almost zero keyword overlap despite being in same industry."
+    },
+    {
+      "id": "B049",
+      "name": "Portfolio-Heavy CV",
+      "category": "portfolio",
+      "cv_text": "Nina Patel\nFull Stack Developer\n\nContact: nina@email.com\nGitHub: github.com/ninapatel (50+ repos, 2K+ stars)\nPortfolio: ninapatel.dev\nLinkedIn: linkedin.com/in/ninapatel\n\nOpen Source:\n- Contributor to React (3 merged PRs)\n- Maintainer of express-validator (500+ stars)\n- Created next-auth-helpers (200+ stars)\n\nExperience:\nFull Stack Developer, OpenSourceCo, 2021 - Present\n- React/Next.js frontend development\n- Node.js/Express backend APIs\n- TypeScript throughout the stack\n- PostgreSQL and MongoDB\n- Docker containerization\n- AWS deployment\n\nSkills:\nReact, Next.js, TypeScript, Node.js, Express, PostgreSQL, MongoDB, Docker, AWS, Git\n\nEducation:\nBS Computer Science, 2021",
+      "job_description": "Senior Full Stack Developer. React, Next.js, TypeScript, Node.js, PostgreSQL, Docker, AWS. Open source contribution is highly valued.",
+      "expected": {
+        "keyword_score": {
+          "min": 40,
+          "max": 85
+        },
+        "ats_score": {
+          "min": 55,
+          "max": 90
+        },
+        "final_score": {
+          "min": 50,
+          "max": 85
+        }
+      },
+      "notes": "Strong portfolio and open source. High keyword match with JD."
+    },
+    {
+      "id": "B050",
+      "name": "Repetitive CV Content",
+      "category": "edge_case",
+      "cv_text": "Mike Johnson\nDeveloper\n\nSkills: Python, Python programming, Python development, Python scripting, Python coding\nMore Skills: Django, Django framework, Django web development\nAdditional: SQL, SQL databases, SQL queries, PostgreSQL, PostgreSQL database\n\nExperience:\nPython Developer, Company, 2022 - Present\n- Python development\n- Django development\n- SQL database work\n\nEducation:\nCS Degree, 2022",
+      "job_description": "Python Developer. Python, Django, PostgreSQL, Docker, Git required.",
+      "expected": {
+        "keyword_score": {
+          "min": 20,
+          "max": 65
+        },
+        "ats_score": {
+          "min": 30,
+          "max": 70
+        },
+        "final_score": {
+          "min": 25,
+          "max": 65
+        }
+      },
+      "notes": "Repetitive/padded CV. Should not get inflated scores from keyword stuffing variation."
+    },
+    {
+      "id": "B051",
+      "name": "Bad English - Backend Dev",
+      "category": "bad_english",
+      "cv_text": "Muhammed Al-Farsi\nBackend Developr\n\nI am working as backend developr for 3 years. I have make many project with Python and Django framwork. I am good at databse design and SQL querys. Also I know Docker and deploy to AWS. I have experience with REST API and microservise architecture.\n\nSkils: Python, Django, PostgreSQL, Docker, AWS, Git\nEducation: BSc Computr Science 2020",
+      "job_description": "Backend Developer. Python, Django, PostgreSQL, Docker, AWS. REST API design. 3+ years experience.",
+      "expected": {
+        "keyword_score": {
+          "min": 25,
+          "max": 90
+        },
+        "ats_score": {
+          "min": 25,
+          "max": 70
+        },
+        "final_score": {
+          "min": 30,
+          "max": 70
+        }
+      }
+    },
+    {
+      "id": "B052",
+      "name": "Bad English - Data Analyst",
+      "category": "bad_english",
+      "cv_text": "Li Wei\nData Analist\n\nI work as data analist since 2 year. My main tool is Excel and Python for analisis. I make report and dashbord for managment team. I also use SQL for data extracton from databse. I have basic knowlege of Tableau.\n\nSkils: Excel, Python, SQL, Tableau\nEducation: Statistik degree 2021",
+      "job_description": "Data Analyst. Excel, Python, SQL, Tableau, statistics, data visualization. 2+ years experience.",
+      "expected": {
+        "keyword_score": {
+          "min": 20,
+          "max": 90
+        },
+        "ats_score": {
+          "min": 25,
+          "max": 65
+        },
+        "final_score": {
+          "min": 30,
+          "max": 65
+        }
+      }
+    },
+    {
+      "id": "B053",
+      "name": "Bad English - QA Engineer",
+      "category": "bad_english",
+      "cv_text": "Raj Patel\nQA Enginear\n\nI am QA enginear with 4 year experiance. I do manual and automaton testing. I use Selenium and Python for test automaton. I write test case and bug raport. I also do performance test with JMeter.\n\nSkils: Selenium, Python, JMeter, Manual Testing, Bug Reporting\nEducation: IT Diploma 2019",
+      "job_description": "QA Engineer. Selenium, Python, JMeter, test automation, manual testing, CI/CD. 3+ years.",
+      "expected": {
+        "keyword_score": {
+          "min": 25,
+          "max": 90
+        },
+        "ats_score": {
+          "min": 25,
+          "max": 65
+        },
+        "final_score": {
+          "min": 30,
+          "max": 70
+        }
+      }
+    },
+    {
+      "id": "B054",
+      "name": "Bad English - Mobile Dev",
+      "category": "bad_english",
+      "cv_text": "Ahmed Hassan\nMobil Developr\n\nI developp mobil aplication for Android and iOS. I use React Nativ and Flutter. I have publised 5 app on Play Store. I integrat REST API and Firebase for backend. Good at UI desing.\n\nSkils: React Native, Flutter, Firebase, REST API, Android, iOS\nEducation: Sofware Engineering 2020",
+      "job_description": "Mobile Developer. React Native or Flutter. Firebase. REST API integration. Published apps preferred.",
+      "expected": {
+        "keyword_score": {
+          "min": 30,
+          "max": 90
+        },
+        "ats_score": {
+          "min": 25,
+          "max": 65
+        },
+        "final_score": {
+          "min": 30,
+          "max": 70
+        }
+      }
+    },
+    {
+      "id": "B055",
+      "name": "Bad English - DevOps",
+      "category": "bad_english",
+      "cv_text": "Oleksiy Kovalenko\nDevOps Enginer\n\nI am devops enginer with experianse in CI/CD pipline. I use Jenkins, Docker and Kubernets for deploiment. I also manege AWS infrastucture with Terraform. I moniter system with Prometheus and Grafana.\n\nSkils: Docker, Kubernetes, Jenkins, Terraform, AWS, Prometheus, Grafana\nEducation: Computr Science 2018",
+      "job_description": "DevOps Engineer. Docker, Kubernetes, Terraform, AWS, CI/CD, monitoring (Prometheus/Grafana).",
+      "expected": {
+        "keyword_score": {
+          "min": 30,
+          "max": 90
+        },
+        "ats_score": {
+          "min": 25,
+          "max": 65
+        },
+        "final_score": {
+          "min": 30,
+          "max": 75
+        }
+      }
+    },
+    {
+      "id": "B056",
+      "name": "Typo Heavy - Frontend Dev",
+      "category": "typo_heavy",
+      "cv_text": "Sarah Conner\nFrnotend Developer\n\nExperience:\nFrnotend Developer, TechCo, 2021 - Present\n- Biult responsive web apps with Raect and TypeScropt\n- Impelmented state managment with Redxu\n- Intergrated REST APis with Axois\n- Wrotte unit tets with Jset\n\nSkills: Raect, TypeScropt, Redxu, JavaScropt, HMTL, CSs, Git\nEducation: BS Compuetr Science 2021",
+      "job_description": "Frontend Developer. React, TypeScript, Redux, JavaScript, HTML, CSS, testing.",
+      "expected": {
+        "keyword_score": {
+          "min": 10,
+          "max": 85
+        },
+        "ats_score": {
+          "min": 30,
+          "max": 70
+        },
+        "final_score": {
+          "min": 25,
+          "max": 70
+        }
+      }
+    },
+    {
+      "id": "B057",
+      "name": "Typo Heavy - Python Dev",
+      "category": "typo_heavy",
+      "cv_text": "Mark Jhonson\nPyhton Devleoper\n\nExperience:\nPyhton Devleoper, DataCo, 2020 - Present\n- Devleoped microservces with FatsAPI\n- Desinged PostgreSLQ databse schemas\n- Deploeyd applicatons on AWS with Dokcer\n- Impelmented CI/CD with GitHbu Actions\n\nSkills: Pyhton, FatsAPI, PostgreSLQ, Dokcer, AWS, Git\nEducation: CS Degere 2020",
+      "job_description": "Python Developer. FastAPI, PostgreSQL, Docker, AWS, CI/CD. 3+ years.",
+      "expected": {
+        "keyword_score": {
+          "min": 10,
+          "max": 90
+        },
+        "ats_score": {
+          "min": 25,
+          "max": 70
+        },
+        "final_score": {
+          "min": 25,
+          "max": 65
+        }
+      }
+    },
+    {
+      "id": "B058",
+      "name": "Typo Heavy - Java Dev",
+      "category": "typo_heavy",
+      "cv_text": "James Wilsno\nJvaa Devleoper\n\nExperience:\nSenoir Jvaa Devleoper, EnterprseCo, 2019 - Present\n- Biult microservces with Srpign Boot\n- Impelmented Kfaka event stremaing\n- Desinged RESTful APis\n- Used Gradel and Mvaen for biuld managment\n\nSkills: Jvaa, Srpign Boot, Kfaka, REST, Gradel, Mvaen\nEducation: SE Degere 2019",
+      "job_description": "Java Developer. Spring Boot, Kafka, REST APIs, Maven/Gradle. Microservices experience.",
+      "expected": {
+        "keyword_score": {
+          "min": 5,
+          "max": 60
+        },
+        "ats_score": {
+          "min": 25,
+          "max": 65
+        },
+        "final_score": {
+          "min": 25,
+          "max": 65
+        }
+      }
+    },
+    {
+      "id": "B059",
+      "name": "Typo Heavy - Cloud Engineer",
+      "category": "typo_heavy",
+      "cv_text": "Emily Brwon\nClodu Enginere\n\nExperience:\nClodu Enginere, CloudCo, 2020 - Present\n- Manaeged AWS infrastrcuture (EC2, S3, RDS, Lmabda)\n- Impelmented Terrfaorm IaC\n- Configuerd Kuberneets clustres\n- Set up monitroing with CloudWtach\n\nSkills: AWS, Terrfaorm, Kuberneets, Dokcer, Liunx\nEducation: IT Degere 2020",
+      "job_description": "Cloud Engineer. AWS (EC2, S3, RDS, Lambda), Terraform, Kubernetes, Docker, Linux.",
+      "expected": {
+        "keyword_score": {
+          "min": 5,
+          "max": 95
+        },
+        "ats_score": {
+          "min": 25,
+          "max": 70
+        },
+        "final_score": {
+          "min": 25,
+          "max": 70
+        }
+      }
+    },
+    {
+      "id": "B060",
+      "name": "Typo Heavy - Full Stack",
+      "category": "typo_heavy",
+      "cv_text": "Chris Taylro\nFull Satck Devleoper\n\nExperience:\nFull Satck Dev, WebCo, 2021 - Present\n- Biult web apps with Raect frnotend and Ndoe.js bakend\n- MognoDB and PostgerSQL databaes\n- Deploeyd on Hroku and AWS\n- REST and GrpahQL APis\n\nSkills: Raect, Ndoe.js, MognoDB, PostgerSQL, GrpahQL\nEducation: Web Dev Bootcamp 2021",
+      "job_description": "Full Stack Developer. React, Node.js, MongoDB, PostgreSQL, GraphQL.",
+      "expected": {
+        "keyword_score": {
+          "min": 5,
+          "max": 95
+        },
+        "ats_score": {
+          "min": 25,
+          "max": 70
+        },
+        "final_score": {
+          "min": 25,
+          "max": 70
+        }
+      }
+    },
+    {
+      "id": "B061",
+      "name": "AI Generated - Generic Dev",
+      "category": "ai_generated",
+      "cv_text": "John Smith\nHighly Motivated Software Engineer\n\nAs a results-driven and innovative software engineer with a proven track record of delivering cutting-edge solutions, I bring a wealth of experience in developing robust, scalable applications. My passion for technology and commitment to excellence drive me to continuously push the boundaries of what's possible.\n\nProfessional Experience:\nSenior Software Engineer, InnovateTech Solutions, 2020 - Present\n- Spearheaded the development of mission-critical applications leveraging Python and Django\n- Orchestrated seamless deployment pipelines utilizing Docker and Kubernetes\n- Championed best practices in code quality through comprehensive code reviews\n- Fostered cross-functional collaboration to deliver transformative solutions\n\nSkills: Python, Django, Docker, Kubernetes, AWS, PostgreSQL, Git, Agile, CI/CD\nEducation: Bachelor of Science in Computer Science, 2019",
+      "job_description": "Python Developer. Django, PostgreSQL, Docker, AWS. 3+ years. Agile environment.",
+      "expected": {
+        "keyword_score": {
+          "min": 30,
+          "max": 80
+        },
+        "ats_score": {
+          "min": 50,
+          "max": 85
+        },
+        "final_score": {
+          "min": 45,
+          "max": 80
+        }
+      }
+    },
+    {
+      "id": "B062",
+      "name": "AI Generated - Data Scientist",
+      "category": "ai_generated",
+      "cv_text": "Emily Johnson\nData Science Professional\n\nDynamic and analytical data science professional with extensive experience in leveraging advanced machine learning algorithms and statistical methodologies to extract actionable insights from complex datasets. Demonstrated expertise in translating business requirements into data-driven solutions that maximize organizational value.\n\nProfessional Experience:\nLead Data Scientist, DataDriven Corp, 2019 - Present\n- Engineered sophisticated machine learning models achieving unprecedented accuracy metrics\n- Pioneered innovative approaches to natural language processing and computer vision\n- Orchestrated end-to-end data pipelines processing petabytes of structured data\n\nSkills: Python, TensorFlow, PyTorch, Scikit-learn, SQL, Spark, AWS SageMaker, Pandas, NumPy\nEducation: Master of Science in Data Science, MIT, 2019",
+      "job_description": "Data Scientist. Python, TensorFlow/PyTorch, SQL, ML pipelines, NLP. 3+ years.",
+      "expected": {
+        "keyword_score": {
+          "min": 25,
+          "max": 75
+        },
+        "ats_score": {
+          "min": 50,
+          "max": 85
+        },
+        "final_score": {
+          "min": 45,
+          "max": 80
+        }
+      }
+    },
+    {
+      "id": "B063",
+      "name": "AI Generated - Product Manager",
+      "category": "ai_generated",
+      "cv_text": "Michael Williams\nVisionary Product Manager\n\nTransformative product leader with an exceptional ability to identify market opportunities and translate them into groundbreaking product strategies. Proven expertise in driving cross-functional alignment and delivering products that delight customers and exceed business objectives.\n\nProfessional Experience:\nSenior Product Manager, TechVision Inc, 2018 - Present\n- Conceptualized and launched revolutionary products generating $50M+ in annual revenue\n- Cultivated strategic partnerships with industry-leading technology providers\n- Spearheaded agile transformation initiatives across multiple product teams\n\nSkills: Product Strategy, Agile, Scrum, JIRA, Data Analytics, A/B Testing, User Research\nEducation: MBA, Stanford Graduate School of Business, 2018",
+      "job_description": "Product Manager. Agile/Scrum, data-driven decisions, user research, roadmap planning. Technical background preferred.",
+      "expected": {
+        "keyword_score": {
+          "min": 20,
+          "max": 65
+        },
+        "ats_score": {
+          "min": 45,
+          "max": 80
+        },
+        "final_score": {
+          "min": 40,
+          "max": 75
+        }
+      }
+    },
+    {
+      "id": "B064",
+      "name": "AI Generated - DevOps",
+      "category": "ai_generated",
+      "cv_text": "David Brown\nDevOps Architect & Cloud Infrastructure Specialist\n\nInnovative DevOps architect with a distinguished career in designing and implementing enterprise-grade cloud infrastructure solutions. Recognized thought leader in containerization, infrastructure as code, and continuous delivery methodologies.\n\nProfessional Experience:\nPrincipal DevOps Engineer, CloudScale Solutions, 2019 - Present\n- Architected revolutionary multi-cloud infrastructure serving millions of concurrent users\n- Pioneered zero-downtime deployment strategies reducing incident rates by 99.9%\n- Mentored and developed a world-class team of 12 infrastructure engineers\n\nSkills: AWS, GCP, Azure, Terraform, Kubernetes, Docker, Jenkins, Ansible, Prometheus, Grafana\nEducation: BS Computer Engineering, Georgia Tech, 2018",
+      "job_description": "DevOps Engineer. AWS, Terraform, Kubernetes, Docker, CI/CD, monitoring. Infrastructure as code.",
+      "expected": {
+        "keyword_score": {
+          "min": 35,
+          "max": 80
+        },
+        "ats_score": {
+          "min": 50,
+          "max": 85
+        },
+        "final_score": {
+          "min": 45,
+          "max": 80
+        }
+      }
+    },
+    {
+      "id": "B065",
+      "name": "AI Generated - Cybersecurity",
+      "category": "ai_generated",
+      "cv_text": "Jessica Davis\nCybersecurity Expert & Information Security Leader\n\nAccomplished cybersecurity professional with an unwavering commitment to safeguarding organizational assets against evolving threat landscapes. Extensive experience in implementing comprehensive security frameworks and leading incident response operations.\n\nProfessional Experience:\nChief Information Security Officer, SecureNet Corp, 2018 - Present\n- Orchestrated enterprise-wide security transformation reducing vulnerabilities by 95%\n- Implemented cutting-edge zero-trust architecture across global infrastructure\n- Led crisis management during critical security incidents with zero data loss\n\nSkills: CISSP, CEH, Penetration Testing, SIEM, Incident Response, ISO 27001, NIST, Firewall, IDS/IPS\nEducation: MS Cybersecurity, Carnegie Mellon, 2017",
+      "job_description": "Security Engineer. Penetration testing, SIEM, incident response, cloud security, compliance (ISO 27001/NIST).",
+      "expected": {
+        "keyword_score": {
+          "min": 25,
+          "max": 70
+        },
+        "ats_score": {
+          "min": 50,
+          "max": 85
+        },
+        "final_score": {
+          "min": 40,
+          "max": 80
+        }
+      }
+    },
+    {
+      "id": "B066",
+      "name": "Long CV - Senior Architect",
+      "category": "long_cv",
+      "cv_text": "Alexander Thompson\nPrincipal Software Architect\nEmail: alex.t@email.com | Phone: +1-555-0101 | LinkedIn: linkedin.com/in/alexthompson | GitHub: github.com/alexthompson\n\nProfessional Summary:\nSeasoned software architect with 15+ years of experience designing and implementing enterprise-scale distributed systems. Deep expertise in cloud-native architectures, microservices, and domain-driven design.\n\nExperience:\n\nPrincipal Architect, MegaCorp Technologies, 2020 - Present\n- Designed and implemented event-driven microservices architecture serving 50M+ daily active users\n- Led migration from monolith to microservices reducing deployment time from 2 weeks to 2 hours\n- Established architectural decision records and technical governance processes\n- Mentored 25+ engineers across 5 teams on distributed systems best practices\n- Reduced infrastructure costs by 40% through optimization and right-sizing\n- Implemented chaos engineering practices improving system resilience by 300%\n\nSenior Software Architect, TechGiant Inc, 2017 - 2020\n- Architected real-time data processing pipeline handling 1M+ events per second\n- Designed multi-region active-active deployment strategy with 99.99% uptime\n- Led technical due diligence for 3 acquisitions worth $200M+\n- Created company-wide API design standards adopted by 15+ teams\n- Built internal developer platform reducing onboarding time by 60%\n\nLead Software Engineer, InnoSoft Solutions, 2014 - 2017\n- Led team of 12 engineers building cloud-native SaaS platform\n- Implemented CQRS and event sourcing patterns for financial transaction processing\n- Designed and deployed Kubernetes clusters across AWS and GCP\n- Established CI/CD pipelines with automated testing achieving 95% code coverage\n\nSoftware Engineer, StartupXYZ, 2010 - 2014\n- Full-stack development with Java/Spring and Angular\n- Database design and optimization for PostgreSQL and MongoDB\n- Integration with third-party APIs and payment processors\n\nJunior Developer, CodeFactory, 2008 - 2010\n- Web application development with PHP and MySQL\n- Frontend development with HTML, CSS, JavaScript\n\nTechnical Skills:\nLanguages: Java, Python, Go, TypeScript, Kotlin, Scala\nFrameworks: Spring Boot, FastAPI, Django, React, Angular, Node.js\nCloud: AWS (ECS, EKS, Lambda, DynamoDB, SQS, SNS, CloudFormation), GCP, Azure\nData: PostgreSQL, MongoDB, Cassandra, Redis, Elasticsearch, Kafka, RabbitMQ\nInfrastructure: Kubernetes, Docker, Terraform, Ansible, ArgoCD\nPractices: DDD, CQRS, Event Sourcing, TDD, Microservices, API Design\n\nCertifications:\n- AWS Solutions Architect Professional (2023)\n- Google Cloud Professional Architect (2022)\n- Certified Kubernetes Administrator (2021)\n- TOGAF 9 Certified (2020)\n\nEducation:\nMS Computer Science, Stanford University, 2008\nBS Computer Science, UC Berkeley, 2006\n\nPublications:\n- 'Scaling Microservices at MegaCorp' - InfoQ, 2023\n- 'Event-Driven Architecture Patterns' - O'Reilly Media, 2022\n\nSpeaking:\n- KubeCon 2023: 'Zero-Downtime Migrations at Scale'\n- QCon 2022: 'Building Resilient Distributed Systems'",
+      "job_description": "Principal Software Architect. 10+ years experience. Microservices, cloud-native, Kubernetes, AWS. Team leadership. DDD, event-driven architecture.",
+      "expected": {
+        "keyword_score": {
+          "min": 35,
+          "max": 85
+        },
+        "ats_score": {
+          "min": 55,
+          "max": 92
+        },
+        "final_score": {
+          "min": 55,
+          "max": 95
+        }
+      }
+    },
+    {
+      "id": "B067",
+      "name": "Long CV - Engineering Director",
+      "category": "long_cv",
+      "cv_text": "Patricia Chen\nVP of Engineering\npatchen@email.com | San Francisco, CA\n\nSummary:\n20+ years in software engineering leadership. Built and scaled engineering organizations from 10 to 200+ engineers. Expert in organizational design, technical strategy, and delivery excellence.\n\nExperience:\n\nVP Engineering, ScaleUp Inc, 2019 - Present\n- Built engineering org from 30 to 180 engineers across 6 offices\n- Established engineering career ladder and promotion framework\n- Reduced time-to-market by 50% through platform engineering investments\n- Led $15M annual engineering budget with 20% YoY efficiency improvement\n- Implemented OKR framework achieving 85% goal completion rate\n\nSenior Director Engineering, BigTech Corp, 2015 - 2019\n- Managed 8 engineering managers and 60+ engineers\n- Delivered 3 major product launches generating $100M+ revenue\n- Established SRE practice reducing incidents by 70%\n- Led technical interviews for 200+ candidates\n\nEngineering Manager, MidSize Tech, 2012 - 2015\n- Managed 3 teams building consumer-facing products\n- Introduced agile practices increasing velocity by 40%\n- Built CI/CD infrastructure from scratch\n\nSenior Software Engineer, StartupABC, 2008 - 2012\n- Full-stack development with Python/Django and React\n- AWS infrastructure management\n- Database design PostgreSQL\n\nSoftware Engineer, WebAgency, 2004 - 2008\n- PHP, MySQL web development\n- Client project delivery\n\nSkills:\nLeadership: Org Design, Hiring, Mentoring, OKRs, Budget Management\nTechnical: Python, Java, AWS, Kubernetes, System Design\nMethodologies: Agile, Scrum, Kanban, SAFe\n\nEducation:\nMS Computer Science, MIT, 2004\nBS Computer Science, CalTech, 2002",
+      "job_description": "VP of Engineering. 15+ years. Engineering org scaling. Budget management. Technical strategy. Cloud infrastructure knowledge.",
+      "expected": {
+        "keyword_score": {
+          "min": 20,
+          "max": 80
+        },
+        "ats_score": {
+          "min": 55,
+          "max": 90
+        },
+        "final_score": {
+          "min": 45,
+          "max": 88
+        }
+      }
+    },
+    {
+      "id": "B068",
+      "name": "Long CV - Full Stack Senior",
+      "category": "long_cv",
+      "cv_text": "Roberto Martinez\nSenior Full Stack Engineer\nroberto@email.com | GitHub: github.com/robertom\n\nSummary:\n12 years of full-stack development experience across startups and enterprises.\n\nExperience:\n\nSenior Full Stack Engineer, FinTech Pro, 2020 - Present\n- React/Next.js frontend with TypeScript\n- Node.js/Express microservices\n- PostgreSQL and Redis data layer\n- AWS deployment (ECS, RDS, ElastiCache)\n- Stripe payment integration processing $5M/month\n- Led frontend architecture migration to Next.js 14\n\nFull Stack Developer, E-Commerce Giant, 2017 - 2020\n- Vue.js storefront serving 2M monthly visitors\n- Python/FastAPI backend services\n- MongoDB and Elasticsearch\n- Docker/Kubernetes deployment\n- Performance optimization reducing load time by 60%\n\nWeb Developer, Digital Agency, 2014 - 2017\n- React and Angular SPAs for 20+ clients\n- Node.js REST APIs\n- MySQL and PostgreSQL databases\n- AWS S3, CloudFront CDN setup\n\nJunior Developer, LocalCo, 2012 - 2014\n- PHP/Laravel backend development\n- jQuery frontend work\n- Basic DevOps (Linux, Nginx)\n\nSkills:\nFrontend: React, Next.js, Vue.js, TypeScript, Tailwind CSS\nBackend: Node.js, Python, FastAPI, Express, Django\nDatabase: PostgreSQL, MongoDB, Redis, Elasticsearch\nCloud: AWS, Docker, Kubernetes, CI/CD\n\nEducation:\nBS Software Engineering, 2012",
+      "job_description": "Senior Full Stack Developer. React/Next.js, Node.js, PostgreSQL, AWS. 8+ years. E-commerce experience preferred.",
+      "expected": {
+        "keyword_score": {
+          "min": 35,
+          "max": 90
+        },
+        "ats_score": {
+          "min": 55,
+          "max": 90
+        },
+        "final_score": {
+          "min": 50,
+          "max": 92
+        }
+      }
+    },
+    {
+      "id": "B069",
+      "name": "Long CV - ML Engineer",
+      "category": "long_cv",
+      "cv_text": "Dr. Yuki Tanaka\nMachine Learning Engineer\nyuki.t@email.com | Scholar: scholar.google.com/yuki\n\nSummary:\nML engineer and researcher with 10+ years experience in NLP, computer vision, and MLOps. Published 15+ papers in top venues.\n\nExperience:\n\nStaff ML Engineer, AI Startup, 2021 - Present\n- Built production NLP pipeline processing 10M documents daily\n- Fine-tuned LLMs (GPT, LLaMA) for domain-specific applications\n- Designed RAG system with vector databases (Pinecone, Weaviate)\n- MLflow experiment tracking and model registry\n- Reduced model inference latency by 70% with quantization\n\nSenior ML Engineer, BigTech AI, 2018 - 2021\n- Computer vision models for autonomous driving\n- PyTorch model training on multi-GPU clusters\n- A/B testing framework for model deployments\n- Mentored 5 junior ML engineers\n\nResearch Scientist, University Lab, 2015 - 2018\n- Published 8 papers in NeurIPS, ICML, ACL\n- Developed novel attention mechanisms\n- Teaching assistant for ML and NLP courses\n\nSkills:\nML: PyTorch, TensorFlow, Scikit-learn, Hugging Face, LangChain\nNLP: Transformers, BERT, GPT, RAG, Vector DBs\nMLOps: MLflow, Kubeflow, AWS SageMaker, Docker\nLanguages: Python, C++, Julia\n\nEducation:\nPhD Computer Science (ML focus), Tokyo University, 2015\nMS Computer Science, Kyoto University, 2012",
+      "job_description": "ML Engineer. PyTorch/TensorFlow, NLP, LLMs, MLOps, Python. Production ML systems. 5+ years.",
+      "expected": {
+        "keyword_score": {
+          "min": 30,
+          "max": 80
+        },
+        "ats_score": {
+          "min": 55,
+          "max": 90
+        },
+        "final_score": {
+          "min": 50,
+          "max": 85
+        }
+      }
+    },
+    {
+      "id": "B070",
+      "name": "Long CV - Platform Engineer",
+      "category": "long_cv",
+      "cv_text": "Daniel O'Brien\nPlatform Engineer\ndaniel@email.com\n\nSummary:\n8 years building internal developer platforms and infrastructure.\n\nExperience:\n\nSenior Platform Engineer, ScaleCo, 2021 - Present\n- Built internal developer platform serving 200+ engineers\n- Kubernetes multi-cluster management with ArgoCD\n- Terraform modules for self-service infrastructure\n- Observability stack (Datadog, PagerDuty, Grafana)\n- Reduced deployment time from 30 min to 3 min\n\nDevOps Engineer, CloudFirst, 2018 - 2021\n- AWS infrastructure automation\n- CI/CD with GitHub Actions and Jenkins\n- Docker container orchestration\n- Security scanning and compliance automation\n\nSystems Administrator, EnterpriseCo, 2016 - 2018\n- Linux server administration (Ubuntu, CentOS)\n- Network configuration and monitoring\n- Backup and disaster recovery\n\nSkills:\nPlatform: Kubernetes, Docker, Terraform, Helm, ArgoCD\nCloud: AWS, GCP\nCI/CD: GitHub Actions, Jenkins, GitLab CI\nMonitoring: Datadog, Grafana, Prometheus, PagerDuty\nLanguages: Go, Python, Bash\n\nEducation:\nBS Information Systems, 2016",
+      "job_description": "Platform Engineer. Kubernetes, Terraform, AWS, CI/CD, observability. Internal developer platform experience. Go or Python.",
+      "expected": {
+        "keyword_score": {
+          "min": 35,
+          "max": 90
+        },
+        "ats_score": {
+          "min": 50,
+          "max": 88
+        },
+        "final_score": {
+          "min": 50,
+          "max": 90
+        }
+      }
+    },
+    {
+      "id": "B071",
+      "name": "Finance - Investment Analyst",
+      "category": "finance",
+      "cv_text": "Michael Chang\nInvestment Analyst\n\nExperience:\nInvestment Analyst, Goldman Partners, 2020 - Present\n- Financial modeling and DCF valuation for M&A transactions\n- Bloomberg Terminal and Capital IQ for market analysis\n- Prepared investment memos and board presentations\n- Portfolio analysis across equities, fixed income, and derivatives\n\nSkills: Financial Modeling, DCF, Bloomberg, Excel, PowerPoint, Python, SQL\nEducation: MBA Finance, Wharton, 2020\nCFA Level III Candidate",
+      "job_description": "Investment Analyst. Financial modeling, DCF valuation, Bloomberg Terminal, Excel. CFA preferred. M&A experience.",
+      "expected": {
+        "keyword_score": {
+          "min": 30,
+          "max": 90
+        },
+        "ats_score": {
+          "min": 40,
+          "max": 80
+        },
+        "final_score": {
+          "min": 40,
+          "max": 80
+        }
+      }
+    },
+    {
+      "id": "B072",
+      "name": "Finance - Risk Manager",
+      "category": "finance",
+      "cv_text": "Sarah Williams\nRisk Manager\n\nExperience:\nSenior Risk Manager, JP Asset Management, 2018 - Present\n- Market risk and credit risk assessment\n- VaR calculations and stress testing\n- Basel III/IV regulatory compliance\n- Risk reporting to senior management and board\n- Python and R for quantitative risk modeling\n\nSkills: Risk Management, VaR, Stress Testing, Basel III, Python, R, SQL, Excel\nEducation: MS Financial Engineering, Columbia, 2018\nFRM Certified",
+      "job_description": "Risk Manager. Market risk, credit risk, VaR, stress testing. Basel III compliance. Python/R for modeling. FRM preferred.",
+      "expected": {
+        "keyword_score": {
+          "min": 35,
+          "max": 90
+        },
+        "ats_score": {
+          "min": 45,
+          "max": 80
+        },
+        "final_score": {
+          "min": 45,
+          "max": 80
+        }
+      }
+    },
+    {
+      "id": "B073",
+      "name": "Finance - FinTech Developer",
+      "category": "finance",
+      "cv_text": "James Liu\nFinTech Software Engineer\n\nExperience:\nSenior Engineer, PaymentTech, 2019 - Present\n- Built payment processing system handling $2B annually\n- Python/FastAPI microservices with event-driven architecture\n- PCI-DSS compliance implementation\n- Real-time fraud detection with ML models\n- PostgreSQL and Redis for transaction data\n\nSkills: Python, FastAPI, PostgreSQL, Redis, Kafka, Docker, AWS, PCI-DSS\nEducation: BS Computer Science + Minor Finance, 2019",
+      "job_description": "FinTech Engineer. Python, payment systems, PCI-DSS, microservices, PostgreSQL. Financial services experience required.",
+      "expected": {
+        "keyword_score": {
+          "min": 30,
+          "max": 75
+        },
+        "ats_score": {
+          "min": 45,
+          "max": 85
+        },
+        "final_score": {
+          "min": 45,
+          "max": 80
+        }
+      }
+    },
+    {
+      "id": "B074",
+      "name": "Finance - Quant Analyst",
+      "category": "finance",
+      "cv_text": "Anna Petrova\nQuantitative Analyst\n\nExperience:\nQuant Analyst, HedgeFund Capital, 2019 - Present\n- Developed algorithmic trading strategies with Python\n- Statistical modeling and time series analysis\n- Monte Carlo simulations for options pricing\n- High-frequency data analysis with pandas and numpy\n- C++ optimization for latency-critical systems\n\nSkills: Python, C++, R, pandas, numpy, scipy, SQL, Bloomberg, MATLAB\nEducation: PhD Applied Mathematics, 2019",
+      "job_description": "Quantitative Analyst. Python, C++, statistical modeling, time series, algorithmic trading. PhD in STEM preferred.",
+      "expected": {
+        "keyword_score": {
+          "min": 25,
+          "max": 80
+        },
+        "ats_score": {
+          "min": 45,
+          "max": 80
+        },
+        "final_score": {
+          "min": 40,
+          "max": 80
+        }
+      }
+    },
+    {
+      "id": "B075",
+      "name": "Finance Analyst vs Dev JD",
+      "category": "cross_sector",
+      "cv_text": "Tom Richards\nFinancial Analyst\n\nExperience:\nFinancial Analyst, ConsultingCo, 2020 - Present\n- Budget forecasting and variance analysis\n- Excel financial models and PowerPoint presentations\n- Quarterly earnings reports\n- Stakeholder communication\n\nSkills: Excel, PowerPoint, Financial Modeling, SAP, Tableau\nEducation: BBA Finance, 2020",
+      "job_description": "Full Stack Developer. React, Node.js, Python, PostgreSQL, Docker, AWS, CI/CD.",
+      "expected": {
+        "keyword_score": {
+          "min": 0,
+          "max": 15
+        },
+        "ats_score": {
+          "min": 20,
+          "max": 60
+        },
+        "final_score": {
+          "min": 20,
+          "max": 65
+        }
+      }
+    },
+    {
+      "id": "B076",
+      "name": "Marketing - Digital Marketing Manager",
+      "category": "marketing",
+      "cv_text": "Laura Garcia\nDigital Marketing Manager\n\nExperience:\nDigital Marketing Manager, BrandCo, 2019 - Present\n- Google Ads and Facebook Ads campaign management ($500K/month budget)\n- SEO/SEM strategy increasing organic traffic by 200%\n- Email marketing automation with HubSpot and Mailchimp\n- Google Analytics and Data Studio reporting\n- Social media strategy across Instagram, LinkedIn, TikTok\n- A/B testing and conversion rate optimization\n\nSkills: Google Ads, Facebook Ads, SEO, Google Analytics, HubSpot, Mailchimp, Canva\nEducation: BA Marketing, 2019",
+      "job_description": "Digital Marketing Manager. Google Ads, Facebook Ads, SEO/SEM, email marketing, analytics. 3+ years.",
+      "expected": {
+        "keyword_score": {
+          "min": 30,
+          "max": 90
+        },
+        "ats_score": {
+          "min": 40,
+          "max": 80
+        },
+        "final_score": {
+          "min": 40,
+          "max": 80
+        }
+      }
+    },
+    {
+      "id": "B077",
+      "name": "Marketing - Content Strategist",
+      "category": "marketing",
+      "cv_text": "Rachel Kim\nContent Strategist\n\nExperience:\nSenior Content Strategist, MediaCo, 2020 - Present\n- Content calendar management for 5 brands\n- Blog writing, copywriting, and editorial planning\n- WordPress and Webflow CMS management\n- SEO content optimization with Ahrefs and SEMrush\n- Video content strategy for YouTube (100K+ subscribers)\n\nSkills: Content Strategy, Copywriting, SEO, WordPress, Ahrefs, SEMrush, Canva, Video Editing\nEducation: BA Communications, 2020",
+      "job_description": "Content Strategist. Content planning, copywriting, SEO, CMS (WordPress), video content. Analytics experience.",
+      "expected": {
+        "keyword_score": {
+          "min": 25,
+          "max": 80
+        },
+        "ats_score": {
+          "min": 40,
+          "max": 80
+        },
+        "final_score": {
+          "min": 40,
+          "max": 75
+        }
+      }
+    },
+    {
+      "id": "B078",
+      "name": "Marketing - Growth Hacker",
+      "category": "marketing",
+      "cv_text": "Alex Turner\nGrowth Marketing Lead\n\nExperience:\nGrowth Lead, SaaS Startup, 2021 - Present\n- Grew MRR from $50K to $500K in 18 months\n- Product-led growth strategy implementation\n- Mixpanel and Amplitude analytics\n- Landing page optimization (Unbounce)\n- Referral program design increasing user acquisition by 300%\n- SQL queries for cohort analysis\n\nSkills: Growth Marketing, PLG, Mixpanel, Amplitude, SQL, Google Ads, Landing Pages\nEducation: BS Business Analytics, 2021",
+      "job_description": "Growth Marketing Manager. PLG, analytics (Mixpanel/Amplitude), paid acquisition, SQL. SaaS experience.",
+      "expected": {
+        "keyword_score": {
+          "min": 25,
+          "max": 75
+        },
+        "ats_score": {
+          "min": 40,
+          "max": 80
+        },
+        "final_score": {
+          "min": 40,
+          "max": 75
+        }
+      }
+    },
+    {
+      "id": "B079",
+      "name": "Marketing - Brand Manager",
+      "category": "marketing",
+      "cv_text": "Sophia Anderson\nBrand Manager\n\nExperience:\nBrand Manager, FMCG Corp, 2019 - Present\n- Brand strategy for $100M consumer product portfolio\n- Market research and competitive analysis\n- Product launch campaigns across TV, digital, print\n- P&L management and pricing strategy\n- Agency management (creative, media, PR)\n\nSkills: Brand Strategy, Market Research, P&L Management, Project Management, PowerPoint\nEducation: MBA Marketing, 2019",
+      "job_description": "Brand Manager. Brand strategy, market research, P&L management, campaign management. FMCG experience preferred.",
+      "expected": {
+        "keyword_score": {
+          "min": 25,
+          "max": 98
+        },
+        "ats_score": {
+          "min": 40,
+          "max": 80
+        },
+        "final_score": {
+          "min": 40,
+          "max": 75
+        }
+      }
+    },
+    {
+      "id": "B080",
+      "name": "Marketing Manager vs Dev JD",
+      "category": "cross_sector",
+      "cv_text": "Chris Martin\nMarketing Manager\n\nExperience:\nMarketing Manager, RetailCo, 2020 - Present\n- Campaign management and budget allocation\n- Social media strategy\n- Brand awareness initiatives\n- Event planning and sponsorships\n\nSkills: Marketing Strategy, Social Media, Event Planning, PowerPoint, Excel\nEducation: BA Communications, 2020",
+      "job_description": "Backend Developer. Python, FastAPI, PostgreSQL, Docker, Kubernetes, AWS, CI/CD pipelines.",
+      "expected": {
+        "keyword_score": {
+          "min": 0,
+          "max": 15
+        },
+        "ats_score": {
+          "min": 20,
+          "max": 60
+        },
+        "final_score": {
+          "min": 20,
+          "max": 65
+        }
+      }
+    }
+  ]
+}
