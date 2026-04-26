@@ -13,6 +13,7 @@
 ## 📋 İçerik
 
 - [Genel Bakış](#-genel-bakış)
+- [Güncel Değişiklikler](#-güncel-değişiklikler)
 - [Özellikler](#-özellikler)
 - [Teknoloji Stack](#-teknoloji-stack)
 - [Mimari](#-mimari)
@@ -35,6 +36,56 @@
 - ✅ **Akıllı İş Eşleştirmesi**: Yapay zeka ile CV'ler ve iş ilanları arasında semantik eşleştirme
 - ✅ **Profil Optimizasyonu**: CV'leri target pozisyonlar için otomatik olarak optimize etme
 - ✅ **Çok Dil Desteği**: Türkçe, İngilizce ve diğer dillerde CV analizi
+
+---
+
+## 🆕 Güncel Değişiklikler
+
+Bu sürümde proje sağlığı, test kapsamı, CV Builder akışı ve recruiter deneyimi için kapsamlı düzeltmeler yapıldı.
+
+### Backend ve API
+
+- CV Builder endpointleri aktif hale getirildi:
+  - `GET /api/v1/cv-builder/templates`
+  - `POST /api/v1/cv-builder/preview`
+  - `POST /api/v1/cv-builder/preview-html`
+  - `POST /api/v1/cv-builder/generate`
+  - `POST /api/v1/cv-builder/suggest-summary`
+- Benchmark rota çakışması giderildi: dinamik rota artık `/api/v1/benchmark/{analysis_id:int}` olarak sınırlandırıldı.
+- Eski paylaşım endpointleri yeni DB tabanlı paylaşım endpointleriyle çakışmaması için legacy path'e taşındı:
+  - `/api/v1/share-legacy/{analysis_id}`
+  - `/api/v1/shared-legacy/{token}`
+- Recruiter local route yetkilendirme import'u doğru recruiter auth helper'ına bağlandı.
+
+### Frontend
+
+- Recruiter session state localStorage ile daha tutarlı hale getirildi.
+- Batch ranking export yardımcıları CSV/HTML/JSON akışları için test edilebilir ve geriye uyumlu hale getirildi.
+- Frontend test paketi Vitest + jsdom ile çalışır durumda.
+- Vite vendor chunk ayrımı eklendi; production build'de ana JS chunk boyutu düşürüldü.
+
+### Test, CI ve Docker
+
+- Pytest fixture düzeni iyileştirildi; test veritabanı SQLite fallback ile temiz başlıyor.
+- Sandbox'lı Windows ortamında `tmp_path` kullanımı workspace-local hale getirildi.
+- CI'da hata gizleyen `|| true` / `|| echo` kullanımları kaldırıldı.
+- `pytest.ini` tek pytest konfigürasyonu olarak bırakıldı.
+- Dockerfile final stage dependency kurulumu düzeltildi.
+- Docker healthcheck `wget` yerine Python stdlib ile çalışacak şekilde güncellendi.
+- Redis healthcheck parola kullanılan compose kurulumuyla uyumlu hale getirildi.
+
+Doğrulanan komutlar:
+
+```bash
+cd frontend
+npm test
+npm run build
+
+cd ..
+python -m pytest --collect-only -q
+python -m pytest tests/test_api.py::test_analyze_endpoint tests/test_api.py::test_cv_builder_preview_html_returns_template_html tests/test_endpoint_coverage.py::TestCVBuilderEndpoints::test_list_templates -q --tb=short
+python -m pytest tests/test_ats_config.py tests/test_train_model.py -q --tb=short
+```
 
 ---
 
@@ -365,7 +416,25 @@ npm run dev
 
 Frontend'e erişim: http://localhost:5173
 
-### 7️⃣ (İsteğe bağlı) Mobile Uygulaması
+### 7️⃣ ML Model Eğitimi
+
+`train_model.py` hem sentetik hem gerçek CSV verisi üzerinden model eğitebilir.
+
+```bash
+# Root dizinde çalıştırın
+python train_model.py --data-csv my_real_data.csv --hire-threshold 70
+```
+
+Gerçek CSV veri seti için dikkat:
+
+- `sample_training_data.csv` içinde listelenen 29 özellik sütunu gereklidir
+- `score` veya `hire` hedef sütunu bulunmalıdır
+- `data-csv` sağlanmışsa en az 30 kayıt ve hem `hire=0` hem `hire=1` örnekleri tavsiye edilir
+- Eğer `hire` sütunu yoksa, `score >= --hire-threshold` kullanılarak etiketler türetilir
+
+Eğer CSV verisi sağlanmazsa, script sentetik veri üreterek modelleri eğitir.
+
+### 8️⃣ (İsteğe bağlı) Mobile Uygulaması
 
 ```bash
 cd mobile
@@ -389,6 +458,12 @@ docker-compose logs -f
 # Servisleri durdur
 docker-compose down
 ```
+
+Notlar:
+
+- Backend image final stage'de `requirements.txt` kopyalayarak wheel cache üzerinden kurulum yapar.
+- Backend container healthcheck'i `http://localhost:8001/health` endpointini Python stdlib ile kontrol eder.
+- Redis servisi `REDIS_PASSWORD` ile başlatılır ve healthcheck aynı parolayı kullanır.
 
 ### Detaylı Kurulum Rehberi
 
@@ -475,6 +550,32 @@ curl -X POST http://localhost:8001/api/cv/render \
   }'
 ```
 
+#### 5. CV Builder HTML Preview
+
+```bash
+curl -X POST http://localhost:8001/api/v1/cv-builder/preview-html \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "full_name": "Ada Lovelace",
+    "email": "ada@example.com",
+    "title": "Software Engineer",
+    "summary": "Backend and AI product engineer.",
+    "skills": ["Python", "FastAPI", "React"],
+    "experiences": [],
+    "education": [],
+    "projects": [],
+    "languages": ["English"],
+    "template": "classic",
+    "output_format": "pdf",
+    "lang": "en"
+  }'
+```
+
+#### 6. Recruiter Batch Export
+
+Recruiter batch ranking sonuçları frontend tarafında CSV, HTML ve JSON olarak export edilebilir. Export yardımcıları `frontend/src/utils/exportUtils.js` içinde tutulur ve Vitest ile test edilir.
+
 ### Web Dashboard Kullanımı
 
 1. **Dashboard'a Giriş**
@@ -515,6 +616,22 @@ Tam API dokümantasyonu: http://localhost:8001/docs
 | **GET** | `/api/analyze/ats` | ATS analizi |
 | **GET** | `/api/user/profile` | Kullanıcı profili |
 | **POST** | `/api/billing/subscribe` | Subscription oluştur |
+
+### Aktif v1 Endpointleri
+
+| Metod | Endpoint | Açıklama |
+|-------|----------|---------|
+| **GET** | `/api/v1/cv-builder/templates` | Kullanıcı planına göre CV şablonlarını listeler |
+| **POST** | `/api/v1/cv-builder/preview` | CV Builder verisini normalize edip preview payload döner |
+| **POST** | `/api/v1/cv-builder/preview-html` | Seçilen şablonla HTML preview üretir |
+| **POST** | `/api/v1/cv-builder/generate` | CV çıktısını PDF/DOCX olarak üretir |
+| **POST** | `/api/v1/cv-builder/suggest-summary` | CV summary önerileri üretir |
+| **GET** | `/api/v1/benchmark/global` | Global benchmark istatistikleri |
+| **GET** | `/api/v1/benchmark/professions` | Meslek bazlı benchmark istatistikleri |
+| **GET** | `/api/v1/benchmark/specializations` | Uzmanlık bazlı benchmark istatistikleri |
+| **GET** | `/api/v1/benchmark/{analysis_id:int}` | Analize özel benchmark sonucu |
+| **POST** | `/api/v1/share` | DB tabanlı paylaşım linki oluşturur |
+| **GET** | `/api/v1/shared/{share_token}` | Paylaşılan analiz görünümü |
 
 Detaylı endpoint referansı: [API Reference](./docs/api-reference.md)
 
@@ -653,7 +770,17 @@ pytest tests/test_api.py -v
 
 # Belirli test'i çalıştır
 pytest tests/test_api.py::test_cv_upload -v
+
+# Test collection/import kontrolü
+pytest --collect-only -q
+
+# Frontend testleri
+cd frontend
+npm test
+npm run build
 ```
+
+Son doğrulamada backend collection `622` test topladı; frontend test paketi `50` testi geçti. Docker CLI yerel ortamda bulunmuyorsa Docker doğrulaması CI veya Docker kurulu bir makinede çalıştırılmalıdır.
 
 ### Code Quality
 
