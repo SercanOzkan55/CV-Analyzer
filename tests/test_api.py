@@ -169,7 +169,7 @@ Hobbies
 Photography
 """
 
-    monkeypatch.setattr(main_module, "_extract_pdf_text", lambda _: sample_cv)
+    monkeypatch.setattr(main_module, "_extract_pdf_text", lambda _: (sample_cv, False))
 
     resp = client.post(
         "/api/v1/cv/auto-fix",
@@ -210,12 +210,12 @@ Interests
 Travel, movies
 """
 
-    monkeypatch.setattr(main_module, "_extract_pdf_text", lambda _: sample_cv)
+    monkeypatch.setattr(main_module, "_extract_pdf_text", lambda _: (sample_cv, False))
 
     resp = client.post(
         "/api/v1/cv/auto-fix",
         files={"file": ("cv.pdf", b"%PDF-1.4\n%EOF\n", "application/pdf")},
-        data={"job_description": "SQL analyst", "use_ai": "false"},
+        data={"job_description": "SQL analyst", "use_ai": "false", "mode": "rebuild"},
     )
 
     assert resp.status_code == 200
@@ -238,6 +238,21 @@ def test_cv_auto_fix_export_endpoint_returns_document(client):
     assert resp.headers["content-type"].startswith(
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
+
+
+def test_cv_auto_fix_export_html_returns_html(client):
+    payload = {
+        "optimized_cv_text": "John Doe\njohn@example.com\n\nPROFESSIONAL SUMMARY\nPython developer.\n\nEXPERIENCE\nBackend Developer\n- Built FastAPI services\n\nSKILLS\nPython, FastAPI, SQL",
+        "job_description": "Python FastAPI backend engineer",
+        "output_format": "html",
+        "template": "classic",
+        "lang": "en",
+    }
+
+    resp = client.post("/api/v1/cv/auto-fix/export", json=payload)
+    assert resp.status_code == 200
+    assert "html" in resp.headers["content-type"]
+    assert b"<" in resp.content
 
 
 def test_cv_auto_fix_parse_endpoint_returns_builder_payload(client):
@@ -263,6 +278,111 @@ def test_cv_auto_fix_parse_endpoint_rejects_empty_text(client):
 
     assert resp.status_code == 400
     assert "cannot be empty" in resp.json().get("detail", "")
+
+
+def test_cv_builder_preview_html_returns_template_html(client):
+    payload = {
+        "full_name": "Jane Doe",
+        "email": "jane@example.com",
+        "phone": "+1 555 123 4567",
+        "location": "Istanbul",
+        "summary": "Backend engineer with Python and FastAPI experience.",
+        "experiences": [
+            {
+                "title": "Backend Engineer",
+                "company": "Acme",
+                "start_date": "2022",
+                "end_date": "Present",
+                "bullets": ["Built APIs", "Improved performance"],
+            }
+        ],
+        "skills": ["Python", "FastAPI", "PostgreSQL"],
+        "template": "modern",
+        "job_description": "Python backend role",
+        "lang": "en",
+    }
+
+    resp = client.post("/api/v1/cv-builder/preview-html", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "html" in data
+    assert "Jane Doe" in data["html"]
+    assert "template" in data and data["template"] == "modern"
+
+
+def test_job_keyword_gap_endpoint_returns_v2_fields(client):
+    payload = {
+        "cv_text": "Python FastAPI PostgreSQL backend development",
+        "job_description": "Need Python, Docker, AWS, REST API and PostgreSQL",
+    }
+    resp = client.post("/api/v1/job/keyword-gap", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "missing_keywords" in data
+    assert "weak_keywords" in data
+    assert "strong_keywords" in data
+    assert "suggested_keywords" in data
+    assert "keyword_coverage_pct" in data
+
+
+def test_job_match_score_endpoint_includes_v2_match_fields(client, sample_texts):
+    cv, job = sample_texts
+    resp = client.post(
+        "/api/v1/job/match-score",
+        json={"cv_text": cv, "job_description": job, "lang": "en"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "match_score_v2" in data
+    assert "keyword_gap_v2" in data
+    assert "missing_keywords" in data
+    assert "strong_keywords" in data
+
+
+def test_cover_letter_endpoint_accepts_company_and_mode(client, monkeypatch):
+    monkeypatch.setattr(main_module, "_ensure_ai_rewrite_allowed", lambda db, user: "pro")
+    payload = {
+        "cv_text": "John Doe\nPython backend developer with API experience",
+        "job_description": "Backend engineer for fintech APIs",
+        "company_name": "Acme",
+        "lang": "en",
+        "tone": "professional",
+        "mode": "senior",
+    }
+    resp = client.post("/api/v1/rewrite/cover-letter", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "result" in data
+    assert "builder_payload" in data
+
+
+def test_cv_versions_save_list_get_flow(client):
+    save_resp = client.post(
+        "/api/v1/cv/versions",
+        json={
+            "cv_text": "John Doe\nPython Developer",
+            "optimized_cv_text": "John Doe\nPROFESSIONAL SUMMARY\nPython Developer",
+            "job_description": "Python developer with SQL",
+            "source": "auto_fix",
+            "lang": "en",
+            "notes": "first save",
+        },
+    )
+    assert save_resp.status_code == 200
+    saved = save_resp.json()
+    assert saved["version_label"].startswith("v")
+
+    list_resp = client.get("/api/v1/cv/versions")
+    assert list_resp.status_code == 200
+    items = list_resp.json()["items"]
+    assert len(items) >= 1
+
+    version_id = saved["id"]
+    get_resp = client.get(f"/api/v1/cv/versions/{version_id}")
+    assert get_resp.status_code == 200
+    row = get_resp.json()
+    assert row["id"] == version_id
+    assert row["source"] == "auto_fix"
 
 
 def test_billing_admin_set_user_plan_updates_user_by_email(client, db_session, monkeypatch):

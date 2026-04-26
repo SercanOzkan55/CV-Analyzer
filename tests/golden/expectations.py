@@ -1,0 +1,107 @@
+# -*- coding: utf-8 -*-
+"""Golden test expectations — what each CV MUST contain after extraction.
+
+Each entry defines hard requirements: if any of these fail,
+the extraction is broken regardless of quality score.
+"""
+
+GOLDEN_EXPECTATIONS = {
+    "Sercan_Özkan_3": {
+        "name_contains": "Sercan",
+        "email": "ozkansercan55@gmail.com",
+        "phone_contains": "546",
+        "must_have_skills": ["Java", "Python", "C++", "HTML", "CSS", "JavaScript"],
+        "must_not_have_skills": ["ozkansercan55", "gmail.com", "3.80", "3.89"],
+        "min_experience_entries": 1,
+        "min_education_entries": 1,
+        "min_project_entries": 3,
+        "languages_must_contain": ["English"],
+        "languages_must_not_contain": ["e n", "en"],
+        "education_must_contain": ["Istanbul Health", "Computer Engineering"],
+        "experience_must_contain": ["Dasal"],
+        "summary_must_not_contain": [
+            "Electricity Generation",  # project content
+            "Windmill",  # project content
+            "Marching Band",  # activity
+        ],
+        "projects_must_contain": [
+            "Millionaire",
+            "Neon Space",
+            "JavaMiniFarmGame",
+            "FoodApp",
+        ],
+    },
+    "AHMETB-KUŞCU-Cv": {
+        "name_contains": "Ahmet",
+        "email": "ahmet.kuscu1@hotmail.com",
+        "phone_contains": "553",
+        "must_have_skills": ["SQL", "HTML", "CSS", "Java", "Next"],
+        "must_not_have_skills": ["ahmet.kuscu1", "hotmail.com", "2022"],
+        "min_experience_entries": 0,
+        "min_education_entries": 1,
+        "min_project_entries": 2,
+        "languages_must_contain": ["Turkish", "English"],
+        "languages_must_not_contain": ["e n", "en", "tr"],
+        "education_must_contain": ["Istanbul Health", "Computer"],
+        "projects_must_contain": ["FARM GAME", "MILLIONAIRE"],
+        "summary_must_not_contain": [],
+    },
+    "Edanur_Cihan": {
+        "name_contains": "Edanur",
+        "email": "edanurcihan13@gmail.com",
+        "phone_contains": "541",
+        "must_have_skills": ["Excel", "Python"],
+        "must_not_have_skills": ["edanurcihan13", "gmail.com", "0541", "13.10"],
+        "min_experience_entries": 1,
+        "min_education_entries": 1,
+        "min_project_entries": 0,
+        "languages_must_contain": [],
+        "languages_must_not_contain": ["e n"],
+        "education_must_contain": ["Endüstri", "Mühendisli"],
+        "experience_must_contain": ["Perfektüp"],
+        "summary_must_not_contain": [],
+        # Date format check
+        "dates_must_not_be_reversed": True,
+    },
+    "cv_21": {
+        "name_contains": "Ehtesham",
+        "email": "ehteshamkhan503@gmail.com",
+        "phone_contains": "9310",
+        "must_have_skills": [],
+        "must_not_have_skills": [
+            "ehteshamkhan503", "gmail.com", "10th", "12th",
+            "62.2", "71.2", "80.34", "16f", "2ndand",
+            "c.b.s.e", "ddc-mis", "u.p", "techno-cultural",
+        ],
+        "min_experience_entries": 0,
+        "min_education_entries": 1,
+        "min_project_entries": 0,
+        "languages_must_contain": ["English", "Hindi"],
+        "languages_must_not_contain": ["e n", "en", "hi"],
+        "education_must_contain": ["Kanpur", "Electrical"],
+        "summary_must_not_contain": [
+            "Electricity Generation",
+            "Windmill",
+            "PIC 16f",
+            "traic",
+        ],
+    },
+    "cv_4": {
+        "name_contains": "Analyn",
+        "email": "aocampo@ucdavis.edu",
+        "phone_contains": "559",
+        "must_have_skills": [],
+        "must_not_have_skills": ["aocampo", "ucdavis.edu", "95616"],
+        "min_experience_entries": 1,
+        "min_education_entries": 1,
+        "min_project_entries": 0,
+        "languages_must_contain": ["Tagalog"],
+        "languages_must_not_contain": ["e n", "en"],
+        "education_must_contain": ["California", "Davis"],
+        "experience_must_contain": ["Receptionist"],
+        "summary_must_not_contain": [
+            "Marching Band",
+            "Intramural Volleyball",
+        ],
+    },
+}

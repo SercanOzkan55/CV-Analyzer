@@ -2,7 +2,48 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { fetchUsage } from '../api'
 
-const AuthContext = createContext(null)
+/**
+ * @typedef {Object} AuthContextValue
+ * @property {any} user
+ * @property {string | null} token
+ * @property {boolean} loading
+ * @property {boolean} planLoading
+ * @property {string} plan
+ * @property {string} role
+ * @property {number} usageToday
+ * @property {number} dailyLimit
+ * @property {string} usageSource
+ * @property {boolean} isBillingAdmin
+ * @property {(email: string, password: string) => Promise<any>} signUp
+ * @property {(email: string, password: string) => Promise<any>} signIn
+ * @property {() => Promise<any>} signInWithGoogle
+ * @property {() => Promise<void>} signOut
+ * @property {() => Promise<void>} deleteUser
+ * @property {(email: string) => Promise<any>} resetPassword
+ * @property {(newPassword: string) => Promise<any>} updatePassword
+ * @property {() => boolean} canAnalyze
+ * @property {() => number} recordAnalysis
+ * @property {(accessToken?: string | null, options?: { background?: boolean, email?: string | null }) => Promise<void>} refreshUsage
+ */
+
+const AUTH_CONTEXT_KEY = '__CV_ANALYZER_AUTH_CONTEXT__'
+
+/**
+ * Keep a single context instance across Vite HMR updates.
+ * Without this, Fast Refresh can recreate the context object and
+ * temporarily desync AuthProvider/useAuth, causing runtime null-context errors.
+ */
+const AuthContext = (() => {
+  if (typeof globalThis !== 'undefined' && globalThis[AUTH_CONTEXT_KEY]) {
+    return globalThis[AUTH_CONTEXT_KEY]
+  }
+
+  const ctx = createContext(/** @type {AuthContextValue | null} */ (null))
+  if (typeof globalThis !== 'undefined') {
+    globalThis[AUTH_CONTEXT_KEY] = ctx
+  }
+  return ctx
+})()
 
 const DAILY_LIMIT_FREE = 5
 
@@ -38,25 +79,27 @@ export function AuthProvider({ children }) {
       return
     }
 
-    // Resolve admin status immediately using the passed email (avoids stale state)
-    const isAdmin = checkBillingAdmin(email || user?.email)
+    // Resolve admin status with both local config and backend role.
+    const localAdmin = checkBillingAdmin(email || user?.email)
 
     if (!background) setPlanLoading(true)
     try {
       const usage = await fetchUsage(accessToken)
       const planType = usage?.plan_type || 'free'
+      const backendRole = usage?.role || 'individual'
+      const isAdmin = localAdmin || backendRole === 'admin'
       const limit = Number(usage?.daily?.limit ?? DAILY_LIMIT_FREE)
       const used = Number(usage?.daily?.used ?? 0)
       const source = usage?.source || 'unknown'
       setPlan(isAdmin ? 'admin' : planType)
       try { localStorage.setItem('cv_plan_cache', isAdmin ? 'admin' : planType) } catch {}
-      setRole(isAdmin ? 'admin' : (usage?.role || 'individual'))
+      setRole(isAdmin ? 'admin' : backendRole)
       setDailyLimit(isAdmin ? Infinity : (planType === 'free' ? limit : Infinity))
       setUsageToday(used)
       setUsageSource(source)
     } catch {
       // Keep existing values if usage endpoint is temporarily unavailable.
-      if (isAdmin) {
+      if (localAdmin || role === 'admin') {
         setPlan('admin')
         setRole('admin')
         setDailyLimit(Infinity)
@@ -167,10 +210,10 @@ export function AuthProvider({ children }) {
     setRole('individual')
   }
 
-  const isBillingAdmin = checkBillingAdmin(user?.email)
+  const isBillingAdmin = checkBillingAdmin(user?.email) || role === 'admin'
 
   function canAnalyze() {
-    if (isBillingAdmin) return true
+    if (isBillingAdmin || role === 'admin') return true
     if (planLoading) return true
     if (plan !== 'free') return true
     return usageToday < dailyLimit
@@ -196,6 +239,7 @@ export function AuthProvider({ children }) {
 }
 
 export function useAuth() {
+  /** @type {AuthContextValue | null} */
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth must be used within AuthProvider')
   return ctx

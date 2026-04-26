@@ -8,7 +8,6 @@ export default function AnimatedBackground() {
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     let animId
-    let particles = []
 
     function resize() {
       canvas.width = window.innerWidth
@@ -18,16 +17,15 @@ export default function AnimatedBackground() {
     window.addEventListener('resize', resize)
 
     class Particle {
-      constructor() {
-        this.reset()
-      }
+      constructor() { this.reset() }
       reset() {
         this.x = Math.random() * canvas.width
         this.y = Math.random() * canvas.height
-        this.size = Math.random() * 2 + 0.5
-        this.speedX = (Math.random() - 0.5) * 0.3
-        this.speedY = (Math.random() - 0.5) * 0.3
-        this.opacity = Math.random() * 0.5 + 0.1
+        this.size = Math.random() * 1.6 + 0.4
+        this.speedX = (Math.random() - 0.5) * 0.25
+        this.speedY = (Math.random() - 0.5) * 0.25
+        this.opacity = Math.random() * 0.45 + 0.08
+        this.color = Math.random() > 0.5 ? '192, 132, 252' : '167, 139, 250'
       }
       update() {
         this.x += this.speedX
@@ -38,15 +36,13 @@ export default function AnimatedBackground() {
       draw() {
         ctx.beginPath()
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(56, 189, 248, ${this.opacity})`
+        ctx.fillStyle = `rgba(${this.color}, ${this.opacity})`
         ctx.fill()
       }
     }
 
-    const count = Math.min(60, Math.floor((canvas.width * canvas.height) / 20000))
-    for (let i = 0; i < count; i++) {
-      particles.push(new Particle())
-    }
+    const count = Math.min(55, Math.floor((canvas.width * canvas.height) / 22000))
+    const particles = Array.from({ length: count }, () => new Particle())
 
     function drawLines() {
       for (let i = 0; i < particles.length; i++) {
@@ -54,9 +50,9 @@ export default function AnimatedBackground() {
           const dx = particles[i].x - particles[j].x
           const dy = particles[i].y - particles[j].y
           const dist = Math.sqrt(dx * dx + dy * dy)
-          if (dist < 150) {
+          if (dist < 130) {
             ctx.beginPath()
-            ctx.strokeStyle = `rgba(56, 189, 248, ${0.06 * (1 - dist / 150)})`
+            ctx.strokeStyle = `rgba(192, 132, 252, ${0.05 * (1 - dist / 130)})`
             ctx.lineWidth = 0.5
             ctx.moveTo(particles[i].x, particles[i].y)
             ctx.lineTo(particles[j].x, particles[j].y)
@@ -81,15 +77,27 @@ export default function AnimatedBackground() {
   }, [])
 
   return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 0,
-        pointerEvents: 'none',
-        opacity: 0.6,
-      }}
-    />
+    <>
+      {/* Floating gradient orbs */}
+      <div className="animated-bg-orbs" aria-hidden="true">
+        <div className="bg-orb bg-orb-1" />
+        <div className="bg-orb bg-orb-2" />
+        <div className="bg-orb bg-orb-3" />
+        <div className="bg-orb bg-orb-4" />
+      </div>
+      {/* Particle canvas */}
+      <canvas
+        ref={canvasRef}
+        className="animated-bg-canvas"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: 'none',
+          opacity: 0.55,
+          transition: 'opacity 0.4s ease',
+        }}
+      />
+    </>
   )
 }
