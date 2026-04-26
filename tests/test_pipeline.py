@@ -22,6 +22,12 @@ def test_run_pipeline_embedding_none(monkeypatch, sample_texts):
     if "main" in sys.modules:
         monkeypatch.setattr("main.get_embedding", lambda text: None)
     main = importlib.import_module("main")
+
+    # Clear in-memory analysis cache so we don't get a cached result from
+    # a previous test that ran with real embeddings.
+    if hasattr(main, "_analysis_mem_cache"):
+        main._analysis_mem_cache.clear()
+
     cv, job = sample_texts
     # With embedding failures we expect the pipeline to handle gracefully
     res = main.run_pipeline(cv, job)

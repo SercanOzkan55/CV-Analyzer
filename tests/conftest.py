@@ -1,5 +1,3 @@
-import main as main_module
-main_module.RATE_LIMIT_ENABLED = False
 """
 Professional test conftest.py
 - Per-function isolated in-memory SQLite DB
@@ -9,8 +7,11 @@ Professional test conftest.py
 """
 
 import os
+from pathlib import Path
+import shutil
 import sys
 import types
+import uuid
 
 import alembic.command
 import alembic.config
@@ -32,11 +33,13 @@ _service_stubs = [
     (
         "services.model_service",
         {
+            "is_mock": lambda: os.getenv("MOCK_SERVICES", "1") == "1",
+            "predict_hire": lambda features: (False, 0.5),
             "predict_match": lambda features: (
-                80.0,
-                90.0,
-                "Low Risk",
-                {"note": "stub"},
+                50.0,
+                50.0,
+                "High Risk",
+                {"mock": "test mode", "features_count": len(features)},
             ),
         },
     ),
@@ -140,6 +143,15 @@ import pytest
 from auth import verify_supabase_jwt
 from database import Base, get_db
 from main import app
+import main as main_module
+
+main_module.RATE_LIMIT_ENABLED = False
+# Disable IP-level global rate limit for tests (avoids 429 cascade across tests)
+main_module._IP_GLOBAL_LIMIT_PER_MIN = 0
+# Disable abuse protection for tests (fingerprint accumulation causes false 429s)
+main_module.ABUSE_PROTECTION_ENABLED = False
+# Disable CPU guard for tests (test runner itself pushes CPU to 100%)
+main_module._CPU_USAGE_LIMIT = 100.0
 
 
 # ─── Mock JWT ───
@@ -183,8 +195,6 @@ def _ensure_test_db_ready():
             connect_args={"check_same_thread": False},
         )
 
-    from sqlalchemy import text
-
     # Postgres ENUM types
     if not _is_sqlite_url(_ACTIVE_TEST_DB_URL):
         try:
@@ -225,6 +235,14 @@ def _ensure_test_db_ready():
         except Exception:
             pass
 
+    # SQLite fallback uses a file so app/TestClient connections share state.
+    # Start each test session from an empty schema in case a prior run crashed.
+    if _is_sqlite_url(_ACTIVE_TEST_DB_URL):
+        try:
+            Base.metadata.drop_all(bind=_engine)
+        except Exception:
+            pass
+
     # Always create missing model tables from SQLAlchemy metadata
     Base.metadata.create_all(bind=_engine)
     yield
@@ -236,6 +254,22 @@ def _ensure_test_db_ready():
 
 
 # ─── Per-function fixtures ───
+
+
+@pytest.fixture(scope="function")
+def tmp_path():
+    """Workspace-local tmp_path replacement for sandboxed Windows test runs."""
+    base = Path.cwd() / "test_tmp"
+    path = base / f"tmp_{uuid.uuid4().hex}"
+    path.mkdir(parents=True, exist_ok=False)
+    try:
+        yield path
+    finally:
+        shutil.rmtree(path, ignore_errors=True)
+        try:
+            base.rmdir()
+        except OSError:
+            pass
 
 
 @pytest.fixture(scope="function")

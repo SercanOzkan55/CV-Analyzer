@@ -1,4 +1,4 @@
-FROM python:3.11-slim AS builder
+FROM python:3.14-slim AS builder
 WORKDIR /app
 
 # Install build deps
@@ -10,15 +10,33 @@ COPY requirements.txt ./
 RUN python -m pip install --upgrade pip
 RUN if [ -f requirements.txt ]; then pip wheel -r requirements.txt -w /wheels; fi
 
-FROM python:3.11-slim
+FROM python:3.14-slim
 WORKDIR /app
 
 # Create non-root user
 RUN useradd -m appuser
 
+# Install Tesseract OCR for camera CV scanning (all supported languages)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tesseract-ocr \
+    tesseract-ocr-tur \
+    tesseract-ocr-fra \
+    tesseract-ocr-deu \
+    tesseract-ocr-spa \
+    tesseract-ocr-ara \
+    tesseract-ocr-por \
+    tesseract-ocr-ita \
+    tesseract-ocr-nld \
+    tesseract-ocr-rus \
+    tesseract-ocr-jpn \
+    tesseract-ocr-kor \
+    tesseract-ocr-chi-sim \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy wheels if any and install
 COPY --from=builder /wheels /wheels
-RUN if [ -d /wheels ]; then pip install --no-index --find-links=/wheels -r requirements.txt || true; fi
+COPY requirements.txt ./
+RUN pip install --no-index --find-links=/wheels -r requirements.txt
 
 # Copy source
 COPY . /app
@@ -26,11 +44,11 @@ RUN chown -R appuser:appuser /app
 
 USER appuser
 
-EXPOSE 8000
+EXPOSE 8001
 
-# Healthcheck (checks root URL)
+# Healthcheck (checks /health endpoint)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD wget -qO- http://localhost:8000/ || exit 1
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=2).read()" || exit 1
 
 ENV PYTHONUNBUFFERED=1
 CMD ["/bin/bash", "./start_gunicorn.sh"]

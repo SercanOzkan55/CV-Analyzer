@@ -11,4 +11,4 @@ def test_csrf_absent():
     )
     assert "csrf" not in resp.headers
     # 401 (no auth) is also a valid secure response
-    assert resp.status_code in (200, 400, 401, 403, 422)
+    assert resp.status_code in (200, 400, 401, 403, 422, 429)

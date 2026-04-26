@@ -2,10 +2,26 @@ import os
 import subprocess
 
 from services import model_worker
+from services.ml_model import predict_score as _ml_predict_score
+from services.ml_model import predict_hire_proba as _ml_predict_hire
 
 
 def is_mock():
     return os.getenv("MOCK_SERVICES", "1") == "1"
+
+
+def predict_hire(features):
+    """Predict hire probability using the classification model.
+
+    Returns (hire_decision: bool, hire_probability: float).
+    """
+    if is_mock():
+        return False, 0.5
+
+    try:
+        return _ml_predict_hire(features)
+    except Exception:
+        return False, 0.5
 
 
 def predict_match(features):

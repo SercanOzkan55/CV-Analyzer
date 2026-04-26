@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from sqlalchemy import (TIMESTAMP, Column, DateTime, Enum, Float, ForeignKey,
-                        Integer, String, Text)
+from sqlalchemy import (TIMESTAMP, Boolean, Column, DateTime, Enum, Float, ForeignKey,
+                        Integer, JSON, String, Text)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -43,6 +43,36 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class APISubscription(Base):
+    """API subscription for local processing mode - zero data retention."""
+    __tablename__ = "api_subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(
+        Integer, ForeignKey("organizations.id"), nullable=False, index=True
+    )
+    organization = relationship("Organization", back_populates="api_subscriptions")
+
+    # API key for authentication
+    api_key = Column(String(255), unique=True, nullable=False, index=True)
+
+    # Monthly limits and usage
+    monthly_limit = Column(Integer, default=1000, nullable=False)
+    monthly_usage = Column(Integer, default=0, nullable=False)
+
+    # Subscription status
+    is_active = Column(Boolean, default=True, nullable=False)
+    expires_at = Column(DateTime, nullable=True)
+
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_used_at = Column(DateTime, nullable=True)
+
+    # Reset monthly usage on the 1st of each month
+    monthly_reset_day = Column(Integer, default=1, nullable=False)
+
+
 class Analysis(Base):
     __tablename__ = "analysis"
 
@@ -59,6 +89,7 @@ class Analysis(Base):
     industry_id = Column(Integer)
     specialization_id = Column(Integer)
     job_title = Column(String, nullable=True, index=True)
+    result = Column(JSON, nullable=True)
 
     created_at = Column(
         TIMESTAMP(timezone=False), server_default=func.now(), index=True
@@ -85,9 +116,11 @@ class Organization(Base):
     stripe_customer_id = Column(String, nullable=True, index=True)
     daily_usage = Column(Integer, default=0)
     monthly_usage = Column(Integer, default=0)
+    cv_credit_limit = Column(Integer, default=100) # Varsayılan aylık 100 CV kotası
     created_at = Column(DateTime, default=datetime.utcnow)
 
     users = relationship("User", back_populates="organization")
+    api_subscriptions = relationship("APISubscription", back_populates="organization")
 
 
 class Candidate(Base):
@@ -97,6 +130,9 @@ class Candidate(Base):
     organization_id = Column(
         Integer, ForeignKey("organizations.id"), nullable=True, index=True
     )
+    name = Column(String, nullable=True)
+    email = Column(String, nullable=True, index=True)
+    phone = Column(String, nullable=True)
     cv_text = Column(Text, nullable=True)
     # cv_embedding will be `vector(1536)` in Postgres when pgvector is installed
     if Vector is not None:
@@ -136,3 +172,255 @@ class FailedTask(Base):
     payload = Column(Text, nullable=True)
     error = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class CVVersion(Base):
+    __tablename__ = "cv_versions"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
+    version_label = Column(String, nullable=False, default="v1")
+    source = Column(String, nullable=False, default="manual")
+    lang = Column(String, nullable=False, default="en")
+    cv_text = Column(Text, nullable=False)
+    optimized_cv_text = Column(Text, nullable=True)
+    job_description = Column(Text, nullable=True)
+    match_score = Column(Float, nullable=True)
+    notes = Column(Text, nullable=True)
+    original_s3_key = Column(String, nullable=True)
+    optimized_s3_key = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+# ── Recruiter Dashboard Models ──────────────────────────────────
+
+
+class RecruiterJob(Base):
+    """A job posting that a recruiter is hiring for."""
+
+    __tablename__ = "recruiter_jobs"
+
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(
+        Integer, ForeignKey("organizations.id"), nullable=False, index=True
+    )
+    created_by = Column(
+        Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    actions = relationship("CandidateAction", back_populates="job", lazy="dynamic")
+
+
+class EmailTemplate(Base):
+    """Reusable email templates with variable placeholders."""
+
+    __tablename__ = "email_templates"
+
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(
+        Integer, ForeignKey("organizations.id"), nullable=False, index=True
+    )
+    created_by = Column(Integer, ForeignKey("app_users.id"), nullable=False)
+    name = Column(String, nullable=False)
+    template_type = Column(String, nullable=False, default="accept")  # accept | reject | custom
+    subject = Column(String, nullable=False)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+# Backward-compatible alias for recruiter email template tests
+RecruiterEmailTemplate = EmailTemplate
+
+
+class CandidateAction(Base):
+    """Tracks recruiter accept/reject decisions per candidate-job pair."""
+
+    __tablename__ = "candidate_actions"
+
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(
+        Integer, ForeignKey("organizations.id"), nullable=False, index=True
+    )
+    job_id = Column(
+        Integer, ForeignKey("recruiter_jobs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    recruiter_id = Column(
+        Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    candidate_name = Column(String, nullable=False)
+    candidate_email = Column(String, nullable=True)
+    cv_text = Column(Text, nullable=True)
+    final_score = Column(Float, nullable=True)
+    ats_score = Column(Float, nullable=True)
+    action = Column(String, nullable=False)  # accepted | rejected | pending
+    email_sent = Column(Boolean, default=False)
+    email_sent_at = Column(DateTime, nullable=True)
+    notes = Column(Text, nullable=True)
+    analysis_snapshot = Column(Text, nullable=True)  # JSON blob of full analysis
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    job = relationship("RecruiterJob", back_populates="actions")
+
+
+class Reminder(Base):
+    """Organization-level interview / application reminders."""
+
+    __tablename__ = "reminders"
+
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(
+        Integer, ForeignKey("organizations.id"), nullable=False, index=True
+    )
+    created_by = Column(
+        Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    reminder_type = Column(String, nullable=False, default="interview")
+    target_email = Column(String, nullable=False)
+    event_date = Column(DateTime, nullable=False, index=True)
+    is_active = Column(Boolean, default=True)
+    notified_3d_at = Column(DateTime, nullable=True)
+    notified_1d_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ── Global ATS Benchmark Models ─────────────────────────────────
+
+
+class ATSBenchmarkGlobal(Base):
+    """Single-row aggregate: global ATS statistics across all CVs."""
+
+    __tablename__ = "ats_benchmark_global"
+
+    id = Column(Integer, primary_key=True, default=1)
+    total_cvs = Column(Integer, nullable=False, default=0)
+    sum_ats = Column(Float, nullable=False, default=0.0)
+    avg_ats = Column(Float, nullable=False, default=0.0)
+    median_ats = Column(Float, nullable=False, default=0.0)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ATSBenchmarkProfession(Base):
+    """Aggregate ATS statistics per profession group."""
+
+    __tablename__ = "ats_benchmark_professions"
+
+    id = Column(Integer, primary_key=True)
+    profession = Column(String, nullable=False, unique=True, index=True)
+    total_cvs = Column(Integer, nullable=False, default=0)
+    sum_ats = Column(Float, nullable=False, default=0.0)
+    avg_ats = Column(Float, nullable=False, default=0.0)
+    median_ats = Column(Float, nullable=False, default=0.0)
+    top_10_pct = Column(Float, nullable=False, default=0.0)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ATSBenchmarkScore(Base):
+    """Individual anonymised ATS score record for percentile calculation."""
+
+    __tablename__ = "ats_benchmark_scores"
+
+    id = Column(Integer, primary_key=True)
+    ats_score = Column(Float, nullable=False, index=True)
+    profession = Column(String, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+# ── User Usage History ──────────────────────────────────────────
+
+
+class UsageDaily(Base):
+    """Tracks daily usage counts per user for usage history charts."""
+
+    __tablename__ = "usage_daily"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(
+        Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    date = Column(DateTime, nullable=False, index=True)
+    count = Column(Integer, nullable=False, default=0)
+
+
+# ── Favorites ───────────────────────────────────────────────────
+
+
+class Favorite(Base):
+    """User-bookmarked analyses for quick access."""
+
+    __tablename__ = "favorites"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(
+        Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    analysis_id = Column(
+        Integer, ForeignKey("analysis.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    note = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+# ── Saved Job Description Templates ─────────────────────────────
+
+
+class JobTemplate(Base):
+    """Saved job description templates for quick reuse."""
+
+    __tablename__ = "job_templates"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(
+        Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title = Column(String(120), nullable=False)
+    description = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ── Analysis Share Links ────────────────────────────────────────
+
+
+class AnalysisShare(Base):
+    """Public share links for analysis results (Pro feature)."""
+
+    __tablename__ = "analysis_shares"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(
+        Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    analysis_id = Column(
+        Integer, ForeignKey("analysis.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    share_token = Column(String(64), unique=True, nullable=False, index=True)
+    is_active = Column(Boolean, default=True)
+    views = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ── Analysis Notes ──────────────────────────────────────────────
+
+
+class AnalysisNote(Base):
+    """User notes/annotations on analysis results."""
+
+    __tablename__ = "analysis_notes"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(
+        Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    analysis_id = Column(
+        Integer, ForeignKey("analysis.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

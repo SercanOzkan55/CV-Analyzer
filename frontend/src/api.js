@@ -1,4 +1,9 @@
-const BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'
+﻿const DEFAULT_BASE = (() => {
+  if (typeof window === 'undefined') return 'http://127.0.0.1:8001'
+  return ''
+})()
+
+const BASE = import.meta.env.VITE_API_BASE || DEFAULT_BASE
 
 function authHeaderFrom(token) {
   if (!token) return undefined
@@ -104,6 +109,48 @@ export async function autoFixCv(token, file, jobDescription, { lang = 'en', useA
   return res.json()
 }
 
+export async function optimizeLinkedIn(token, payload = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+  }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+
+  const res = await fetch(`${BASE}/api/v1/linkedin/optimize`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `LinkedIn optimize failed: ${res.status}`)
+  }
+
+  return res.json()
+}
+
+export async function fetchJobMatchScore(token, payload = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+  }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+
+  const res = await fetch(`${BASE}/api/v1/job/match-score`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Job match score failed: ${res.status}`)
+  }
+
+  return res.json()
+}
+
 export async function exportAutoFixedCV(token, payload) {
   const headers = {
     'Content-Type': 'application/json',
@@ -203,6 +250,24 @@ export async function fetchSpecializationBenchmarks(token) {
   return res.json()
 }
 
+export async function fetchGlobalBenchmark() {
+  const res = await fetch(`${BASE}/api/v1/benchmark/global`)
+  if (!res.ok) throw new Error(`fetchGlobalBenchmark failed: ${res.status}`)
+  return res.json()
+}
+
+export async function fetchProfessionBenchmarks() {
+  const res = await fetch(`${BASE}/api/v1/benchmark/professions`)
+  if (!res.ok) throw new Error(`fetchProfessionBenchmarks failed: ${res.status}`)
+  return res.json()
+}
+
+export async function fetchBlogFeed() {
+  const res = await fetch(`${BASE}/api/v1/blog/feed`)
+  if (!res.ok) throw new Error(`fetchBlogFeed failed: ${res.status}`)
+  return res.json()
+}
+
 export async function fetchCandidates(token) {
   const headers = {}
   const auth = authHeaderFrom(token)
@@ -279,6 +344,196 @@ export async function fetchUsage(token) {
   return res.json()
 }
 
+export async function fetchUsageHistory(token, days = 30) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/usage-history?days=${days}`, { headers })
+  if (!res.ok) throw new Error(`Usage history fetch failed: ${res.status}`)
+  return res.json()
+}
+
+export async function fetchFavorites(token) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/favorites`, { headers })
+  if (!res.ok) throw new Error(`Favorites fetch failed: ${res.status}`)
+  return res.json()
+}
+
+export async function toggleFavorite(token, analysisId, note = '') {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/favorites/toggle`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ analysis_id: analysisId, note }),
+  })
+  if (!res.ok) throw new Error(`Toggle favorite failed: ${res.status}`)
+  return res.json()
+}
+
+export async function fetchFavoriteIds(token) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/favorites/ids`, { headers })
+  if (!res.ok) throw new Error(`Favorite IDs fetch failed: ${res.status}`)
+  return res.json()
+}
+
+// â”€â”€ JD Templates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export async function fetchJDTemplates(token) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/jd-templates`, { headers })
+  if (!res.ok) throw new Error(`JD templates fetch failed: ${res.status}`)
+  return res.json()
+}
+
+export async function createJDTemplate(token, title, description) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/jd-templates`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ title, description }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Create template failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function deleteJDTemplate(token, templateId) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/jd-templates/${templateId}`, {
+    method: 'DELETE', headers,
+  })
+  if (!res.ok) throw new Error(`Delete template failed: ${res.status}`)
+  return res.json()
+}
+
+// â”€â”€ Analysis Sharing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export async function createShareLink(token, analysisId) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/share`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ analysis_id: analysisId }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Share failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function revokeShareLink(token, shareToken) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/share/${shareToken}`, {
+    method: 'DELETE', headers,
+  })
+  if (!res.ok) throw new Error(`Revoke share failed: ${res.status}`)
+  return res.json()
+}
+
+export async function fetchSharedAnalysis(shareToken) {
+  const res = await fetch(`${BASE}/api/v1/shared/${shareToken}`)
+  if (!res.ok) throw new Error(`Shared analysis not found: ${res.status}`)
+  return res.json()
+}
+
+// â”€â”€ History CSV Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export async function exportHistoryCSV(token) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/history/export`, { headers })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Export failed: ${res.status}`)
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'cv_analysis_history.csv'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// â”€â”€ Analysis Notes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export async function saveAnalysisNote(token, analysisId, content) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/notes`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ analysis_id: analysisId, content }),
+  })
+  if (!res.ok) throw new Error(`Save note failed: ${res.status}`)
+  return res.json()
+}
+
+export async function fetchAnalysisNote(token, analysisId) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/notes/${analysisId}`, { headers })
+  if (!res.ok) throw new Error(`Fetch note failed: ${res.status}`)
+  return res.json()
+}
+
+export async function deleteAnalysisNote(token, analysisId) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/notes/${analysisId}`, {
+    method: 'DELETE', headers,
+  })
+  if (!res.ok) throw new Error(`Delete note failed: ${res.status}`)
+  return res.json()
+}
+
+// â”€â”€ Usage Streak â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export async function fetchUsageStreak(token) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/usage-streak`, { headers })
+  if (!res.ok) throw new Error(`Streak fetch failed: ${res.status}`)
+  return res.json()
+}
+
+// â”€â”€ Dashboard Insights â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export async function fetchInsights(token) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/insights`, { headers })
+  if (!res.ok) throw new Error(`Insights fetch failed: ${res.status}`)
+  return res.json()
+}
+
 export async function createCheckoutSession(token, payload = {}) {
   const headers = {
     'Content-Type': 'application/json',
@@ -352,6 +607,12 @@ export async function fetchCVTemplates(token) {
   return res.json()
 }
 
+export async function fetchFonts() {
+  const res = await fetch(`${BASE}/api/v1/fonts`)
+  if (!res.ok) throw new Error(`Fetch fonts failed: ${res.status}`)
+  return res.json()
+}
+
 export async function generateCV(token, payload) {
   const headers = {
     'Content-Type': 'application/json',
@@ -384,6 +645,23 @@ export async function previewCV(token, payload) {
     body: JSON.stringify(payload),
   })
   if (!res.ok) throw new Error(`CV preview failed: ${res.status}`)
+  return res.json()
+}
+
+export async function suggestSummary(token, payload) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+
+  const res = await fetch(`${BASE}/api/v1/cv-builder/suggest-summary`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Summary suggestion failed: ${res.status}`)
+  }
   return res.json()
 }
 
@@ -456,4 +734,313 @@ export async function billingAdminListFeedback(token, adminToken, { limit = 50 }
     throw new Error(err.detail || `Billing admin feedback fetch failed: ${res.status}`)
   }
   return res.json()
+}
+
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// CV Optimizer â€” Rewrite + Keyword Optimization + Score Breakdown
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+export async function rewriteCV(token, payload) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+
+  const res = await fetch(`${BASE}/api/v1/cv/rewrite`, {
+    method: 'POST', headers,
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Rewrite failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function optimizeKeywords(token, payload) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+
+  const res = await fetch(`${BASE}/api/v1/cv/optimize-keywords`, {
+    method: 'POST', headers,
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Keyword optimize failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function fetchScoreBreakdown(token, payload) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+
+  const res = await fetch(`${BASE}/api/v1/score/breakdown`, {
+    method: 'POST', headers,
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Score breakdown failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function recruiterAdvancedSearch(token, payload) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+
+  const res = await fetch(`${BASE}/api/v1/recruiter/advanced-search`, {
+    method: 'POST', headers,
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Advanced search failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+// â”€â”€ Recruiter Dashboard API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+async function _recruiterJson(token, path, method = 'GET', payload = null) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const opts = { method, headers }
+  if (payload) opts.body = JSON.stringify(payload)
+  const res = await fetch(`${BASE}${path}`, opts)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    const detail = Array.isArray(err.detail)
+      ? err.detail.map(e => e.msg || e.message || JSON.stringify(e)).join('; ')
+      : err.detail
+    throw new Error(detail || `Request failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function recruiterScanCV(token, formData) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/recruiter/scan-cv`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    const detail = Array.isArray(err.detail)
+      ? err.detail.map(e => e.msg || e.message || JSON.stringify(e)).join('; ')
+      : err.detail
+    throw new Error(detail || `Scan failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+// â”€â”€ Cover Letter Generator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export async function generateCoverLetter(token, payload = {}) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+
+  const res = await fetch(`${BASE}/api/v1/rewrite/cover-letter`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Cover letter generation failed: ${res.status}`)
+  }
+
+  return res.json()
+}
+
+// â”€â”€ Interview Simulator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export async function generateInterviewQuestions(token, payload = {}) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+
+  const res = await fetch(`${BASE}/api/v1/interview/questions`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Interview questions failed: ${res.status}`)
+  }
+
+  return res.json()
+}
+
+export async function evaluateInterviewAnswer(token, payload = {}) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+
+  const res = await fetch(`${BASE}/api/v1/interview/evaluate`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Interview evaluation failed: ${res.status}`)
+  }
+
+  return res.json()
+}
+
+
+// ¦¦ Recruiter SaaS Batch Hub ¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦
+
+// --- Recruiter SaaS Functions (Enterprise) ---
+
+export async function recruiterListJobs(token) {
+  const headers = { 'Content-Type': 'application/json' };
+  const auth = authHeaderFrom(token);
+  if (auth) headers['Authorization'] = auth;
+
+  const res = await fetch(`${BASE}/api/v1/recruiter/jobs`, { headers });
+  if (!res.ok) throw new Error('Failed to fetch jobs');
+  return res.json();
+}
+
+export async function recruiterDashboardActions(token, jobId) {
+  const headers = { 'Content-Type': 'application/json' };
+  const auth = authHeaderFrom(token);
+  if (auth) headers['Authorization'] = auth;
+
+  const res = await fetch(`${BASE}/api/v1/recruiter/dashboard/actions/${jobId}`, { headers });
+  if (!res.ok) throw new Error('Failed to fetch candidates');
+  return res.json();
+}
+
+export async function recruiterSaaSBatchUpload(token, jobId, files) {
+  const headers = {};
+  const auth = authHeaderFrom(token);
+  if (auth) headers['Authorization'] = auth;
+
+  const fd = new FormData();
+  fd.append('job_id', jobId);
+  files.forEach((f) => fd.append('files', f));
+
+  const res = await fetch(`${BASE}/api/v1/recruiter/dashboard/batch-upload`, {
+    method: 'POST',
+    headers,
+    body: fd,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Batch upload failed');
+  }
+  return res.json();
+}
+
+export async function downloadRecruiterReport(token, jobId) {
+  const headers = {};
+  const auth = authHeaderFrom(token);
+  if (auth) headers['Authorization'] = auth;
+
+  const res = await fetch(`${BASE}/api/v1/recruiter/report/${jobId}`, { headers });
+  if (!res.ok) throw new Error('Download failed');
+  return res.blob();
+}
+
+
+// --- Legacy Recruiter Functions (Keeping for compatibility) ---
+
+export const recruiterCreateJob = async (token, payload) => {
+  const res = await fetch(`${BASE}/api/v1/recruiter/jobs`, {
+    method: 'POST',
+    headers: { 
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+export const recruiterDashboardRank = async (token, payload) => {
+  const res = await fetch(`${BASE}/api/v1/recruiter/dashboard/rank`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+export const recruiterDashboardPreview = async (token, payload) => {
+  const res = await fetch(`${BASE}/api/v1/recruiter/dashboard/preview`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+export const recruiterDashboardAction = async (token, payload) => {
+  const res = await fetch(`${BASE}/api/v1/recruiter/dashboard/action`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+export const recruiterCreateTemplate = async (token, payload) => {
+  const res = await fetch(`${BASE}/api/v1/recruiter/templates`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+export const recruiterListTemplates = async (token) => {
+  const res = await fetch(`${BASE}/api/v1/recruiter/templates`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  return res.json();
+}
+
+export const recruiterDeleteTemplate = async (token, templateId) => {
+  const res = await fetch(`${BASE}/api/v1/recruiter/templates/${templateId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  return res.json();
+}
+
+export const recruiterPreviewTemplate = async (token, payload) => {
+  const res = await fetch(`${BASE}/api/v1/recruiter/templates/preview`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+export const recruiterSendEmail = async (token, payload) => {
+  const res = await fetch(`${BASE}/api/v1/recruiter/send-email`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return res.json();
 }

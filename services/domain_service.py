@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from services.embedding_service import get_embedding
+from utils.centroid import update_centroid
 
 load_dotenv()
 
@@ -122,36 +123,7 @@ def detect_or_create_domain(job_text, embedding=None):
 # CENTROID UPDATE
 # ==========================================================
 def update_domain_centroid(cur, domain_id, embedding):
-
-    cur.execute(
-        "SELECT centroid, sample_count FROM domains WHERE id = %s;", (domain_id,)
-    )
-
-    row = cur.fetchone()
-    if not row:
-        return
-
-    centroid, count = row
-
-    # Fix string centroid issue
-    if isinstance(centroid, str):
-        centroid = json.loads(centroid)
-
-    centroid = list(centroid)
-
-    updated = [
-        (float(c) * count + float(e)) / (count + 1) for c, e in zip(centroid, embedding)
-    ]
-
-    cur.execute(
-        """
-        UPDATE domains
-        SET centroid = %s,
-            sample_count = sample_count + 1
-        WHERE id = %s;
-    """,
-        (updated, domain_id),
-    )
+    update_centroid(cur, "domains", domain_id, embedding)
 
 
 # ==========================================================
