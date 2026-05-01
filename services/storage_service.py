@@ -9,9 +9,9 @@ import logging
 import uuid
 from typing import Literal
 
-from config.aws import ALLOWED_CONTENT_TYPES, MAX_UPLOAD_BYTES, is_configured
+from config.aws import is_configured
 from security.file_guard import validate_file_upload
-from security.s3_guard import enforce_ownership
+from security.s3_guard import enforce_ownership, redact_s3_key
 from security.validators import validate_user_id
 from services import s3_service
 from services import local_storage_service
@@ -50,7 +50,7 @@ def _validate_upload(
     Uses security.file_guard for magic-byte / extension / size checks.
     Returns the validated content type.
     """
-    if not is_configured():
+    if STORAGE_BACKEND != "local" and not is_configured():
         raise RuntimeError("S3 storage is not configured")
     # file_guard does size, extension, magic-byte, PDF complexity checks
     return validate_file_upload(file_bytes, filename, content_type)
@@ -73,7 +73,7 @@ def upload_original_cv(
     else:
         s3_service.upload(file_bytes, key, ct)
         
-    logger.info("storage:original_uploaded backend=%s user=%s key=%s", STORAGE_BACKEND, safe_uid, key)
+    logger.info("storage:original_uploaded backend=%s user=%s key=%s", STORAGE_BACKEND, safe_uid, redact_s3_key(key))
     return key
 
 
@@ -94,7 +94,7 @@ def upload_optimized_cv(
     else:
         s3_service.upload(file_bytes, key, ct)
         
-    logger.info("storage:optimized_uploaded backend=%s user=%s key=%s", STORAGE_BACKEND, safe_uid, key)
+    logger.info("storage:optimized_uploaded backend=%s user=%s key=%s", STORAGE_BACKEND, safe_uid, redact_s3_key(key))
     return key
 
 
@@ -126,7 +126,7 @@ def delete_cv(key: str, user_id: str) -> None:
     else:
         s3_service.delete(key)
         
-    logger.info("storage:deleted backend=%s user=%s key=%s", STORAGE_BACKEND, user_id, key)
+    logger.info("storage:deleted backend=%s user=%s key=%s", STORAGE_BACKEND, user_id, redact_s3_key(key))
 
 
 # ── Existence check ─────────────────────────────────────────────────

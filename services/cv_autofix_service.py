@@ -565,9 +565,11 @@ def _polish_text(text: str, lang: str = "en") -> str:
         stripped = re.sub(r"\.{2,}", ".", stripped)
         stripped = re.sub(r",{2,}", ",", stripped)
         # Missing space after period (but not in URLs, emails, numbers)
-        stripped = re.sub(r"(?<=[a-zA-Z])\.(?=[A-Z])", ". ", stripped)
+        stripped = re.sub(r"(?<=[a-zA-Z)])\.(?=[A-Z])", ". ", stripped)
         # Missing space after comma (but not in numbers like 1,000)
         stripped = re.sub(r",(?=[A-Za-z])", ", ", stripped)
+        # PDF line wraps often leave "hands- on" / "real- world" artifacts.
+        stripped = re.sub(r"\b([A-Za-z]{3,})-\s+(on|world|time|stack|end|based|level)\b", r"\1-\2", stripped, flags=re.I)
         # Normalize bullet chars: ▪ ◦ ◆ ▸ ► → •
         stripped = re.sub(r"^[\u25AA\u25E6\u25C6\u25B8\u25BA]\s*", "• ", stripped)
         # Ensure bullet lines start with uppercase
@@ -1396,6 +1398,33 @@ def _pipeline_to_structured_text(
             contacts.append(val)
 
     summary = (normalized.get("summary") or "").strip()
+    if not summary:
+        skills_for_summary = [
+            str(skill).strip()
+            for skill in (normalized.get("skills") or normalized.get("skill") or [])
+            if str(skill).strip()
+        ][:6]
+        education_for_summary = normalized.get("education") or []
+        projects_for_summary = normalized.get("projects") or normalized.get("project") or []
+        degree = ""
+        if education_for_summary and isinstance(education_for_summary[0], dict):
+            degree = str(education_for_summary[0].get("degree") or "").strip()
+        project_names = [
+            str((proj or {}).get("name") or (proj or {}).get("title") or "").strip()
+            for proj in projects_for_summary
+            if isinstance(proj, dict) and str((proj or {}).get("name") or (proj or {}).get("title") or "").strip()
+        ][:2]
+        if skills_for_summary or degree or project_names:
+            subject = degree.title() if degree else "Professional"
+            if project_names and skills_for_summary:
+                summary = (
+                    f"{subject} with project experience in {', '.join(project_names)}. "
+                    f"Core skills include {', '.join(skills_for_summary)}."
+                )
+            elif skills_for_summary:
+                summary = f"{subject} with core skills in {', '.join(skills_for_summary)}."
+            elif project_names:
+                summary = f"{subject} with project experience in {', '.join(project_names)}."
 
     # ── experience ──
     experience_lines: List[str] = []
@@ -1785,13 +1814,53 @@ def _parse_experience_entries(lines: List[str]) -> List[Dict]:
     entries: List[Dict] = []
     current: Dict | None = None
 
+    _date_token = (
+        r"(?:\d{1,2}[/.]\s*)?(?:19|20)\d{2}"
+        r"|[A-Za-z\u00C0-\u024F\u0400-\u04FF]{2,12}\.?\s+(?:19|20)\d{2}"
+    )
+    _date_sep = r"[-\u2013\u2014]"
+    _date_range_anywhere_re = re.compile(
+        rf"\(?\s*(?:tarih|date|duration|period)?\s*[:：]?\s*"
+        rf"(?P<start>{_date_token})\s*{_date_sep}\s*"
+        rf"(?P<end>{_date_token}|present|current|ongoing|halen|devam\s+ediyor)\s*\)?",
+        re.I | re.UNICODE,
+    )
+    _date_range_full_re = re.compile(
+        rf"^\(?\s*(?P<start>{_date_token})\s*{_date_sep}\s*"
+        rf"(?P<end>{_date_token}|present|current|ongoing|halen|devam\s+ediyor)\s*\)?$",
+        re.I | re.UNICODE,
+    )
+    _date_range_reversed_re = re.compile(
+        rf"^\s*(?P<end>{_date_token})\)?\s*{_date_sep}\s*\(?\s*"
+        rf"(?:tarih|date|duration|period)\s*[:：]?\s*(?P<start>{_date_token})\s*$",
+        re.I | re.UNICODE,
+    )
+
+    def _extract_date_range(value: str) -> tuple[str, str, str]:
+        text = (value or "").strip()
+        if not text:
+            return "", "", ""
+        match = _date_range_reversed_re.search(text)
+        if not match:
+            match = _date_range_anywhere_re.search(text)
+        if not match:
+            match = _date_range_full_re.search(text)
+        if not match:
+            return text, "", ""
+        start = match.group("start").strip(" ()")
+        end = match.group("end").strip(" ()")
+        cleaned = (text[: match.start()] + " " + text[match.end():]).strip(" -\u2013\u2014|()")
+        cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+        return cleaned, start, end
+
     def _new_entry(title: str) -> Dict:
+        title, start_date, end_date = _extract_date_range(title)
         entry = {
             "title": title,
             "company": "",
             "location": "",
-            "start_date": "",
-            "end_date": "",
+            "start_date": start_date,
+            "end_date": end_date,
             "bullets": [],
         }
         # Auto-split "Role - Company" or "Role – Company" in title
@@ -1835,6 +1904,9 @@ def _parse_experience_entries(lines: List[str]) -> List[Dict]:
         clean = value.strip()
         if not clean:
             return False
+        _, range_start, range_end = _extract_date_range(clean)
+        if range_start or range_end:
+            return True
         if date_range_pattern.match(clean):
             return True
         if single_date_pattern.match(clean):
@@ -1963,6 +2035,16 @@ def _parse_experience_entries(lines: List[str]) -> List[Dict]:
 
         if current is None:
             current = _new_entry(line)
+            continue
+
+        cleaned_date_line, range_start, range_end = _extract_date_range(line)
+        if range_start or range_end:
+            if not current.get("start_date"):
+                current["start_date"] = range_start
+            if not current.get("end_date"):
+                current["end_date"] = range_end
+            if cleaned_date_line and cleaned_date_line != line and not current.get("location"):
+                current["location"] = cleaned_date_line
             continue
 
         if (not current.get("start_date") and not current.get("end_date")) and _is_date_like(line):
@@ -2361,6 +2443,19 @@ def _parse_project_entries(lines: List[str]) -> List[Dict]:
         r"^\s*[-*•\u2013\u2014\u2023\u25aa\u25a0►]\s+"
     )
 
+    _PROJECT_CONTINUATION_RE = re.compile(
+        r"^(?:and|or|with|to|for|in|on|of|by|as|using|between|while|through|that|which|ve|ile|i[cç]in|olarak)\b",
+        re.I,
+    )
+
+    def _looks_like_project_continuation(value: str) -> bool:
+        text = (value or "").strip()
+        if not text or _BULLET_RE_PROJ.match(text):
+            return False
+        if len(text.split()) >= 6 and not text.isupper():
+            return True
+        return bool(_PROJECT_CONTINUATION_RE.match(text))
+
     entries: List[Dict] = []
     current: Dict | None = None
 
@@ -2448,6 +2543,10 @@ def _parse_project_entries(lines: List[str]) -> List[Dict]:
                 and not _BULLET_RE_PROJ.match(line)):
             desc = current["description"]
             current["description"] = (desc + " " + line).rstrip(",").strip()
+            continue
+
+        if current is not None and current.get("bullets") and _looks_like_project_continuation(line):
+            current["bullets"][-1] = (current["bullets"][-1].rstrip() + " " + line).strip()
             continue
 
         # If current project exists, hasn't collected bullets yet, and this
@@ -2592,6 +2691,12 @@ def auto_fix_cv_text(
     quality = validate_extraction(cv_text, normalized)
     needs_llm_fallback = quality.get("needs_llm_fallback", False)
 
+    # Use the strict schema as the single source of truth for downstream text
+    # and PDF payload generation. The validator above intentionally sees the
+    # raw normalized output so it can still trigger AI fallback on bad parses.
+    clean_schema = build_schema(normalized)
+    normalized = clean_schema.model_dump()
+
     before_ats = analyze_cv(cv_text, job_description, lang=lang)
 
     # ═══ MODE DETECTION ═══
@@ -2612,6 +2717,9 @@ def auto_fix_cv_text(
     # Multi-column CVs must always go through the pipeline (never preserve raw text)
     if is_multi_column and detected_mode == "preserve":
         detected_mode = "light_fix"
+
+    if needs_llm_fallback and detected_mode == "light_fix":
+        detected_mode = "rebuild"
 
     # ═══ GENERATE STRUCTURED TEXT FROM PIPELINE JSON ═══
     dropped_sections: List[str] = []
@@ -2635,8 +2743,8 @@ def auto_fix_cv_text(
         )
 
     # ═══ KEYWORD BOOSTING ═══
-    if job_description and detected_mode != "preserve":
-        boost_mode = "balanced" if detected_mode == "light_fix" else "strict"
+    if detected_mode != "preserve" and (job_description or use_ai or detected_mode == "rebuild"):
+        boost_mode = "strict" if use_ai else ("balanced" if detected_mode == "light_fix" else "strict")
         boosted_text = _boost_keywords(
             optimized_text, structured_sections, job_description,
             mode=boost_mode, section_order=section_order,
@@ -2668,13 +2776,11 @@ def auto_fix_cv_text(
     if current_score >= (best_score - STRUCTURED_SCORE_TOLERANCE):
         best_score = max(best_score, current_score)
 
-    ai_autofix_enabled = str(os.getenv("AI_AUTOFIX_REWRITE", "0") or "0").strip().lower() in ("1", "true", "yes", "on")
-    
     should_run_ai = False
     if needs_llm_fallback and rewrite_service.ai_rewrite_available():
         should_run_ai = True
         warnings.append("LLM Fallback triggered by Quality Validator due to catastrophic parsing failure.")
-    elif use_ai and mode != "safe" and ai_autofix_enabled and rewrite_service.ai_rewrite_available():
+    elif use_ai and rewrite_service.ai_rewrite_available():
         should_run_ai = True
         
     if should_run_ai:
@@ -2729,9 +2835,10 @@ def auto_fix_cv_text(
             fallback_contacts=orig_contacts,
         )
         fallback_ats = analyze_cv(fallback_text, job_description, lang=lang)
-        if float(fallback_ats.get("overall_score", 0) or 0) >= float(before_ats.get("overall_score", 0) or 0):
+        if float(fallback_ats.get("overall_score", 0) or 0) >= float(after_ats.get("overall_score", 0) or 0):
             optimized_text = fallback_text
             after_ats = fallback_ats
+            warnings.append("Structured rewrite scored lower than the source CV, so the safer non-regression output was used.")
 
     # ═══ APPLIED CHANGES ═══
     score_delta = round(
@@ -2752,6 +2859,10 @@ def auto_fix_cv_text(
     )
     if skills_inferred:
         applied_changes.append("SKILLS section was missing and was inferred from CV content.")
+    if use_ai and not used_ai:
+        applied_changes.append(
+            "Applied strict wording polish: summary, experience, and project bullets were normalized with stronger ATS action verbs where safe."
+        )
     if not any(c for c in applied_changes if "Smart mode" not in c):
         applied_changes.append("Clean CV detected; kept original content unchanged.")
 

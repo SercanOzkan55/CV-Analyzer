@@ -71,6 +71,9 @@ def rank_candidates(analyses: list[dict]) -> list[dict]:
             "detected_skills": (item.get("detected_skills") or [])[:15],
             "missing_skills": (item.get("missing_skills") or [])[:10],
             "score_breakdown": item.get("score_breakdown") or {},
+            "job_description_quality": item.get("job_description_quality") or {},
+            "warnings": item.get("warnings") or [],
+            "score_version": item.get("score_version") or "",
             "file_name": item.get("file_name", ""),
             "cv_text": item.get("cv_text", ""),
         })
@@ -199,6 +202,8 @@ def build_preview(analysis: dict) -> dict:
         "last_experience": last_experience,
         "education": education_text,
         "score_breakdown": analysis.get("score_breakdown") or {},
+        "job_description_quality": analysis.get("job_description_quality") or {},
+        "warnings": analysis.get("warnings") or [],
     }
 
 

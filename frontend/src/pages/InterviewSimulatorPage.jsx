@@ -4,7 +4,8 @@ import {
   Mic, MicOff, FileText, Briefcase, Sparkles, ChevronRight, ChevronLeft,
   Upload, Clipboard, Check, AlertCircle, MessageSquare, Star, TrendingUp,
   GraduationCap, Users, Code2, BookOpen, Zap, Target, HelpCircle,
-  Send, RotateCcw, Volume2, Award, ThumbsUp, Lightbulb,
+  Send, RotateCcw, Volume2, Award, ThumbsUp, Lightbulb, Clock,
+  ListChecks, SlidersHorizontal, Save, RefreshCw, Copy,
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import DragDropUpload from '../components/DragDropUpload'
@@ -37,32 +38,75 @@ const CATEGORY_COLORS = {
   competency: '#34d399',
 }
 const DIFFICULTY_COLORS = { easy: '#34d399', medium: '#fbbf24', hard: '#ef4444' }
+const QUESTION_COUNT_OPTIONS = [3, 5, 7, 10]
+const INTERVIEW_SESSION_KEY = 'cv-analyzer:interview-session-v2'
+
+function readSavedInterviewSession() {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = window.localStorage.getItem(INTERVIEW_SESSION_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    const questions = Array.isArray(parsed.questions) ? parsed.questions : []
+    const phase = questions.length && ['questions', 'practice', 'review'].includes(parsed.phase)
+      ? parsed.phase
+      : 'setup'
+    return {
+      ...parsed,
+      phase,
+      questions,
+      currentIdx: Math.max(0, Math.min(Number(parsed.currentIdx || 0), Math.max(questions.length - 1, 0))),
+      questionCount: QUESTION_COUNT_OPTIONS.includes(Number(parsed.questionCount)) ? Number(parsed.questionCount) : 5,
+      answeredQuestions: parsed.answeredQuestions && typeof parsed.answeredQuestions === 'object' ? parsed.answeredQuestions : {},
+      answerDrafts: parsed.answerDrafts && typeof parsed.answerDrafts === 'object' ? parsed.answerDrafts : {},
+    }
+  } catch {
+    return {}
+  }
+}
+
+function wordCount(text) {
+  return text.trim() ? text.trim().split(/\s+/).length : 0
+}
+
+function formatDuration(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
 
 export default function InterviewSimulatorPage() {
   const { token } = useAuth()
   const { t, lang } = useLanguage()
   const { addToast } = useToast()
+  const savedSessionRef = useRef(null)
+  if (savedSessionRef.current === null) savedSessionRef.current = readSavedInterviewSession()
+  const savedSession = savedSessionRef.current || {}
 
   // ── Setup State ──
-  const [cvText, setCvText] = useState('')
-  const [jobDescription, setJobDescription] = useState('')
-  const [mode, setMode] = useState('senior')
+  const [cvText, setCvText] = useState(savedSession.cvText || '')
+  const [jobDescription, setJobDescription] = useState(savedSession.jobDescription || '')
+  const [mode, setMode] = useState(savedSession.mode || 'senior')
+  const [questionCount, setQuestionCount] = useState(savedSession.questionCount || 5)
   const [inputTab, setInputTab] = useState('paste')
   const [pdfFile, setPdfFile] = useState(null)
   const [pdfLoading, setPdfLoading] = useState(false)
 
   // ── Session State ──
-  const [phase, setPhase] = useState('setup') // setup | questions | practice | review
-  const [questions, setQuestions] = useState([])
-  const [currentIdx, setCurrentIdx] = useState(0)
+  const [phase, setPhase] = useState(savedSession.phase || 'setup') // setup | questions | practice | review
+  const [questions, setQuestions] = useState(savedSession.questions || [])
+  const [currentIdx, setCurrentIdx] = useState(savedSession.currentIdx || 0)
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
   // ── Answer State ──
-  const [userAnswer, setUserAnswer] = useState('')
+  const [userAnswer, setUserAnswer] = useState(savedSession.userAnswer || '')
   const [evaluating, setEvaluating] = useState(false)
-  const [evaluation, setEvaluation] = useState(null)
-  const [answeredQuestions, setAnsweredQuestions] = useState({})
+  const [evaluation, setEvaluation] = useState(savedSession.evaluation || null)
+  const [answeredQuestions, setAnsweredQuestions] = useState(savedSession.answeredQuestions || {})
+  const [answerDrafts, setAnswerDrafts] = useState(savedSession.answerDrafts || {})
   const [showTip, setShowTip] = useState(false)
 
   // ── Voice State ──
@@ -76,6 +120,32 @@ export default function InterviewSimulatorPage() {
     const supported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window
     setSpeechSupported(supported)
   }, [t])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const snapshot = {
+      cvText,
+      jobDescription,
+      mode,
+      questionCount,
+      phase,
+      questions,
+      currentIdx,
+      answeredQuestions,
+      answerDrafts,
+      userAnswer,
+      evaluation,
+    }
+    try {
+      window.localStorage.setItem(INTERVIEW_SESSION_KEY, JSON.stringify(snapshot))
+    } catch {}
+  }, [cvText, jobDescription, mode, questionCount, phase, questions, currentIdx, answeredQuestions, answerDrafts, userAnswer, evaluation])
+
+  useEffect(() => {
+    if (phase !== 'practice' || evaluating) return undefined
+    const timer = window.setInterval(() => setElapsedSeconds(seconds => seconds + 1), 1000)
+    return () => window.clearInterval(timer)
+  }, [phase, currentIdx, evaluating])
 
   // ── PDF Upload ──
   async function handlePdfUpload(file) {
@@ -112,12 +182,16 @@ export default function InterviewSimulatorPage() {
         job_description: jobDescription.trim(),
         lang,
         mode,
-        count: 5,
+        count: questionCount,
       })
       setQuestions(data.questions || [])
       setCurrentIdx(0)
       setPhase('questions')
       setAnsweredQuestions({})
+      setAnswerDrafts({})
+      setEvaluation(null)
+      setUserAnswer('')
+      setCategoryFilter('all')
       addToast(t('iv.questions_generated'), 'success')
     } catch (err) {
       setError(err.message || t('iv.error_generic'))
@@ -128,11 +202,18 @@ export default function InterviewSimulatorPage() {
 
   // ── Start Practice ──
   function handleStartPractice(idx) {
+    const savedAnswer = answeredQuestions[idx]
     setCurrentIdx(idx)
-    setUserAnswer('')
-    setEvaluation(null)
+    setUserAnswer(savedAnswer?.answer || answerDrafts[idx] || '')
+    setEvaluation(savedAnswer?.evaluation || null)
     setShowTip(false)
-    setPhase('practice')
+    setElapsedSeconds(0)
+    setPhase(savedAnswer?.evaluation ? 'review' : 'practice')
+  }
+
+  function handleAnswerChange(value) {
+    setUserAnswer(value)
+    setAnswerDrafts(prev => ({ ...prev, [currentIdx]: value }))
   }
 
   // ── Submit Answer ──
@@ -151,6 +232,7 @@ export default function InterviewSimulatorPage() {
       const evalResult = data.evaluation || {}
       setEvaluation(evalResult)
       setAnsweredQuestions(prev => ({ ...prev, [currentIdx]: { answer: userAnswer, evaluation: evalResult } }))
+      setAnswerDrafts(prev => ({ ...prev, [currentIdx]: userAnswer }))
       setPhase('review')
     } catch (err) {
       setError(err.message)
@@ -177,7 +259,7 @@ export default function InterviewSimulatorPage() {
       for (let i = 0; i < event.results.length; i++) {
         transcript += event.results[i][0].transcript
       }
-      setUserAnswer(transcript)
+      handleAnswerChange(transcript)
     }
     recognition.onerror = () => setIsListening(false)
     recognition.onend = () => setIsListening(false)
@@ -218,9 +300,31 @@ export default function InterviewSimulatorPage() {
     setQuestions([])
     setCurrentIdx(0)
     setAnsweredQuestions({})
+    setAnswerDrafts({})
     setEvaluation(null)
     setUserAnswer('')
     setError(null)
+    setElapsedSeconds(0)
+    setCategoryFilter('all')
+    setQuestionCount(5)
+    try { window.localStorage.removeItem(INTERVIEW_SESSION_KEY) } catch {}
+  }
+
+  function handleRetryCurrent() {
+    setEvaluation(null)
+    setPhase('practice')
+    setElapsedSeconds(0)
+  }
+
+  async function handleCopySampleAnswer() {
+    const sample = evaluation?.sample_answer || ''
+    if (!sample) return
+    try {
+      await navigator.clipboard.writeText(sample)
+      addToast(t('iv.sample_copied'), 'success')
+    } catch {
+      addToast(t('iv.copy_failed'), 'error')
+    }
   }
 
   const currentQ = questions[currentIdx]
@@ -228,6 +332,22 @@ export default function InterviewSimulatorPage() {
   const avgScore = completedCount > 0
     ? Math.round(Object.values(answeredQuestions).reduce((s, a) => s + (a.evaluation?.score || 0), 0) / completedCount)
     : 0
+  const remainingCount = Math.max(questions.length - completedCount, 0)
+  const answerWords = wordCount(userAnswer)
+  const answerGoalPercent = Math.min(100, Math.round((answerWords / 90) * 100))
+  const answerMinutes = answerWords > 0 ? Math.max(1, Math.ceil(answerWords / 140)) : 0
+  const categories = ['all', ...Array.from(new Set(questions.map(q => q.category).filter(Boolean)))]
+  const filteredQuestions = questions
+    .map((question, idx) => ({ question, idx }))
+    .filter(item => categoryFilter === 'all' || item.question.category === categoryFilter)
+
+  function categoryLabel(category) {
+    return t(`iv.cat_${category}`) || category
+  }
+
+  function difficultyLabel(difficulty) {
+    return t(`iv.diff_${difficulty}`) || difficulty
+  }
 
   return (
     <div className="app-layout">
@@ -261,6 +381,23 @@ export default function InterviewSimulatorPage() {
               <div className="iv-progress-info">
                 <span>{completedCount}/{questions.length} {t('iv.completed')}</span>
                 {avgScore > 0 && <span className="iv-avg-score"><Star size={12} /> {t('iv.avg_score')}: {avgScore}/10</span>}
+              </div>
+              <div className="iv-session-stats">
+                <div className="iv-session-stat">
+                  <ListChecks size={15} />
+                  <span>{t('iv.remaining')}</span>
+                  <strong>{remainingCount}</strong>
+                </div>
+                <div className="iv-session-stat">
+                  <Clock size={15} />
+                  <span>{t('iv.current_time')}</span>
+                  <strong>{phase === 'practice' ? formatDuration(elapsedSeconds) : '--'}</strong>
+                </div>
+                <div className="iv-session-stat">
+                  <Target size={15} />
+                  <span>{t('iv.mode_label')}</span>
+                  <strong>{t(`iv.mode_${mode}`)}</strong>
+                </div>
               </div>
             </motion.div>
           )}
@@ -333,6 +470,22 @@ export default function InterviewSimulatorPage() {
                       })}
                     </div>
                   </div>
+                  <div className="iv-field">
+                    <label className="iv-label">{t('iv.question_count')}</label>
+                    <div className="iv-count-grid">
+                      {QUESTION_COUNT_OPTIONS.map(count => (
+                        <button
+                          key={count}
+                          type="button"
+                          className={`iv-count-btn ${questionCount === count ? 'iv-count-active' : ''}`}
+                          onClick={() => setQuestionCount(count)}
+                        >
+                          <ListChecks size={14} />
+                          <span>{count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   {/* Feature highlights */}
                   <div className="iv-features">
                     <div className="iv-feature"><Mic size={14} /> {t('iv.feature_voice')}</div>
@@ -361,8 +514,27 @@ export default function InterviewSimulatorPage() {
           {/* ════════ PHASE: QUESTIONS LIST ════════ */}
           {phase === 'questions' && (
             <motion.div key="questions" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
+              <div className="iv-question-board-head">
+                <div>
+                  <h2>{t('iv.question_board')}</h2>
+                  <span>{questions.length} {t('iv.questions_ready')}</span>
+                </div>
+                <div className="iv-filter-tabs" aria-label={t('iv.category_filter')}>
+                  {categories.map(category => (
+                    <button
+                      key={category}
+                      type="button"
+                      className={`iv-filter-tab ${categoryFilter === category ? 'iv-filter-active' : ''}`}
+                      onClick={() => setCategoryFilter(category)}
+                    >
+                      <SlidersHorizontal size={13} />
+                      {category === 'all' ? t('iv.all_categories') : categoryLabel(category)}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="iv-questions-grid">
-                {questions.map((q, idx) => {
+                {filteredQuestions.map(({ question: q, idx }) => {
                   const answered = answeredQuestions[idx]
                   return (
                     <motion.div key={idx} className={`iv-question-card ${answered ? 'iv-question-answered' : ''}`}
@@ -370,8 +542,8 @@ export default function InterviewSimulatorPage() {
                       onClick={() => handleStartPractice(idx)}>
                       <div className="iv-question-top">
                         <span className="iv-question-num">Q{idx + 1}</span>
-                        <span className="iv-badge" style={{ '--badge-color': CATEGORY_COLORS[q.category] || '#60a5fa' }}>{q.category}</span>
-                        <span className="iv-badge iv-badge-diff" style={{ '--badge-color': DIFFICULTY_COLORS[q.difficulty] || '#fbbf24' }}>{q.difficulty}</span>
+                        <span className="iv-badge" style={{ '--badge-color': CATEGORY_COLORS[q.category] || '#60a5fa' }}>{categoryLabel(q.category)}</span>
+                        <span className="iv-badge iv-badge-diff" style={{ '--badge-color': DIFFICULTY_COLORS[q.difficulty] || '#fbbf24' }}>{difficultyLabel(q.difficulty)}</span>
                         {answered && <span className="iv-badge iv-badge-score"><Star size={10} /> {answered.evaluation?.score}/10</span>}
                       </div>
                       <p className="iv-question-text">{q.question}</p>
@@ -388,12 +560,14 @@ export default function InterviewSimulatorPage() {
           {/* ════════ PHASE: PRACTICE ════════ */}
           {phase === 'practice' && currentQ && (
             <motion.div key="practice" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
+              <div className="iv-practice-layout">
               <div className="iv-practice-card">
                 <div className="iv-practice-header">
                   <div className="iv-practice-meta">
                     <span className="iv-question-num">Q{currentIdx + 1}/{questions.length}</span>
-                    <span className="iv-badge" style={{ '--badge-color': CATEGORY_COLORS[currentQ.category] || '#60a5fa' }}>{currentQ.category}</span>
-                    <span className="iv-badge iv-badge-diff" style={{ '--badge-color': DIFFICULTY_COLORS[currentQ.difficulty] || '#fbbf24' }}>{currentQ.difficulty}</span>
+                    <span className="iv-badge" style={{ '--badge-color': CATEGORY_COLORS[currentQ.category] || '#60a5fa' }}>{categoryLabel(currentQ.category)}</span>
+                    <span className="iv-badge iv-badge-diff" style={{ '--badge-color': DIFFICULTY_COLORS[currentQ.difficulty] || '#fbbf24' }}>{difficultyLabel(currentQ.difficulty)}</span>
+                    <span className="iv-badge iv-badge-time"><Clock size={10} /> {formatDuration(elapsedSeconds)}</span>
                   </div>
                   <div className="iv-practice-actions-top">
                     <motion.button type="button" className="iv-icon-btn" onClick={readQuestionAloud} title={t('iv.read_aloud')} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
@@ -418,7 +592,7 @@ export default function InterviewSimulatorPage() {
                 <div className="iv-answer-section">
                   <label className="iv-label">{t('iv.your_answer')}</label>
                   <div className="iv-answer-wrap">
-                    <textarea ref={answerRef} className="iv-answer-textarea" rows={8} value={userAnswer} onChange={e => setUserAnswer(e.target.value)}
+                    <textarea ref={answerRef} className="iv-answer-textarea" rows={8} value={userAnswer} onChange={e => handleAnswerChange(e.target.value)}
                       placeholder={t('iv.answer_placeholder')} disabled={evaluating} />
                     {speechSupported && (
                       <motion.button type="button" className={`iv-voice-btn ${isListening ? 'iv-voice-active' : ''}`}
@@ -428,8 +602,12 @@ export default function InterviewSimulatorPage() {
                     )}
                   </div>
                   {isListening && <div className="iv-listening-indicator"><span className="iv-listening-dot" /> {t('iv.listening')}</div>}
+                  <div className="iv-answer-meter" aria-hidden="true">
+                    <span style={{ width: `${answerGoalPercent}%` }} />
+                  </div>
                   <div className="iv-answer-footer">
-                    <span className="iv-word-count">{userAnswer.trim() ? userAnswer.trim().split(/\s+/).length : 0} {t('iv.words')}</span>
+                    <span className="iv-word-count">{answerWords} {t('iv.words')} - {answerMinutes} {t('iv.minutes')}</span>
+                    <span className="iv-autosave"><Save size={12} /> {t('iv.draft_saved')}</span>
                     <div className="iv-answer-actions">
                       <button type="button" className="iv-nav-btn" onClick={handleBackToQuestions}>{t('iv.back_to_list')}</button>
                       <motion.button type="button" className="iv-submit-answer-btn" disabled={!userAnswer.trim() || evaluating}
@@ -439,6 +617,42 @@ export default function InterviewSimulatorPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+              <aside className="iv-session-panel">
+                <div className="iv-side-section">
+                  <h3><ListChecks size={15} /> {t('iv.session_queue')}</h3>
+                  <div className="iv-question-rail">
+                    {questions.map((q, idx) => {
+                      const answered = answeredQuestions[idx]
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          className={`iv-rail-btn ${idx === currentIdx ? 'iv-rail-current' : ''} ${answered ? 'iv-rail-done' : ''}`}
+                          onClick={() => handleStartPractice(idx)}
+                          title={q.question}
+                        >
+                          {answered ? <Check size={12} /> : idx + 1}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="iv-side-section">
+                  <h3><Target size={15} /> {t('iv.answer_targets')}</h3>
+                  <div className="iv-target-row">
+                    <span>{t('iv.depth')}</span>
+                    <strong>{answerWords}/90</strong>
+                  </div>
+                  <div className="iv-side-meter"><span style={{ width: `${answerGoalPercent}%` }} /></div>
+                  <div className="iv-structure-list">
+                    <span>{t('iv.star_situation')}</span>
+                    <span>{t('iv.star_action')}</span>
+                    <span>{t('iv.star_result')}</span>
+                    <span>{t('iv.star_metric')}</span>
+                  </div>
+                </div>
+              </aside>
               </div>
             </motion.div>
           )}
@@ -483,14 +697,22 @@ export default function InterviewSimulatorPage() {
                 {/* Sample answer */}
                 {evaluation.sample_answer && (
                   <div className="iv-review-sample">
-                    <h4><Award size={14} /> {t('iv.sample_answer')}</h4>
+                    <div className="iv-review-sample-head">
+                      <h4><Award size={14} /> {t('iv.sample_answer')}</h4>
+                      <button type="button" className="iv-mini-action" onClick={handleCopySampleAnswer}>
+                        <Copy size={13} /> {t('iv.copy_sample')}
+                      </button>
+                    </div>
                     <p>{evaluation.sample_answer}</p>
                   </div>
                 )}
 
                 {/* Navigation */}
                 <div className="iv-review-nav">
-                  <button type="button" className="iv-nav-btn" onClick={handleBackToQuestions}>{t('iv.back_to_list')}</button>
+                  <div className="iv-review-nav-left">
+                    <button type="button" className="iv-nav-btn" onClick={handleBackToQuestions}>{t('iv.back_to_list')}</button>
+                    <button type="button" className="iv-nav-btn" onClick={handleRetryCurrent}><RefreshCw size={14} /> {t('iv.retry_answer')}</button>
+                  </div>
                   <div className="iv-review-nav-arrows">
                     {currentIdx > 0 && <button type="button" className="iv-nav-btn" onClick={handlePrevQuestion}><ChevronLeft size={14} /> {t('iv.prev')}</button>}
                     {currentIdx < questions.length - 1 && (

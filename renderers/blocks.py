@@ -187,6 +187,18 @@ def _split_bullets(raw: str) -> List[str]:
     return parts
 
 
+def _looks_like_tech_list(text: str) -> bool:
+    value = _clean(text)
+    if not value or not re.search(r"[,|/]", value):
+        return False
+    tokens = [part.strip() for part in re.split(r"\s*[,|/]\s*", value) if part.strip()]
+    if len(tokens) < 2:
+        return False
+    if any(len(token.split()) > 4 for token in tokens):
+        return False
+    return not re.search(r"\b(?:developed|implemented|designed|managed|created|built|geliştirdi|tasarladı)\b", value, re.I)
+
+
 def render_experience(exp: Experience) -> List[str]:
     """Return structured lines: [title_line, date_line, bullet, bullet, …]"""
     lines: List[str] = []
@@ -276,6 +288,12 @@ def render_project(proj: Project) -> List[str]:
     # Fix "Name-Tech" → "Name — Tech" in project titles
     name = re.sub(r"([A-Za-z0-9])\u2013\s*([A-Z])", "\\1 \u2014 \\2", name)
     name = re.sub(r"([A-Za-z0-9])-\s*([A-Z][a-z])", "\\1 \u2014 \\2", name)
+
+    # If description is only a technology stack, keep it on the project title
+    # line so project layouts stay consistent across parsed CV variants.
+    if name and desc and _looks_like_tech_list(desc):
+        name = f"{name} \u2013 {desc}"
+        desc = ""
 
     if name:
         lines.append(name)

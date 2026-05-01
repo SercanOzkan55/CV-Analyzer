@@ -4,10 +4,13 @@ import {
   Briefcase, Plus, X, GripVertical, Calendar, Building2, MapPin,
   Star, Trophy, Target, TrendingUp, Trash2, Edit3, Check, ChevronDown,
   Flame, Award, Zap, ExternalLink, Clock, FileText, BarChart3,
+  Bell, Mail,
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import { useLanguage } from '../i18n/LanguageContext'
 import { useToast } from '../components/Toast'
+import { useAuth } from '../context/AuthContext'
+import { createReminder, updateReminder, deleteReminder, sendReminderTest } from '../api'
 
 const STORAGE_KEY = 'cv_analyzer_job_tracker'
 
@@ -23,6 +26,41 @@ const PRIORITY_COLORS = { high: '#ef4444', medium: '#fbbf24', low: '#60a5fa' }
 
 function generateId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7) }
 
+function copy(lang, tr, en) { return lang === 'tr' ? tr : en }
+
+function toDateTimeLocal(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 16)
+}
+
+function daysUntil(value) {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return Math.ceil((date.getTime() - Date.now()) / 86400000)
+}
+
+function formatReminderDate(value, lang) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString(lang === 'tr' ? 'tr-TR' : 'en-US', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function reminderTypeFromStatus(status) {
+  if (status === 'offer') return 'offer'
+  if (status === 'interview') return 'interview'
+  return 'follow_up'
+}
+
 function loadJobs() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {} } catch { return {} }
 }
@@ -32,7 +70,8 @@ const containerVariants = { hidden: {}, show: { transition: { staggerChildren: 0
 const itemVariants = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.35 } } }
 
 // ── Add/Edit Modal ──
-function JobModal({ job, onSave, onClose, t }) {
+function JobModal({ job, initialStatus, userEmail, onSave, onClose, t, lang }) {
+  const defaultReminder = ['interview', 'offer'].includes(job?.status || initialStatus)
   const [form, setForm] = useState({
     company: job?.company || '',
     role: job?.role || '',
@@ -42,12 +81,23 @@ function JobModal({ job, onSave, onClose, t }) {
     notes: job?.notes || '',
     priority: job?.priority || 'medium',
     appliedDate: job?.appliedDate || new Date().toISOString().slice(0, 10),
+    reminderEnabled: job?.reminderEnabled ?? defaultReminder,
+    reminderDate: toDateTimeLocal(job?.reminderDate || ''),
+    reminderEmail: job?.reminderEmail || userEmail || '',
+    reminderType: job?.reminderType || reminderTypeFromStatus(job?.status || initialStatus),
   })
+  const [saving, setSaving] = useState(false)
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
     if (!form.company.trim() || !form.role.trim()) return
-    onSave(form)
+    if (form.reminderEnabled && !form.reminderDate) return
+    setSaving(true)
+    try {
+      await onSave(form)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
@@ -106,9 +156,64 @@ function JobModal({ job, onSave, onClose, t }) {
             <label>{t('jt.notes')}</label>
             <textarea value={form.notes} onChange={e => set('notes', e.target.value)} rows={3} placeholder={t('jt.notes_ph')} className="jt-notes-textarea" />
           </div>
+          <div className="jt-reminder-editor">
+            <label className="jt-reminder-toggle">
+              <input
+                type="checkbox"
+                checked={!!form.reminderEnabled}
+                onChange={e => set('reminderEnabled', e.target.checked)}
+              />
+              <span>
+                <Bell size={15} />
+                {copy(lang, 'Mail hatırlatma kur', 'Set email reminder')}
+              </span>
+            </label>
+            {form.reminderEnabled && (
+              <>
+                <div className="jt-form-row">
+                  <div className="jt-form-field">
+                    <label>{copy(lang, 'Hatırlatma türü', 'Reminder type')}</label>
+                    <select className="jt-select" value={form.reminderType} onChange={e => set('reminderType', e.target.value)}>
+                      <option value="interview">{copy(lang, 'Mülakat', 'Interview')}</option>
+                      <option value="offer">{copy(lang, 'Teklif / son tarih', 'Offer / deadline')}</option>
+                      <option value="follow_up">{copy(lang, 'Takip', 'Follow-up')}</option>
+                      <option value="deadline">{copy(lang, 'Son tarih', 'Deadline')}</option>
+                    </select>
+                  </div>
+                  <div className="jt-form-field">
+                    <label>{copy(lang, 'Tarih ve saat', 'Date and time')} *</label>
+                    <div className="jt-input-wrap">
+                      <Calendar size={15} className="jt-input-icon" />
+                      <input
+                        type="datetime-local"
+                        value={form.reminderDate}
+                        onChange={e => set('reminderDate', e.target.value)}
+                        required={!!form.reminderEnabled}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="jt-form-field">
+                  <label>{copy(lang, 'Mail nereye gelsin?', 'Send email to')}</label>
+                  <div className="jt-input-wrap">
+                    <Mail size={15} className="jt-input-icon" />
+                    <input
+                      type="email"
+                      value={form.reminderEmail}
+                      onChange={e => set('reminderEmail', e.target.value)}
+                      placeholder={userEmail || 'you@example.com'}
+                    />
+                  </div>
+                </div>
+                <p className="jt-reminder-help">
+                  {copy(lang, 'CV Analyzer etkinliğe 3 gün ve 1 gün kala otomatik mail gönderir.', 'CV Analyzer sends automatic email reminders 3 days and 1 day before the event.')}
+                </p>
+              </>
+            )}
+          </div>
           <div className="jt-modal-actions">
             <button type="button" className="jt-btn-secondary" onClick={onClose}>{t('common.cancel')}</button>
-            <button type="submit" className="jt-btn-primary"><Check size={16} /> {job ? t('jt.save') : t('jt.add')}</button>
+            <button type="submit" className="jt-btn-primary" disabled={saving}><Check size={16} /> {saving ? copy(lang, 'Kaydediliyor', 'Saving') : job ? t('jt.save') : t('jt.add')}</button>
           </div>
         </form>
       </motion.div>
@@ -117,9 +222,10 @@ function JobModal({ job, onSave, onClose, t }) {
 }
 
 // ── Job Card ──
-function JobCard({ job, onEdit, onDelete, dragHandlers, isDragging }) {
-  const { t } = useLanguage()
+function JobCard({ job, onEdit, onDelete, onSendReminderTest, dragHandlers, isDragging }) {
+  const { t, lang } = useLanguage()
   const daysSince = Math.floor((Date.now() - new Date(job.appliedDate).getTime()) / 86400000)
+  const reminderDays = daysUntil(job.reminderDate)
 
   return (
     <motion.div className={`jt-card ${isDragging ? 'jt-card-dragging' : ''}`}
@@ -139,6 +245,22 @@ function JobCard({ job, onEdit, onDelete, dragHandlers, isDragging }) {
       <p className="jt-card-role">{job.role}</p>
       {job.location && <p className="jt-card-location"><MapPin size={11} /> {job.location}</p>}
       {job.salary && <p className="jt-card-salary"><BarChart3 size={11} /> {job.salary}</p>}
+      {job.reminderEnabled && job.reminderDate && (
+        <div className={`jt-card-reminder ${job.reminderSyncError ? 'jt-card-reminder-error' : job.reminderId ? 'jt-card-reminder-active' : ''}`}>
+          <Bell size={11} />
+          <span>{formatReminderDate(job.reminderDate, lang)}</span>
+          {reminderDays !== null && <b>{reminderDays <= 0 ? copy(lang, 'bugün', 'today') : `${reminderDays}d`}</b>}
+          {job.reminderId && (
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); onSendReminderTest?.(job) }}
+              title={copy(lang, 'Test maili gönder', 'Send test email')}
+            >
+              <Mail size={11} />
+            </button>
+          )}
+        </div>
+      )}
       <div className="jt-card-footer">
         <span className="jt-card-date"><Clock size={11} /> {daysSince}d</span>
         {job.url && <a href={job.url} target="_blank" rel="noopener noreferrer" className="jt-card-link"><ExternalLink size={11} /></a>}
@@ -149,8 +271,10 @@ function JobCard({ job, onEdit, onDelete, dragHandlers, isDragging }) {
 
 // ── Main Page ──
 export default function JobTrackerPage() {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const { addToast } = useToast()
+  const { user, token } = useAuth()
+  const userEmail = user?.email || ''
 
   const [jobs, setJobs] = useState(() => loadJobs())
   const [modalOpen, setModalOpen] = useState(false)
@@ -171,6 +295,10 @@ export default function JobTrackerPage() {
   const interviews = allJobs.filter(j => j.status === 'interview').length
   const offers = allJobs.filter(j => j.status === 'offer').length
   const interviewRate = totalApps > 0 ? Math.round((interviews + offers) / totalApps * 100) : 0
+  const upcomingReminders = allJobs
+    .filter(j => j.reminderEnabled && j.reminderDate && daysUntil(j.reminderDate) !== null && daysUntil(j.reminderDate) >= 0)
+    .sort((a, b) => new Date(a.reminderDate).getTime() - new Date(b.reminderDate).getTime())
+    .slice(0, 4)
 
   // Weekly streak
   const thisWeekApps = allJobs.filter(j => {
@@ -181,22 +309,77 @@ export default function JobTrackerPage() {
   }).length
 
   // ── CRUD ──
-  function handleAddJob(formData) {
+  function buildReminderPayload(job) {
+    const eventDate = job.reminderDate ? new Date(job.reminderDate) : null
+    return {
+      title: `${job.company} - ${job.role}`.trim(),
+      description: [job.location, job.notes].filter(Boolean).join('\n\n'),
+      reminder_type: job.reminderType || reminderTypeFromStatus(job.status),
+      event_date: eventDate?.toISOString(),
+      target_email: job.reminderEmail || userEmail,
+      is_active: !!job.reminderEnabled,
+    }
+  }
+
+  async function syncReminder(job) {
+    if (!job.reminderEnabled || !job.reminderDate) {
+      if (token && job.reminderId) {
+        await deleteReminder(token, job.reminderId).catch(() => null)
+      }
+      return { ...job, reminderId: null, reminderSyncError: '' }
+    }
+
+    if (!token) {
+      return {
+        ...job,
+        reminderSyncError: copy(lang, 'Mail hatırlatma için giriş gerekir.', 'Login is required for email reminders.'),
+      }
+    }
+
+    const payload = buildReminderPayload(job)
+    const saved = job.reminderId
+      ? await updateReminder(token, job.reminderId, payload)
+      : await createReminder(token, payload)
+
+    return {
+      ...job,
+      reminderId: saved.id || job.reminderId,
+      reminderEmail: saved.target_email || job.reminderEmail || userEmail,
+      reminderSyncError: '',
+    }
+  }
+
+  async function handleAddJob(formData) {
     const id = generateId()
     const colJobs = getColumnJobs(addToColumn)
-    const newJob = { ...formData, id, status: addToColumn, order: colJobs.length, createdAt: Date.now() }
+    let newJob = { ...formData, id, status: addToColumn, order: colJobs.length, createdAt: Date.now() }
+    try {
+      newJob = await syncReminder(newJob)
+    } catch (err) {
+      newJob = { ...newJob, reminderSyncError: err.message || 'Reminder sync failed' }
+      addToast(copy(lang, 'Başvuru kaydedildi ama mail hatırlatma kurulamadı.', 'Job saved, but email reminder could not be scheduled.'), 'warning')
+    }
     setJobs(prev => ({ ...prev, [id]: newJob }))
     setModalOpen(false)
-    addToast(t('jt.job_added'), 'success')
+    addToast(newJob.reminderId ? copy(lang, 'Başvuru ve mail hatırlatma kaydedildi', 'Job and email reminder saved') : t('jt.job_added'), 'success')
   }
-  function handleEditJob(formData) {
+  async function handleEditJob(formData) {
     if (!editingJob) return
-    setJobs(prev => ({ ...prev, [editingJob.id]: { ...editingJob, ...formData } }))
+    let updatedJob = { ...editingJob, ...formData }
+    try {
+      updatedJob = await syncReminder(updatedJob)
+    } catch (err) {
+      updatedJob = { ...updatedJob, reminderSyncError: err.message || 'Reminder sync failed' }
+      addToast(copy(lang, 'Başvuru güncellendi ama mail hatırlatma senkronize edilemedi.', 'Job updated, but email reminder could not be synced.'), 'warning')
+    }
+    setJobs(prev => ({ ...prev, [editingJob.id]: updatedJob }))
     setEditingJob(null)
     setModalOpen(false)
     addToast(t('jt.job_updated'), 'success')
   }
   function handleDeleteJob(id) {
+    const job = jobs[id]
+    if (token && job?.reminderId) deleteReminder(token, job.reminderId).catch(() => null)
     setJobs(prev => { const copy = { ...prev }; delete copy[id]; return copy })
     addToast(t('jt.job_deleted'), 'success')
   }
@@ -233,16 +416,35 @@ export default function JobTrackerPage() {
     setDragOverCol(null)
     if (!draggedJob) return
     if (draggedJob.status === colId) return
-    const oldStatus = draggedJob.status
+    const updatedJob = { ...draggedJob, status: colId, order: getColumnJobs(colId).length }
     setJobs(prev => ({
       ...prev,
-      [draggedJob.id]: { ...draggedJob, status: colId, order: getColumnJobs(colId).length }
+      [draggedJob.id]: updatedJob
     }))
     // Toast for status change
     if (colId === 'offer') addToast(`🎉 ${t('jt.congrats_offer')}`, 'success')
     else if (colId === 'interview') addToast(`📞 ${t('jt.moved_interview')}`, 'success')
     else addToast(t('jt.job_moved'), 'success')
+    if (['interview', 'offer'].includes(colId) && !draggedJob.reminderDate) {
+      setEditingJob({
+        ...updatedJob,
+        reminderEnabled: true,
+        reminderType: reminderTypeFromStatus(colId),
+        reminderEmail: draggedJob.reminderEmail || userEmail,
+      })
+      setModalOpen(true)
+    }
     setDraggedJob(null)
+  }
+
+  async function handleSendReminderTest(job) {
+    if (!token || !job.reminderId) return
+    try {
+      await sendReminderTest(token, job.reminderId)
+      addToast(copy(lang, 'Test hatırlatma maili gönderildi', 'Test reminder email sent'), 'success')
+    } catch (err) {
+      addToast(err.message || copy(lang, 'Test maili gönderilemedi', 'Test email could not be sent'), 'error')
+    }
   }
 
   const dragHandlers = { onDragStart, onDragEnd }
@@ -289,6 +491,34 @@ export default function JobTrackerPage() {
             </div>
           </motion.div>
 
+          {upcomingReminders.length > 0 && (
+            <motion.div className="jt-reminder-panel" variants={itemVariants}>
+              <div className="jt-reminder-panel-head">
+                <div>
+                  <h3><Bell size={16} /> {copy(lang, 'Yaklaşan hatırlatmalar', 'Upcoming reminders')}</h3>
+                  <p>{copy(lang, 'Mülakat, teklif ve takip tarihleri için mail hatırlatmaları açık.', 'Email reminders are active for interviews, offers, and follow-ups.')}</p>
+                </div>
+                <span>{upcomingReminders.length}</span>
+              </div>
+              <div className="jt-reminder-list">
+                {upcomingReminders.map(job => {
+                  const remaining = daysUntil(job.reminderDate)
+                  return (
+                    <button key={job.id} type="button" className="jt-reminder-chip" onClick={() => openEditModal(job)}>
+                      <Bell size={14} />
+                      <span>
+                        <strong>{job.company}</strong>
+                        <small>{job.role}</small>
+                      </span>
+                      <em>{formatReminderDate(job.reminderDate, lang)}</em>
+                      {remaining !== null && <b>{remaining <= 0 ? copy(lang, 'bugün', 'today') : `${remaining}d`}</b>}
+                    </button>
+                  )
+                })}
+              </div>
+            </motion.div>
+          )}
+
           {/* Kanban Board */}
           <motion.div className="jt-board" variants={itemVariants}>
             {COLUMNS.map(col => {
@@ -312,6 +542,7 @@ export default function JobTrackerPage() {
                     <AnimatePresence>
                       {colJobs.map(job => (
                         <JobCard key={job.id} job={job} onEdit={openEditModal} onDelete={handleDeleteJob}
+                          onSendReminderTest={handleSendReminderTest}
                           dragHandlers={dragHandlers} isDragging={draggedJob?.id === job.id} />
                       ))}
                     </AnimatePresence>
@@ -343,7 +574,15 @@ export default function JobTrackerPage() {
         {/* Modal */}
         <AnimatePresence>
           {modalOpen && (
-            <JobModal job={editingJob} onSave={editingJob ? handleEditJob : handleAddJob} onClose={() => { setModalOpen(false); setEditingJob(null) }} t={t} />
+            <JobModal
+              job={editingJob}
+              initialStatus={editingJob?.status || addToColumn}
+              userEmail={userEmail}
+              onSave={editingJob ? handleEditJob : handleAddJob}
+              onClose={() => { setModalOpen(false); setEditingJob(null) }}
+              t={t}
+              lang={lang}
+            />
           )}
         </AnimatePresence>
       </main>

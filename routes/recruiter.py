@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import or_, select, text
 
 from auth import verify_supabase_jwt
+from config.aws import MAX_UPLOAD_BYTES
 from database import get_db
 from models import (
     Analysis,
@@ -49,9 +50,20 @@ from services.recruiter_helpers import (
     _validate_reminder_email,
     _ensure_not_expired,
 )
+from security.file_guard import read_upload_limited
 from services.tasks import batch_recruiter_task
 
 logger = logging.getLogger("app.recruiter")
+
+_MAX_BATCH_FILES = int(os.getenv("RECRUITER_MAX_BATCH_FILES", "100"))
+
+
+def _format_bytes(value: int) -> str:
+    if value >= 1024 * 1024:
+        return f"{value / (1024 * 1024):.0f} MB"
+    if value >= 1024:
+        return f"{value / 1024:.0f} KB"
+    return f"{value} bytes"
 
 
 def _main():
@@ -100,6 +112,10 @@ def _get_user(db, supabase_id: str, email: str):
 
 def _pipeline(cv_text: str, job_description: str, lang: str = ""):
     return _main().run_pipeline(cv_text, job_description, lang=lang)
+
+
+def _billable_usage(db, recruiter: User | None, endpoint: str, response: Response | None = None):
+    return _main()._consume_billable_usage(db, recruiter, endpoint, response=response)
 
 router = APIRouter(prefix="/api/v1/recruiter")
 
@@ -597,6 +613,7 @@ def recruiter_search(
 @router.post("/batch-rank")
 async def recruiter_batch_rank(
     request: Request,
+    response: Response,
     files: list[UploadFile] = File(...),
     job_description: str = Form(""),
     jd_file: UploadFile | None = File(None),
@@ -606,12 +623,16 @@ async def recruiter_batch_rank(
 ):
     if not files:
         raise HTTPException(status_code=400, detail="At least one CV file is required")
-    if len(files) > 5000:
-        raise HTTPException(status_code=400, detail="Maximum 5000 CV files allowed")
+    if len(files) > _MAX_BATCH_FILES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maximum {_MAX_BATCH_FILES} CV files allowed",
+        )
 
     jd_text = await _resolve_job_description_text(job_description, jd_file)
     if not jd_text:
         raise HTTPException(status_code=400, detail="Job description is empty")
+    _billable_usage(db, recruiter, "recruiter-batch-rank", response=response)
 
     ranked = []
     skill_counts: dict[str, int] = {}
@@ -646,14 +667,24 @@ async def recruiter_batch_rank(
     skipped = []
     for idx, upload in enumerate(files):
         try:
-            contents = await upload.read()
+            contents = await read_upload_limited(upload)
             _validate_pdf_upload(contents, upload.content_type)
             cv_text, _ = _extract_pdf_text(contents)
             if not cv_text:
                 skipped.append(upload.filename or f"candidate_{idx + 1}")
                 continue
 
-            result = _pipeline(cv_text, jd_text)
+            autofix = _main().auto_fix_cv_text(
+                cv_text=cv_text,
+                job_description=jd_text,
+                lang="en",
+                use_ai=False,
+                mode="safe",
+            )
+            normalized_text = autofix.get("optimized_cv_text") or cv_text
+            result = _pipeline(normalized_text, jd_text)
+            jd_quality = result.get("job_description_quality") or {}
+            result_warnings = result.get("warnings") or []
             detected_skills = result.get("detected_skills") or []
             for s in detected_skills:
                 key = str(s or "").strip().lower()
@@ -661,7 +692,13 @@ async def recruiter_batch_rank(
                     skill_counts[key] = skill_counts.get(key, 0) + 1
 
             file_fallback = (upload.filename or f"candidate_{idx + 1}").replace(".pdf", "")
-            cand_name, cand_email = _extract_candidate_info(cv_text, file_fallback)
+            builder_payload = autofix.get("builder_payload") or {}
+            cand_name = builder_payload.get("full_name") or ""
+            cand_email = builder_payload.get("email") or ""
+            if not cand_name or not cand_email:
+                fallback_name, fallback_email = _extract_candidate_info(cv_text, file_fallback)
+                cand_name = cand_name or fallback_name
+                cand_email = cand_email or fallback_email
 
             ranked.append(
                 {
@@ -672,12 +709,17 @@ async def recruiter_batch_rank(
                     "final_score_breakdown": result.get("final_score_breakdown"),
                     "ats_score": float(result.get("ats_score") or 0.0),
                     "skill_score": float(result.get("skill_score") or 0.0),
+                    "job_description_quality": jd_quality,
+                    "warnings": result_warnings,
+                    "score_version": result.get("score_version") or "",
                     "missing_skills": result.get("missing_skills") or [],
                     "keyword_gap": result.get("keyword_gap") or {},
                     "score_breakdown": result.get("score_breakdown") or {},
                     "recommendations": result.get("recommendations") or [],
                     "strengths": (result.get("detected_skills") or [])[:5],
-                    "cv_text": cv_text,
+                    "cv_text": normalized_text,
+                    "original_cv_text": cv_text,
+                    "builder_payload": builder_payload,
                 }
             )
             
@@ -723,6 +765,14 @@ async def recruiter_batch_rank(
         "total_candidates": total,
         "job_description_preview": jd_text[:300],
         "ranking": ranked,
+        "job_description_quality": (ranked[0].get("job_description_quality") if ranked else {}),
+        "score_version": (ranked[0].get("score_version") if ranked else ""),
+        "warnings": sorted({
+            str(w).strip()
+            for row in ranked
+            for w in (row.get("warnings") or [])
+            if str(w).strip()
+        }),
         "skipped_count": len(skipped),
         "skipped_files": skipped[:10] if skipped else [],  # Show first 10 skipped for user feedback
         "analytics": {
@@ -740,6 +790,7 @@ async def recruiter_batch_rank(
 async def recruiter_batch_upload(
     job_id: int = Form(..., gt=0),
     files: list[UploadFile] = File(...),
+    response: Response = None,
     db=Depends(get_db),
     recruiter=Depends(recruiter_required),
     request: Request = None,
@@ -779,10 +830,13 @@ async def recruiter_batch_upload(
             detail="At least one file is required"
         )
     
-    if len(files) > 5000:
+    if len(files) > _MAX_BATCH_FILES:
         raise HTTPException(
             status_code=400,
-            detail="Maximum 5000 files per upload (you provided {})".format(len(files))
+            detail="Maximum {} files per upload (you provided {})".format(
+                _MAX_BATCH_FILES,
+                len(files),
+            )
         )
 
     job = db.query(RecruiterJob).filter(
@@ -812,7 +866,9 @@ async def recruiter_batch_upload(
             )
 
         try:
-            contents = await file.read()
+            contents = await read_upload_limited(file)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
             logger.error("batch_upload: failed to read file %s error=%s", file.filename, e)
             raise HTTPException(
@@ -827,11 +883,14 @@ async def recruiter_batch_upload(
                 detail="File is empty: {}".format(file.filename)
             )
 
-        # Validate file size (max 5MB per file)
-        if len(contents) > 5_000_000:
+        # Validate file size before text extraction.
+        if len(contents) > MAX_UPLOAD_BYTES:
             raise HTTPException(
                 status_code=400,
-                detail="File too large (max 5MB): {}".format(file.filename)
+                detail="File too large (max {}): {}".format(
+                    _format_bytes(MAX_UPLOAD_BYTES),
+                    file.filename,
+                )
             )
 
         # Extract text from file
@@ -894,6 +953,7 @@ async def recruiter_batch_upload(
                 requested_cv_count, available_credits
             )
         )
+    _billable_usage(db, recruiter, "recruiter-batch-upload", response=response)
 
     # Deduct credits and queue batch task
     org.monthly_usage += requested_cv_count
@@ -1020,13 +1080,20 @@ def recruiter_list_jobs(
 
 @_get_limiter().limit("120/hour")
 @router.post("/dashboard/rank")
-def recruiter_dashboard_rank(body: RecruiterRankRequest, recruiter=Depends(recruiter_required), request: Request = None):
+def recruiter_dashboard_rank(
+    body: RecruiterRankRequest,
+    response: Response,
+    db=Depends(get_db),
+    recruiter=Depends(recruiter_required),
+    request: Request = None,
+):
     if not body.cv_texts:
         raise HTTPException(status_code=400, detail="At least one CV is required")
     if len(body.cv_texts) > 100:
         raise HTTPException(status_code=400, detail="Maximum 100 CVs")
     if not body.job_description.strip():
         raise HTTPException(status_code=400, detail="Job description is required")
+    _billable_usage(db, recruiter, "recruiter-dashboard-rank", response=response)
 
     analyses = []
     for item in body.cv_texts:
@@ -1034,10 +1101,20 @@ def recruiter_dashboard_rank(body: RecruiterRankRequest, recruiter=Depends(recru
         if not cv_text.strip():
             continue
 
-        result = _pipeline(cv_text, body.job_description, lang=body.lang)
+        autofix = _main().auto_fix_cv_text(
+            cv_text=cv_text,
+            job_description=body.job_description,
+            lang=body.lang,
+            use_ai=False,
+            mode="safe",
+        )
+        normalized_text = autofix.get("optimized_cv_text") or cv_text
+        result = _pipeline(normalized_text, body.job_description, lang=body.lang)
         result["candidate_name"] = item.get("name", "")
         result["candidate_email"] = item.get("email", "")
-        result["cv_text"] = cv_text
+        result["cv_text"] = normalized_text
+        result["original_cv_text"] = cv_text
+        result["builder_payload"] = autofix.get("builder_payload") or {}
         result["file_name"] = item.get("file_name", "")
         analyses.append(result)
 
@@ -1046,13 +1123,30 @@ def recruiter_dashboard_rank(body: RecruiterRankRequest, recruiter=Depends(recru
         if i < len(ranked):
             ranked[i]["analysis"] = _rc_sw(analysis)
 
-    return {"total": len(ranked), "ranking": ranked}
+    return {
+        "total": len(ranked),
+        "ranking": ranked,
+        "job_description_quality": (analyses[0].get("job_description_quality") if analyses else {}),
+        "score_version": (analyses[0].get("score_version") if analyses else ""),
+        "warnings": sorted({
+            str(w).strip()
+            for analysis in analyses
+            for w in (analysis.get("warnings") or [])
+            if str(w).strip()
+        }),
+    }
 
 
 @router.post("/dashboard/preview")
-def recruiter_dashboard_preview(body: RecruiterPreviewRequest, recruiter=Depends(recruiter_required)):
+def recruiter_dashboard_preview(
+    body: RecruiterPreviewRequest,
+    response: Response,
+    db=Depends(get_db),
+    recruiter=Depends(recruiter_required),
+):
     if not body.cv_text.strip():
         raise HTTPException(status_code=400, detail="CV text is required")
+    _billable_usage(db, recruiter, "recruiter-dashboard-preview", response=response)
 
     result = _pipeline(body.cv_text, body.job_description, lang=body.lang)
     result["candidate_name"] = body.candidate_name
@@ -1666,6 +1760,7 @@ async def recruiter_scan_cv(
     supabase_id = (user or {}).get("user_id", "mock-user") if _main().MOCK_SERVICES_ON else user.get("user_id")
     email = (user or {}).get("email", "dev@example.com") if _main().MOCK_SERVICES_ON else user.get("email")
     db_user = _get_user(db, str(supabase_id), email)
+    _billable_usage(db, db_user, "recruiter-scan-cv", response=response)
 
     # ── OCR all pages ──
     page_texts = []
@@ -1723,7 +1818,7 @@ async def recruiter_scan_cv(
         mode="light_fix",
     )
     normalized_text = autofix.get("optimized_cv_text") or combined_text
-    payload = _main().structured_text_to_builder_payload(
+    payload = autofix.get("builder_payload") or _main().structured_text_to_builder_payload(
         normalized_text,
         job_description=job_description,
         lang=lang,

@@ -17,11 +17,41 @@ import sys
 import traceback
 from datetime import datetime, timezone
 
+try:
+    from security.redaction import redact_for_log, redact_sensitive_text
+except Exception:  # pragma: no cover - logging must keep working during boot
+    def redact_sensitive_text(value: str, max_length: int = 2000) -> str:
+        return value
+
+    def redact_for_log(value, key: str | None = None, max_depth: int = 4):
+        return value
+
 _LOG_DIR = os.getenv("LOG_DIR", "/app/logs")
 _LOG_MAX_BYTES = int(os.getenv("LOG_MAX_BYTES", str(50 * 1024 * 1024)))  # 50 MB
 _LOG_BACKUP_COUNT = int(os.getenv("LOG_BACKUP_COUNT", "5"))
 _LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 _LOG_FORMAT = os.getenv("LOG_FORMAT", "text").lower()  # "json" or "text"
+
+
+class RedactingFilter(logging.Filter):
+    """Best-effort secret and PII redaction before records hit handlers."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            if isinstance(record.msg, str) and not record.args:
+                record.msg = redact_sensitive_text(record.msg)
+            if isinstance(record.args, dict):
+                record.args = {
+                    key: redact_for_log(value, key=str(key))
+                    for key, value in record.args.items()
+                }
+            elif isinstance(record.args, tuple):
+                record.args = tuple(redact_for_log(value) for value in record.args)
+            elif record.args:
+                record.args = redact_for_log(record.args)
+        except Exception:
+            pass
+        return True
 
 
 class JSONFormatter(logging.Formatter):
@@ -32,7 +62,7 @@ class JSONFormatter(logging.Formatter):
             "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
             "level": record.levelname,
             "logger": record.name,
-            "message": record.getMessage(),
+            "message": redact_sensitive_text(record.getMessage()),
             "module": record.module,
             "function": record.funcName,
             "line": record.lineno,
@@ -40,13 +70,16 @@ class JSONFormatter(logging.Formatter):
         if record.exc_info and record.exc_info[1]:
             log_entry["exception"] = {
                 "type": record.exc_info[0].__name__ if record.exc_info[0] else None,
-                "message": str(record.exc_info[1]),
-                "traceback": traceback.format_exception(*record.exc_info),
+                "message": redact_sensitive_text(str(record.exc_info[1])),
+                "traceback": [
+                    redact_sensitive_text(line, max_length=4000)
+                    for line in traceback.format_exception(*record.exc_info)
+                ],
             }
         # Merge any extra fields passed via `extra={}` kwarg
         for key in ("user_id", "request_id", "path", "method", "status_code", "duration_ms"):
             if hasattr(record, key):
-                log_entry[key] = getattr(record, key)
+                log_entry[key] = redact_for_log(getattr(record, key), key=key)
         return json.dumps(log_entry, default=str, ensure_ascii=False)
 
 
@@ -71,11 +104,13 @@ def setup_logging() -> None:
 
     root = logging.getLogger()
     root.setLevel(_LOG_LEVEL)
+    root.addFilter(RedactingFilter())
 
     # ── Always add stderr handler ──
     stderr_handler = logging.StreamHandler(sys.stderr)
     stderr_handler.setFormatter(fmt)
     stderr_handler.setLevel(_LOG_LEVEL)
+    stderr_handler.addFilter(RedactingFilter())
     root.addHandler(stderr_handler)
 
     # ── Add rotating file handlers if LOG_DIR is set ──
@@ -97,4 +132,5 @@ def setup_logging() -> None:
             )
             handler.setFormatter(fmt)
             handler.setLevel(_LOG_LEVEL)
+            handler.addFilter(RedactingFilter())
             target_logger.addHandler(handler)

@@ -38,6 +38,7 @@ TESSERACT_CMD = os.getenv("TESSERACT_CMD", "").strip() or r"C:\Program Files\Tes
 import hashlib
 import hmac
 import io
+import ipaddress
 import json
 import os
 import re
@@ -47,7 +48,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 
 try:
@@ -119,6 +120,7 @@ from services.billing_service import get_entitlements, is_feature_enabled
 from services.cv_autofix_service import auto_fix_cv_text, structured_text_to_builder_payload
 from services import rewrite_service
 from services.ats_config import get_ats_weights
+from security.redaction import redact_for_log, redact_mapping
 from database import engine
 
 share_tokens = {}  # In-memory store for share tokens
@@ -140,16 +142,49 @@ app.include_router(recruiter_extended_router)
 app.include_router(recruiter_local_router)
 app.include_router(downloads_router)
 
-# Middleware to allow large uploads (up to 1GB)
+# Middleware to reject oversized request bodies before expensive parsing.
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
+from config.aws import MAX_PDF_OBJECTS, MAX_PDF_PAGES, MAX_UPLOAD_BYTES
+from security.file_guard import read_upload_limited
+
+
+def _format_bytes(value: int) -> str:
+    if value >= 1024 * 1024:
+        return f"{value / (1024 * 1024):.0f} MB"
+    if value >= 1024:
+        return f"{value / 1024:.0f} KB"
+    return f"{value} bytes"
+
+
+def _get_max_request_body_bytes() -> int:
+    default_limit = MAX_UPLOAD_BYTES + 1024 * 1024
+    try:
+        configured = int(os.getenv("MAX_REQUEST_BODY_BYTES", str(default_limit)))
+    except (TypeError, ValueError):
+        configured = default_limit
+    return max(configured, MAX_UPLOAD_BYTES)
+
+
+async def _read_upload_or_400(file: UploadFile, max_bytes: int = MAX_UPLOAD_BYTES) -> bytes:
+    try:
+        return await read_upload_limited(file, max_bytes=max_bytes)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 class LimitUploadSizeMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        max_body_size = 1024 * 1024 * 1024  # 1 GB
+        max_body_size = _get_max_request_body_bytes()
         content_length = request.headers.get("content-length")
-        if content_length and int(content_length) > max_body_size:
-            return Response("Request too large", status_code=413)
+        try:
+            declared_length = int(content_length or "0")
+        except ValueError:
+            declared_length = 0
+        if declared_length and declared_length > max_body_size:
+            return Response(
+                f"Request too large. Max body size is {_format_bytes(max_body_size)}.",
+                status_code=413,
+            )
         return await call_next(request)
 
 app.add_middleware(LimitUploadSizeMiddleware)
@@ -905,7 +940,11 @@ _audit_rt_logger = logging.getLogger("app.audit.runtime")
 
 def _audit_event(event: str, **kwargs) -> None:
     """Log a structured audit event for runtime control changes."""
-    _audit_rt_logger.warning("AUDIT:%s %s", event, " ".join(f"{k}={v}" for k, v in kwargs.items()))
+    safe_kwargs = {
+        key: redact_for_log(value, key=key)
+        for key, value in kwargs.items()
+    }
+    _audit_rt_logger.warning("AUDIT:%s %s", event, " ".join(f"{k}={v}" for k, v in safe_kwargs.items()))
 
 
 # ── Runtime: Request sampling (1%) ───────────────────────────────────────
@@ -916,6 +955,27 @@ _sample_logger = logging.getLogger("app.sample")
 
 # ── Runtime: Admin token ─────────────────────────────────────────────────
 _ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
+_ADMIN_IP_ALLOWLIST_RAW = os.getenv("ADMIN_IP_ALLOWLIST", "").strip()
+_ADMIN_RATE_LIMIT_PER_MIN = int(os.getenv("ADMIN_RATE_LIMIT_PER_MIN", "20"))
+_ADMIN_RATE_WINDOW_SECONDS = 60
+_admin_rate_lock = _threading.Lock()
+_admin_rate_hits: dict[str, list[float]] = {}
+
+
+def _parse_ip_allowlist(raw: str):
+    entries = []
+    for item in (raw or "").split(","):
+        value = item.strip()
+        if not value:
+            continue
+        try:
+            entries.append(ipaddress.ip_network(value, strict=False))
+        except ValueError:
+            logger.warning("Ignoring invalid ADMIN_IP_ALLOWLIST entry")
+    return entries
+
+
+_ADMIN_IP_ALLOWLIST = _parse_ip_allowlist(_ADMIN_IP_ALLOWLIST_RAW)
 
 
 def _check_admin_token(request: Request) -> bool:
@@ -926,6 +986,58 @@ def _check_admin_token(request: Request) -> bool:
     if not auth.startswith("Bearer "):
         return False
     return hmac.compare_digest(auth[7:].strip(), _ADMIN_TOKEN)
+
+
+def _admin_client_host(request: Request) -> str:
+    return _extract_client_ip(request) or (request.client.host if request.client else "")
+
+
+def _admin_ip_allowed(request: Request) -> bool:
+    if not _ADMIN_IP_ALLOWLIST:
+        return True
+    try:
+        ip_obj = ipaddress.ip_address(_admin_client_host(request))
+    except ValueError:
+        return False
+    return any(ip_obj in network for network in _ADMIN_IP_ALLOWLIST)
+
+
+def _admin_rate_limited(request: Request) -> bool:
+    if _ADMIN_RATE_LIMIT_PER_MIN <= 0:
+        return False
+
+    now = time.time()
+    identity = _admin_client_host(request) or "unknown"
+    cutoff = now - _ADMIN_RATE_WINDOW_SECONDS
+    with _admin_rate_lock:
+        hits = [ts for ts in _admin_rate_hits.get(identity, []) if ts >= cutoff]
+        if len(hits) >= _ADMIN_RATE_LIMIT_PER_MIN:
+            _admin_rate_hits[identity] = hits
+            return True
+        hits.append(now)
+        _admin_rate_hits[identity] = hits
+
+        if len(_admin_rate_hits) > 1000:
+            stale_keys = [
+                key for key, values in _admin_rate_hits.items()
+                if not values or max(values) < cutoff
+            ]
+            for key in stale_keys[:200]:
+                _admin_rate_hits.pop(key, None)
+    return False
+
+
+def _admin_access_error(request: Request):
+    if not _check_admin_token(request):
+        _audit_event("admin_access_denied", reason="invalid_token", path=request.url.path)
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    if not _admin_ip_allowed(request):
+        _audit_event("admin_access_denied", reason="ip_not_allowed", path=request.url.path)
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    if _admin_rate_limited(request):
+        _audit_event("admin_access_denied", reason="rate_limited", path=request.url.path)
+        return JSONResponse({"error": "rate_limited"}, status_code=429)
+    return None
 
 # ── Ops: Blue/Green readiness gate ───────────────────────────────────────
 _app_ready = False
@@ -966,7 +1078,7 @@ if _ENV_MODE in ("production", "prod"):
         allow_origins=_cors_origins or ["https://yourdomain.com"],
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID", "X-Trace-ID"],
+        allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID", "X-Trace-ID", "X-CSRF-Token"],
     )
 else:
     # Development: allow localhost
@@ -985,13 +1097,39 @@ else:
         allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID", "X-Trace-ID"],
+        allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID", "X-Trace-ID", "X-CSRF-Token"],
     )
 
 # Serve only the built frontend assets under /static (never the project root).
 _static_dir = os.path.join(os.path.dirname(__file__), "frontend", "dist")
 if os.path.isdir(_static_dir):
     app.mount("/static", StaticFiles(directory=_static_dir), name="static")
+
+
+_CSRF_PROTECTION_ENABLED = os.getenv("CSRF_PROTECTION_ENABLED", "1").lower() in ("1", "true", "yes")
+_CSRF_UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+@app.middleware("http")
+async def csrf_cookie_guard(request: Request, call_next):
+    """Require double-submit CSRF token for cookie-authenticated unsafe requests."""
+    if (
+        _CSRF_PROTECTION_ENABLED
+        and request.method.upper() in _CSRF_UNSAFE_METHODS
+        and request.headers.get("cookie")
+        and not request.headers.get("authorization")
+    ):
+        cookie_token = request.cookies.get("csrf_token") or request.cookies.get("XSRF-TOKEN")
+        header_token = request.headers.get("X-CSRF-Token") or request.headers.get("X-XSRF-TOKEN")
+        if (
+            not cookie_token
+            or not header_token
+            or len(cookie_token) < 16
+            or not hmac.compare_digest(cookie_token, header_token)
+        ):
+            audit_log("csrf_rejected", path=request.url.path, method=request.method)
+            return JSONResponse(status_code=403, content={"detail": "CSRF token missing or invalid"})
+    return await call_next(request)
 
 
 # Security headers middleware
@@ -1099,7 +1237,11 @@ async def production_guard_middleware(request: Request, call_next):
 
     # ── Large request body guard ──
     content_length = request.headers.get("content-length")
-    if content_length and int(content_length) > _MAX_REQUEST_BODY_BYTES:
+    try:
+        declared_length = int(content_length or "0")
+    except ValueError:
+        declared_length = 0
+    if declared_length and declared_length > _MAX_REQUEST_BODY_BYTES:
         _guard_logger.warning(
             "guard:large_request ip=%s path=%s bytes=%s",
             request.client.host if request.client else "?", path, content_length,
@@ -1554,7 +1696,7 @@ def _search_rate_ok(user_id: str) -> bool:
 
 
 # ── 9. Large allocation guard ────────────────────────────────────────────
-_MAX_REQUEST_BODY_BYTES = int(os.getenv("MAX_REQUEST_BODY_BYTES", str(1024 * 1024 * 1024)))  # 1 GB
+_MAX_REQUEST_BODY_BYTES = _get_max_request_body_bytes()
 _MAX_RESPONSE_BODY_BYTES = int(os.getenv("MAX_RESPONSE_BODY_BYTES", str(50 * 1024 * 1024)))  # 50 MB
 
 
@@ -1618,7 +1760,7 @@ def audit_log(event_type: str, **fields):
         payload = {
             "event_type": event_type,
             "timestamp": datetime.utcnow().isoformat() + "Z",
-            **fields,
+            **redact_mapping(fields),
         }
         audit_logger.info("%s", json.dumps(payload, ensure_ascii=False))
     except Exception:
@@ -1956,7 +2098,7 @@ def _compute_abuse_risk_score(
     if request.method not in ("GET", "POST", "OPTIONS"):
         score += 15
 
-    if content_length > 5_000_000:
+    if content_length > MAX_UPLOAD_BYTES:
         score += 25
 
     if fingerprint_count > ABUSE_BURST_SOFT_LIMIT:
@@ -2434,8 +2576,9 @@ def health_full():
 @app.get("/admin/status")
 def admin_status(request: Request):
     """Runtime control status overview. Requires admin token."""
-    if not _check_admin_token(request):
-        return JSONResponse({"error": "forbidden"}, status_code=403)
+    admin_error = _admin_access_error(request)
+    if admin_error:
+        return admin_error
     return {
         "app_ready": _app_ready,
         "kill_switch": _is_killed(),
@@ -2450,8 +2593,9 @@ def admin_status(request: Request):
 @app.get("/admin/flags")
 def admin_flags_get(request: Request):
     """Read live feature flags. Requires admin token."""
-    if not _check_admin_token(request):
-        return JSONResponse({"error": "forbidden"}, status_code=403)
+    admin_error = _admin_access_error(request)
+    if admin_error:
+        return admin_error
     with _live_flags_lock:
         return dict(_live_flags)
 
@@ -2459,8 +2603,9 @@ def admin_flags_get(request: Request):
 @app.post("/admin/flags")
 async def admin_flags_set(request: Request):
     """Update live feature flags. Body: {flag_name: bool}. Requires admin token."""
-    if not _check_admin_token(request):
-        return JSONResponse({"error": "forbidden"}, status_code=403)
+    admin_error = _admin_access_error(request)
+    if admin_error:
+        return admin_error
     body = await request.json()
     changed = {}
     with _live_flags_lock:
@@ -2475,8 +2620,9 @@ async def admin_flags_set(request: Request):
 @app.post("/admin/kill-switch")
 async def admin_kill_switch(request: Request):
     """Toggle kill switch. Body: {"enabled": bool}. Requires admin token."""
-    if not _check_admin_token(request):
-        return JSONResponse({"error": "forbidden"}, status_code=403)
+    admin_error = _admin_access_error(request)
+    if admin_error:
+        return admin_error
     body = await request.json()
     val = body.get("enabled")
     if not isinstance(val, bool):
@@ -2488,8 +2634,9 @@ async def admin_kill_switch(request: Request):
 @app.post("/admin/drain")
 async def admin_drain(request: Request):
     """Toggle drain mode. Body: {"enabled": bool}. Requires admin token."""
-    if not _check_admin_token(request):
-        return JSONResponse({"error": "forbidden"}, status_code=403)
+    admin_error = _admin_access_error(request)
+    if admin_error:
+        return admin_error
     body = await request.json()
     val = body.get("enabled")
     if not isinstance(val, bool):
@@ -2501,8 +2648,9 @@ async def admin_drain(request: Request):
 @app.post("/admin/panic/clear")
 def admin_panic_clear(request: Request):
     """Clear panic mode. Requires admin token."""
-    if not _check_admin_token(request):
-        return JSONResponse({"error": "forbidden"}, status_code=403)
+    admin_error = _admin_access_error(request)
+    if admin_error:
+        return admin_error
     _clear_panic()
     try:
         ADMIN_ACTIONS_TOTAL.labels(action="panic_clear").inc()
@@ -2514,8 +2662,9 @@ def admin_panic_clear(request: Request):
 @app.get("/admin/breakers")
 def admin_breakers_get(request: Request):
     """Read circuit breaker states. Requires admin token."""
-    if not _check_admin_token(request):
-        return JSONResponse({"error": "forbidden"}, status_code=403)
+    admin_error = _admin_access_error(request)
+    if admin_error:
+        return admin_error
     now = time.time()
     return {
         svc: {
@@ -2530,8 +2679,9 @@ def admin_breakers_get(request: Request):
 @app.post("/admin/breakers")
 async def admin_breakers_reset(request: Request):
     """Reset a circuit breaker. Body: {"service": "name"}. Requires admin token."""
-    if not _check_admin_token(request):
-        return JSONResponse({"error": "forbidden"}, status_code=403)
+    admin_error = _admin_access_error(request)
+    if admin_error:
+        return admin_error
     body = await request.json()
     svc = body.get("service", "")
     if svc not in _circuit_breaker_state:
@@ -2568,8 +2718,16 @@ def _ensure_new_tables():
     """Create new feature tables if they don't exist."""
     try:
         from sqlalchemy import inspect as sa_inspect
-        from database import Base as _Base
+        from database import Base as _Base, DATABASE_URL as _DATABASE_URL
         from models import UsageDaily, Favorite, JobTemplate, AnalysisShare, AnalysisNote, Reminder
+
+        if MOCK_SERVICES_ON and str(_DATABASE_URL or "").startswith("sqlite"):
+            _Base.metadata.create_all(engine)
+            logging.getLogger("app.startup").info(
+                "Mock sqlite schema ensured for all models"
+            )
+            return
+
         inspector = sa_inspect(engine)
         existing = set(inspector.get_table_names())
         tables_to_create = []
@@ -2706,10 +2864,53 @@ def validate_startup_config():
 
     # ── Required secrets in production ──
     if _ENV_MODE in ("production", "prod"):
+        _truthy = lambda name: os.getenv(name, "").strip().lower() in ("1", "true", "yes", "on")
+        _cors_lower = [origin.lower() for origin in _cors_origins]
+
         if not os.getenv("SUPABASE_JWT_SECRET") and not os.getenv("SUPABASE_JWT_SECRET_FILE"):
             fatals.append("SUPABASE_JWT_SECRET (or _FILE) is required in production")
         if not os.getenv("DATABASE_URL"):
             fatals.append("DATABASE_URL is required in production")
+        if MOCK_SERVICES_ON:
+            fatals.append("MOCK_SERVICES must be disabled in production")
+        if _truthy("DEV_ALLOW_SELF_PREMIUM"):
+            fatals.append("DEV_ALLOW_SELF_PREMIUM must be disabled in production")
+        if not _ADMIN_TOKEN or len(_ADMIN_TOKEN) < 32:
+            fatals.append("ADMIN_TOKEN is required in production and must be at least 32 characters")
+        if _ADMIN_TOKEN.lower() in ("changeme", "admin", "secret", "password"):
+            fatals.append("ADMIN_TOKEN uses a known unsafe default")
+        if not _ADMIN_IP_ALLOWLIST:
+            warnings.append("ADMIN_IP_ALLOWLIST not set; admin endpoints rely only on bearer token")
+        if _ADMIN_RATE_LIMIT_PER_MIN <= 0:
+            warnings.append("ADMIN_RATE_LIMIT_PER_MIN is disabled")
+        if not _CSRF_PROTECTION_ENABLED:
+            warnings.append("CSRF_PROTECTION_ENABLED is off; cookie-auth unsafe requests are not protected")
+        if not os.getenv("BILLING_ADMIN_TOKEN", "").strip():
+            warnings.append("BILLING_ADMIN_TOKEN not set (billing admin panel is disabled)")
+        if not _cors_origins:
+            fatals.append("CORS_ORIGINS must list the production frontend origin")
+        if "*" in _cors_origins:
+            fatals.append("CORS_ORIGINS cannot contain '*' in production")
+        if any("localhost" in origin or "127.0.0.1" in origin for origin in _cors_lower):
+            fatals.append("CORS_ORIGINS cannot include localhost/127.0.0.1 in production")
+        if os.getenv("STORAGE_BACKEND", "s3").strip().lower() == "local" and not _truthy("ALLOW_LOCAL_STORAGE_IN_PROD"):
+            fatals.append("STORAGE_BACKEND=local is not allowed in production without ALLOW_LOCAL_STORAGE_IN_PROD=1")
+
+        _sse_algorithm = os.getenv("S3_SSE_ALGORITHM", "AES256").strip()
+        if _sse_algorithm not in ("AES256", "aws:kms"):
+            fatals.append("S3_SSE_ALGORITHM must be AES256 or aws:kms")
+        if _sse_algorithm == "aws:kms" and not os.getenv("S3_KMS_KEY_ID", "").strip():
+            fatals.append("S3_KMS_KEY_ID is required when S3_SSE_ALGORITHM=aws:kms")
+        if _sse_algorithm != "aws:kms":
+            warnings.append("S3_SSE_ALGORITHM is not aws:kms; use KMS for production CV storage")
+        if not _truthy("CLAMAV_ENABLED"):
+            warnings.append("CLAMAV_ENABLED is off; uploaded files will not be malware-scanned")
+        if not os.getenv("BACKUP_S3_BUCKET", "").strip():
+            warnings.append("BACKUP_S3_BUCKET not set; offsite database backups are disabled")
+        if not os.getenv("BACKUP_ENCRYPTION_PASSPHRASE", "").strip():
+            warnings.append("BACKUP_ENCRYPTION_PASSPHRASE not set; local database backups will not be encrypted")
+        if os.getenv("BACKUP_S3_BUCKET", "").strip() and not os.getenv("BACKUP_S3_KMS_KEY_ID", "").strip():
+            warnings.append("BACKUP_S3_KMS_KEY_ID not set; backup uploads will use AES256 instead of KMS")
         # S3 is checked below via require_configured()
 
         # Billing / Stripe — required for payment processing in prod
@@ -2719,7 +2920,11 @@ def validate_startup_config():
             warnings.append("STRIPE_WEBHOOK_SECRET not set (webhook verification disabled)")
 
         # S3 explicit env check (budget sanity — require_configured() does detailed check below)
-        if not os.getenv("AWS_ACCESS_KEY_ID") and not os.getenv("AWS_ROLE_ARN"):
+        if (
+            not os.getenv("AWS_ACCESS_KEY_ID")
+            and not os.getenv("AWS_ROLE_ARN")
+            and not _truthy("AWS_USE_IAM_ROLE")
+        ):
             warnings.append("AWS credentials not configured (S3 storage will fail)")
         if not os.getenv("AWS_S3_BUCKET") and not os.getenv("S3_BUCKET"):
             warnings.append("S3 bucket name not set")
@@ -2824,21 +3029,24 @@ def validate_startup_config():
         _logger.warning("startup:config_warning %s", w)
 
     # Validate S3 bucket connectivity
-    try:
-        from config.aws import is_configured, require_configured, S3_BUCKET
-        require_configured()
-        if is_configured():
-            from services.storage_service import check_health
-            if check_health():
-                _logger.info("startup: S3 bucket '%s' OK", S3_BUCKET)
-            else:
-                _logger.warning("startup: S3 bucket '%s' unreachable", S3_BUCKET)
-    except RuntimeError as exc:
-        _logger.error("startup: S3 FATAL — %s", exc)
-        if _ENV_MODE in ("production", "prod"):
-            fatals.append(f"S3 configuration error: {exc}")
-    except Exception as exc:
-        _logger.warning("startup: S3 check skipped — %s", exc)
+    if MOCK_SERVICES_ON:
+        _logger.info("startup: S3 check skipped in MOCK_SERVICES mode")
+    else:
+        try:
+            from config.aws import is_configured, require_configured, S3_BUCKET
+            require_configured()
+            if is_configured():
+                from services.storage_service import check_health
+                if check_health():
+                    _logger.info("startup: S3 bucket '%s' OK", S3_BUCKET)
+                else:
+                    _logger.warning("startup: S3 bucket '%s' unreachable", S3_BUCKET)
+        except RuntimeError as exc:
+            _logger.error("startup: S3 FATAL — %s", exc)
+            if _ENV_MODE in ("production", "prod"):
+                fatals.append(f"S3 configuration error: {exc}")
+        except Exception as exc:
+            _logger.warning("startup: S3 check skipped — %s", exc)
 
     # ── Fatal check: stop server if required config is missing ──
     if fatals:
@@ -3309,6 +3517,7 @@ def cv_builder_preview_html(
 @app.post("/api/v1/cv-builder/generate")
 def cv_builder_generate(
     body: CVBuilderRequest,
+    response: Response,
     user=Depends(verify_supabase_jwt),
     db=Depends(get_db),
 ):
@@ -3319,6 +3528,7 @@ def cv_builder_generate(
     db_user = _resolve_request_user(db, user)
     plan = _resolve_effective_plan(db, db_user)
     font_family = body.font_family if _is_premium_plan(plan) else ""
+    _consume_billable_usage(db, db_user, "cv-builder-generate", response=response)
 
     try:
         result = build_cv(
@@ -3364,12 +3574,14 @@ def cv_builder_generate(
 @app.post("/api/v1/cv-builder/suggest-summary")
 def cv_builder_suggest_summary(
     body: CVSummarySuggestRequest,
+    response: Response,
     user=Depends(verify_supabase_jwt),
     db=Depends(get_db),
 ):
     _ensure_not_expired(user)
     db_user = _resolve_request_user(db, user)
     plan = _ensure_ai_rewrite_allowed(db, db_user)
+    _consume_billable_usage(db, db_user, "cv-builder-suggest-summary", response=response)
 
     count = max(1, min(int(body.count or 3), 5))
     try:
@@ -3442,6 +3654,18 @@ def get_or_create_user(db, supabase_id: str, email: str):
             pass
 
     return user
+
+
+def _get_owned_analysis_or_404(db, analysis_id: int, db_user: User) -> Analysis:
+    """Return an analysis only when it belongs to the authenticated user."""
+    analysis = (
+        db.query(Analysis)
+        .filter(Analysis.id == analysis_id, Analysis.user_id == db_user.id)
+        .first()
+    )
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return analysis
 
 
 def _record_usage_daily(db, user_id: int):
@@ -3639,6 +3863,85 @@ def _consume_daily_quota(user_id: str, limit: int = REDIS_FREE_DAILY_LIMIT):
             "allowed": used <= limit,
             "source": "memory",
         }
+
+
+# ── Billable usage ───────────────────────────────────────────────────────
+def _apply_daily_quota_headers(response: Response | None, quota: dict | None) -> None:
+    if response is None or quota is None:
+        return
+    try:
+        response.headers["X-Daily-Limit"] = str(quota["limit"])
+        response.headers["X-Daily-Used"] = str(quota["used"])
+        response.headers["X-Daily-Remaining"] = str(quota["remaining"])
+    except Exception:
+        pass
+
+
+def _consume_billable_usage(
+    db,
+    db_user: User | None,
+    endpoint: str,
+    response: Response | None = None,
+):
+    """Consume one dashboard-visible daily usage unit for billable actions."""
+    if db_user is None:
+        return None
+
+    plan_type = _resolve_effective_plan(db, db_user)
+    if _normalize_plan(plan_type) == "admin" or _is_admin_user(db_user):
+        return None
+
+    quota_today = _quota_today_date()
+    now_utc = datetime.utcnow()
+    try:
+        if db_user.last_reset is None or db_user.last_reset.date() < quota_today:
+            db_user.daily_usage = 0
+            db_user.last_reset = now_utc
+        if db_user.updated_at is None or (db_user.updated_at.year, db_user.updated_at.month) != (quota_today.year, quota_today.month):
+            db_user.monthly_usage = 0
+            db_user.updated_at = now_utc
+    except Exception:
+        pass
+
+    daily_limit = _resolve_daily_limit_for_plan(plan_type)
+    monthly_limit = USER_PLAN_LIMITS_MONTHLY.get(
+        _normalize_plan(plan_type), USER_PLAN_LIMITS_MONTHLY["free"]
+    )
+
+    quota = _consume_daily_quota(db_user.supabase_id or str(db_user.id), limit=daily_limit)
+    _apply_daily_quota_headers(response, quota)
+    if quota is not None:
+        if not quota["allowed"]:
+            _metric_quota_hit(endpoint, "user_daily")
+            raise HTTPException(
+                status_code=403,
+                detail=f"Daily limit reached ({quota['limit']}/day)",
+            )
+    elif (db_user.daily_usage or 0) >= daily_limit:
+        _metric_quota_hit(endpoint, "user_daily")
+        raise HTTPException(status_code=403, detail="Daily limit reached")
+
+    if (db_user.monthly_usage or 0) >= monthly_limit:
+        _metric_quota_hit(endpoint, "user_monthly")
+        raise HTTPException(status_code=403, detail="Monthly limit reached")
+
+    try:
+        db_user.daily_usage = (db_user.daily_usage or 0) + 1
+        db_user.monthly_usage = (db_user.monthly_usage or 0) + 1
+        db.add(db_user)
+        db.commit()
+    except Exception:
+        db.rollback()
+        _metric_error(endpoint, "usage")
+        raise
+
+    try:
+        _record_usage_daily(db, db_user.id)
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    return quota
 
 
 # ── Disk safety ──────────────────────────────────────────────────────────
@@ -4142,6 +4445,7 @@ def build_features(
     return features
 
 
+ANALYSIS_SCORE_VERSION = os.getenv("ANALYSIS_SCORE_VERSION", "v3-jd-quality")
 ANALYSIS_CACHE_TTL = int(os.getenv("ANALYSIS_CACHE_TTL", "86400"))
 _analysis_mem_cache: dict[str, tuple[float, dict]] = {}
 
@@ -4217,6 +4521,15 @@ def _extract_pdf_text(contents: bytes) -> tuple[str, bool]:
 
     Returns (text, truncated) where truncated is True if content was capped.
     """
+    from services.pdf_text_extractor import extract_pdf_text
+
+    return extract_pdf_text(
+        contents,
+        max_pages=_MAX_PDF_PAGES,
+        max_chars=_MAX_PDF_EXTRACTED_CHARS,
+        ocr_extract_text=_ocr_extract_text,
+    )
+
     from renderers.blocks import fix_decomposed_diacritics
 
     # ── Primary: pdfplumber with coordinate-based column detection ──
@@ -4452,8 +4765,8 @@ def _extract_pdf_text(contents: bytes) -> tuple[str, bool]:
 
 
 # ── PDF safety constants ──
-_MAX_PDF_PAGES = 50
-_MAX_PDF_OBJECTS = 5_000
+_MAX_PDF_PAGES = MAX_PDF_PAGES
+_MAX_PDF_OBJECTS = MAX_PDF_OBJECTS
 _MAX_PDF_EXTRACTED_CHARS = 100_000
 
 
@@ -4464,8 +4777,11 @@ def _validate_pdf_upload(contents: bytes, content_type: str | None) -> None:
         raise HTTPException(status_code=400, detail="Empty file")
     if content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
-    if len(contents) > 5_000_000:
-        raise HTTPException(status_code=400, detail="File too large (max 5MB)")
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large (max {_format_bytes(MAX_UPLOAD_BYTES)})",
+        )
     if not contents.startswith(b"%PDF-"):
         raise HTTPException(status_code=400, detail="Invalid PDF file")
 
@@ -4508,7 +4824,10 @@ async def _resolve_job_description_text(
     if jd_file is None:
         raise HTTPException(status_code=400, detail="Job description is required")
 
-    contents = await jd_file.read()
+    try:
+        contents = await read_upload_limited(jd_file, max_bytes=1_000_000)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Job description file too large")
     if len(contents) > 1_000_000:
         raise HTTPException(status_code=400, detail="Job description file too large")
 
@@ -4648,6 +4967,59 @@ def _seniority_match_score(cv_text: str, job_description: str) -> float:
     return 35.0
 
 
+def _assess_job_description_quality(job_description: str, jd_skills: list | None = None) -> dict:
+    text = str(job_description or "").strip()
+    if not text:
+        return {"status": "missing", "valid": False, "reason": "empty", "word_count": 0}
+
+    tokens = re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿÇĞİÖŞÜçğıöşü0-9+#.]{2,}", text)
+    alpha_tokens = [tok for tok in tokens if re.search(r"[A-Za-zÀ-ÖØ-öø-ÿÇĞİÖŞÜçğıöşü]", tok)]
+    word_count = len(tokens)
+    lower = text.lower()
+    has_skill = bool(jd_skills)
+    role_terms = {
+        "developer", "engineer", "analyst", "manager", "designer", "intern", "specialist",
+        "consultant", "assistant", "coordinator", "architect", "technician", "administrator",
+        "backend", "frontend", "fullstack", "full-stack", "software", "data", "devops",
+        "qa", "tester", "sales", "marketing", "teacher", "nurse", "accountant", "product",
+        "recruiter", "junior", "senior", "lead", "mühendis", "muhendis", "geliştirici",
+        "gelistirici", "uzman", "stajyer", "analist", "tasarımcı", "tasarimci", "yönetici",
+        "yonetici", "öğretmen", "ogretmen", "hemşire", "hemsire", "satış", "satis",
+    }
+    has_role = any(re.search(rf"\b{re.escape(term)}\b", lower) for term in role_terms)
+    vowel_re = re.compile(r"[aeiouıöüAEIOUİÖÜ]")
+    meaningful_alpha = [
+        tok for tok in alpha_tokens
+        if vowel_re.search(tok) or tok.lower() in {"qa", "hr", "ui", "ux", "c++", "c#"}
+    ]
+
+    if not has_skill and not has_role:
+        if word_count < 4:
+            return {
+                "status": "invalid",
+                "valid": False,
+                "reason": "too_short_without_role_or_skill",
+                "word_count": word_count,
+            }
+        if alpha_tokens and not meaningful_alpha:
+            return {
+                "status": "invalid",
+                "valid": False,
+                "reason": "gibberish_like_text",
+                "word_count": word_count,
+            }
+
+    if word_count < 15:
+        return {
+            "status": "weak",
+            "valid": True,
+            "reason": "too_short_for_reliable_matching",
+            "word_count": word_count,
+        }
+
+    return {"status": "ok", "valid": True, "reason": "ok", "word_count": word_count}
+
+
 def _build_match_score_v2(result: dict, keyword_gap_v2: dict) -> dict:
     keyword_coverage = float(keyword_gap_v2.get("keyword_coverage_pct", 0.0) or 0.0)
     experience_match = float(result.get("experience_score", 0.0) or 0.0)
@@ -4725,7 +5097,7 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
         cv_hash = _stable_hash(cv_text)
         job_hash = _stable_hash(job_description)
         # Cache is language-aware to avoid returning English content on non-English UI.
-        cache_key = f"analysis:v2:{detected_lang}:{cv_hash}:{job_hash}"
+        cache_key = f"analysis:{ANALYSIS_SCORE_VERSION}:{detected_lang}:{cv_hash}:{job_hash}"
     except Exception:
         cache_key = None
 
@@ -4821,6 +5193,7 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
     jd_skill_data = extract_skills(job_description)
     jd_skills = sorted(jd_skill_data.get("found", set()))
     jd_skill_set = {str(s).strip().lower() for s in jd_skills if str(s).strip()}
+    jd_quality = _assess_job_description_quality(job_description, jd_skills)
     extra_skills = sorted([skill for skill in detected_skills if skill.lower() not in jd_skill_set])[:25]
 
     title_match = _title_match_score(cv_text, job_description)
@@ -4881,7 +5254,8 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
     # since keyword/skill/semantic scores are meaningless without a JD target.
     from services.ats_service import compute_final_score
     breakdown = None
-    if not job_description or not job_description.strip():
+    _has_jd = bool(job_description and job_description.strip())
+    if not _has_jd:
         final_score = round(float(ats_score), 2)
     else:
         # Request a debug breakdown from compute_final_score so we can
@@ -4966,6 +5340,29 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
                 "Embeddings unavailable; semantic signals disabled for this analysis."
             )
 
+    if _has_jd and jd_quality.get("status") == "invalid":
+        final_score = 0.0
+        confidence = min(float(confidence or 0.0), 30.0)
+        risk_level = localize_risk_level("High Risk", detected_lang)
+        warnings.append(
+            "Job description appears invalid or meaningless; match score is disabled until a real job description is provided."
+        )
+        if isinstance(breakdown, dict):
+            breakdown["jd_quality_override"] = "invalid"
+            breakdown["final"] = 0.0
+    elif _has_jd and jd_quality.get("status") == "weak":
+        weak_cap = float(os.getenv("WEAK_JD_MATCH_CAP", "45") or "45")
+        if final_score > weak_cap:
+            final_score = round(weak_cap, 2)
+            warnings.append(
+                "Job description is too short for reliable matching; match score was capped. Add responsibilities, required skills, seniority, and role context."
+            )
+            if isinstance(breakdown, dict):
+                breakdown["jd_quality_override"] = "weak_cap"
+                breakdown["final"] = final_score
+
+    interpretation = interpret_score_localized(final_score, detected_lang)
+
     # ATS config-based composite score
     ats_weights = get_ats_weights()
     score_breakdown = {
@@ -4985,7 +5382,6 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
     # Separate "CV quality" (structural) from "job match" (relevance).
     # This prevents misleading UX where a chef's CV scores 71 against a dev JD
     # because the CV is well-structured, even though relevance is near zero.
-    _has_jd = bool(job_description and job_description.strip())
     if _has_jd:
         # Job match: keyword + skill + semantic + seniority (content relevance)
         _job_match = round(min(100.0, max(0.0,
@@ -5003,6 +5399,9 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
             _decomp_text = "Partial match — some skills align"
         else:
             _decomp_text = "CV is well-structured but not aligned with this role"
+        if jd_quality.get("status") == "invalid":
+            _job_match = 0.0
+            _decomp_text = "Job description is invalid - enter a real role description to calculate match"
     else:
         _job_match = 0.0
         _ats_quality = round(min(100.0, max(0.0, float(ats_score))), 2)
@@ -5057,10 +5456,12 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
         "embedding_available": not embedding_failed,
         "score_decomposition": score_decomposition,
         "ml_calibration": ml_calibration,
+        "job_description_quality": jd_quality,
+        "score_version": ANALYSIS_SCORE_VERSION,
     }
 
     # ── Score Suggestions (actionable improvement tips) ────────────
-    if _has_jd:
+    if _has_jd and jd_quality.get("status") != "invalid":
         from services.ats_service import generate_score_suggestions
         result["score_suggestions"] = generate_score_suggestions(
             missing_skills=missing_skills,
@@ -5093,6 +5494,16 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
         result["warnings"] = warnings
 
     result["match_score_v2"] = _build_match_score_v2(result, keyword_gap_v2)
+    if _has_jd and jd_quality.get("status") == "invalid":
+        result["match_score_v2"]["match_score"] = 0.0
+        result["match_score_v2"]["weak_signals"] = list(result["match_score_v2"].get("weak_signals") or []) + [
+            "Invalid job description"
+        ]
+    elif _has_jd and jd_quality.get("status") == "weak":
+        result["match_score_v2"]["match_score"] = min(
+            float(result["match_score_v2"].get("match_score") or 0.0),
+            float(final_score),
+        )
 
     # Store analysis result in Redis cache for subsequent identical requests.
     if cache_key:
@@ -5269,6 +5680,17 @@ def analyze(
                 raise HTTPException(
                     status_code=403, detail="Organization monthly limit reached"
                 )
+        redis_quota = _consume_daily_quota(
+            db_user.supabase_id or str(db_user.id),
+            limit=_resolve_daily_limit_for_plan(_resolve_effective_plan(db, db_user)),
+        )
+        _apply_daily_quota_headers(response, redis_quota)
+        if redis_quota is not None and not redis_quota["allowed"]:
+            _metric_quota_hit("analyze", "user_daily")
+            raise HTTPException(
+                status_code=403,
+                detail=f"Daily limit reached ({redis_quota['limit']}/day)",
+            )
     elif not _is_admin_user(db_user):
         # individual user quota using plan mapping
         user_daily_limit = USER_PLAN_LIMITS_DAILY.get(
@@ -5347,6 +5769,9 @@ def analyze(
             "skill_score": result.get("skill_score"),
             "experience_score": result.get("experience_score"),
             "ats_score": result.get("ats_score"),
+            "job_description_quality": result.get("job_description_quality"),
+            "warnings": result.get("warnings", []),
+            "score_version": result.get("score_version"),
             "missing_skills": result.get("missing_skills", []),
             "recommendations": result.get("recommendations", []),
         },
@@ -5667,22 +6092,8 @@ async def analyze_pdf(
                         detail=f"Daily limit reached ({redis_quota['limit']}/day)",
                     )
 
-        contents = await file.read()
-        if file.content_type != "application/pdf":
-            raise HTTPException(status_code=400, detail="Only PDF files are allowed")
-        if len(contents) > 5_000_000:
-            raise HTTPException(status_code=400, detail="File too large (max 5MB)")
-        if not contents.startswith(b"%PDF-"):
-            raise HTTPException(status_code=400, detail="Invalid PDF file")
-        # Optional virus scan in mock mode as well, when enabled
-        try:
-            _scan_upload_for_viruses(contents)
-        except HTTPException:
-            raise
-        except Exception:
-            # Fail closed on scanner errors when explicitly enabled
-            if os.getenv("CLAMAV_ENABLED", "0").lower() in ("1", "true", "yes"):
-                raise HTTPException(status_code=500, detail="Virus scanner error")
+        contents = await _read_upload_or_400(file)
+        _validate_pdf_upload(contents, file.content_type)
         try:
             text, _pdf_truncated = _extract_pdf_text(contents)
         except HTTPException:
@@ -5706,7 +6117,7 @@ async def analyze_pdf(
             mode="safe",
         )
         normalized_text = autofix.get("optimized_cv_text") or text
-        payload = structured_text_to_builder_payload(
+        payload = autofix.get("builder_payload") or structured_text_to_builder_payload(
             normalized_text,
             job_description=job_description,
             lang=lang,
@@ -5798,6 +6209,17 @@ async def analyze_pdf(
             raise HTTPException(
                 status_code=429, detail="Organization monthly limit reached"
             )
+        redis_quota = _consume_daily_quota(
+            db_user.supabase_id or str(db_user.id),
+            limit=_resolve_daily_limit_for_plan(_resolve_effective_plan(db, db_user)),
+        )
+        _apply_daily_quota_headers(response, redis_quota)
+        if redis_quota is not None and not redis_quota["allowed"]:
+            _metric_quota_hit("analyze-pdf", "user_daily")
+            raise HTTPException(
+                status_code=403,
+                detail=f"Daily limit reached ({redis_quota['limit']}/day)",
+            )
         # usage increment BEFORE parse
         if org:
             org.daily_usage = (org.daily_usage or 0) + 1
@@ -5842,21 +6264,8 @@ async def analyze_pdf(
         db.commit()
 
     # Only after quota check and increment, read and parse file
-    contents = await file.read()
-    if file.content_type != "application/pdf":
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
-    if len(contents) > 5_000_000:
-        raise HTTPException(status_code=400, detail="File too large (max 5MB)")
-    if not contents.startswith(b"%PDF-"):
-        raise HTTPException(status_code=400, detail="Invalid PDF file")
-    # Optional virus scan for uploaded PDFs
-    try:
-        _scan_upload_for_viruses(contents)
-    except HTTPException:
-        raise
-    except Exception:
-        if os.getenv("CLAMAV_ENABLED", "0").lower() in ("1", "true", "yes"):
-            raise HTTPException(status_code=500, detail="Virus scanner error")
+    contents = await _read_upload_or_400(file)
+    _validate_pdf_upload(contents, file.content_type)
     try:
         import PyPDF2
 
@@ -5913,6 +6322,9 @@ async def analyze_pdf(
                         "skill_score": result.get("skill_score"),
                         "experience_score": result.get("experience_score"),
                         "ats_score": result.get("ats_score"),
+                        "job_description_quality": result.get("job_description_quality"),
+                        "warnings": result.get("warnings", []),
+                        "score_version": result.get("score_version"),
                         "missing_skills": result.get("missing_skills", []),
                         "recommendations": result.get("recommendations", []),
                     },
@@ -6331,7 +6743,11 @@ def list_favorites(
     analysis_ids = [f.analysis_id for f in favs]
     analyses = {}
     if analysis_ids:
-        records = db.query(Analysis).filter(Analysis.id.in_(analysis_ids)).all()
+        records = (
+            db.query(Analysis)
+            .filter(Analysis.id.in_(analysis_ids), Analysis.user_id == db_user.id)
+            .all()
+        )
         analyses = {a.id: a for a in records}
 
     return {
@@ -6365,6 +6781,7 @@ def toggle_favorite(
     supabase_id = user.get("user_id")
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
+    _get_owned_analysis_or_404(db, body.analysis_id, db_user)
 
     # Check plan limit for free users
     if db_user.plan_type == "free":
@@ -6548,6 +6965,7 @@ def create_share_link(
             status_code=403,
             detail="Sharing is a Pro feature. Upgrade to share analyses.",
         )
+    _get_owned_analysis_or_404(db, body.analysis_id, db_user)
 
     # Check if share already exists
     existing = (
@@ -6613,7 +7031,11 @@ def view_shared_analysis(
     if not share:
         raise HTTPException(status_code=404, detail="Share link not found or expired")
 
-    analysis = db.query(Analysis).filter(Analysis.id == share.analysis_id).first()
+    analysis = (
+        db.query(Analysis)
+        .filter(Analysis.id == share.analysis_id, Analysis.user_id == share.user_id)
+        .first()
+    )
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
 
@@ -6710,6 +7132,7 @@ def save_analysis_note(
 
     if not body.content.strip():
         raise HTTPException(status_code=400, detail="Note content required")
+    _get_owned_analysis_or_404(db, body.analysis_id, db_user)
 
     existing = (
         db.query(AnalysisNote)
@@ -6744,6 +7167,7 @@ def get_analysis_note(
     supabase_id = user.get("user_id")
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
+    _get_owned_analysis_or_404(db, analysis_id, db_user)
 
     note = (
         db.query(AnalysisNote)
@@ -6771,6 +7195,7 @@ def delete_analysis_note(
     supabase_id = user.get("user_id")
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
+    _get_owned_analysis_or_404(db, analysis_id, db_user)
 
     note = (
         db.query(AnalysisNote)
@@ -7180,6 +7605,512 @@ def get_me(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
     }
 
 
+class UserReminderCreateRequest(BaseModel):
+    title: str
+    description: str | None = None
+    reminder_type: str = "interview"
+    event_date: datetime
+    target_email: str | None = None
+    is_active: bool = True
+
+
+class UserReminderUpdateRequest(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    reminder_type: str | None = None
+    event_date: datetime | None = None
+    target_email: str | None = None
+    is_active: bool | None = None
+
+
+def _get_current_db_user(user, db) -> User:
+    _ensure_not_expired(user)
+    if MOCK_SERVICES_ON:
+        mock_user_id = (user or {}).get("user_id") if isinstance(user, dict) else None
+        mock_email = (user or {}).get("email") if isinstance(user, dict) else None
+        return get_or_create_user(
+            db,
+            str(mock_user_id or "mock-user"),
+            mock_email or "dev@example.com",
+        )
+    return get_or_create_user(db, user.get("user_id"), user.get("email"))
+
+
+def _storage_key_fingerprint(key: str | None) -> str | None:
+    if not key:
+        return None
+    return hashlib.sha256(str(key).encode("utf-8")).hexdigest()[:16]
+
+
+def _delete_cv_version_files(row: CVVersion, supabase_id: str) -> tuple[int, list[dict]]:
+    """Delete S3/local objects referenced by one CVVersion row."""
+    from services.storage_service import delete_cv
+
+    deleted = 0
+    errors: list[dict] = []
+    seen: set[str] = set()
+    for key in (row.original_s3_key, row.optimized_s3_key):
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        try:
+            delete_cv(key, supabase_id)
+            deleted += 1
+        except Exception as exc:
+            errors.append(
+                {
+                    "version_id": row.id,
+                    "key_hash": _storage_key_fingerprint(key),
+                    "error": exc.__class__.__name__,
+                }
+            )
+    return deleted, errors
+
+
+def _delete_cv_versions_for_user(db, db_user: User, rows: list[CVVersion]) -> dict:
+    deleted_files = 0
+    file_errors: list[dict] = []
+    deletable_ids: list[int] = []
+
+    for row in rows:
+        files, errors = _delete_cv_version_files(row, db_user.supabase_id)
+        deleted_files += files
+        if errors:
+            file_errors.extend(errors)
+            continue
+        deletable_ids.append(int(row.id))
+
+    if deletable_ids:
+        db.query(CVVersion).filter(
+            CVVersion.user_id == db_user.id,
+            CVVersion.id.in_(deletable_ids),
+        ).delete(synchronize_session=False)
+
+    return {
+        "deleted_cv_versions": len(deletable_ids),
+        "deleted_files": deleted_files,
+        "file_errors": file_errors,
+        "blocked_cv_versions": len(rows) - len(deletable_ids),
+    }
+
+
+def _delete_analysis_records_for_user(db, user_id: int) -> dict:
+    from models import AnalysisNote, AnalysisShare, Favorite
+
+    analysis_ids = [
+        row[0]
+        for row in db.query(Analysis.id)
+        .filter(Analysis.user_id == user_id)
+        .all()
+    ]
+    if not analysis_ids:
+        return {
+            "deleted_analyses": 0,
+            "deleted_favorites": 0,
+            "deleted_shares": 0,
+            "deleted_notes": 0,
+        }
+
+    deleted_notes = db.query(AnalysisNote).filter(
+        AnalysisNote.user_id == user_id,
+        AnalysisNote.analysis_id.in_(analysis_ids),
+    ).delete(synchronize_session=False)
+    deleted_shares = db.query(AnalysisShare).filter(
+        AnalysisShare.user_id == user_id,
+        AnalysisShare.analysis_id.in_(analysis_ids),
+    ).delete(synchronize_session=False)
+    deleted_favorites = db.query(Favorite).filter(
+        Favorite.user_id == user_id,
+        Favorite.analysis_id.in_(analysis_ids),
+    ).delete(synchronize_session=False)
+    deleted_analyses = db.query(Analysis).filter(
+        Analysis.user_id == user_id,
+        Analysis.id.in_(analysis_ids),
+    ).delete(synchronize_session=False)
+
+    return {
+        "deleted_analyses": int(deleted_analyses or 0),
+        "deleted_favorites": int(deleted_favorites or 0),
+        "deleted_shares": int(deleted_shares or 0),
+        "deleted_notes": int(deleted_notes or 0),
+    }
+
+
+@app.get("/api/v1/me/data-summary")
+def get_my_data_summary(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
+    """Return a privacy-oriented summary of data held for the current user."""
+    from models import (
+        AnalysisNote,
+        AnalysisShare,
+        CandidateAction,
+        Favorite,
+        JobTemplate,
+        UsageDaily,
+    )
+
+    db_user = _get_current_db_user(user, db)
+    cv_rows = db.query(CVVersion).filter(CVVersion.user_id == db_user.id).all()
+    stored_files = sum(
+        1
+        for row in cv_rows
+        for key in (row.original_s3_key, row.optimized_s3_key)
+        if key
+    )
+
+    return {
+        "user_id": db_user.id,
+        "email": db_user.email,
+        "cv_versions": len(cv_rows),
+        "stored_cv_files": stored_files,
+        "analyses": db.query(Analysis).filter(Analysis.user_id == db_user.id).count(),
+        "favorites": db.query(Favorite).filter(Favorite.user_id == db_user.id).count(),
+        "analysis_shares": db.query(AnalysisShare).filter(AnalysisShare.user_id == db_user.id).count(),
+        "analysis_notes": db.query(AnalysisNote).filter(AnalysisNote.user_id == db_user.id).count(),
+        "job_templates": db.query(JobTemplate).filter(JobTemplate.user_id == db_user.id).count(),
+        "usage_days": db.query(UsageDaily).filter(UsageDaily.user_id == db_user.id).count(),
+        "reminders": db.query(Reminder).filter(Reminder.created_by == db_user.id).count(),
+        "candidate_actions": db.query(CandidateAction).filter(CandidateAction.recruiter_id == db_user.id).count(),
+    }
+
+
+@app.delete("/api/v1/me/data")
+def delete_my_data(
+    scope: str = Query("stored_cvs", pattern="^(stored_cvs|analyses|workspace|all)$"),
+    confirm: str = Query(..., min_length=6, max_length=6),
+    user=Depends(verify_supabase_jwt),
+    db=Depends(get_db),
+):
+    """Delete selected privacy-sensitive data for the current user."""
+    from models import CandidateAction, JobTemplate, UsageDaily
+
+    if confirm != "DELETE":
+        raise HTTPException(status_code=400, detail="confirm=DELETE is required")
+
+    db_user = _get_current_db_user(user, db)
+    summary: dict[str, object] = {"scope": scope}
+
+    try:
+        if scope in ("stored_cvs", "all"):
+            rows = db.query(CVVersion).filter(CVVersion.user_id == db_user.id).all()
+            summary.update(_delete_cv_versions_for_user(db, db_user, rows))
+
+        if scope in ("analyses", "all"):
+            summary.update(_delete_analysis_records_for_user(db, db_user.id))
+
+        if scope in ("workspace", "all"):
+            deleted_templates = db.query(JobTemplate).filter(
+                JobTemplate.user_id == db_user.id
+            ).delete(synchronize_session=False)
+            deleted_usage_days = db.query(UsageDaily).filter(
+                UsageDaily.user_id == db_user.id
+            ).delete(synchronize_session=False)
+            deleted_reminders = db.query(Reminder).filter(
+                Reminder.created_by == db_user.id
+            ).delete(synchronize_session=False)
+            deleted_candidate_actions = db.query(CandidateAction).filter(
+                CandidateAction.recruiter_id == db_user.id
+            ).delete(synchronize_session=False)
+            summary.update(
+                {
+                    "deleted_job_templates": int(deleted_templates or 0),
+                    "deleted_usage_days": int(deleted_usage_days or 0),
+                    "deleted_reminders": int(deleted_reminders or 0),
+                    "deleted_candidate_actions": int(deleted_candidate_actions or 0),
+                }
+            )
+
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        logger.exception("privacy:data_delete_failed user=%s scope=%s", db_user.id, scope)
+        raise HTTPException(status_code=500, detail="Data deletion failed")
+
+    try:
+        audit_payload = dict(summary)
+        audit_payload.pop("scope", None)
+        audit_log("privacy_data_delete", user_id=db_user.id, scope=scope, **audit_payload)
+    except Exception:
+        pass
+
+    return {"deleted": True, **summary}
+
+
+def _purge_expired_cv_versions(db, days: int, limit: int, dry_run: bool = True) -> dict:
+    days = max(1, min(int(days), 3650))
+    limit = max(1, min(int(limit), 1000))
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    rows = (
+        db.query(CVVersion)
+        .filter(CVVersion.created_at < cutoff)
+        .order_by(CVVersion.created_at.asc())
+        .limit(limit)
+        .all()
+    )
+    if dry_run:
+        file_count = sum(
+            1
+            for row in rows
+            for key in (row.original_s3_key, row.optimized_s3_key)
+            if key
+        )
+        return {
+            "dry_run": True,
+            "retention_days": days,
+            "eligible_cv_versions": len(rows),
+            "eligible_files": file_count,
+        }
+
+    deleted_rows = 0
+    deleted_files = 0
+    file_errors: list[dict] = []
+    for row in rows:
+        owner = db.query(User).filter(User.id == row.user_id).first()
+        if not owner:
+            continue
+        files, errors = _delete_cv_version_files(row, owner.supabase_id)
+        deleted_files += files
+        if errors:
+            file_errors.extend(errors)
+            continue
+        db.delete(row)
+        deleted_rows += 1
+
+    return {
+        "dry_run": False,
+        "retention_days": days,
+        "deleted_cv_versions": deleted_rows,
+        "deleted_files": deleted_files,
+        "file_errors": file_errors,
+    }
+
+
+@app.post("/api/v1/admin/storage/retention/run")
+def run_storage_retention(
+    request: Request,
+    days: int = Query(default=int(os.getenv("CV_RETENTION_DAYS", "90")), ge=1, le=3650),
+    limit: int = Query(default=int(os.getenv("CV_RETENTION_BATCH_LIMIT", "200")), ge=1, le=1000),
+    dry_run: bool = Query(default=True),
+    confirm: str = Query("", max_length=6),
+    db=Depends(get_db),
+):
+    """Admin-only cleanup for expired stored CV versions and their files."""
+    admin_error = _admin_access_error(request)
+    if admin_error:
+        detail = "Rate limited" if admin_error.status_code == 429 else "Forbidden"
+        raise HTTPException(status_code=admin_error.status_code, detail=detail)
+    if not dry_run and confirm != "DELETE":
+        raise HTTPException(status_code=400, detail="confirm=DELETE is required for deletion")
+
+    try:
+        result = _purge_expired_cv_versions(db, days=days, limit=limit, dry_run=dry_run)
+        if not dry_run:
+            db.commit()
+        audit_log("storage_retention_run", **result)
+        return result
+    except Exception:
+        db.rollback()
+        logger.exception("storage_retention_failed")
+        raise HTTPException(status_code=500, detail="Storage retention failed")
+
+
+def _normalize_reminder_datetime(value: datetime) -> datetime:
+    if value.tzinfo is not None:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
+
+
+def _ensure_reminder_organization(db, db_user: User) -> int:
+    if db_user.organization_id:
+        return int(db_user.organization_id)
+
+    domain = f"personal-user-{db_user.id}.cvanalyzer.local"
+    org = db.query(Organization).filter(Organization.domain == domain).first()
+    if org:
+        return int(org.id)
+
+    org = Organization(
+        name=f"{(db_user.email or 'User').split('@')[0]} Personal Workspace",
+        domain=domain,
+        plan_type="free",
+        billing_status="trialing",
+    )
+    try:
+        db.add(org)
+        db.commit()
+        db.refresh(org)
+        return int(org.id)
+    except Exception:
+        db.rollback()
+        org = db.query(Organization).filter(Organization.domain == domain).first()
+        if org:
+            return int(org.id)
+        raise
+
+
+def _reminder_type_label(value: str) -> str:
+    labels = {
+        "interview": "Mülakat",
+        "offer": "Teklif",
+        "deadline": "Son tarih",
+        "follow_up": "Takip",
+        "other": "Hatırlatma",
+    }
+    return labels.get(str(value or "").strip().lower(), "Hatırlatma")
+
+
+def _serialize_reminder(reminder: Reminder) -> dict:
+    now = datetime.utcnow()
+    delta = reminder.event_date - now if reminder.event_date else timedelta()
+    hours_left = max(0, int(delta.total_seconds() // 3600))
+    days_left = max(0, int((delta.total_seconds() + 86399) // 86400))
+    return {
+        "id": reminder.id,
+        "title": reminder.title,
+        "description": reminder.description,
+        "reminder_type": reminder.reminder_type,
+        "reminder_type_label": _reminder_type_label(reminder.reminder_type),
+        "event_date": reminder.event_date.isoformat() + "Z" if reminder.event_date else None,
+        "target_email": reminder.target_email,
+        "is_active": reminder.is_active,
+        "notified_3d_at": reminder.notified_3d_at.isoformat() + "Z" if reminder.notified_3d_at else None,
+        "notified_1d_at": reminder.notified_1d_at.isoformat() + "Z" if reminder.notified_1d_at else None,
+        "days_left": days_left,
+        "hours_left": hours_left,
+        "created_at": reminder.created_at.isoformat() + "Z" if reminder.created_at else None,
+        "updated_at": reminder.updated_at.isoformat() + "Z" if reminder.updated_at else None,
+    }
+
+
+def _get_user_reminder_or_404(db, db_user: User, reminder_id: int) -> Reminder:
+    reminder = (
+        db.query(Reminder)
+        .filter(Reminder.id == reminder_id, Reminder.created_by == db_user.id)
+        .first()
+    )
+    if not reminder:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    return reminder
+
+
+@app.get("/api/v1/reminders")
+def list_user_reminders(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
+    db_user = _get_current_db_user(user, db)
+    reminders = (
+        db.query(Reminder)
+        .filter(Reminder.created_by == db_user.id)
+        .order_by(Reminder.event_date.asc())
+        .all()
+    )
+    return {"reminders": [_serialize_reminder(r) for r in reminders], "total": len(reminders)}
+
+
+@app.post("/api/v1/reminders")
+def create_user_reminder(
+    body: UserReminderCreateRequest,
+    user=Depends(verify_supabase_jwt),
+    db=Depends(get_db),
+):
+    db_user = _get_current_db_user(user, db)
+    title = (body.title or "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="Title is required")
+    if len(title) > 500:
+        raise HTTPException(status_code=400, detail="Title too long")
+
+    event_date = _normalize_reminder_datetime(body.event_date)
+    if event_date <= datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Event date must be in the future")
+
+    target_email = _validate_reminder_email(body.target_email or db_user.email or "")
+    org_id = _ensure_reminder_organization(db, db_user)
+
+    reminder = Reminder(
+        organization_id=org_id,
+        created_by=db_user.id,
+        title=title,
+        description=(body.description or "").strip()[:1000],
+        reminder_type=(body.reminder_type or "interview").strip()[:40],
+        target_email=target_email,
+        event_date=event_date,
+        is_active=bool(body.is_active),
+    )
+    db.add(reminder)
+    db.commit()
+    db.refresh(reminder)
+    return _serialize_reminder(reminder)
+
+
+@app.put("/api/v1/reminders/{reminder_id}")
+def update_user_reminder(
+    reminder_id: int,
+    body: UserReminderUpdateRequest,
+    user=Depends(verify_supabase_jwt),
+    db=Depends(get_db),
+):
+    db_user = _get_current_db_user(user, db)
+    reminder = _get_user_reminder_or_404(db, db_user, reminder_id)
+
+    if body.title is not None:
+        title = body.title.strip()
+        if not title:
+            raise HTTPException(status_code=400, detail="Title is required")
+        reminder.title = title[:500]
+    if body.description is not None:
+        reminder.description = body.description.strip()[:1000]
+    if body.reminder_type is not None:
+        reminder.reminder_type = (body.reminder_type or "other").strip()[:40]
+    if body.event_date is not None:
+        event_date = _normalize_reminder_datetime(body.event_date)
+        if event_date <= datetime.utcnow():
+            raise HTTPException(status_code=400, detail="Event date must be in the future")
+        reminder.event_date = event_date
+        reminder.notified_3d_at = None
+        reminder.notified_1d_at = None
+    if body.target_email is not None:
+        reminder.target_email = _validate_reminder_email(body.target_email)
+    if body.is_active is not None:
+        reminder.is_active = bool(body.is_active)
+
+    db.add(reminder)
+    db.commit()
+    db.refresh(reminder)
+    return _serialize_reminder(reminder)
+
+
+@app.delete("/api/v1/reminders/{reminder_id}")
+def delete_user_reminder(
+    reminder_id: int,
+    user=Depends(verify_supabase_jwt),
+    db=Depends(get_db),
+):
+    db_user = _get_current_db_user(user, db)
+    reminder = _get_user_reminder_or_404(db, db_user, reminder_id)
+    db.delete(reminder)
+    db.commit()
+    return {"deleted": True}
+
+
+@app.post("/api/v1/reminders/{reminder_id}/send-test")
+def send_user_reminder_test(
+    reminder_id: int,
+    user=Depends(verify_supabase_jwt),
+    db=Depends(get_db),
+):
+    db_user = _get_current_db_user(user, db)
+    reminder = _get_user_reminder_or_404(db, db_user, reminder_id)
+    delta = reminder.event_date - datetime.utcnow()
+    days_left = max(1, int((delta.total_seconds() + 86399) // 86400))
+    if not _send_reminder_email(reminder, days_left, reminder.target_email):
+        raise HTTPException(
+            status_code=503,
+            detail="Email provider is not configured or failed to send",
+        )
+    return {"sent": True, "to": reminder.target_email}
+
+
 @app.get("/api/v1/benchmark/specializations")
 def get_benchmark_specializations(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
     """Return per-specialization benchmark statistics.
@@ -7332,6 +8263,7 @@ async def auto_fix_cv_pdf(
     lang: str = Form("en"),
     use_ai: bool = Form(True),
     mode: str = Form("safe"),
+    response: Response = None,
     user=Depends(verify_supabase_jwt),
     db=Depends(get_db),
 ):
@@ -7349,12 +8281,10 @@ async def auto_fix_cv_pdf(
         pass
     _check_cost_guard("optimize", COST_OPTIMIZE_PER_DAY)
 
-    db_user = None
-    supabase_id = None
-    if not MOCK_SERVICES_ON:
-        supabase_id = user.get("user_id")
-        email = user.get("email")
-        db_user = get_or_create_user(db, supabase_id, email)
+    supabase_id = (user or {}).get("user_id", "mock-user") if MOCK_SERVICES_ON else user.get("user_id")
+    email = (user or {}).get("email", "dev@example.com") if MOCK_SERVICES_ON else user.get("email")
+    db_user = get_or_create_user(db, str(supabase_id or "mock-user"), email)
+    _consume_billable_usage(db, db_user, "cv-auto-fix", response=response)
 
     # Per-user + global optimize concurrency guard
     from security.runtime_guard import OptimizeConcurrencyGuard
@@ -7365,7 +8295,7 @@ async def auto_fix_cv_pdf(
         raise HTTPException(status_code=429, detail=str(exc))
 
     try:
-        contents = await file.read()
+        contents = await _read_upload_or_400(file)
         _validate_pdf_upload(contents, file.content_type)
         cv_text, _cv_truncated = _extract_pdf_text(contents)
 
@@ -7448,6 +8378,7 @@ class CoverLetterRewriteRequest(BaseModel):
     lang: str = "en"
     tone: str = "professional"
     mode: str = "senior"
+    low_token: bool = True
 
 
 class LinkedInOptimizeRequest(BaseModel):
@@ -7473,6 +8404,25 @@ class SaveCVVersionRequest(BaseModel):
     source: str = "manual"
     lang: str = "en"
     notes: str | None = ""
+
+
+def _stored_text_value(value: str | None, field_name: str) -> str | None:
+    """Optionally store only metadata for privacy-sensitive CV text fields."""
+    text_value = str(value or "")
+    mode = os.getenv("CV_VERSION_TEXT_STORAGE_MODE", "full").strip().lower()
+    if mode not in ("metadata_only", "hash_only"):
+        return text_value or None
+    if not text_value:
+        return None
+    return json.dumps(
+        {
+            "storage": "metadata_only",
+            "field": field_name,
+            "sha256": hashlib.sha256(text_value.encode("utf-8")).hexdigest(),
+            "chars": len(text_value),
+        },
+        ensure_ascii=True,
+    )
 
 
 class KeywordGapRequest(BaseModel):
@@ -7529,6 +8479,7 @@ def _next_cv_version_label(db, user_id: int) -> str:
 @rate_limit(f"{RATE_LIMIT_IP_REWRITE_PER_MIN}/minute")
 def rewrite_cv_endpoint(
     body: CVRewriteRequest,
+    response: Response,
     user=Depends(verify_supabase_jwt),
     db=Depends(get_db),
 ):
@@ -7538,6 +8489,7 @@ def rewrite_cv_endpoint(
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
     plan = _ensure_ai_rewrite_allowed(db, db_user)
+    _consume_billable_usage(db, db_user, "rewrite-cv", response=response)
 
     from security.runtime_guard import OptimizeConcurrencyGuard
     try:
@@ -7775,6 +8727,7 @@ def list_feedback(
 @rate_limit(f"{RATE_LIMIT_IP_REWRITE_PER_MIN}/minute")
 def rewrite_bullets_endpoint(
     body: BulletRewriteRequest,
+    response: Response,
     user=Depends(verify_supabase_jwt),
     db=Depends(get_db),
 ):
@@ -7784,6 +8737,7 @@ def rewrite_bullets_endpoint(
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
     plan = _ensure_ai_rewrite_allowed(db, db_user)
+    _consume_billable_usage(db, db_user, "rewrite-bullets", response=response)
 
     try:
         bullets = rewrite_service.rewrite_bullets(
@@ -7815,6 +8769,7 @@ def rewrite_bullets_endpoint(
 @rate_limit(f"{RATE_LIMIT_IP_REWRITE_PER_MIN}/minute")
 def rewrite_cover_letter_endpoint(
     body: CoverLetterRewriteRequest,
+    response: Response,
     user=Depends(verify_supabase_jwt),
     db=Depends(get_db),
 ):
@@ -7824,20 +8779,24 @@ def rewrite_cover_letter_endpoint(
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
     plan = _ensure_ai_rewrite_allowed(db, db_user)
+    _consume_billable_usage(db, db_user, "rewrite-cover-letter", response=response)
 
     try:
+        detected_lang = detect_language(body.cv_text)
+        output_lang = detected_lang or body.lang or "en"
         builder_payload = structured_text_to_builder_payload(
             body.cv_text,
             job_description=body.job_description,
-            lang=body.lang,
+            lang=output_lang,
         )
         letter = rewrite_service.rewrite_cover_letter_from_builder_payload(
             builder_payload=builder_payload.model_dump(),
             job_description=body.job_description,
             company_name=body.company_name or "",
-            lang=body.lang,
+            lang=output_lang,
             tone=body.tone,
             mode=body.mode,
+            low_token=body.low_token,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -7854,7 +8813,13 @@ def rewrite_cover_letter_endpoint(
     except Exception:
         pass
 
-    return {"result": letter, "plan": plan, "builder_payload": builder_payload.model_dump()}
+    return {
+        "result": letter,
+        "plan": plan,
+        "builder_payload": builder_payload.model_dump(),
+        "language": output_lang,
+        "low_token": body.low_token,
+    }
 
 
 class InterviewQuestionsRequest(BaseModel):
@@ -7877,6 +8842,7 @@ class InterviewEvaluateRequest(BaseModel):
 @rate_limit(f"{RATE_LIMIT_IP_REWRITE_PER_MIN}/minute")
 def interview_questions_endpoint(
     body: InterviewQuestionsRequest,
+    response: Response,
     user=Depends(verify_supabase_jwt),
     db=Depends(get_db),
 ):
@@ -7886,6 +8852,7 @@ def interview_questions_endpoint(
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
     plan = _ensure_ai_rewrite_allowed(db, db_user)
+    _consume_billable_usage(db, db_user, "interview-questions", response=response)
 
     try:
         questions = rewrite_service.generate_interview_questions(
@@ -7918,6 +8885,7 @@ def interview_questions_endpoint(
 @rate_limit(f"{RATE_LIMIT_IP_REWRITE_PER_MIN}/minute")
 def interview_evaluate_endpoint(
     body: InterviewEvaluateRequest,
+    response: Response,
     user=Depends(verify_supabase_jwt),
     db=Depends(get_db),
 ):
@@ -7927,6 +8895,7 @@ def interview_evaluate_endpoint(
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
     plan = _ensure_ai_rewrite_allowed(db, db_user)
+    _consume_billable_usage(db, db_user, "interview-evaluate", response=response)
 
     try:
         evaluation = rewrite_service.evaluate_interview_answer(
@@ -7958,6 +8927,7 @@ def interview_evaluate_endpoint(
 @rate_limit(f"{RATE_LIMIT_IP_REWRITE_PER_MIN}/minute")
 def optimize_linkedin_endpoint(
     body: LinkedInOptimizeRequest,
+    response: Response,
     user=Depends(verify_supabase_jwt),
     db=Depends(get_db),
 ):
@@ -7967,6 +8937,7 @@ def optimize_linkedin_endpoint(
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
     plan = _ensure_ai_rewrite_allowed(db, db_user)
+    _consume_billable_usage(db, db_user, "linkedin-optimize", response=response)
 
     try:
         result = rewrite_service.optimize_linkedin_profile(
@@ -7999,6 +8970,7 @@ def optimize_linkedin_endpoint(
 @rate_limit(f"{RATE_LIMIT_IP_MATCH_PER_MIN}/minute")
 def job_match_score_endpoint(
     body: JobMatchScoreRequest,
+    response: Response,
     user=Depends(verify_supabase_jwt),
     db=Depends(get_db),
 ):
@@ -8007,6 +8979,7 @@ def job_match_score_endpoint(
     supabase_id = user.get("user_id")
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
+    _consume_billable_usage(db, db_user, "job-match-score", response=response)
 
     try:
         result = run_pipeline(
@@ -8046,6 +9019,11 @@ def job_match_score_endpoint(
         2,
     )
     mode_score = max(0.0, min(100.0, mode_score))
+    jd_quality = result.get("job_description_quality") or {}
+    if jd_quality.get("status") == "invalid":
+        mode_score = 0.0
+    elif jd_quality.get("status") == "weak":
+        mode_score = min(mode_score, float(result.get("final_score") or mode_score))
     mode_interpretation = interpret_score_localized(mode_score, body.lang)
 
     try:
@@ -8089,6 +9067,7 @@ def job_match_score_endpoint(
 @rate_limit(f"{RATE_LIMIT_IP_MATCH_PER_MIN}/minute")
 def keyword_gap_detector_endpoint(
     body: KeywordGapRequest,
+    response: Response,
     user=Depends(verify_supabase_jwt),
     db=Depends(get_db),
 ):
@@ -8097,6 +9076,7 @@ def keyword_gap_detector_endpoint(
     supabase_id = user.get("user_id")
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
+    _consume_billable_usage(db, db_user, "keyword-gap", response=response)
 
     try:
         result = compare(body.cv_text, body.job_description)
@@ -8156,9 +9136,9 @@ def save_cv_version(
         version_label=version_label[:40],
         source=str(body.source or "manual")[:40],
         lang=str(body.lang or "en")[:10],
-        cv_text=cv_text,
-        optimized_cv_text=str(body.optimized_cv_text or "") or None,
-        job_description=str(body.job_description or "") or None,
+        cv_text=_stored_text_value(cv_text, "cv_text") or "",
+        optimized_cv_text=_stored_text_value(body.optimized_cv_text, "optimized_cv_text"),
+        job_description=_stored_text_value(body.job_description, "job_description"),
         match_score=match_score,
         notes=str(body.notes or "") or None,
     )
@@ -8376,8 +9356,20 @@ def _parse_billing_admin_allowed_emails() -> set[str]:
     }
 
 
-def _require_billing_admin_access(user_payload: dict, x_billing_admin_token: str | None):
+def _require_billing_admin_access(
+    user_payload: dict,
+    x_billing_admin_token: str | None,
+    request: Request | None = None,
+):
     _require_billing_admin_token(x_billing_admin_token)
+
+    if request is not None:
+        if not _admin_ip_allowed(request):
+            audit_log("billing_admin_access_denied", reason="ip_not_allowed", path=request.url.path)
+            raise HTTPException(status_code=403, detail="Billing admin access denied")
+        if _admin_rate_limited(request):
+            audit_log("billing_admin_access_denied", reason="rate_limited", path=request.url.path)
+            raise HTTPException(status_code=429, detail="Billing admin rate limited")
 
     allowed_emails = _parse_billing_admin_allowed_emails()
     if not allowed_emails:
@@ -8395,6 +9387,7 @@ def _require_billing_admin_access(user_payload: dict, x_billing_admin_token: str
 
 @app.get("/api/v1/billing/admin/me")
 def billing_admin_me(
+    request: Request,
     user=Depends(verify_supabase_jwt),
     x_billing_admin_token: str | None = Header(
         default=None,
@@ -8402,7 +9395,7 @@ def billing_admin_me(
     ),
 ):
     _ensure_not_expired(user)
-    _require_billing_admin_access(user, x_billing_admin_token)
+    _require_billing_admin_access(user, x_billing_admin_token, request)
     return {
         "status": "ok",
         "email": str((user or {}).get("email") or ""),
@@ -8411,6 +9404,7 @@ def billing_admin_me(
 
 @app.get("/api/v1/billing/admin/users")
 def billing_admin_list_users(
+    request: Request,
     user=Depends(verify_supabase_jwt),
     x_billing_admin_token: str | None = Header(
         default=None,
@@ -8423,7 +9417,7 @@ def billing_admin_list_users(
     db=Depends(get_db),
 ):
     _ensure_not_expired(user)
-    _require_billing_admin_access(user, x_billing_admin_token)
+    _require_billing_admin_access(user, x_billing_admin_token, request)
 
     query = db.query(User)
     if email:
@@ -8466,6 +9460,7 @@ def billing_admin_list_users(
 
 @app.get("/api/v1/billing/admin/feedback")
 def billing_admin_list_feedback(
+    request: Request,
     user=Depends(verify_supabase_jwt),
     x_billing_admin_token: str | None = Header(
         default=None,
@@ -8474,7 +9469,7 @@ def billing_admin_list_feedback(
     limit: int = Query(default=50, ge=1, le=200),
 ):
     _ensure_not_expired(user)
-    _require_billing_admin_access(user, x_billing_admin_token)
+    _require_billing_admin_access(user, x_billing_admin_token, request)
 
     items = _read_feedback_records(limit=limit, include_all=True)
 
@@ -9080,6 +10075,7 @@ def activate_premium_trial(
 @app.post("/api/v1/billing/admin/set-user-plan")
 def admin_set_user_plan(
     body: AdminSetUserPlanRequest,
+    request: Request,
     user=Depends(verify_supabase_jwt),
     x_billing_admin_token: str | None = Header(
         default=None,
@@ -9093,7 +10089,7 @@ def admin_set_user_plan(
     one-off grants, rollback of incorrect upgrades).
     """
     _ensure_not_expired(user)
-    _require_billing_admin_access(user, x_billing_admin_token)
+    _require_billing_admin_access(user, x_billing_admin_token, request)
 
     supabase_id = str(body.supabase_id or "").strip()
     email = str(body.email or "").strip().lower()
@@ -9504,6 +10500,7 @@ def _do_send_email(to_email: str, subject: str, body: str, recruiter_email: str 
     from email.utils import formataddr
 
     _logger = logging.getLogger("app.recruiter.email")
+    default_from = (os.environ.get("REMINDER_EMAIL_FROM") or "sikayet.cvanalizor@gmail.com").strip()
 
     # Try SendGrid first
     sendgrid_key = os.environ.get("SENDGRID_API_KEY", "")
@@ -9513,7 +10510,7 @@ def _do_send_email(to_email: str, subject: str, body: str, recruiter_email: str 
             from sendgrid.helpers.mail import Mail, Email, To, Content, Header
 
             sg = sendgrid.SendGridAPIClient(api_key=sendgrid_key)
-            platform_from = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@cvanalyzer.com")
+            platform_from = (os.environ.get("SENDGRID_FROM_EMAIL") or default_from).strip()
             # Use recruiter name in display, platform address for deliverability
             if recruiter_email and recruiter_email != platform_from:
                 from_email = Email(platform_from, name=recruiter_email)
@@ -9529,10 +10526,15 @@ def _do_send_email(to_email: str, subject: str, body: str, recruiter_email: str 
             if recruiter_email:
                 mail.reply_to = Email(recruiter_email)
             response = sg.client.mail.send.post(request_body=mail.get())
-            _logger.info("sendgrid_sent to=%s reply_to=%s status=%s", to_email, recruiter_email, response.status_code)
+            _logger.info(
+                "sendgrid_sent to=%s reply_to=%s status=%s",
+                redact_for_log(to_email, key="to_email"),
+                redact_for_log(recruiter_email, key="recruiter_email"),
+                response.status_code,
+            )
             return response.status_code in (200, 201, 202)
         except Exception as e:
-            _logger.error("sendgrid_failed to=%s error=%s", to_email, e)
+            _logger.error("sendgrid_failed to=%s error=%s", redact_for_log(to_email, key="to_email"), e)
 
     # Fallback to SMTP
     smtp_host = os.environ.get("SMTP_HOST", "")
@@ -9544,7 +10546,7 @@ def _do_send_email(to_email: str, subject: str, body: str, recruiter_email: str 
             smtp_port = int(os.environ.get("SMTP_PORT", "587"))
             smtp_user = os.environ.get("SMTP_USER", "")
             smtp_pass = os.environ.get("SMTP_PASS", "")
-            platform_from = os.environ.get("SMTP_FROM", "noreply@cvanalyzer.com")
+            platform_from = (os.environ.get("SMTP_FROM") or default_from).strip()
 
             # Build From with recruiter display-name
             if recruiter_email and recruiter_email != platform_from:
@@ -9565,12 +10567,16 @@ def _do_send_email(to_email: str, subject: str, body: str, recruiter_email: str 
                     server.login(smtp_user, smtp_pass)
                 server.sendmail(platform_from, [to_email], msg.as_string())
 
-            _logger.info("smtp_sent to=%s reply_to=%s", to_email, recruiter_email)
+            _logger.info(
+                "smtp_sent to=%s reply_to=%s",
+                redact_for_log(to_email, key="to_email"),
+                redact_for_log(recruiter_email, key="recruiter_email"),
+            )
             return True
         except Exception as e:
-            _logger.error("smtp_failed to=%s error=%s", to_email, e)
+            _logger.error("smtp_failed to=%s error=%s", redact_for_log(to_email, key="to_email"), e)
 
-    _logger.warning("no_email_backend configured, email not sent to=%s", to_email)
+    _logger.warning("no_email_backend configured, email not sent to=%s", redact_for_log(to_email, key="to_email"))
     return False
 
 
@@ -9582,23 +10588,32 @@ def _validate_reminder_email(email: str) -> str:
 
 
 def _render_reminder_subject(reminder: Reminder, days_left: int) -> str:
-    label = reminder.reminder_type or "Hatırlatma"
-    return f"[{label.capitalize()}] {reminder.title} - {days_left} gün kaldı"
+    label = _reminder_type_label(reminder.reminder_type)
+    day_text = "1 gün kaldı" if int(days_left) <= 1 else f"{int(days_left)} gün kaldı"
+    return f"[CV Analyzer] {label}: {reminder.title} - {day_text}"
 
 
 def _render_reminder_body(reminder: Reminder, days_left: int) -> str:
     event_date = reminder.event_date.strftime("%Y-%m-%d %H:%M")
+    label = _reminder_type_label(reminder.reminder_type)
+    day_text = "1 gün kaldı" if int(days_left) <= 1 else f"{int(days_left)} gün kaldı"
     body_lines = [
-        f"Merhaba,",
+        "Merhaba,",
         "",
-        f"{reminder.title} için planlanmış tarih: {event_date}",
-        f"Kalan süre: {days_left} gün.",
+        "CV Analyzer hatırlatması:",
+        f"Etkinlik: {label}",
+        f"Başlık: {reminder.title}",
+        f"Tarih: {event_date}",
+        f"Kalan süre: {day_text}.",
     ]
     if reminder.description:
-        body_lines.extend(["", "Açıklama:", reminder.description.strip()])
+        body_lines.extend(["", "Notlar:", reminder.description.strip()])
     body_lines.extend([
         "",
-        "Lütfen hazırlanmayı unutmayın.",
+        "Kısa kontrol listesi:",
+        "- CV ve iş ilanını tekrar gözden geçir.",
+        "- Görüşme linkini, adresi veya son teklif tarihini kontrol et.",
+        "- Sorularını ve takip notlarını hazırla.",
         "",
         "Bu hatırlatma otomatik olarak gönderildi."
     ])
@@ -9618,12 +10633,14 @@ def _send_reminder_email(reminder: Reminder, days_left: int, recipient: str) -> 
 
 def _process_due_reminders(db):
     now = datetime.utcnow()
+    today = now.date()
+    window_end = datetime.combine(today + timedelta(days=3), datetime.max.time())
     reminders = (
         db.query(Reminder)
         .filter(
             Reminder.is_active == True,
             Reminder.event_date > now,
-            Reminder.event_date <= now + timedelta(days=3),
+            Reminder.event_date <= window_end,
             or_(Reminder.notified_3d_at.is_(None), Reminder.notified_1d_at.is_(None)),
         )
         .all()
@@ -9631,11 +10648,11 @@ def _process_due_reminders(db):
     for reminder in reminders:
         if reminder.event_date <= now:
             continue
-        delta = reminder.event_date - now
+        days_left = (reminder.event_date.date() - today).days
         recipient = reminder.target_email or ""
         if not recipient:
             continue
-        if reminder.notified_1d_at is None and delta <= timedelta(days=1):
+        if reminder.notified_1d_at is None and days_left <= 1:
             if _send_reminder_email(reminder, 1, recipient):
                 reminder.notified_1d_at = now
                 db.add(reminder)
@@ -9644,8 +10661,7 @@ def _process_due_reminders(db):
         if (
             reminder.notified_3d_at is None
             and reminder.notified_1d_at is None
-            and timedelta(days=1) < delta
-            and delta <= timedelta(days=3)
+            and days_left == 3
         ):
             if _send_reminder_email(reminder, 3, recipient):
                 reminder.notified_3d_at = now
@@ -10058,6 +11074,7 @@ def score_breakdown_endpoint(
     supabase_id = user.get("user_id")
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
+    _consume_billable_usage(db, db_user, "score-breakdown", response=response)
 
     from services.ats_scoring import score_cv
     from services.job_match_service import match_cv_to_job, generate_feedback, recruiter_score
@@ -10151,13 +11168,16 @@ async def upload_cv(
         raise HTTPException(status_code=400, detail=str(exc))
 
     content_type = file.content_type or "application/pdf"
-    contents = await file.read()
+    contents = await _read_upload_or_400(file)
 
     # Full file validation (size, extension, mime, magic bytes, PDF complexity)
     try:
         validate_file_upload(contents, file.filename, content_type)
+        _scan_upload_for_viruses(contents)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    except HTTPException:
+        raise
 
     try:
         key = upload_original_cv(contents, supabase_id, content_type, file.filename)
@@ -10205,12 +11225,16 @@ async def upload_optimized_cv_route(
         raise HTTPException(status_code=400, detail=str(exc))
 
     content_type = file.content_type or "application/pdf"
-    contents = await file.read()
+    contents = await _read_upload_or_400(file)
 
     try:
         validate_file_upload(contents, file.filename, content_type)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    try:
+        _scan_upload_for_viruses(contents)
+    except HTTPException:
+        raise
 
     try:
         key = upload_optimized_cv(contents, supabase_id, content_type, file.filename)
@@ -10270,14 +11294,14 @@ def download_cv(
         if STORAGE_BACKEND == "local":
             return FileResponse(url_or_path, filename=os.path.basename(key))
             
-        audit_log("cv_download", user_id=supabase_id, key=key[:80])
+        audit_log("cv_download", user_id=supabase_id, key_hash=_storage_key_fingerprint(key))
         return {"url": url_or_path}
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid key format")
     except HTTPException:
         raise
     except Exception:
-        logger.exception("s3:download_error user=%s key=%s", supabase_id, key)
+        logger.exception("s3:download_error user=%s key_hash=%s", supabase_id, _storage_key_fingerprint(key))
         raise HTTPException(status_code=500, detail="Download failed")
 
 
@@ -10306,7 +11330,7 @@ def delete_cv_file(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid key format")
     except Exception:
-        logger.exception("s3:delete_error user=%s key=%s", supabase_id, key)
+        logger.exception("s3:delete_error user=%s key_hash=%s", supabase_id, _storage_key_fingerprint(key))
         raise HTTPException(status_code=500, detail="Delete failed")
 
     return {"deleted": key}
