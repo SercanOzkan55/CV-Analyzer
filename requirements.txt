@@ -45,7 +45,7 @@ fpdf2==2.8.7
 gevent==25.9.1
 geventhttpclient==2.3.9
 greenlet==3.3.2
-gunicorn==25.1.0
+gunicorn==25.3.0
 h11==0.16.0
 httpcore==1.0.9
 httptools==0.7.1
