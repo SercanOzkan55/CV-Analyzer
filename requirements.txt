@@ -32,7 +32,7 @@ distro==1.9.0
 dnspython==2.8.0
 ecdsa==0.19.1
 email-validator==2.3.0
-fastapi==0.135.1
+fastapi==0.136.1
 fastapi-cli==0.0.24
 fastapi-cloud-cli==0.14.0
 fastar==0.8.0
