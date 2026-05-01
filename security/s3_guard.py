@@ -4,6 +4,7 @@ Key validation, ownership enforcement, per-user CV limits,
 and presigned URL hardening.
 """
 
+import hashlib
 import logging
 import re
 
@@ -37,11 +38,11 @@ def validate_s3_key(key: str) -> None:
         raise ValueError("S3 key is required")
 
     if _TRAVERSAL_RE.search(key):
-        logger.warning("s3_guard:traversal_attempt key=%s", key[:80])
+        logger.warning("s3_guard:traversal_attempt key=%s", redact_s3_key(key))
         raise ValueError("Path traversal detected in key")
 
     if not _SAFE_KEY_RE.match(key):
-        logger.warning("s3_guard:invalid_key key=%s", key[:80])
+        logger.warning("s3_guard:invalid_key key=%s", redact_s3_key(key))
         raise ValueError("Invalid S3 key format")
 
 
@@ -53,9 +54,20 @@ def enforce_ownership(key: str, user_id: str) -> None:
     expected_prefix = f"user_{user_id}/"
     if not key.startswith(expected_prefix):
         logger.warning(
-            "s3_guard:ownership_violation user=%s key=%s", user_id, key[:80]
+            "s3_guard:ownership_violation user=%s key=%s", user_id, redact_s3_key(key)
         )
         raise PermissionError("Access denied: key does not belong to this user")
+
+
+def redact_s3_key(key: str | None) -> str:
+    """Return a stable non-reversible key fingerprint for logs/audits."""
+    if not key:
+        return ""
+    digest = hashlib.sha256(str(key).encode("utf-8")).hexdigest()[:16]
+    parts = str(key).split("/")
+    owner = parts[0][:18] if parts else "unknown"
+    folder = parts[1] if len(parts) > 1 else "unknown"
+    return f"{owner}/{folder}/sha256:{digest}"
 
 
 def enforce_user_cv_limit(db, user_id: int, limit: int = MAX_CVS_PER_USER) -> None:

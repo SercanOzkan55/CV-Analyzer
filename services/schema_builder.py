@@ -40,6 +40,20 @@ def _clean(value: Any) -> str:
     return text
 
 
+def _balance_parentheses(value: str) -> str:
+    text = _clean(value)
+    if text.count("(") > text.count(")") and len(text) <= 180:
+        text = text + ")" * (text.count("(") - text.count(")"))
+    return text
+
+
+def _clean_sentence_spacing(value: str) -> str:
+    text = _clean(value)
+    text = re.sub(r"(?<=[A-Za-z)])\.(?=[A-Z])", ". ", text)
+    text = re.sub(r",(?=[A-Za-z])", ", ", text)
+    return text
+
+
 def _clean_list(items: list | None) -> List[str]:
     return [_clean(v) for v in (items or []) if _clean(v)]
 
@@ -47,12 +61,560 @@ def _clean_list(items: list | None) -> List[str]:
 def _clean_bullets(bullets: list | None) -> List[str]:
     out: List[str] = []
     for b in bullets or []:
-        text = _clean(b)
+        text = _clean_sentence_spacing(b)
         # Strip leading bullet markers for consistency
         text = re.sub(r"^[-*•]\s*", "", text).strip()
         if text:
             out.append(text)
     return out
+
+
+_BULLET_PREFIX_RE = re.compile(r"^\s*[-*•\u2022\u2023\u25aa\u25a0\uf0b7]\s*")
+_INSTITUTION_WORD_RE = re.compile(
+    r"\b(?:university|universit\w*|üniversite\w*|institute|technology|college|school"
+    r"|faculty|academy|enstit|okulu|lisesi)\b",
+    re.I,
+)
+_DEGREE_WORD_RE = re.compile(
+    r"\b(?:b\.?\s*tech|b\.?\s*sc|b\.?\s*s\.?c|m\.?\s*sc|bachelor|master"
+    r"|degree|diploma|associate|ph\.?\s*d|lisans|mühendisliğ\w*|muhendisli\w*)\b",
+    re.I,
+)
+_DATE_RANGE_VALUE_RE = re.compile(
+    r"^\s*((?:19|20)\d{2}|\d{1,2}[/.]\s*(?:19|20)\d{2})\s*[-\u2013\u2014]\s*"
+    r"((?:19|20)\d{2}|\d{2}|\d{1,2}[/.]\s*(?:19|20)\d{2}|present|current|ongoing|halen|devam\s+ediyor)\s*$",
+    re.I,
+)
+_YEAR_RANGE_RE = re.compile(r"^\s*(?:19|20)\d{2}\s*[-\u2013\u2014]\s*(?:19|20)?\d{2}\s*$")
+_BAD_NAME_RE = re.compile(
+    r"\b(?:b\.?\s*tech|b\.?\s*sc|m\.?\s*sc|bachelor|master|degree|engineer"
+    r"|developer|student|intern|professional|summary|resume|cv)\b",
+    re.I,
+)
+_NAME_TECH_RE = re.compile(
+    r"\b(?:html|css|javascript|typescript|typecript|python|java|react|next\.?\s*js"
+    r"|node\.?js|sql|git|github|docker|websocket|rest\s+api|c\+\+)\b",
+    re.I,
+)
+_GENERIC_URL_RE = re.compile(
+    r"^(?:https?://)?(?:www\.)?[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:/\S*)?$",
+    re.I,
+)
+_SUMMARY_NOISE_RE = re.compile(
+    r"\b(?:father'?s\s+name|date\s+of\s+birth|birth\s+date|marital\s+status"
+    r"|nationality|declaration|sex\s*:|gender\s*:|home\s+town|hobbies?"
+    r"|cricket|football|watching\s+movies|assert\s+you|place\s*:|date\s*$"
+    r"|gold\s+medallist|participated\s+in|active\s+member|society)\b",
+    re.I,
+)
+_SKILL_GARBAGE_RE = re.compile(
+    r"(?:@|gmail\.com|hotmail\.com|yahoo\.com|^\d+(?:\.\d+)?%?$"
+    r"|^\d{1,2}(?:th|st|nd|rd)$|^\d{4}$|^\d{1,2}[/.]\d{1,2}[/.]\d{2,4}$"
+    r"|^[a-z]$|^[a-z]\.[a-z]\.?|^b\.?\s*tech\b|^b\.?\s*sc\b|^m\.?\s*sc\b"
+    r"|bachelor|master|degree|school$|university$|^real$|^ehteshamkhan\d*$)",
+    re.I,
+)
+_SCHOOL_LEVEL_EDU_RE = re.compile(
+    r"\b(?P<degree>\d{1,2}(?:th|st|nd|rd)|high\s+school|secondary\s+school|lise)"
+    r"\s+from\s+(?P<school>.*?)(?=\s+in\s+(?:the\s+)?year\b|\s+\d{1,2}(?:th|st|nd|rd)\s+from\b|$)"
+    r"(?:\s+in\s+(?:the\s+)?year\s*(?P<year>(?:19|20)\d{2})?)?"
+    r"(?:\s*(?:with\s+)?(?P<gpa>\d+(?:\.\d+)?\s*%\s*(?:marks?)?))?",
+    re.I,
+)
+
+
+def _strip_bullet_prefix(text: str) -> str:
+    return _BULLET_PREFIX_RE.sub("", _clean(text)).strip()
+
+
+def _looks_like_year_range(text: str) -> bool:
+    return bool(_YEAR_RANGE_RE.match(_clean(text)))
+
+
+def _has_plausible_phone_digits(text: str) -> bool:
+    digits = re.sub(r"\D", "", _clean(text))
+    return len(digits) >= 7
+
+
+def _name_is_structural(name: str) -> bool:
+    value = _clean(name)
+    if not value or len(value.split()) > 5:
+        return True
+    if _INSTITUTION_WORD_RE.search(value):
+        return True
+    if _NAME_TECH_RE.search(value) and re.search(r"[,/|]", value):
+        return True
+    return bool(_BAD_NAME_RE.search(value))
+
+
+def _iter_payload_strings(value: Any):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for nested in value.values():
+            yield from _iter_payload_strings(nested)
+    elif isinstance(value, list):
+        for nested in value:
+            yield from _iter_payload_strings(nested)
+
+
+def _find_name_candidate(data: Dict[str, Any]) -> str:
+    bad_words = {
+        "RESUME", "SUMMARY", "PROFESSIONAL", "EDUCATION", "EXPERIENCE",
+        "SKILLS", "PROJECTS", "BACHELOR", "MASTER", "DEGREE", "TECH",
+        "UNIVERSITY", "SCHOOL", "INSTITUTE", "ENGINEERING", "ENGINEER",
+        "COMPUTER", "SOFTWARE", "DEVELOPER", "TECHNOLOGY", "GAME",
+        "BLOG", "APP", "APPLICATION", "PROJECT", "PERSONAL", "MILLIONAIRE",
+        "WHO", "WANTS",
+    }
+
+    priority_texts: list[str] = []
+    for key in ("raw_text", "text", "content"):
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            priority_texts.append(value)
+
+    seen_texts: set[str] = set()
+    ordered_texts: list[str] = []
+    for text in priority_texts + [str(v) for v in _iter_payload_strings(data)]:
+        if text in seen_texts:
+            continue
+        seen_texts.add(text)
+        ordered_texts.append(text)
+
+    for text in priority_texts:
+        for match in re.finditer(r"\b([A-Z][A-Z'â€™.-]{1,}(?:\s+[A-Z][A-Z'â€™.-]{1,}){1,3})\b", text):
+            candidate = match.group(1).strip(" -|")
+            words = candidate.split()
+            if (
+                2 <= len(words) <= 4
+                and not any(w.strip(".'â€™") in bad_words for w in words)
+                and not _INSTITUTION_WORD_RE.search(candidate)
+                and not _NAME_TECH_RE.search(candidate)
+            ):
+                return candidate.title()
+
+    for text in ordered_texts:
+        for line in str(text).splitlines():
+            candidate = _clean(line).strip(" -|")
+            if candidate.isupper():
+                continue
+            words = candidate.split()
+            if not (2 <= len(words) <= 4):
+                continue
+            if any(w.strip(".'â€™").upper() in bad_words for w in words):
+                continue
+            if _BAD_NAME_RE.search(candidate) or _NAME_TECH_RE.search(candidate) or _INSTITUTION_WORD_RE.search(candidate):
+                continue
+            if re.search(r"[@:/]|\d", candidate):
+                continue
+            if re.match(
+                r"^[A-ZÇĞİÖŞÜ][A-Za-zÀ-ÖØ-öø-ÿÇĞİÖŞÜçğıöşü'’-]+"
+                r"(?:\s+[A-ZÇĞİÖŞÜ][A-Za-zÀ-ÖØ-öø-ÿÇĞİÖŞÜçğıöşü'’-]+){1,3}$",
+                candidate,
+            ):
+                return candidate
+
+    for text in ordered_texts:
+        for match in re.finditer(r"\b([A-Z][A-Z'’.-]{1,}(?:\s+[A-Z][A-Z'’.-]{1,}){1,3})\b", text):
+            candidate = match.group(1).strip(" -|")
+            words = candidate.split()
+            if (
+                2 <= len(words) <= 4
+                and not any(w.strip(".'’") in bad_words for w in words)
+                and not _INSTITUTION_WORD_RE.search(candidate)
+                and not _NAME_TECH_RE.search(candidate)
+            ):
+                return candidate.title()
+    return ""
+
+
+def _split_date_range_value(value: str) -> tuple[str, str]:
+    match = _DATE_RANGE_VALUE_RE.match(_clean(value))
+    if not match:
+        return "", ""
+    start, end = match.group(1).strip(), match.group(2).strip()
+    if re.fullmatch(r"\d{2}", end) and re.fullmatch(r"(?:19|20)\d{2}", start):
+        end = start[:2] + end
+    return start, end
+
+
+def _looks_like_tech_list(text: str) -> bool:
+    value = _clean(text)
+    if not value or not re.search(r"[,|/]", value):
+        return False
+    tokens = [part.strip() for part in re.split(r"\s*[,|/]\s*", value) if part.strip()]
+    return len(tokens) >= 2 and all(len(token.split()) <= 4 for token in tokens)
+
+
+def _extract_school_level_education_entries(text: str) -> list[EducationEntry]:
+    value = re.sub(r"\b(?:academic|professional)\s*:?", " ", _strip_bullet_prefix(text), flags=re.I)
+    entries: list[EducationEntry] = []
+    for match in _SCHOOL_LEVEL_EDU_RE.finditer(value):
+        degree = _clean(match.group("degree")).strip(" .")
+        school = _clean(match.group("school")).strip(" .,-")
+        year = _clean(match.group("year")).strip()
+        gpa = _clean(match.group("gpa")).strip()
+        if not degree or not school:
+            continue
+        entries.append(
+            EducationEntry(
+                degree=degree,
+                school=school,
+                start_date=year,
+                end_date=year,
+                gpa=gpa,
+            )
+        )
+    return entries
+
+
+def _clean_summary_text(summary: str, full_name: str = "") -> str:
+    text = _clean(summary)
+    if not text:
+        return ""
+    text = re.sub(r"\b([A-Za-z]{3,})-\s+(on|world|time|stack|end|based|level)\b", r"\1-\2", text, flags=re.I)
+    if full_name:
+        text = re.sub(rf"^\s*{re.escape(full_name)}\b", "", text, flags=re.I).strip()
+    text = _EMAIL_SUMMARY_RE.sub("", text)
+    text = _PHONE_SUMMARY_RE.sub("", text)
+    text = _URL_SUMMARY_RE.sub("", text)
+    starter = re.search(r"\b(?:to\s+\w+|seeking|objective|profile)\b", text, re.I)
+    if starter and starter.start() <= 120:
+        text = text[starter.start():].strip()
+    chunks = re.split(r"(?<=[.!?])\s+|(?:\s+[•\uf0b7]\s+)", text)
+    kept = [chunk.strip() for chunk in chunks if chunk.strip() and not _SUMMARY_NOISE_RE.search(chunk)]
+    return _enforce_summary_rules(" ".join(kept))
+
+
+def _normalize_education_entry(edu: EducationEntry) -> None:
+    for attr in ("degree", "field", "school", "location", "start_date", "end_date", "gpa"):
+        setattr(edu, attr, _balance_parentheses(_strip_bullet_prefix(getattr(edu, attr, ""))))
+
+    edu.school = re.sub(r"^\s*(?:professional|academic)\s*:?\s*", "", edu.school, flags=re.I).strip()
+
+    if edu.start_date and not edu.end_date:
+        start, end = _split_date_range_value(edu.start_date)
+        if start or end:
+            edu.start_date, edu.end_date = start, end
+
+    if edu.school and edu.start_date and not any(_split_date_range_value(edu.start_date)):
+        if _INSTITUTION_WORD_RE.search(edu.start_date) or len(edu.start_date.split()) > 4:
+            edu.school = f"{edu.school} {edu.start_date}".strip()
+            edu.start_date = ""
+
+    if not edu.school and edu.degree:
+        parts = re.split(r"\s+[-\u2013\u2014]\s+", edu.degree, maxsplit=1)
+        if len(parts) == 2:
+            left, right = parts[0].strip(), parts[1].strip()
+            if _INSTITUTION_WORD_RE.search(left) and not _INSTITUTION_WORD_RE.search(right):
+                edu.school, edu.degree = left, right
+            elif _INSTITUTION_WORD_RE.search(right):
+                edu.degree, edu.school = left, right
+
+    combined = " ".join(p for p in [edu.degree, edu.school, edu.location, edu.start_date] if p)
+    match = re.search(
+        r"(?P<degree>\b(?:B\.?\s*Tech|B\.?\s*Sc|B\.?\s*S\.?c|M\.?\s*Sc|Bachelor(?:'s)?(?:\s+Degree)?|Master(?:'s)?(?:\s+Degree)?)\b(?:\s+in\s+.+?)?)\s+from\s+(?P<school>.+?)(?:,\s*in\s+year|\s+in\s+year|$)",
+        combined,
+        re.I,
+    )
+    if match:
+        edu.degree = _clean(match.group("degree")).strip(" .")
+        edu.school = _clean(match.group("school")).strip(" .")
+
+    if not edu.degree and edu.school:
+        match = re.match(
+            r"(?P<degree>.+?\b(?:degree|b\.?\s*tech|b\.?\s*sc|bachelor|master)\b)\s+(?P<school>.+(?:university|institute|college|school).*)$",
+            edu.school,
+            re.I,
+        )
+        if match:
+            edu.degree = _clean(match.group("degree")).strip(" -")
+            edu.school = _clean(match.group("school")).strip(" -")
+
+    if not edu.start_date or not edu.end_date:
+        years = re.findall(r"\b((?:19|20)\d{2})\s*[-\u2013\u2014]\s*(\d{2}|(?:19|20)\d{2})\b", combined)
+        if years:
+            start, end = years[0]
+            if len(end) == 2:
+                end = start[:2] + end
+            edu.start_date = edu.start_date or start
+            edu.end_date = edu.end_date or end
+    if not edu.gpa:
+        grade = re.search(r"\b\d+(?:\.\d+)?\s*%\s*(?:marks?)?", combined, re.I)
+        if grade:
+            edu.gpa = grade.group(0).strip()
+    if edu.start_date and not any(_split_date_range_value(edu.start_date)):
+        year_range = re.search(r"\b((?:19|20)\d{2})\s*[-\u2013\u2014]\s*(\d{2}|(?:19|20)\d{2})\b", edu.start_date)
+        if year_range:
+            start, end = year_range.group(1), year_range.group(2)
+            edu.start_date = start
+            edu.end_date = edu.end_date or (start[:2] + end if len(end) == 2 else end)
+        elif re.fullmatch(r"(?:19|20)\d{2}", edu.start_date.strip()):
+            pass
+        else:
+            edu.start_date = ""
+    if edu.location and (re.search(r"\bstudent\s+at\b", edu.location, re.I) or len(edu.location.split()) > 8):
+        edu.location = ""
+
+
+def _is_trivial_education(edu: EducationEntry) -> bool:
+    text = _clean(" ".join([edu.degree, edu.school, edu.field, edu.location, edu.start_date, edu.end_date]))
+    if not text:
+        return True
+    if not (edu.start_date or edu.end_date) and len(text.split()) <= 2:
+        return True
+    if re.search(r"\bstudent\s+at\b", text, re.I) and not (edu.start_date or edu.end_date):
+        return True
+    return False
+
+
+def _clean_skill_list(items: list[str]) -> list[str]:
+    output: list[str] = []
+    seen: set[str] = set()
+    for item in items or []:
+        skill = _strip_bullet_prefix(item).strip(" .")
+        if not skill or _SKILL_GARBAGE_RE.search(skill):
+            continue
+        if len(skill.split()) > 8 and not re.search(r"[,;|/]", skill):
+            continue
+        key = skill.lower()
+        if key not in seen:
+            seen.add(key)
+            output.append(skill)
+    return output
+
+
+def _merge_skill_fragments(items: list[str]) -> list[str]:
+    merged: list[str] = []
+    current = ""
+
+    def flush() -> None:
+        nonlocal current
+        if current.strip():
+            merged.append(current.strip(" ,"))
+        current = ""
+
+    for raw in items or []:
+        raw_text = _clean(raw)
+        had_bullet = bool(_BULLET_PREFIX_RE.match(raw_text))
+        item = _strip_bullet_prefix(raw_text).strip(" .")
+        if not item:
+            continue
+
+        starts_continuation = bool(
+            re.match(r"^(?:and|or|ve|ile|with|using|&)\b", item, re.I)
+            or item[:1].islower()
+            or (
+                len(item.split()) <= 3
+                and not re.match(r"^(?:proficient|experienced|skilled|strong|good|hands)\b", item, re.I)
+            )
+        )
+        starts_new = had_bullet or not current or not starts_continuation
+
+        if starts_new:
+            flush()
+            current = item
+            continue
+
+        if item.startswith("&") or re.match(r"^(?:and|or|ve|ile)\b", item, re.I):
+            sep = " "
+        else:
+            sep = ", "
+        current = f"{current.rstrip(' ,')}{sep}{item}"
+
+    flush()
+    return merged
+
+
+def _repair_schema(schema: CVSchema, data: Dict[str, Any]) -> None:
+    if _name_is_structural(schema.full_name):
+        schema.full_name = _find_name_candidate(data)
+
+    if re.match(r"^\s*project\s*:", schema.summary, re.I):
+        name = re.sub(r"^\s*project\s*:\s*", "", schema.summary, flags=re.I)
+        desc = ""
+        if re.search(r"\bsynopsis\s*:", name, re.I):
+            name, desc = re.split(r"\bsynopsis\s*:\s*", name, maxsplit=1, flags=re.I)
+        schema.projects.append(ProjectEntry(name=_clean(name), description=_clean(desc), bullets=[]))
+        schema.summary = ""
+
+    schema.summary = _clean_summary_text(schema.summary, schema.full_name)
+
+    expanded_edu: list[EducationEntry] = []
+    for edu in schema.education:
+        raw_edu_text = _clean(" ".join(
+            _strip_bullet_prefix(getattr(edu, attr, ""))
+            for attr in ("degree", "field", "school", "location", "start_date", "end_date", "gpa")
+            if getattr(edu, attr, "")
+        ))
+        _normalize_education_entry(edu)
+        school_level_entries = _extract_school_level_education_entries(raw_edu_text)
+        if school_level_entries and not (_DEGREE_WORD_RE.search(edu.degree) and edu.school):
+            expanded_edu.extend(school_level_entries)
+            continue
+        expanded_edu.append(edu)
+    schema.education = expanded_edu
+
+    deduped_edu: list[EducationEntry] = []
+    seen_edu: set[str] = set()
+    seen_edu_period: dict[str, int] = {}
+    def _weak_edu_degree(value: str) -> bool:
+        return bool(re.search(r"\b(?:student|year)\b", value or "", re.I))
+
+    for edu in schema.education:
+        if _is_trivial_education(edu):
+            continue
+        key = re.sub(r"\W+", "", f"{edu.degree}|{edu.school}|{edu.start_date}|{edu.end_date}".lower())
+        period_key = re.sub(r"\W+", "", f"{edu.school}|{edu.start_date}|{edu.end_date}".lower())
+        if period_key and period_key in seen_edu_period:
+            existing_idx = seen_edu_period[period_key]
+            existing = deduped_edu[existing_idx]
+            if _weak_edu_degree(edu.degree):
+                continue
+            if _weak_edu_degree(existing.degree):
+                deduped_edu[existing_idx] = edu
+                seen_edu.add(key)
+            continue
+        if key and key not in seen_edu:
+            seen_edu.add(key)
+            if period_key:
+                seen_edu_period[period_key] = len(deduped_edu)
+            deduped_edu.append(edu)
+    schema.education = deduped_edu
+
+    repaired_exps: list[ExperienceEntry] = []
+    for exp in schema.experiences:
+        raw_title = _strip_bullet_prefix(exp.title)
+        raw_company = _strip_bullet_prefix(exp.company)
+        raw_location = _strip_bullet_prefix(exp.location)
+        exp.title = _balance_parentheses(raw_title)
+        exp.company = _balance_parentheses(raw_company)
+        exp.location = _balance_parentheses(raw_location)
+        labels: dict[str, str] = {}
+        kept_bullets: list[str] = []
+        for bullet in exp.bullets:
+            clean_bullet = _strip_bullet_prefix(bullet)
+            label_match = re.match(r"^(organization|company|employer|duration|project\s+title|synopsis)\s*:\s*(.+)$", clean_bullet, re.I)
+            if label_match:
+                labels[label_match.group(1).lower()] = label_match.group(2).strip()
+            else:
+                kept_bullets.append(_clean_sentence_spacing(clean_bullet))
+        if labels.get("organization") and not exp.company:
+            exp.company = labels["organization"]
+        if labels.get("project title") and (not exp.title or exp.title.lower() == "experience"):
+            exp.title = labels["project title"]
+        if labels.get("synopsis"):
+            kept_bullets.insert(0, _clean_sentence_spacing(labels["synopsis"]))
+        if labels.get("duration") and not exp.location:
+            exp.location = labels["duration"]
+        exp.bullets = [b for b in kept_bullets if b]
+        if not exp.bullets and repaired_exps and len(" ".join([exp.title, exp.company]).split()) >= 6:
+            target = repaired_exps[-1]
+            fragment = _clean(" ".join([raw_title, raw_company]))
+            if target.bullets:
+                target.bullets[-1] = f"{target.bullets[-1]} {fragment}".strip()
+            else:
+                target.bullets.append(fragment)
+            continue
+        repaired_exps.append(exp)
+    schema.experiences = repaired_exps
+
+    expanded_projects: list[ProjectEntry] = []
+    embedded_project_re = re.compile(
+        r"(?P<prefix>.+?\.)\s+(?P<name>[A-Z][A-Z0-9 '&/.-]{3,})\s*[-\u2013\u2014]\s*"
+        r"(?P<tech>(?:[A-Za-z][A-Za-z0-9.+#]*\s*,\s*)+[A-Za-z][A-Za-z0-9.+#]*)\s*$"
+    )
+    for proj in schema.projects:
+        proj.name = _balance_parentheses(_strip_bullet_prefix(proj.name))
+        proj.description = _balance_parentheses(_strip_bullet_prefix(proj.description))
+        proj.name = re.sub(r"^\s*project\s*:\s*", "", proj.name, flags=re.I).strip()
+        proj.description = re.sub(r"^\s*synopsis\s*:\s*", "", proj.description, flags=re.I).strip()
+        embedded = embedded_project_re.match(proj.description)
+        if embedded:
+            proj.description = _clean(embedded.group("prefix"))
+            expanded_projects.append(proj)
+            expanded_projects.append(
+                ProjectEntry(
+                    name=_clean(embedded.group("name")).title(),
+                    description="",
+                    bullets=[_clean(embedded.group("tech"))],
+                )
+            )
+            continue
+        if proj.name and proj.description and _looks_like_tech_list(proj.description):
+            proj.name = f"{proj.name} - {proj.description}"
+            proj.description = ""
+        expanded_projects.append(proj)
+    schema.projects = expanded_projects
+
+    merged_edu: list[EducationEntry] = []
+    idx = 0
+    while idx < len(schema.education):
+        edu = schema.education[idx]
+        if (
+            idx + 1 < len(schema.education)
+            and edu.degree
+            and edu.school
+            and _DEGREE_WORD_RE.search(edu.school)
+            and schema.education[idx + 1].school
+            and _INSTITUTION_WORD_RE.search(schema.education[idx + 1].school)
+        ):
+            nxt = schema.education[idx + 1]
+            edu.degree = _clean(f"{edu.degree} - {edu.school}")
+            edu.school = nxt.school
+            edu.location = edu.location or nxt.location
+            edu.gpa = edu.gpa or nxt.gpa
+            idx += 2
+            merged_edu.append(edu)
+            continue
+        merged_edu.append(edu)
+        idx += 1
+    schema.education = merged_edu
+
+    merged_projects: list[ProjectEntry] = []
+    for proj in schema.projects:
+        if merged_projects and not proj.description and not proj.bullets and len(proj.name.split()) >= 5 and not proj.name.isupper():
+            target = merged_projects[-1]
+            if target.bullets:
+                target.bullets[-1] = f"{target.bullets[-1]} {proj.name}".strip()
+            else:
+                target.description = f"{target.description} {proj.name}".strip()
+            continue
+        merged_projects.append(proj)
+    schema.projects = merged_projects
+
+    invalid_language_skills: list[str] = []
+    valid_languages: list[str] = []
+    for lang in (_strip_bullet_prefix(item).strip(" .") for item in schema.languages):
+        if not lang:
+            continue
+        if _is_valid_language(lang):
+            valid_languages.append(lang)
+        elif re.search(
+            r"\b(?:proficient|knowledge|experience|skilled|familiar|hands[- ]?on|transmission|switching|control)\b",
+            lang,
+            re.I,
+        ):
+            invalid_language_skills.append(lang)
+    schema.languages = valid_languages
+
+    schema.skills = _clean_skill_list(_merge_skill_fragments(schema.skills))
+    if invalid_language_skills:
+        schema.skills.extend(_clean_skill_list(invalid_language_skills))
+    if schema.skills_categorized:
+        cleaned_cat: Dict[str, List[str]] = {}
+        for category, values in schema.skills_categorized.items():
+            clean_category = _strip_bullet_prefix(category).strip(":")
+            clean_values = _clean_skill_list(values)
+            if clean_category and clean_values:
+                cleaned_cat[clean_category] = clean_values
+        schema.skills_categorized = cleaned_cat
+
+    schema.languages = [
+        lang for lang in (_strip_bullet_prefix(item).strip(" .") for item in schema.languages)
+        if lang and _is_valid_language(lang)
+    ]
 
 
 def _is_language_item(text: str) -> bool:
@@ -195,7 +757,7 @@ def build_schema(normalized: Dict[str, Any]) -> CVSchema:
         "full_name", "title", "email", "phone", "location", "linkedin",
         "summary", "experiences", "education", "skills", "skills_categorized",
         "projects", "certifications", "languages", "interests", "misc", "language",
-        "section_titles", "format_hints", "contact",
+        "section_titles", "format_hints", "contact", "raw_text", "text", "content",
     }
     for key in list(data.keys()):
         if key.startswith("_") or key in _SKIP:
@@ -363,14 +925,18 @@ def build_schema(normalized: Dict[str, Any]) -> CVSchema:
         section_titles=section_titles,
     )
     schema.ensure_skills_categorized()
+    _repair_schema(schema, data)
     _sanitize_schema(schema)
     _cross_section_fixup(schema)
     _document_level_validation(schema, _summary_source)
     _anomaly_detection(schema)
     _fallback_from_raw(data, schema, _summary_source)
+    _repair_schema(schema, data)
     _normalize_layout(schema)
     _schema_integrity_check(schema)
     _ats_compliance_check(schema, _summary_source)
+    _repair_schema(schema, data)
+    _sanitize_schema(schema)
     _purge_empty_entries(schema)
     _cap_misc(schema)
     _normalize_layout(schema)          # re-run after compliance moves
@@ -382,8 +948,10 @@ def build_schema(normalized: Dict[str, Any]) -> CVSchema:
     if sanity == 0:
         logger.warning("build_schema: sanity_score=0, triggering fallback_from_raw")
         _fallback_from_raw(data, schema, _summary_source)
+        _repair_schema(schema, data)
         # Re-run compliance after fallback rebuilds schema
         _ats_compliance_check(schema, _summary_source)
+        _sanitize_schema(schema)
         _purge_empty_entries(schema)
         _cap_misc(schema)
         # Reset lock snapshot — fallback invalidated the previous one
@@ -454,14 +1022,16 @@ def _sanitize_schema(schema: CVSchema) -> None:
     # ── Contact: blank out empty-looking fields ──
     if schema.email and not re.search(r"@.+\.", schema.email):
         schema.email = ""
-    if schema.phone and not re.search(r"\d{4,}", schema.phone):
+    if schema.phone and not _has_plausible_phone_digits(schema.phone):
         schema.phone = ""
-    if schema.linkedin and not re.search(r"linkedin\.com|github\.com|https?://", schema.linkedin, re.I):
-        schema.linkedin = ""
+    if schema.phone and _looks_like_year_range(schema.phone):
+        schema.phone = ""
 
     # ── Fix malformed URLs in contact fields ──
     if schema.linkedin:
         schema.linkedin = _fix_url_string(schema.linkedin)
+    if schema.linkedin and not _GENERIC_URL_RE.match(schema.linkedin):
+        schema.linkedin = ""
     if schema.email:
         schema.email = _fix_url_string(schema.email)
 
@@ -724,7 +1294,7 @@ def _is_valid_language(text: str) -> bool:
     from utils.section_scorer import is_language_entry
     from utils.cv_normalizer import _ISO_LANG_CODES
 
-    t = text.strip()
+    t = _strip_bullet_prefix(text).strip(" .")
     if not t or len(t) <= 1:
         return False
     # Reject bare ISO codes (en, tr, de, ...)
@@ -732,6 +1302,8 @@ def _is_valid_language(text: str) -> bool:
         return False
     # Reject URLs, emails, pure numbers
     if "@" in t or re.match(r"https?://", t, re.I) or re.match(r"^[\d\W]+$", t):
+        return False
+    if re.match(r"^(?:proficient|advanced|intermediate|basic|fluent)\s+in\b", t, re.I):
         return False
     # Permissive mode — items are already in the languages section
     return is_language_entry(t, strict=False)
@@ -1032,9 +1604,11 @@ def _anomaly_detection(schema: CVSchema) -> None:
         t = lang.strip()
         if not t or len(t) <= 1:
             continue
-        if len(t.split()) > 6:
+        if len(t.split()) > 12:
             continue
         if _TECH_CROSS_RE.search(t):
+            continue
+        if not _is_valid_language(t):
             continue
         if "@" in t or re.match(r"https?://", t, re.I):
             continue
@@ -1050,6 +1624,8 @@ def _anomaly_detection(schema: CVSchema) -> None:
         schema.email = schema.email[:_CONTACT_MAX_LEN]
     if schema.phone and len(schema.phone) > _CONTACT_MAX_LEN:
         schema.phone = schema.phone[:_CONTACT_MAX_LEN]
+    if schema.phone and _looks_like_year_range(schema.phone):
+        schema.phone = ""
     if schema.linkedin and len(schema.linkedin) > _CONTACT_MAX_LEN:
         schema.linkedin = schema.linkedin[:_CONTACT_MAX_LEN]
     if schema.location and len(schema.location) > _CONTACT_MAX_LEN:
@@ -1191,7 +1767,7 @@ def _fallback_from_raw(
 # ── Final layout normalization ────────────────────────────────────────────
 
 _CANONICAL_ORDER = [
-    "summary", "experience", "education", "projects", "skills",
+    "summary", "experience", "projects", "education", "skills",
     "certifications", "languages", "interests", "misc",
 ]
 
@@ -1418,15 +1994,15 @@ def _ats_compliance_check(schema: CVSchema, summary_source: str = "") -> None:
             kept_edu.append(edu)
     schema.education = kept_edu
 
-    # ── Rule 3: Skills — reject long sentences (>8 words) ──
+    # ── Rule 3: Skills — reject long prose while preserving merged skill phrases ──
     schema.skills = [
         s for s in schema.skills
-        if s and len(s.split()) <= 8
+        if s and (len(s.split()) <= 8 or (len(s.split()) <= 18 and re.search(r"[,;/&]", s)))
     ]
     if schema.skills_categorized:
         for cat in list(schema.skills_categorized):
             cleaned = [s for s in schema.skills_categorized[cat]
-                       if s and len(s.split()) <= 8]
+                       if s and (len(s.split()) <= 8 or (len(s.split()) <= 18 and re.search(r"[,;/&]", s)))]
             if cleaned:
                 schema.skills_categorized[cat] = cleaned
             else:

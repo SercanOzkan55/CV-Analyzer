@@ -143,5 +143,35 @@ describe('exportUtils', () => {
       expect(lines.length).toBe(3)
       expect(csv).toContain('Jane Smith')
     })
+
+    it('includes job description quality diagnostics', () => {
+      const mockBatch = {
+        job_description_quality: {
+          status: 'invalid',
+          reason: 'too_short_without_role_or_skill'
+        },
+        ranking: [
+          {
+            rank: 1,
+            candidate_name: 'John Doe',
+            candidate_email: 'john@example.com',
+            file_name: 'CV_John.pdf',
+            final_score: 0,
+            ats_score: 81,
+            skill_score: 0,
+            semantic_score: 0,
+            experience_score: 0,
+            warnings: ['Job description appears invalid or meaningless; match score is disabled.']
+          }
+        ]
+      }
+
+      const csv = exportBatchToCSV(mockBatch)
+
+      expect(csv).toContain('JD Quality')
+      expect(csv).toContain('Invalid JD')
+      expect(csv).toContain('too_short_without_role_or_skill')
+      expect(csv).toContain('match scoring was disabled')
+    })
   })
 })

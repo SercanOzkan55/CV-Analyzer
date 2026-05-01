@@ -45,6 +45,28 @@ function listText(value) {
   return String(value)
 }
 
+function getJdQuality(row, batchResult) {
+  if (row?.job_description_quality?.status) return row.job_description_quality
+  if (batchResult?.job_description_quality?.status) return batchResult.job_description_quality
+  return {}
+}
+
+export function getJdQualityLabel(quality) {
+  const status = quality?.status || 'ok'
+  if (status === 'invalid') return 'Invalid JD'
+  if (status === 'weak') return 'Weak JD'
+  if (status === 'missing') return 'Missing JD'
+  return 'OK'
+}
+
+export function getJdQualityMessage(quality) {
+  const status = quality?.status
+  if (status === 'invalid') return 'Job description is invalid; match scoring was disabled.'
+  if (status === 'weak') return 'Job description is too short; match score may be capped.'
+  if (status === 'missing') return 'No job description was provided.'
+  return ''
+}
+
 /**
  * Export batch ranking to CSV with improved formatting
  */
@@ -64,6 +86,10 @@ export function exportBatchToCSV(batchResult, fileName = null, options = {}) {
     'Skill Match (%)',
     'Semantic Match (%)',
     'Experience Score (%)',
+    'JD Quality',
+    'JD Quality Reason',
+    'JD Warning',
+    'Score Version',
     'Strengths',
     'Missing Skills',
     'Overall Match'
@@ -71,7 +97,13 @@ export function exportBatchToCSV(batchResult, fileName = null, options = {}) {
 
   const lines = [
     headers.join(','),
-    ...rows.map((r, idx) => [
+    ...rows.map((r, idx) => {
+      const jdQuality = getJdQuality(r, batchResult)
+      const warnings = [
+        getJdQualityMessage(jdQuality),
+        ...((Array.isArray(r.warnings) ? r.warnings : []) || []),
+      ].filter(Boolean)
+      return [
       escapeCsv(r.rank || idx + 1),
       escapeCsv(r.candidate_name || ''),
       escapeCsv(r.candidate_email || r.email || ''),
@@ -81,10 +113,15 @@ export function exportBatchToCSV(batchResult, fileName = null, options = {}) {
       Number(r.skill_score ?? r.keyword_score ?? 0).toFixed(2),
       Number(r.semantic_score || 0).toFixed(2),
       Number(r.experience_score || 0).toFixed(2),
+      escapeCsv(getJdQualityLabel(jdQuality)),
+      escapeCsv(jdQuality.reason || ''),
+      escapeCsv([...new Set(warnings)].join('; ')),
+      escapeCsv(r.score_version || batchResult?.score_version || ''),
       escapeCsv(listText(r.strengths ?? r.detected_strengths)),
       escapeCsv(listText(r.missing_skills)),
       escapeCsv(getMatchInterpretation(r.final_score))
-    ].join(','))
+    ].join(',')
+    })
   ]
 
   const timestamp = new Date().toISOString().slice(0, 10)

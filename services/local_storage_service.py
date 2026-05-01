@@ -5,6 +5,8 @@ import logging
 import shutil
 from pathlib import Path
 
+from security.s3_guard import redact_s3_key
+
 logger = logging.getLogger("app.storage.local")
 
 # Root directory for local storage, relative to the app root
@@ -20,7 +22,7 @@ def upload(file_bytes: bytes, key: str, content_type: str = None) -> None:
     _ensure_dir(full_path)
     with open(full_path, "wb") as f:
         f.write(file_bytes)
-    logger.debug("local_storage:saved key=%s size=%d", key, len(file_bytes))
+    logger.debug("local_storage:saved key=%s size=%d", redact_s3_key(key), len(file_bytes))
 
 def download(key: str) -> bytes:
     """Read bytes from local disk."""
@@ -35,7 +37,7 @@ def delete(key: str) -> None:
     full_path = os.path.join(LOCAL_STORAGE_ROOT, key)
     if os.path.exists(full_path):
         os.remove(full_path)
-        logger.debug("local_storage:deleted key=%s", key)
+        logger.debug("local_storage:deleted key=%s", redact_s3_key(key))
 
 def head(key: str) -> dict | None:
     """Check if file exists and return metadata (simulated)."""

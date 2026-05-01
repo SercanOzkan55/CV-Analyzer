@@ -46,6 +46,7 @@ const AuthContext = (() => {
 })()
 
 const DAILY_LIMIT_FREE = 5
+const BILLABLE_USAGE_EVENT = 'cv-analyzer:billable-usage'
 
 function checkBillingAdmin(email) {
   const configured = String(import.meta.env.VITE_BILLING_ADMIN_EMAILS || '')
@@ -212,6 +213,21 @@ export function AuthProvider({ children }) {
 
   const isBillingAdmin = checkBillingAdmin(user?.email) || role === 'admin'
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    function handleBillableUsage() {
+      if (!token) return
+      if (!isBillingAdmin && role !== 'admin') {
+        setUsageToday((prev) => prev + 1)
+      }
+      refreshUsage(token, { background: true })
+    }
+
+    window.addEventListener(BILLABLE_USAGE_EVENT, handleBillableUsage)
+    return () => window.removeEventListener(BILLABLE_USAGE_EVENT, handleBillableUsage)
+  }, [token, isBillingAdmin, role])
+
   function canAnalyze() {
     if (isBillingAdmin || role === 'admin') return true
     if (planLoading) return true
@@ -222,6 +238,7 @@ export function AuthProvider({ children }) {
   function recordAnalysis() {
     const newCount = usageToday + 1
     setUsageToday(newCount)
+    if (token) refreshUsage(token, { background: true })
     return newCount
   }
 

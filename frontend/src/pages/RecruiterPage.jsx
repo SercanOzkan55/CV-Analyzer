@@ -47,6 +47,78 @@ function getScoreColor(score) {
   return '#ef4444'
 }
 
+function assessJobDescriptionQuality(text) {
+  const value = String(text || '').trim()
+  if (!value) return { status: 'missing', valid: false, reason: 'empty', word_count: 0 }
+
+  const tokens = value.match(/[\p{L}0-9+#.]{2,}/gu) || []
+  const lower = value.toLowerCase()
+  const roleTerms = [
+    'developer', 'engineer', 'analyst', 'manager', 'designer', 'intern', 'specialist',
+    'consultant', 'assistant', 'coordinator', 'architect', 'technician', 'administrator',
+    'backend', 'frontend', 'fullstack', 'full-stack', 'software', 'data', 'devops',
+    'qa', 'tester', 'sales', 'marketing', 'teacher', 'nurse', 'accountant', 'product',
+    'recruiter', 'junior', 'senior', 'lead', 'muhendis', 'gelistirici', 'uzman',
+    'stajyer', 'analist', 'tasarimci', 'yonetici', 'ogretmen', 'hemsire', 'satis',
+  ]
+  const knownSkillTerms = [
+    'python', 'java', 'javascript', 'typescript', 'react', 'node', 'sql', 'docker',
+    'aws', 'azure', 'kubernetes', 'excel', 'powerbi', 'figma', 'php', 'c++', 'c#',
+  ]
+  const hasRole = roleTerms.some(term => new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(lower))
+  const hasSkill = knownSkillTerms.some(term => lower.includes(term))
+  const alphaTokens = tokens.filter(tok => /\p{L}/u.test(tok))
+  const meaningfulAlpha = alphaTokens.filter(tok => /[aeiou]/i.test(tok) || ['qa', 'hr', 'ui', 'ux', 'c++', 'c#'].includes(tok.toLowerCase()))
+
+  if (!hasRole && !hasSkill && tokens.length < 4) {
+    return { status: 'invalid', valid: false, reason: 'too_short_without_role_or_skill', word_count: tokens.length }
+  }
+  if (!hasRole && !hasSkill && alphaTokens.length > 0 && meaningfulAlpha.length === 0) {
+    return { status: 'invalid', valid: false, reason: 'gibberish_like_text', word_count: tokens.length }
+  }
+  if (tokens.length < 15) {
+    return { status: 'weak', valid: true, reason: 'too_short_for_reliable_matching', word_count: tokens.length }
+  }
+  return { status: 'ok', valid: true, reason: 'ok', word_count: tokens.length }
+}
+
+function getJdQualityMeta(quality) {
+  const status = quality?.status
+  if (status === 'invalid') {
+    return {
+      level: 'invalid',
+      label: 'Invalid JD',
+      title: 'Job description is invalid',
+      message: 'Enter a real role description before ranking candidates. Match scores are disabled for meaningless text.',
+      color: '#ef4444',
+      background: 'rgba(239, 68, 68, 0.10)',
+      border: 'rgba(239, 68, 68, 0.35)',
+    }
+  }
+  if (status === 'weak') {
+    return {
+      level: 'weak',
+      label: 'Weak JD',
+      title: 'Job description is too short',
+      message: 'Add responsibilities, required skills, seniority, and role context. Match scores may be capped.',
+      color: '#eab308',
+      background: 'rgba(234, 179, 8, 0.10)',
+      border: 'rgba(234, 179, 8, 0.35)',
+    }
+  }
+  return null
+}
+
+function getBatchJdQuality(batchResult) {
+  if (batchResult?.job_description_quality?.status) return batchResult.job_description_quality
+  const row = (batchResult?.ranking || []).find(item => item?.job_description_quality?.status)
+  return row?.job_description_quality || null
+}
+
+function getRowJdQuality(row, batchResult) {
+  return row?.job_description_quality?.status ? row.job_description_quality : getBatchJdQuality(batchResult)
+}
+
 function SkeletonTableRows({ count = 5 }) {
   return Array.from({ length: count }).map((_, i) => (
     <tr key={i} className="skeleton-row">
@@ -228,12 +300,22 @@ export default function RecruiterPage() {
     if (!token) return
     if (!cvFiles.length) { setError('Select at least one CV PDF'); return }
     if (!jdText.trim() && !jdFile) { setError('Enter job description or upload JD file'); return }
+    const preflightJdQuality = jdText.trim() ? assessJobDescriptionQuality(jdText) : null
+    const preflightJdMeta = getJdQualityMeta(preflightJdQuality)
+    if (preflightJdMeta?.level === 'invalid') {
+      setError(preflightJdMeta.message)
+      toast.error(preflightJdMeta.message)
+      return
+    }
     setError(null); setBatchLoading(true); setBatchProgress({ processed: 0, total: cvFiles.length })
     try {
       // Split into batches of 200 CVs to avoid FormData parsing issues
       const BATCH_SIZE = 200
       const allResults = []
       const allSkipped = []
+      const allWarnings = []
+      let jobDescriptionQuality = preflightJdQuality
+      let scoreVersion = ''
       const batches = []
       
       for (let i = 0; i < cvFiles.length; i += BATCH_SIZE) {
@@ -257,6 +339,19 @@ export default function RecruiterPage() {
         if (result.ranking && Array.isArray(result.ranking)) {
           allResults.push(...result.ranking)
         }
+        if (Array.isArray(result.warnings)) {
+          allWarnings.push(...result.warnings)
+        }
+        if (result.job_description_quality?.status) {
+          jobDescriptionQuality = result.job_description_quality
+        } else if (result.ranking?.[0]?.job_description_quality?.status) {
+          jobDescriptionQuality = result.ranking[0].job_description_quality
+        }
+        if (result.score_version) {
+          scoreVersion = result.score_version
+        } else if (result.ranking?.[0]?.score_version) {
+          scoreVersion = result.ranking[0].score_version
+        }
         
         // Collect skipped files for feedback
         if (result.skipped_files && Array.isArray(result.skipped_files)) {
@@ -271,6 +366,9 @@ export default function RecruiterPage() {
         skipped_count: allSkipped.length,
         skipped_files: allSkipped,
         job_description_preview: jdText.substring(0, 300),
+        job_description_quality: jobDescriptionQuality,
+        score_version: scoreVersion,
+        warnings: [...new Set(allWarnings.filter(Boolean))],
         analytics: {
           avg_score: allResults.length > 0 ? Math.round(allResults.reduce((sum, r) => sum + r.final_score, 0) / allResults.length * 100) / 100 : 0,
           candidate_distribution: {
@@ -374,6 +472,10 @@ export default function RecruiterPage() {
   const avgScore = candidates.length
     ? Math.round(candidates.reduce((sum, c) => sum + getScore(c), 0) / candidates.length) : 0
   const distribution = batchResult?.analytics?.candidate_distribution || { high: 0, medium: 0, low: 0 }
+  const batchJdQuality = getBatchJdQuality(batchResult)
+  const batchJdQualityMeta = getJdQualityMeta(batchJdQuality)
+  const draftJdQuality = jdText.trim() ? assessJobDescriptionQuality(jdText) : null
+  const draftJdQualityMeta = jdText.trim() ? getJdQualityMeta(draftJdQuality) : null
 
   // ── Load jobs ───────────────────────────────────────────────────────────────
   const loadJobs = useCallback(async () => {
@@ -866,6 +968,31 @@ export default function RecruiterPage() {
             <div className="recruiter-form-group">
               <label>{t('recruiter.jd_text_label')}</label>
               <textarea className="recruiter-textarea" value={jdText} onChange={e => setJdText(e.target.value)} rows={5} placeholder={t('recruiter.jd_text_placeholder')} />
+              {draftJdQualityMeta && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 10,
+                    marginTop: 10,
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    border: `1px solid ${draftJdQualityMeta.border}`,
+                    background: draftJdQualityMeta.background,
+                    color: draftJdQualityMeta.color,
+                    fontSize: '0.82rem',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: 2 }} />
+                  <div>
+                    <strong>{draftJdQualityMeta.title}</strong>
+                    <div style={{ color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                      {draftJdQualityMeta.message}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="recruiter-form-row">
               <div className="recruiter-form-group recruiter-file-group">
@@ -1134,6 +1261,31 @@ export default function RecruiterPage() {
                   </motion.div>
                 )}
               </AnimatePresence>
+              {batchJdQualityMeta && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 10,
+                    padding: '12px 14px',
+                    marginBottom: 12,
+                    borderRadius: 8,
+                    border: `1px solid ${batchJdQualityMeta.border}`,
+                    background: batchJdQualityMeta.background,
+                    color: batchJdQualityMeta.color,
+                    fontSize: '0.85rem',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 2 }} />
+                  <div>
+                    <strong>{batchJdQualityMeta.title}</strong>
+                    <div style={{ color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                      {batchJdQualityMeta.message}
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="admin-table-wrapper">
                 <table className="data-table data-table-elite admin-table">
                   <thead>
@@ -1146,9 +1298,10 @@ export default function RecruiterPage() {
                       <th>#</th>
                       <th>{t('recruiter.candidates')}</th>
                       <th>Email</th>
-                      <th>{t('results.final_score')}</th>
-                      <th>ATS</th>
-                      <th>Skill</th>
+                      <th>Match</th>
+                      <th>CV Quality</th>
+                      <th>Skill Fit</th>
+                      <th>JD</th>
                       <th>Strengths</th>
                       <th></th>
                     </tr>
@@ -1181,6 +1334,34 @@ export default function RecruiterPage() {
                         </td>
                         <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.85rem' }}>{Math.round(r.ats_score)}%</td>
                         <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.85rem' }}>{Math.round(r.skill_score)}%</td>
+                        <td>
+                          {(() => {
+                            const rowMeta = getJdQualityMeta(getRowJdQuality(r, batchResult))
+                            if (!rowMeta) {
+                              return <span style={{ color: '#22c55e', fontSize: '0.78rem', fontWeight: 700 }}>OK</span>
+                            }
+                            return (
+                              <span
+                                title={rowMeta.message}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  padding: '3px 7px',
+                                  borderRadius: 6,
+                                  background: rowMeta.background,
+                                  color: rowMeta.color,
+                                  border: `1px solid ${rowMeta.border}`,
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                <AlertTriangle size={12} /> {rowMeta.label}
+                              </span>
+                            )
+                          })()}
+                        </td>
                         <td>
                           {(r.strengths || []).filter(s => typeof s === 'string' && isNaN(Number(s))).slice(0, 2).map((s, si) => (
                             <span key={si} style={{ display: 'inline-block', padding: '2px 7px', borderRadius: 6, background: '#22c55e18', color: '#22c55e', fontSize: '0.72rem', marginRight: 3 }}>
@@ -1620,6 +1801,33 @@ export default function RecruiterPage() {
                   <p className="text-muted">{selected.result.interpretation}</p>
                 </div>
               </div>
+              {(() => {
+                const selectedJdMeta = getJdQualityMeta(selected.result.job_description_quality)
+                if (!selectedJdMeta) return null
+                return (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 10,
+                      padding: '10px 12px',
+                      borderRadius: 8,
+                      border: `1px solid ${selectedJdMeta.border}`,
+                      background: selectedJdMeta.background,
+                      color: selectedJdMeta.color,
+                      fontSize: '0.84rem',
+                    }}
+                  >
+                    <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: 2 }} />
+                    <div>
+                      <strong>{selectedJdMeta.title}</strong>
+                      <div style={{ color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                        {selectedJdMeta.message}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
               <ScoreBars items={[
                 { label: t('results.semantic'),   value: selected.result.semantic_score },
                 { label: t('results.keyword'),    value: selected.result.keyword_score },

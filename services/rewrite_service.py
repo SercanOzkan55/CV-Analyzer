@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import hashlib
 from typing import List, Optional
 
 from dotenv import load_dotenv
@@ -10,6 +11,8 @@ load_dotenv()
 
 MAX_INPUT_CHARS = int(os.getenv("REWRITE_MAX_INPUT_CHARS", "8000") or "8000")
 MAX_OUTPUT_CHARS = int(os.getenv("REWRITE_MAX_OUTPUT_CHARS", "4000") or "4000")
+COVER_LETTER_CACHE_LIMIT = int(os.getenv("COVER_LETTER_CACHE_LIMIT", "100") or "100")
+_COVER_LETTER_CACHE: dict[str, str] = {}
 LINKEDIN_ALLOWED_MODES = {"junior", "senior", "manager", "tech", "academic"}
 REWRITE_ALLOWED_MODES = {
     "junior",
@@ -67,15 +70,23 @@ def _normalize_rewrite_mode(mode: str) -> str:
 
 def _extract_keywords(text: str, max_items: int = 12) -> List[str]:
     source = str(text or "").lower()
-    tokens = re.findall(r"[a-zA-Z0-9+#.\-]{3,}", source)
+    tokens = re.findall(r"[\w+#.\-]{3,}", source, flags=re.UNICODE)
     stop = {
         "and", "with", "for", "the", "this", "that", "are", "from", "you",
         "your", "job", "role", "cv", "experience", "work", "using", "have",
         "will", "can", "our", "their", "skills", "years", "plus",
+        "summary", "name", "highlights", "highlight",
+        "computer", "engineering", "student", "junior", "senior", "developer",
+        "engineer", "position",
+        "bir", "ve", "ile", "için", "olan", "gibi", "iş", "cv", "deneyim",
+        "beceri", "yıl", "aday", "pozisyon", "aranan", "nitelikler",
+        "bilgisayar", "mühendisliği", "öğrencisiyim", "geliştirme", "gerçek",
+        "muhendisligi", "ogrencisiyim", "gelistirme", "gercek",
     }
     seen = set()
     out = []
     for token in tokens:
+        token = token.strip(".,;:()[]{}")
         if token in stop:
             continue
         if token in seen:
@@ -93,6 +104,269 @@ def _mock_generate(prompt: str, max_tokens: int = 512) -> str:
     if len(snippet) > MAX_OUTPUT_CHARS:
         snippet = snippet[:MAX_OUTPUT_CHARS]
     return f"[mock-rewrite] {snippet[: max_tokens * 4]}"
+
+
+def _language_name(lang: str) -> str:
+    code = str(lang or "en").strip().lower()
+    names = {
+        "en": "English",
+        "tr": "Turkish",
+        "fr": "French",
+        "de": "German",
+        "es": "Spanish",
+        "ar": "Arabic",
+        "pt": "Portuguese",
+        "it": "Italian",
+        "nl": "Dutch",
+        "ru": "Russian",
+        "ja": "Japanese",
+        "ko": "Korean",
+        "zh": "Chinese",
+    }
+    return names.get(code, "English")
+
+
+def _infer_role(job_description: str) -> str:
+    text = str(job_description or "").strip()
+    patterns = [
+        r"\b((?:junior|senior|lead|staff|principal)?\s*(?:software|backend|frontend|full stack|data|ml|ai|devops|mobile)?\s*(?:developer|engineer|analyst|specialist|manager|intern))\b",
+        r"\b((?:junior|senior|kıdemli|lider)?\s*(?:backend|frontend|full stack|yazılım|veri|mobil)?\s*(?:geliştirici|mühendis|uzman|stajyer))\b",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.I)
+        if match:
+            return match.group(1).strip()
+
+    for line in text.splitlines():
+        candidate = re.sub(r"[*#:_]+", " ", line).strip()
+        candidate = re.split(r"[.!?]", candidate, maxsplit=1)[0]
+        candidate = re.sub(r"\b(job description|iş tanımı|position|role|pozisyonu?)\b", "", candidate, flags=re.I).strip(" -|")
+        if 4 <= len(candidate) <= 90:
+            return candidate
+    return "the role"
+
+
+def _cover_letter_skill_text(cv_text: str, job_description: str, lang: str) -> str:
+    cv_keywords = _extract_keywords(cv_text, max_items=12)
+    job_keywords = set(_extract_keywords(job_description, max_items=16))
+    keywords = [kw for kw in cv_keywords if kw in job_keywords]
+    for keyword in cv_keywords:
+        if keyword not in keywords:
+            keywords.append(keyword)
+        if len(keywords) >= 5:
+            break
+    if not keywords:
+        return "relevant skills" if lang != "tr" else "ilgili yetkinlikler"
+    if lang == "tr":
+        return ", ".join(keywords[:4])
+    return ", ".join(keywords[:4])
+
+
+def _mock_cover_letter(
+    cv_text: str,
+    job_description: str,
+    lang: str,
+    tone: str,
+    company_name: str,
+    mode: str,
+) -> str:
+    """Local deterministic cover letter fallback that never returns the prompt."""
+    code = str(lang or "en").strip().lower()
+    role = _infer_role(job_description)
+    company = str(company_name or "").strip()
+    company_target = company or ("your team" if code != "tr" else "ekibiniz")
+    skill_text = _cover_letter_skill_text(cv_text, job_description, code)
+
+    if code == "tr":
+        role_text = role if role != "the role" else "bu pozisyon"
+        return (
+            "Sayın İşe Alım Ekibi,\n\n"
+            f"{company_target} bünyesindeki {role_text} için başvurmaktan memnuniyet duyuyorum. "
+            f"CV'mde öne çıkan {skill_text} deneyimim ve öğrenmeye açık çalışma tarzımın bu pozisyonun beklentileriyle uyumlu olduğuna inanıyorum.\n\n"
+            "Teknik konulara analitik yaklaşan, sorumluluk almaktan çekinmeyen ve ekip içinde net iletişime önem veren bir adayım. "
+            "İş tanımında yer alan gereksinimleri dikkatle inceledim; mevcut deneyimimi bu ihtiyaçlara hızlıca uyarlayarak değer üretebileceğime inanıyorum.\n\n"
+            "Bu fırsatı daha detaylı konuşmaktan mutluluk duyarım. Zamanınız ve değerlendirmeniz için teşekkür ederim.\n\n"
+            "Saygılarımla,"
+        )
+
+    if code == "de":
+        return (
+            "Sehr geehrtes Recruiting-Team,\n\n"
+            f"ich bewerbe mich mit großem Interesse auf die Position {role} bei {company_target}. "
+            f"Meine Erfahrung mit {skill_text} sowie meine strukturierte Arbeitsweise passen gut zu den Anforderungen der Stelle.\n\n"
+            "Ich arbeite analytisch, lerne schnell und übernehme Verantwortung für saubere, nachvollziehbare Ergebnisse. "
+            "Gerne würde ich meine Fähigkeiten in Ihr Team einbringen und gemeinsam nachhaltige Lösungen entwickeln.\n\n"
+            "Vielen Dank für Ihre Zeit und die Prüfung meiner Bewerbung.\n\n"
+            "Mit freundlichen Grüßen,"
+        )
+
+    if code == "fr":
+        return (
+            "Madame, Monsieur,\n\n"
+            f"Je souhaite vous présenter ma candidature pour le poste {role} au sein de {company_target}. "
+            f"Mon expérience autour de {skill_text} et ma capacité d'apprentissage correspondent aux attentes du poste.\n\n"
+            "Je suis une personne rigoureuse, curieuse et orientée résolution de problèmes. "
+            "Je serais heureux de mettre mes compétences au service de votre équipe.\n\n"
+            "Je vous remercie pour votre temps et votre considération.\n\n"
+            "Cordialement,"
+        )
+
+    if code == "es":
+        return (
+            "Estimado equipo de selección,\n\n"
+            f"Me gustaría postularme para el puesto de {role} en {company_target}. "
+            f"Mi experiencia en {skill_text} y mi forma de trabajo orientada al aprendizaje encajan con las necesidades del puesto.\n\n"
+            "Soy una persona analítica, responsable y enfocada en aportar resultados claros. "
+            "Me entusiasma la posibilidad de contribuir al equipo y seguir creciendo profesionalmente.\n\n"
+            "Gracias por su tiempo y consideración.\n\n"
+            "Atentamente,"
+        )
+
+    return (
+        "Dear Hiring Team,\n\n"
+        f"I am excited to apply for the {role} position at {company_target}. "
+        f"My background in {skill_text}, together with a practical and {tone} working style, aligns well with the needs described in the job posting.\n\n"
+        "I approach technical work with curiosity, ownership, and clear communication. "
+        f"As a {mode}-level candidate, I am eager to contribute quickly, learn from the team, and help deliver reliable results for the role.\n\n"
+        "Thank you for your time and consideration. I would welcome the opportunity to discuss how my experience can support your team.\n\n"
+        "Sincerely,"
+    )
+
+
+def _clean_cover_letter_output(raw: str) -> str:
+    text = str(raw or "").strip()
+    text = re.sub(r"^\[mock-rewrite\]\s*", "", text, flags=re.I).strip()
+
+    prompt_echo_markers = (
+        "Draft a tailored cover letter",
+        "Write a tailored cover letter",
+        "Rewrite mode:",
+        "Job description:",
+        "Candidate context:",
+        "Job context:",
+        "Rules:",
+        "CV:",
+    )
+    if sum(1 for marker in prompt_echo_markers if marker.lower() in text.lower()) >= 2:
+        return ""
+
+    text = re.sub(r"^(cover letter|ön yazı|motivation letter)\s*[:\-]\s*", "", text, flags=re.I).strip()
+    return text[:MAX_OUTPUT_CHARS].strip()
+
+
+def _truncate_words(text: str, max_chars: int) -> str:
+    value = re.sub(r"\s+", " ", str(text or "")).strip()
+    if len(value) <= max_chars:
+        return value
+    cut = value[:max_chars].rsplit(" ", 1)[0].strip()
+    return cut or value[:max_chars].strip()
+
+
+def _flatten_text_items(value, limit: int = 8) -> list[str]:
+    items: list[str] = []
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, dict):
+                parts = []
+                for key in ("title", "company", "degree", "school", "name", "description"):
+                    part = str(item.get(key) or "").strip()
+                    if part:
+                        parts.append(part)
+                bullets = item.get("bullets") or item.get("highlights") or []
+                if isinstance(bullets, list):
+                    parts.extend(str(b).strip() for b in bullets[:2] if str(b).strip())
+                text = " - ".join(parts)
+            else:
+                text = str(item or "").strip()
+            if text:
+                items.append(_truncate_words(text, 260))
+            if len(items) >= limit:
+                break
+    elif value:
+        items.append(_truncate_words(str(value), 260))
+    return items
+
+
+def _compact_job_context(job_description: str) -> str:
+    text = _guard_text(job_description, MAX_INPUT_CHARS, "job_description")
+    role = _infer_role(text)
+    keywords = _extract_keywords(text, max_items=14)
+    lines = []
+    for raw_line in re.split(r"[\r\n]+", text):
+        line = re.sub(r"\s+", " ", raw_line).strip(" -\t")
+        if not line:
+            continue
+        lines.append(_truncate_words(line, 220))
+        if len(lines) >= 8:
+            break
+    return "\n".join(
+        part for part in (
+            f"Target role: {role}",
+            "Important job keywords: " + ", ".join(keywords[:12]) if keywords else "",
+            "Relevant job context:\n- " + "\n- ".join(lines[:6]) if lines else "",
+        )
+        if part
+    )[:1400]
+
+
+def _compact_builder_context(builder_payload: dict, fallback_text: str = "") -> str:
+    data = builder_payload if isinstance(builder_payload, dict) else {}
+    lines: list[str] = []
+    for key, label in (("full_name", "Name"), ("summary", "Summary"), ("headline", "Headline")):
+        value = str(data.get(key) or "").strip()
+        if value:
+            lines.append(f"{label}: {_truncate_words(value, 420)}")
+
+    skills = data.get("skills") or []
+    if isinstance(skills, list) and skills:
+        lines.append("Skills: " + ", ".join(str(s).strip() for s in skills if str(s).strip())[:500])
+
+    categorized = data.get("skills_categorized") or {}
+    if isinstance(categorized, dict) and not skills:
+        flat = []
+        for values in categorized.values():
+            if isinstance(values, list):
+                flat.extend(str(v).strip() for v in values if str(v).strip())
+        if flat:
+            lines.append("Skills: " + ", ".join(flat[:18])[:500])
+
+    experiences = _flatten_text_items(data.get("experiences"), limit=4)
+    if experiences:
+        lines.append("Experience highlights:\n- " + "\n- ".join(experiences))
+
+    projects = _flatten_text_items(data.get("projects"), limit=3)
+    if projects:
+        lines.append("Project highlights:\n- " + "\n- ".join(projects))
+
+    education = _flatten_text_items(data.get("education"), limit=2)
+    if education:
+        lines.append("Education:\n- " + "\n- ".join(education))
+
+    compact = "\n".join(lines).strip()
+    if compact:
+        return compact[:1900]
+    return _truncate_words(fallback_text, 1900)
+
+
+def _cover_letter_cache_key(payload: dict) -> str:
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+
+
+def _cover_letter_cache_get(payload: dict) -> str | None:
+    return _COVER_LETTER_CACHE.get(_cover_letter_cache_key(payload))
+
+
+def _cover_letter_cache_set(payload: dict, value: str) -> None:
+    if COVER_LETTER_CACHE_LIMIT <= 0:
+        return
+    if len(_COVER_LETTER_CACHE) >= COVER_LETTER_CACHE_LIMIT:
+        try:
+            _COVER_LETTER_CACHE.pop(next(iter(_COVER_LETTER_CACHE)))
+        except Exception:
+            _COVER_LETTER_CACHE.clear()
+    _COVER_LETTER_CACHE[_cover_letter_cache_key(payload)] = value
 
 
 def _generate(prompt: str, max_tokens: int = 512) -> str:
@@ -164,7 +438,7 @@ def rewrite_cv_for_ats(
     rewrite_mode = _normalize_rewrite_mode(mode)
 
     prompt = (
-        f"Rewrite the following CV to improve ATS compatibility in a {tone} tone.\n"
+        f"Rewrite the following CV to improve ATS compatibility and professional wording in a {tone} tone.\n"
         f"Rewrite mode: {rewrite_mode}.\n"
         f"Language: {lang}.\n"
         "Rules:\n"
@@ -175,6 +449,11 @@ def rewrite_cv_for_ats(
         "5. Remove clearly irrelevant sections such as references, hobbies, marital status, date of birth, and photo mentions.\n"
         f"6. Use job-description keywords only when they are already supported by the CV or clearly implied by the source text.\n"
         "7. CRITICAL: If the CV text appears to be a corrupted multi-column layout where text from the left and right columns are mixed on the same line (e.g. 'SQL PROJECT NAME' or 'HTML / CSS FARM GAME'), you MUST disentangle them and reconstruct the sections logically into a single-column format.\n"
+        "8. Rewrite the professional summary into 2-4 concise lines that state role/level, core strengths, and supported target direction.\n"
+        "9. Rewrite weak experience and project bullets using strong, truthful action verbs such as contributed, developed, implemented, designed, optimized, analyzed, collaborated, and maintained.\n"
+        "10. For each experience/project bullet, prefer action + scope/tool + result/purpose. If no measurable metric exists in the source, describe the purpose or contribution without inventing numbers.\n"
+        "11. Fix grammar, awkward phrasing, broken line wraps, repeated words, and sentence flow across all sections.\n"
+        "12. Keep the CV in the same language as the input/requested language. Return only the rewritten CV text, no commentary or markdown fences.\n"
         f"Job description (optional): {job_description}\n\n"
         f"CV:\n{cv_text}\n"
     )
@@ -212,22 +491,68 @@ def rewrite_cover_letter(
     tone: str = "professional",
     company_name: str = "",
     mode: str = "senior",
+    low_token: bool = True,
 ) -> str:
     cv_text = _guard_text(cv_text, MAX_INPUT_CHARS, "cv_text")
     job_description = _guard_text(job_description, MAX_INPUT_CHARS, "job_description")
     rewrite_mode = _normalize_rewrite_mode(mode)
     company_name = str(company_name or "").strip()
-    company_hint = f"Company: {company_name}.\n" if company_name else ""
+    lang_name = _language_name(lang)
+    cache_payload = {
+        "cv": cv_text,
+        "jd": job_description,
+        "lang": lang,
+        "tone": tone,
+        "company": company_name,
+        "mode": rewrite_mode,
+        "low_token": bool(low_token),
+    }
+    cached = _cover_letter_cache_get(cache_payload)
+    if cached:
+        return cached
 
-    prompt = (
-        f"Draft a tailored cover letter in a {tone} tone based on the CV and job description.\n"
-        f"Rewrite mode: {rewrite_mode}.\n"
-        f"Language: {lang}.\n\n"
-        f"{company_hint}"
-        f"Job description:\n{job_description}\n\n"
-        f"CV:\n{cv_text}\n"
+    if low_token:
+        candidate_context = _truncate_words(cv_text, 1900)
+        job_context = _compact_job_context(job_description)
+        prompt = (
+            "Write a tailored cover letter from compact context.\n"
+            f"Language: {lang_name}. Tone: {tone}. Candidate level/mode: {rewrite_mode}.\n"
+            f"Company: {company_name or 'the company'}.\n"
+            "Rules:\n"
+            "- Use only facts supported by the candidate context.\n"
+            "- Preserve the target role and align with the job context.\n"
+            "- Do not invent employers, dates, degrees, metrics, or skills.\n"
+            "- 3 concise paragraphs, 150-220 words, no headings, no markdown, no metadata.\n\n"
+            f"Candidate context:\n{candidate_context}\n\n"
+            f"Job context:\n{job_context}\n"
+        )
+        raw = _generate(prompt, max_tokens=520)
+    else:
+        company_hint = f"Company: {company_name}.\n" if company_name else ""
+        prompt = (
+            f"Draft a tailored cover letter in a {tone} tone based on the CV and job description.\n"
+            f"Rewrite mode: {rewrite_mode}.\n"
+            f"Language: {lang_name}.\n"
+            "Return only the finished cover letter body. Do not include labels, analysis notes, markdown fences, prompt text, or metadata.\n\n"
+            f"{company_hint}"
+            f"Job description:\n{job_description}\n\n"
+            f"CV:\n{cv_text}\n"
+        )
+        raw = _generate(prompt, max_tokens=900)
+    cleaned = _clean_cover_letter_output(raw)
+    if cleaned:
+        _cover_letter_cache_set(cache_payload, cleaned)
+        return cleaned
+    fallback = _mock_cover_letter(
+        cv_text=cv_text,
+        job_description=job_description,
+        lang=lang,
+        tone=tone,
+        company_name=company_name,
+        mode=rewrite_mode,
     )
-    return _generate(prompt)
+    _cover_letter_cache_set(cache_payload, fallback)
+    return fallback
 
 
 def rewrite_cover_letter_from_builder_payload(
@@ -237,6 +562,7 @@ def rewrite_cover_letter_from_builder_payload(
     lang: str = "en",
     tone: str = "professional",
     mode: str = "senior",
+    low_token: bool = True,
 ) -> str:
     if not isinstance(builder_payload, dict):
         raise ValueError("builder_payload must be a dictionary")
@@ -270,6 +596,8 @@ def rewrite_cover_letter_from_builder_payload(
                         lines.append(f"  • {text}")
 
     synthesized_cv = "\n".join(lines).strip()
+    if low_token:
+        synthesized_cv = _compact_builder_context(builder_payload, synthesized_cv)
     return rewrite_cover_letter(
         cv_text=synthesized_cv or json.dumps(builder_payload)[:MAX_INPUT_CHARS],
         job_description=job_description,
@@ -277,6 +605,7 @@ def rewrite_cover_letter_from_builder_payload(
         tone=tone,
         company_name=company_name,
         mode=mode,
+        low_token=low_token,
     )
 
 

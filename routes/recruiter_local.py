@@ -4,20 +4,33 @@ CVs are processed and results returned without saving to database.
 """
 
 import secrets
+import os
 from datetime import datetime, timedelta
 from typing import List
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Header, UploadFile
 from sqlalchemy.orm import Session
 
+from config.aws import MAX_UPLOAD_BYTES
 from database import get_db
 from models import APISubscription, Organization, RecruiterJob
 from routes.recruiter import recruiter_required
+from security.file_guard import read_upload_limited
 from utils.cv_processor import process_cv_batch
 from utils.csv_exporter import generate_csv_download
 from utils.json_exporter import generate_json_download
 
 router = APIRouter(prefix="/api/v1/recruiter", tags=["recruiter-local"])
+
+_MAX_LOCAL_BATCH_FILES = int(os.getenv("RECRUITER_LOCAL_MAX_BATCH_FILES", "100"))
+
+
+def _format_bytes(value: int) -> str:
+    if value >= 1024 * 1024:
+        return f"{value / (1024 * 1024):.0f} MB"
+    if value >= 1024:
+        return f"{value / 1024:.0f} KB"
+    return f"{value} bytes"
 
 
 def generate_api_key() -> str:
@@ -170,10 +183,10 @@ async def process_cvs_local_mode(
     if not files or len(files) == 0:
         raise HTTPException(status_code=400, detail="At least one file is required")
 
-    if len(files) > 500:
+    if len(files) > _MAX_LOCAL_BATCH_FILES:
         raise HTTPException(
             status_code=400,
-            detail=f"Maximum 500 files per request (you provided {len(files)})"
+            detail=f"Maximum {_MAX_LOCAL_BATCH_FILES} files per request (you provided {len(files)})"
         )
 
     # Process CVs (no database save)
@@ -183,7 +196,15 @@ async def process_cvs_local_mode(
         # Convert UploadFile to dict format for ultra-fast processing
         cv_files = []
         for file in files:
-            content = await file.read()
+            try:
+                content = await read_upload_limited(file)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc))
+            if len(content) > MAX_UPLOAD_BYTES:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"File too large (max {_format_bytes(MAX_UPLOAD_BYTES)}): {file.filename}",
+                )
             cv_files.append({
                 'filename': file.filename,
                 'content': content,

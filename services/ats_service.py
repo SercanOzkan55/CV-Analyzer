@@ -56,6 +56,29 @@ MIN_REQUIRED_SECTIONS = [
 ]
 
 
+def _has_project_based_experience(cv_text: str) -> bool:
+    """Treat substantial project sections as experience for student/entry CVs."""
+    text_lower = cv_text.lower()
+    has_projects = bool(re.search(r"\b(?:projects?|key projects|projeler)\b", text_lower))
+    if not has_projects:
+        return False
+    has_project_work = bool(
+        re.search(
+            r"\b(?:developed|implemented|designed|built|created|used|applied|managed|"
+            r"geliştirdi|uyguladı|tasarladı)\b",
+            text_lower,
+        )
+    )
+    has_entry_context = bool(
+        re.search(
+            r"\b(?:student|intern|junior|entry[-\s]?level|graduate|computer engineer|"
+            r"bachelor|university|öğrenci|stajyer|mezun|üniversite)\b",
+            text_lower,
+        )
+    )
+    return has_project_work and has_entry_context
+
+
 # ── Action verbs (comprehensive list for professional CVs) ───────────
 
 ACTION_VERBS = [
@@ -619,7 +642,27 @@ def _work_experience_score(cv_text: str) -> float:
         re.search(r"\b(?:experience|work\s+experience|professional\s+experience|employment|deneyim|iş\s+deneyimi)\b", text_lower)
     )
     if not has_exp:
-        return 20.0
+        if not _has_project_based_experience(cv_text):
+            return 20.0
+        # Student and entry-level CVs often carry practical work under
+        # Projects. Score that as project-based experience without requiring
+        # the CV to invent a formal work-history section.
+        score = 45.0
+        bullets = len(re.findall(r"(^|\n)\s*(\-|\*|â€¢|•)\s+", cv_text))
+        if bullets >= 6:
+            score += 12.0
+        elif bullets >= 3:
+            score += 8.0
+        action_count = sum(
+            1
+            for v in ACTION_VERBS
+            if re.search(r"\b" + re.escape(v) + r"(?:s|ed|ing|d)?\b", text_lower)
+        )
+        if action_count >= 5:
+            score += 12.0
+        elif action_count >= 2:
+            score += 8.0
+        return min(70.0, score)
 
     score = 45.0
 
@@ -1134,6 +1177,8 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
         for s in MIN_REQUIRED_SECTIONS
         if re.search(r"\b" + re.escape(s) + r"\b", cv_text.lower())
     ]
+    if "experience" not in required_found and _has_project_based_experience(cv_text):
+        required_found.append("experience")
     section_presence_score = (len(required_found) / len(MIN_REQUIRED_SECTIONS)) * 100
     contact_score = _contact_score(cv_text)
     bullet_score = _bullet_ratio(cv_text)

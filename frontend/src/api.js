@@ -11,6 +11,11 @@ function authHeaderFrom(token) {
   return t.toLowerCase().startsWith('bearer ') ? t : `Bearer ${t}`
 }
 
+function notifyBillableUsage() {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event('cv-analyzer:billable-usage'))
+}
+
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
@@ -84,12 +89,13 @@ export async function analyzePdf(token, file, jobDescription, { lang = 'en' } = 
   return data
 }
 
-export async function autoFixCv(token, file, jobDescription, { lang = 'en', useAi = true } = {}) {
+export async function autoFixCv(token, file, jobDescription, { lang = 'en', useAi = true, mode } = {}) {
   const fd = new FormData()
   fd.append('file', file)
   fd.append('job_description', jobDescription || '')
   fd.append('lang', lang)
   fd.append('use_ai', String(useAi))
+  fd.append('mode', mode || (useAi ? 'strict' : 'safe'))
 
   const headers = {}
   const auth = authHeaderFrom(token)
@@ -106,6 +112,7 @@ export async function autoFixCv(token, file, jobDescription, { lang = 'en', useA
     throw new Error(err.detail || `Auto-fix failed: ${res.status}`)
   }
 
+  notifyBillableUsage()
   return res.json()
 }
 
@@ -127,6 +134,7 @@ export async function optimizeLinkedIn(token, payload = {}) {
     throw new Error(err.detail || `LinkedIn optimize failed: ${res.status}`)
   }
 
+  notifyBillableUsage()
   return res.json()
 }
 
@@ -148,6 +156,7 @@ export async function fetchJobMatchScore(token, payload = {}) {
     throw new Error(err.detail || `Job match score failed: ${res.status}`)
   }
 
+  notifyBillableUsage()
   return res.json()
 }
 
@@ -332,6 +341,7 @@ export async function recruiterBatchRank(token, { jobDescription = '', jdFile = 
     const err = await res.json().catch(() => ({}))
     throw new Error(err.detail || `Batch rank failed: ${res.status}`)
   }
+  notifyBillableUsage()
   return res.json()
 }
 
@@ -662,6 +672,7 @@ export async function suggestSummary(token, payload) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.detail || `Summary suggestion failed: ${res.status}`)
   }
+  notifyBillableUsage()
   return res.json()
 }
 
@@ -754,6 +765,7 @@ export async function rewriteCV(token, payload) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.detail || `Rewrite failed: ${res.status}`)
   }
+  notifyBillableUsage()
   return res.json()
 }
 
@@ -770,6 +782,7 @@ export async function optimizeKeywords(token, payload) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.detail || `Keyword optimize failed: ${res.status}`)
   }
+  notifyBillableUsage()
   return res.json()
 }
 
@@ -786,6 +799,7 @@ export async function fetchScoreBreakdown(token, payload) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.detail || `Score breakdown failed: ${res.status}`)
   }
+  notifyBillableUsage()
   return res.json()
 }
 
@@ -840,6 +854,7 @@ export async function recruiterScanCV(token, formData) {
       : err.detail
     throw new Error(detail || `Scan failed: ${res.status}`)
   }
+  notifyBillableUsage()
   return res.json()
 }
 
@@ -861,6 +876,7 @@ export async function generateCoverLetter(token, payload = {}) {
     throw new Error(err.detail || `Cover letter generation failed: ${res.status}`)
   }
 
+  notifyBillableUsage()
   return res.json()
 }
 
@@ -882,6 +898,7 @@ export async function generateInterviewQuestions(token, payload = {}) {
     throw new Error(err.detail || `Interview questions failed: ${res.status}`)
   }
 
+  notifyBillableUsage()
   return res.json()
 }
 
@@ -901,7 +918,49 @@ export async function evaluateInterviewAnswer(token, payload = {}) {
     throw new Error(err.detail || `Interview evaluation failed: ${res.status}`)
   }
 
+  notifyBillableUsage()
   return res.json()
+}
+
+// ── User reminders / job tracker notifications ─────────────────────────────
+
+async function _reminderJson(token, path, method = 'GET', payload = null) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+
+  const opts = { method, headers }
+  if (payload) opts.body = JSON.stringify(payload)
+
+  const res = await fetch(`${BASE}${path}`, opts)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    const detail = Array.isArray(err.detail)
+      ? err.detail.map(e => e.msg || e.message || JSON.stringify(e)).join('; ')
+      : err.detail
+    throw new Error(detail || `Reminder request failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function listReminders(token) {
+  return _reminderJson(token, '/api/v1/reminders')
+}
+
+export async function createReminder(token, payload) {
+  return _reminderJson(token, '/api/v1/reminders', 'POST', payload)
+}
+
+export async function updateReminder(token, reminderId, payload) {
+  return _reminderJson(token, `/api/v1/reminders/${reminderId}`, 'PUT', payload)
+}
+
+export async function deleteReminder(token, reminderId) {
+  return _reminderJson(token, `/api/v1/reminders/${reminderId}`, 'DELETE')
+}
+
+export async function sendReminderTest(token, reminderId) {
+  return _reminderJson(token, `/api/v1/reminders/${reminderId}/send-test`, 'POST')
 }
 
 
@@ -948,6 +1007,7 @@ export async function recruiterSaaSBatchUpload(token, jobId, files) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || 'Batch upload failed');
   }
+  notifyBillableUsage();
   return res.json();
 }
 
@@ -982,6 +1042,7 @@ export const recruiterDashboardRank = async (token, payload) => {
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
+  if (res.ok) notifyBillableUsage();
   return res.json();
 }
 
@@ -991,6 +1052,7 @@ export const recruiterDashboardPreview = async (token, payload) => {
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
+  if (res.ok) notifyBillableUsage();
   return res.json();
 }
 

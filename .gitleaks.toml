@@ -1,0 +1,25 @@
+title = "CV Analyzer Gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Project placeholders and non-secret examples"
+regexes = [
+  '''(?i)example[_-]?(key|token|secret|password)''',
+  '''(?i)(changeme|placeholder|testsecret|dummy|mock|dev@example\.com)''',
+  '''(?i)(AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|OPENAI_API_KEY|SENDGRID_API_KEY|SMTP_PASS|SUPABASE_JWT_SECRET|STRIPE_SECRET_KEY)=\s*$''',
+  '''(?i)(S3_KMS_KEY_ID|DATABASE_URL|REDIS_URL|SUPABASE_URL|SUPABASE_KEY)=\s*$''',
+  '''(?i)sb_publishable_[A-Za-z0-9_]+''',
+]
+paths = [
+  '''frontend/dist/.*''',
+  '''frontend/node_modules/.*''',
+  '''node_modules/.*''',
+  '''venv/.*''',
+  '''\.pytest_cache/.*''',
+  '''__pycache__/.*''',
+  '''.*\.pyc$''',
+  '''.*\.sarif$''',
+  '''.*coverage.*''',
+]

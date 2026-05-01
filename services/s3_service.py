@@ -15,10 +15,14 @@ from config.aws import (
     AWS_SECRET_ACCESS_KEY,
     AWS_REGION,
     S3_BUCKET,
+    S3_KMS_KEY_ID,
+    S3_SSE_ALGORITHM,
     PRESIGNED_URL_EXPIRY,
+    has_partial_static_credentials,
+    has_static_credentials,
     is_configured,
 )
-from security.s3_guard import validate_s3_key, clamp_presigned_expiry
+from security.s3_guard import clamp_presigned_expiry, redact_s3_key, validate_s3_key
 
 logger = logging.getLogger(__name__)
 
@@ -41,13 +45,28 @@ def _get_client():
     if _client is None:
         if not is_configured():
             raise RuntimeError("AWS S3 credentials are not configured")
-        _client = boto3.client(
-            "s3",
-            aws_access_key_id=AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-            region_name=AWS_REGION,
-        )
+        if has_partial_static_credentials():
+            raise RuntimeError("AWS S3 credentials are partially configured")
+        client_kwargs = {"region_name": AWS_REGION}
+        if has_static_credentials():
+            client_kwargs.update(
+                {
+                    "aws_access_key_id": AWS_ACCESS_KEY_ID,
+                    "aws_secret_access_key": AWS_SECRET_ACCESS_KEY,
+                }
+            )
+        _client = boto3.client("s3", **client_kwargs)
     return _client
+
+
+def _encryption_args() -> dict:
+    algorithm = (S3_SSE_ALGORITHM or "AES256").strip()
+    args = {"ServerSideEncryption": algorithm}
+    if algorithm == "aws:kms":
+        if not S3_KMS_KEY_ID:
+            raise RuntimeError("S3_KMS_KEY_ID is required when S3_SSE_ALGORITHM=aws:kms")
+        args["SSEKMSKeyId"] = S3_KMS_KEY_ID
+    return args
 
 
 def validate_key(key: str) -> None:
@@ -63,6 +82,7 @@ def validate_key(key: str) -> None:
 def upload(file_bytes: bytes, key: str, content_type: str = "application/pdf", _retries: int = 3) -> str:
     """Upload bytes to S3.  Returns the key on success. Retries transient errors."""
     validate_key(key)
+    log_key = redact_s3_key(key)
     last_exc = None
     for attempt in range(1, _retries + 1):
         try:
@@ -71,13 +91,14 @@ def upload(file_bytes: bytes, key: str, content_type: str = "application/pdf", _
                 Key=key,
                 Body=file_bytes,
                 ContentType=content_type,
-                ServerSideEncryption="AES256",
+                Metadata={"app": "cv-analyzer", "content-class": "cv"},
+                **_encryption_args(),
             )
-            logger.info("s3:upload key=%s size=%d attempt=%d", key, len(file_bytes), attempt)
+            logger.info("s3:upload key=%s size=%d attempt=%d", log_key, len(file_bytes), attempt)
             return key
         except ClientError as exc:
             code = exc.response["Error"]["Code"]
-            logger.error("s3:upload_failed key=%s error=%s attempt=%d", key, code, attempt)
+            logger.error("s3:upload_failed key=%s error=%s attempt=%d", log_key, code, attempt)
             _s3_error()
             if code == "InvalidAccessKeyId":
                 raise RuntimeError("AWS credentials are invalid") from exc
@@ -85,7 +106,7 @@ def upload(file_bytes: bytes, key: str, content_type: str = "application/pdf", _
                 raise PermissionError("S3 access denied") from exc
             last_exc = exc
         except BotoCoreError as exc:
-            logger.error("s3:upload_error key=%s error=%s attempt=%d", key, exc, attempt)
+            logger.error("s3:upload_error key=%s error=%s attempt=%d", log_key, exc, attempt)
             _s3_error()
             last_exc = exc
         if attempt < _retries:
@@ -96,17 +117,22 @@ def upload(file_bytes: bytes, key: str, content_type: str = "application/pdf", _
 def get_presigned_url(key: str, expires: int = PRESIGNED_URL_EXPIRY) -> str:
     """Generate a time-limited download URL.  Never returns a public URL."""
     validate_key(key)
+    log_key = redact_s3_key(key)
     expires = clamp_presigned_expiry(expires)
     try:
         url = _get_client().generate_presigned_url(
             "get_object",
-            Params={"Bucket": S3_BUCKET, "Key": key},
+            Params={
+                "Bucket": S3_BUCKET,
+                "Key": key,
+                "ResponseContentDisposition": f'attachment; filename="{key.rsplit("/", 1)[-1]}"',
+            },
             ExpiresIn=expires,
         )
-        logger.info("s3:presign key=%s expires=%ds", key, expires)
+        logger.info("s3:presign key=%s expires=%ds", log_key, expires)
         return url
     except (ClientError, BotoCoreError) as exc:
-        logger.error("s3:presign_failed key=%s error=%s", key, exc)
+        logger.error("s3:presign_failed key=%s error=%s", log_key, exc)
         _s3_error()
         raise
 
@@ -114,11 +140,12 @@ def get_presigned_url(key: str, expires: int = PRESIGNED_URL_EXPIRY) -> str:
 def delete(key: str) -> None:
     """Delete an object from S3."""
     validate_key(key)
+    log_key = redact_s3_key(key)
     try:
         _get_client().delete_object(Bucket=S3_BUCKET, Key=key)
-        logger.info("s3:delete key=%s", key)
+        logger.info("s3:delete key=%s", log_key)
     except (ClientError, BotoCoreError) as exc:
-        logger.error("s3:delete_failed key=%s error=%s", key, exc)
+        logger.error("s3:delete_failed key=%s error=%s", log_key, exc)
         _s3_error()
         raise
 
@@ -151,11 +178,12 @@ def check_permissions() -> dict:
     Returns dict with 'read' and 'write' boolean results.
     """
     result = {"read": False, "write": False}
-    test_key = "__healthcheck_permissions_probe"
+    test_key = "user_healthcheck/original/healthcheck.pdf"
     try:
         _get_client().put_object(
             Bucket=S3_BUCKET, Key=test_key, Body=b"ok",
             ContentType="text/plain",
+            **_encryption_args(),
         )
         result["write"] = True
     except Exception as exc:

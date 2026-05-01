@@ -113,6 +113,7 @@ export default function CoverLetterPage() {
         lang,
         tone,
         mode,
+        low_token: true,
       })
 
       const letterText = data?.result?.cover_letter || data?.result?.text || data?.result || ''

@@ -8,13 +8,23 @@ from email.utils import formataddr
 from fastapi import HTTPException, UploadFile
 from sqlalchemy import or_
 
+from config.aws import MAX_PDF_OBJECTS, MAX_PDF_PAGES, MAX_UPLOAD_BYTES
 from database import engine
 from models import Reminder
+from security.redaction import redact_for_log
 
 _MAX_SEARCH_QUERY_LEN = int(os.getenv("MAX_SEARCH_QUERY_LEN", "500"))
-_MAX_PDF_PAGES = 50
-_MAX_PDF_OBJECTS = 5000
+_MAX_PDF_PAGES = MAX_PDF_PAGES
+_MAX_PDF_OBJECTS = MAX_PDF_OBJECTS
 _MAX_PDF_EXTRACTED_CHARS = 60_000
+
+
+def _format_bytes(value: int) -> str:
+    if value >= 1024 * 1024:
+        return f"{value / (1024 * 1024):.0f} MB"
+    if value >= 1024:
+        return f"{value / 1024:.0f} KB"
+    return f"{value} bytes"
 
 
 def _is_postgres_engine() -> bool:
@@ -32,25 +42,28 @@ def _validate_pdf_upload(contents: bytes, content_type: str | None) -> None:
         raise HTTPException(status_code=400, detail="Empty file")
     if content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
-    if len(contents) > 5_000_000:
-        raise HTTPException(status_code=400, detail="File too large (max 5MB)")
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large (max {_format_bytes(MAX_UPLOAD_BYTES)})",
+        )
     if not contents.startswith(b"%PDF-"):
         raise HTTPException(status_code=400, detail="Invalid PDF file")
 
     obj_count = contents.count(b" obj")
-    if obj_count > 5_000:
+    if obj_count > _MAX_PDF_OBJECTS:
         logging.getLogger("app.security").warning(
-            "pdf_rejected: too many objects %d > %d", obj_count, 5_000
+            "pdf_rejected: too many objects %d > %d", obj_count, _MAX_PDF_OBJECTS
         )
         raise HTTPException(status_code=400, detail="PDF too complex (too many objects)")
 
     page_count = contents.count(b"/Type /Page") - contents.count(b"/Type /Pages")
-    if page_count > 10:
+    if page_count > _MAX_PDF_PAGES:
         logging.getLogger("app.security").warning(
-            "pdf_rejected: too many pages %d > %d", page_count, 10
+            "pdf_rejected: too many pages %d > %d", page_count, _MAX_PDF_PAGES
         )
         raise HTTPException(
-            status_code=400, detail="PDF too large (max 10 pages)"
+            status_code=400, detail=f"PDF too large (max {_MAX_PDF_PAGES} pages)"
         )
 
     try:
@@ -72,6 +85,14 @@ def _extract_pdf_text(contents: bytes) -> tuple[str, bool]:
 
     Returns (text, truncated) where truncated is True if content was capped.
     """
+    from services.pdf_text_extractor import extract_pdf_text
+
+    return extract_pdf_text(
+        contents,
+        max_pages=_MAX_PDF_PAGES,
+        max_chars=_MAX_PDF_EXTRACTED_CHARS,
+    )
+
     from renderers.blocks import fix_decomposed_diacritics
 
     # ── Primary: pdfplumber with coordinate-based column detection ──
@@ -304,6 +325,7 @@ def _do_send_email(
     recruiter_email: str = "",
 ) -> bool:
     _logger = logging.getLogger("app.recruiter.email")
+    default_from = (os.environ.get("REMINDER_EMAIL_FROM") or "sikayet.cvanalizor@gmail.com").strip()
 
     sendgrid_key = os.environ.get("SENDGRID_API_KEY", "")
     if sendgrid_key:
@@ -311,7 +333,7 @@ def _do_send_email(
             import sendgrid
             from sendgrid.helpers.mail import Mail, Email, To, Content
 
-            platform_from = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@cvanalyzer.com")
+            platform_from = (os.environ.get("SENDGRID_FROM_EMAIL") or default_from).strip()
             if recruiter_email and recruiter_email != platform_from:
                 from_email = Email(platform_from, name=recruiter_email)
             else:
@@ -329,13 +351,13 @@ def _do_send_email(
             )
             _logger.info(
                 "sendgrid_sent to=%s reply_to=%s status=%s",
-                to_email,
-                recruiter_email,
+                redact_for_log(to_email, key="to_email"),
+                redact_for_log(recruiter_email, key="recruiter_email"),
                 response.status_code,
             )
             return response.status_code in (200, 201, 202)
         except Exception as e:
-            _logger.error("sendgrid_failed to=%s error=%s", to_email, e)
+            _logger.error("sendgrid_failed to=%s error=%s", redact_for_log(to_email, key="to_email"), e)
 
     smtp_host = os.environ.get("SMTP_HOST", "")
     if smtp_host:
@@ -346,7 +368,7 @@ def _do_send_email(
             smtp_port = int(os.environ.get("SMTP_PORT", "587"))
             smtp_user = os.environ.get("SMTP_USER", "")
             smtp_pass = os.environ.get("SMTP_PASS", "")
-            platform_from = os.environ.get("SMTP_FROM", "noreply@cvanalyzer.com")
+            platform_from = (os.environ.get("SMTP_FROM") or default_from).strip()
 
             if recruiter_email and recruiter_email != platform_from:
                 from_display = formataddr((recruiter_email, platform_from))
@@ -366,12 +388,16 @@ def _do_send_email(
                     server.login(smtp_user, smtp_pass)
                 server.sendmail(platform_from, [to_email], msg.as_string())
 
-            _logger.info("smtp_sent to=%s reply_to=%s", to_email, recruiter_email)
+            _logger.info(
+                "smtp_sent to=%s reply_to=%s",
+                redact_for_log(to_email, key="to_email"),
+                redact_for_log(recruiter_email, key="recruiter_email"),
+            )
             return True
         except Exception as e:
-            _logger.error("smtp_failed to=%s error=%s", to_email, e)
+            _logger.error("smtp_failed to=%s error=%s", redact_for_log(to_email, key="to_email"), e)
 
-    _logger.warning("no_email_backend configured, email not sent to=%s", to_email)
+    _logger.warning("no_email_backend configured, email not sent to=%s", redact_for_log(to_email, key="to_email"))
     return False
 
 
@@ -382,24 +408,44 @@ def _validate_reminder_email(email: str) -> str:
     return candidate_email
 
 
+def _reminder_type_label(value: str) -> str:
+    labels = {
+        "interview": "Mülakat",
+        "offer": "Teklif",
+        "deadline": "Son tarih",
+        "follow_up": "Takip",
+        "other": "Hatırlatma",
+    }
+    return labels.get(str(value or "").strip().lower(), "Hatırlatma")
+
+
 def _render_reminder_subject(reminder: Reminder, days_left: int) -> str:
-    label = reminder.reminder_type or "Hatırlatma"
-    return f"[{label.capitalize()}] {reminder.title} - {days_left} gün kaldı"
+    label = _reminder_type_label(reminder.reminder_type)
+    day_text = "1 gün kaldı" if int(days_left) <= 1 else f"{int(days_left)} gün kaldı"
+    return f"[CV Analyzer] {label}: {reminder.title} - {day_text}"
 
 
 def _render_reminder_body(reminder: Reminder, days_left: int) -> str:
     event_date = reminder.event_date.strftime("%Y-%m-%d %H:%M")
+    label = _reminder_type_label(reminder.reminder_type)
+    day_text = "1 gün kaldı" if int(days_left) <= 1 else f"{int(days_left)} gün kaldı"
     body_lines = [
         "Merhaba,",
         "",
-        f"{reminder.title} için planlanmış tarih: {event_date}",
-        f"Kalan süre: {days_left} gün.",
+        "CV Analyzer hatırlatması:",
+        f"Etkinlik: {label}",
+        f"Başlık: {reminder.title}",
+        f"Tarih: {event_date}",
+        f"Kalan süre: {day_text}.",
     ]
     if reminder.description:
-        body_lines.extend(["", "Açıklama:", reminder.description.strip()])
+        body_lines.extend(["", "Notlar:", reminder.description.strip()])
     body_lines.extend([
         "",
-        "Lütfen hazırlanmayı unutma.",
+        "Kısa kontrol listesi:",
+        "- CV ve iş ilanını tekrar gözden geçir.",
+        "- Görüşme linkini, adresi veya son teklif tarihini kontrol et.",
+        "- Sorularını ve takip notlarını hazırla.",
         "",
         "Bu hatırlatma otomatik olarak gönderildi.",
     ])
@@ -419,12 +465,14 @@ def _send_reminder_email(reminder: Reminder, days_left: int, recipient: str) -> 
 
 def _process_due_reminders(db):
     now = datetime.utcnow()
+    today = now.date()
+    window_end = datetime.combine(today + timedelta(days=3), datetime.max.time())
     reminders = (
         db.query(Reminder)
         .filter(
             Reminder.is_active == True,
             Reminder.event_date > now,
-            Reminder.event_date <= now + timedelta(days=3),
+            Reminder.event_date <= window_end,
             or_(Reminder.notified_3d_at.is_(None), Reminder.notified_1d_at.is_(None)),
         )
         .all()
@@ -432,11 +480,11 @@ def _process_due_reminders(db):
     for reminder in reminders:
         if reminder.event_date <= now:
             continue
-        delta = reminder.event_date - now
+        days_left = (reminder.event_date.date() - today).days
         recipient = reminder.target_email or ""
         if not recipient:
             continue
-        if reminder.notified_1d_at is None and delta <= timedelta(days=1):
+        if reminder.notified_1d_at is None and days_left <= 1:
             if _send_reminder_email(reminder, 1, recipient):
                 reminder.notified_1d_at = now
                 db.add(reminder)
@@ -445,8 +493,7 @@ def _process_due_reminders(db):
         if (
             reminder.notified_3d_at is None
             and reminder.notified_1d_at is None
-            and timedelta(days=1) < delta
-            and delta <= timedelta(days=3)
+            and days_left == 3
         ):
             if _send_reminder_email(reminder, 3, recipient):
                 reminder.notified_3d_at = now
