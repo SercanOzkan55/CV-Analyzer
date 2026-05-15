@@ -134,6 +134,7 @@ export const BatchUploadLocalMode = ({
       // Individual file processing
       if (files.length > 500) {
         setError('Maximum 500 files per upload')
+        setProcessing(false)
         return
       }
 
@@ -388,17 +389,6 @@ export const BatchUploadLocalMode = ({
                   </div>
                 </>
               )}
-            </div>
-                </p>
-                <button
-                  type="button"
-                  className="bul-btn bul-btn-primary"
-                  onClick={handleBrowse}
-                  disabled={processing}
-                >
-                  Select Files
-                </button>
-              </div>
             </div>
 
             {/* File List */}

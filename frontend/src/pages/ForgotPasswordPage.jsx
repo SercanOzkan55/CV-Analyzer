@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
   return (
     <div className="auth-layout">
       <Navbar />
-      <div className="auth-page">
+      <main className="auth-page" id="main-content">
         <div className="auth-card">
           <h1>{t('auth.forgot_title')}</h1>
           <p className="auth-subtitle">{t('auth.forgot_subtitle')}</p>
@@ -63,7 +63,7 @@ export default function ForgotPasswordPage() {
             <Link to="/login" className="link-btn">{t('auth.back_to_login')}</Link>
           </p>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

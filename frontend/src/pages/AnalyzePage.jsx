@@ -26,6 +26,54 @@ function uiCopy(lang, tr, en) {
   return lang === 'tr' ? tr : en
 }
 
+const STATUS_COLOR = {
+  success: 'var(--status-success)',
+  warning: 'var(--status-warning)',
+  danger: 'var(--status-danger)',
+  info: 'var(--status-info)',
+  accent: 'var(--status-accent)',
+}
+
+const STATUS_BG = {
+  success: 'var(--status-success-bg)',
+  warning: 'var(--status-warning-bg)',
+  danger: 'var(--status-danger-bg)',
+  info: 'var(--status-info-bg)',
+  accent: 'var(--status-accent-bg)',
+}
+
+const STATUS_BORDER = {
+  success: 'var(--status-success-border)',
+  warning: 'var(--status-warning-border)',
+  danger: 'var(--status-danger-border)',
+  info: 'var(--status-info-border)',
+  accent: 'var(--status-accent-border)',
+}
+
+function scoreStatus(score, mid = 50, high = 70) {
+  const value = Number(score) || 0
+  if (value >= high) return 'success'
+  if (value >= mid) return 'warning'
+  return 'danger'
+}
+
+function scoreColor(score, mid = 50, high = 70) {
+  return STATUS_COLOR[scoreStatus(score, mid, high)]
+}
+
+function scoreToneStyle(score, mid = 50, high = 70) {
+  const status = scoreStatus(score, mid, high)
+  return {
+    background: STATUS_BG[status],
+    border: `1px solid ${STATUS_BORDER[status]}`,
+  }
+}
+
+function scoreGradient(score, mid = 50, high = 70) {
+  const status = scoreStatus(score, mid, high)
+  return `linear-gradient(90deg, ${STATUS_COLOR[status]}, color-mix(in srgb, ${STATUS_COLOR[status]} 70%, white))`
+}
+
 function normalizeForMatch(value) {
   return String(value || '').toLocaleLowerCase('tr-TR')
 }
@@ -785,15 +833,15 @@ export default function AnalyzePage() {
   function getRiskColor(level) {
     const lower = (level || '').toLowerCase()
     // Support multiple languages: "low risk", "düşük risk", "risque faible", etc.
-    if (lower.includes('low') || lower.includes('düşük') || lower.includes('faible') || lower.includes('bajo') || lower.includes('منخفضة') || lower.includes('baixo') || lower.includes('basso') || lower.includes('laag') || lower.includes('низкий') || lower.includes('低')) return '#22c55e'
-    if (lower.includes('medium') || lower.includes('orta') || lower.includes('moyen') || lower.includes('medio') || lower.includes('متوسطة') || lower.includes('médio') || lower.includes('gemiddeld') || lower.includes('средний') || lower.includes('中')) return '#eab308'
-    return '#ef4444'
+    if (lower.includes('low') || lower.includes('düşük') || lower.includes('faible') || lower.includes('bajo') || lower.includes('منخفضة') || lower.includes('baixo') || lower.includes('basso') || lower.includes('laag') || lower.includes('низкий') || lower.includes('低')) return STATUS_COLOR.success
+    if (lower.includes('medium') || lower.includes('orta') || lower.includes('moyen') || lower.includes('medio') || lower.includes('متوسطة') || lower.includes('médio') || lower.includes('gemiddeld') || lower.includes('средний') || lower.includes('中')) return STATUS_COLOR.warning
+    return STATUS_COLOR.danger
   }
 
   return (
     <div className="app-layout">
       <Navbar />
-      <main className="main-content">
+      <main className="main-content" id="main-content">
         <QuotaWarningBanner />
         <motion.div
           className="page-header"
@@ -913,30 +961,30 @@ export default function AnalyzePage() {
                 {jobDesc?.trim() ? (
                   /* JD provided → show match level */
                   result.final_score >= 75 ? (
-                    <span style={{ background: '#166534', color: '#4ade80', padding: '2px 10px', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 600 }}>
+                    <span className="status-pill status-pill-success">
                       {t('results.strong_match')}
                     </span>
                   ) : result.final_score >= 50 ? (
-                    <span style={{ background: '#854d0e', color: '#facc15', padding: '2px 10px', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 600 }}>
+                    <span className="status-pill status-pill-warning">
                       {t('results.moderate_match')}
                     </span>
                   ) : (
-                    <span style={{ background: '#991b1b', color: '#f87171', padding: '2px 10px', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 600 }}>
+                    <span className="status-pill status-pill-danger">
                       {t('results.weak_match')}
                     </span>
                   )
                 ) : (
                   /* No JD → show CV quality level */
                   result.final_score >= 75 ? (
-                    <span style={{ background: '#166534', color: '#4ade80', padding: '2px 10px', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 600 }}>
+                    <span className="status-pill status-pill-success">
                       {t('results.excellent_quality')}
                     </span>
                   ) : result.final_score >= 50 ? (
-                    <span style={{ background: '#854d0e', color: '#facc15', padding: '2px 10px', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 600 }}>
+                    <span className="status-pill status-pill-warning">
                       {t('results.good_quality')}
                     </span>
                   ) : (
-                    <span style={{ background: '#991b1b', color: '#f87171', padding: '2px 10px', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 600 }}>
+                    <span className="status-pill status-pill-danger">
                       {t('results.needs_improvement')}
                     </span>
                   )
@@ -951,9 +999,9 @@ export default function AnalyzePage() {
                 <div>
                   <h2 style={{ margin: '0 0 0.5rem 0' }}>{t('results.title')}</h2>
                   <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
-                    <span style={{ color: '#4ade80' }}>✓ {result.ats?.passed_checks ?? 0} {t('results.passed_checks')}</span>
-                    <span style={{ color: '#facc15' }}>⚠ {result.ats?.warning_checks ?? 0} {t('results.warnings')}</span>
-                    <span style={{ color: '#f87171' }}>✕ {result.ats?.failed_checks ?? 0} {t('results.issues')}</span>
+                    <span className="status-count status-count-success">✓ {result.ats?.passed_checks ?? 0} {t('results.passed_checks')}</span>
+                    <span className="status-count status-count-warning">⚠ {result.ats?.warning_checks ?? 0} {t('results.warnings')}</span>
+                    <span className="status-count status-count-danger">✕ {result.ats?.failed_checks ?? 0} {t('results.issues')}</span>
                   </div>
                 </div>
                 <ScoreCircle score={result.final_score} size={100} label={jobDesc?.trim() ? t('results.final_score') : t('results.analysis_score')} />
@@ -970,23 +1018,22 @@ export default function AnalyzePage() {
                     {/* CV Quality */}
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                        <span style={{ fontSize: '0.82rem', color: '#94a3b8', fontWeight: 500 }}>
+                        <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
                           📄 {t('results.cv_quality') || 'CV Quality'}
                         </span>
                         <span style={{
                           fontSize: '1rem', fontWeight: 700,
-                          color: (result.score_decomposition.ats_quality || 0) >= 70 ? '#4ade80'
-                               : (result.score_decomposition.ats_quality || 0) >= 50 ? '#facc15' : '#f87171',
+                          color: scoreColor(result.score_decomposition.ats_quality || 0),
                           fontFamily: "'JetBrains Mono', monospace",
                         }}>
                           {Math.round(result.score_decomposition.ats_quality || 0)}%
                         </span>
                       </div>
-                      <div style={{ width: '100%', height: '6px', background: '#1e293b', borderRadius: '3px', overflow: 'hidden' }}>
+                      <div style={{ width: '100%', height: '6px', background: 'var(--bg-input)', borderRadius: '3px', overflow: 'hidden' }}>
                         <div style={{
                           width: `${Math.min(100, result.score_decomposition.ats_quality || 0)}%`,
                           height: '100%', borderRadius: '3px',
-                          background: 'linear-gradient(90deg, #3b82f6, #60a5fa)',
+                          background: 'linear-gradient(90deg, var(--status-info), color-mix(in srgb, var(--status-info) 70%, white))',
                           transition: 'width 0.8s ease',
                         }} />
                       </div>
@@ -994,27 +1041,22 @@ export default function AnalyzePage() {
                     {/* Job Match */}
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                        <span style={{ fontSize: '0.82rem', color: '#94a3b8', fontWeight: 500 }}>
+                        <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
                           🎯 {t('results.job_match') || 'Job Match'}
                         </span>
                         <span style={{
                           fontSize: '1rem', fontWeight: 700,
-                          color: (result.score_decomposition.job_match || 0) >= 70 ? '#4ade80'
-                               : (result.score_decomposition.job_match || 0) >= 40 ? '#facc15' : '#f87171',
+                          color: scoreColor(result.score_decomposition.job_match || 0, 40),
                           fontFamily: "'JetBrains Mono', monospace",
                         }}>
                           {Math.round(result.score_decomposition.job_match || 0)}%
                         </span>
                       </div>
-                      <div style={{ width: '100%', height: '6px', background: '#1e293b', borderRadius: '3px', overflow: 'hidden' }}>
+                      <div style={{ width: '100%', height: '6px', background: 'var(--bg-input)', borderRadius: '3px', overflow: 'hidden' }}>
                         <div style={{
                           width: `${Math.min(100, result.score_decomposition.job_match || 0)}%`,
                           height: '100%', borderRadius: '3px',
-                          background: (result.score_decomposition.job_match || 0) >= 70
-                            ? 'linear-gradient(90deg, #22c55e, #4ade80)'
-                            : (result.score_decomposition.job_match || 0) >= 40
-                              ? 'linear-gradient(90deg, #eab308, #facc15)'
-                              : 'linear-gradient(90deg, #ef4444, #f87171)',
+                          background: scoreGradient(result.score_decomposition.job_match || 0, 40),
                           transition: 'width 0.8s ease',
                         }} />
                       </div>
@@ -1022,16 +1064,11 @@ export default function AnalyzePage() {
                   </div>
                   {/* Interpretation message */}
                   <div style={{
-                    background: (result.score_decomposition.job_match || 0) >= 70
-                      ? 'rgba(34,197,94,0.08)' : (result.score_decomposition.job_match || 0) >= 40
-                        ? 'rgba(234,179,8,0.08)' : 'rgba(239,68,68,0.08)',
-                    border: `1px solid ${(result.score_decomposition.job_match || 0) >= 70
-                      ? 'rgba(34,197,94,0.2)' : (result.score_decomposition.job_match || 0) >= 40
-                        ? 'rgba(234,179,8,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                    ...scoreToneStyle(result.score_decomposition.job_match || 0, 40),
                     borderRadius: '0.5rem',
                     padding: '0.5rem 0.75rem',
                     fontSize: '0.82rem',
-                    color: '#cbd5e1',
+                    color: 'var(--color-text-secondary)',
                   }}>
                     {result.score_decomposition.interpretation}
                   </div>
@@ -1042,8 +1079,8 @@ export default function AnalyzePage() {
             {/* Info banner when no job description */}
             {!jobDesc?.trim() && (
               <div style={{
-                background: 'rgba(56,189,248,0.08)',
-                border: '1px solid rgba(56,189,248,0.25)',
+                background: 'var(--status-info-bg)',
+                border: '1px solid var(--status-info-border)',
                 borderRadius: '0.75rem',
                 padding: '0.75rem 1rem',
                 marginBottom: '1rem',
@@ -1051,7 +1088,7 @@ export default function AnalyzePage() {
                 alignItems: 'center',
                 gap: '0.5rem',
                 fontSize: '0.85rem',
-                color: '#7dd3fc',
+                color: 'var(--status-info)',
               }}>
                 <span style={{ fontSize: '1.1rem' }}>ℹ️</span>
                 {t('results.no_jd_info')}
@@ -1069,7 +1106,7 @@ export default function AnalyzePage() {
             )}
 
             {/* Tabs */}
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '1px solid #1e293b', paddingBottom: '0.75rem', flexWrap: 'wrap' }}>
+            <div className="analysis-tabs">
               {[
                 { id: 'overview', icon: '📊', label: t('analyze.tab_overview') },
                 { id: 'detailed', icon: '📋', label: t('analyze.tab_detailed') },
@@ -1080,17 +1117,7 @@ export default function AnalyzePage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  style={{
-                    background: activeTab === tab.id ? 'rgba(192,132,252,0.1)' : 'transparent',
-                    color: activeTab === tab.id ? '#c084fc' : '#94a3b8',
-                    border: 'none',
-                    borderBottom: activeTab === tab.id ? '2px solid #c084fc' : '2px solid transparent',
-                    padding: '0.5rem 1rem',
-                    cursor: 'pointer',
-                    fontSize: '0.9rem',
-                    fontWeight: activeTab === tab.id ? 600 : 400,
-                    transition: 'all 0.2s',
-                  }}
+                  className={`analysis-tab ${activeTab === tab.id ? 'active' : ''}`}
                   type="button"
                 >
                   {tab.icon} {tab.label}
@@ -1297,22 +1324,22 @@ export default function AnalyzePage() {
                           <span>{section.icon}</span>
                           <strong>{section.label?.[lang] || section.label?.en || section.name}</strong>
                         </div>
-                        <span style={{ fontSize: '1.25rem', fontWeight: 700, color: section.score >= 70 ? '#4ade80' : section.score >= 50 ? '#facc15' : '#f87171' }}>
+                        <span style={{ fontSize: '1.25rem', fontWeight: 700, color: scoreColor(section.score) }}>
                           {Math.round(section.score)}
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                        {section.status === 'pass' && <span style={{ color: '#4ade80', fontSize: '0.8rem' }}>✓ {t('results.status_pass')}</span>}
-                        {section.status === 'warning' && <span style={{ color: '#facc15', fontSize: '0.8rem' }}>⚠ {t('results.status_warning')}</span>}
-                        {section.status === 'fail' && <span style={{ color: '#f87171', fontSize: '0.8rem' }}>✕ {t('results.status_fail')}</span>}
+                        {section.status === 'pass' && <span style={{ color: STATUS_COLOR.success, fontSize: '0.8rem' }}>✓ {t('results.status_pass')}</span>}
+                        {section.status === 'warning' && <span style={{ color: STATUS_COLOR.warning, fontSize: '0.8rem' }}>⚠ {t('results.status_warning')}</span>}
+                        {section.status === 'fail' && <span style={{ color: STATUS_COLOR.danger, fontSize: '0.8rem' }}>✕ {t('results.status_fail')}</span>}
                       </div>
                       {/* Score bar */}
-                      <div style={{ width: '100%', height: '4px', background: '#1e293b', borderRadius: '2px', marginBottom: '0.5rem' }}>
+                      <div style={{ width: '100%', height: '4px', background: 'var(--bg-input)', borderRadius: '2px', marginBottom: '0.5rem' }}>
                         <div style={{
                           width: `${Math.min(100, section.score)}%`,
                           height: '100%',
                           borderRadius: '2px',
-                          background: section.score >= 70 ? '#22c55e' : section.score >= 50 ? '#eab308' : '#ef4444',
+                          background: scoreColor(section.score),
                           transition: 'width 0.5s ease',
                         }} />
                       </div>
@@ -1339,11 +1366,11 @@ export default function AnalyzePage() {
 
                   {/* Score Suggestions — actionable improvement tips */}
                   {jobDesc?.trim() && result.score_suggestions?.length > 0 && (
-                    <div className="card" style={{ borderLeft: '3px solid #a855f7' }}>
-                      <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0, color: '#c084fc' }}>
+                    <div className="card" style={{ borderLeft: '3px solid var(--status-accent)' }}>
+                      <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0, color: 'var(--status-accent)' }}>
                         💡 {t('results.suggestions_title') || 'How to Improve Your Score'}
                       </h3>
-                      <p style={{ fontSize: '0.82rem', color: '#94a3b8', margin: '0 0 0.75rem 0' }}>
+                      <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: '0 0 0.75rem 0' }}>
                         {t('results.suggestions_desc') || 'Add these to your CV for the highest impact:'}
                       </p>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -1364,7 +1391,7 @@ export default function AnalyzePage() {
                               <span style={{ fontSize: '0.85rem', color: '#e2e8f0' }}>{s.action}</span>
                             </div>
                             <span style={{
-                              background: 'linear-gradient(135deg, #a855f7, #6366f1)',
+                              background: 'var(--gradient-accent)',
                               color: '#fff',
                               padding: '2px 8px',
                               borderRadius: '999px',
@@ -1398,26 +1425,26 @@ export default function AnalyzePage() {
                     style={{
                       margin: 0,
                       padding: '1rem 1.25rem',
-                      borderLeft: `3px solid ${section.status === 'pass' ? '#22c55e' : section.status === 'warning' ? '#eab308' : '#ef4444'}`,
+                      borderLeft: `3px solid ${section.status === 'pass' ? STATUS_COLOR.success : section.status === 'warning' ? STATUS_COLOR.warning : STATUS_COLOR.danger}`,
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        {section.status === 'pass' && <span style={{ color: '#4ade80' }}>✓</span>}
-                        {section.status === 'warning' && <span style={{ color: '#facc15' }}>⚠</span>}
-                        {section.status === 'fail' && <span style={{ color: '#f87171' }}>✕</span>}
+                        {section.status === 'pass' && <span style={{ color: STATUS_COLOR.success }}>✓</span>}
+                        {section.status === 'warning' && <span style={{ color: STATUS_COLOR.warning }}>⚠</span>}
+                        {section.status === 'fail' && <span style={{ color: STATUS_COLOR.danger }}>✕</span>}
                         <span>{section.icon}</span>
                         <strong>{section.label?.[lang] || section.label?.en || section.name}</strong>
                       </div>
-                      <span style={{ fontSize: '1.1rem', fontWeight: 700, color: section.score >= 70 ? '#4ade80' : section.score >= 50 ? '#facc15' : '#f87171' }}>
+                      <span style={{ fontSize: '1.1rem', fontWeight: 700, color: scoreColor(section.score) }}>
                         {Math.round(section.score)}
                       </span>
                     </div>
-                    <p style={{ margin: '0.25rem 0 0.5rem 0', fontSize: '0.9rem', color: '#94a3b8' }}>{L(section.message)}</p>
+                    <p style={{ margin: '0.25rem 0 0.5rem 0', fontSize: '0.9rem', color: 'var(--color-text-secondary)' }}>{L(section.message)}</p>
                     {section.recommendations?.length > 0 && (
                       <div>
                         <strong style={{ fontSize: '0.85rem', color: '#cbd5e1' }}>{t('results.recommendations')}:</strong>
-                        <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.25rem', fontSize: '0.85rem', color: '#94a3b8' }}>
+                        <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
                           {section.recommendations.map((rec, i) => <li key={i} style={{ marginBottom: '2px' }}>{L(rec)}</li>)}
                         </ul>
                       </div>
@@ -1451,13 +1478,13 @@ export default function AnalyzePage() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
                   {/* High Priority */}
                   {result.ats?.priority_recommendations?.high?.length > 0 && (
-                    <div className="card" style={{ margin: 0, borderLeft: '3px solid #ef4444' }}>
-                      <h3 style={{ color: '#f87171', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
+                    <div className="card" style={{ margin: 0, borderLeft: '3px solid var(--status-danger)' }}>
+                      <h3 style={{ color: 'var(--status-danger)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
                         ◎ {t('results.high_priority')}
                       </h3>
                       <ul style={{ margin: 0, paddingLeft: '1rem', listStyle: 'none' }}>
                         {result.ats.priority_recommendations.high.map((rec, i) => (
-                          <li key={i} style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: '#fca5a5' }}>→ {L(rec)}</li>
+                          <li key={i} style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--status-danger)' }}>→ {L(rec)}</li>
                         ))}
                       </ul>
                     </div>
@@ -1465,13 +1492,13 @@ export default function AnalyzePage() {
 
                   {/* Medium Priority */}
                   {result.ats?.priority_recommendations?.medium?.length > 0 && (
-                    <div className="card" style={{ margin: 0, borderLeft: '3px solid #eab308' }}>
-                      <h3 style={{ color: '#facc15', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
+                    <div className="card" style={{ margin: 0, borderLeft: '3px solid var(--status-warning)' }}>
+                      <h3 style={{ color: 'var(--status-warning)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
                         🔶 {t('results.medium_priority')}
                       </h3>
                       <ul style={{ margin: 0, paddingLeft: '1rem', listStyle: 'none' }}>
                         {result.ats.priority_recommendations.medium.map((rec, i) => (
-                          <li key={i} style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: '#fde68a' }}>→ {L(rec)}</li>
+                          <li key={i} style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--status-warning)' }}>→ {L(rec)}</li>
                         ))}
                       </ul>
                     </div>
@@ -1479,13 +1506,13 @@ export default function AnalyzePage() {
 
                   {/* Low Priority */}
                   {result.ats?.priority_recommendations?.low?.length > 0 && (
-                    <div className="card" style={{ margin: 0, borderLeft: '3px solid #a855f7' }}>
-                      <h3 style={{ color: '#c084fc', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
+                    <div className="card" style={{ margin: 0, borderLeft: '3px solid var(--status-accent)' }}>
+                      <h3 style={{ color: 'var(--status-accent)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
                         💡 {t('results.low_priority')}
                       </h3>
                       <ul style={{ margin: 0, paddingLeft: '1rem', listStyle: 'none' }}>
                         {result.ats.priority_recommendations.low.map((rec, i) => (
-                          <li key={i} style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: '#d8b4fe' }}>→ {L(rec)}</li>
+                          <li key={i} style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--status-accent)' }}>→ {L(rec)}</li>
                         ))}
                       </ul>
                     </div>
@@ -1494,8 +1521,8 @@ export default function AnalyzePage() {
 
                 {/* Industry-Specific Tips */}
                 {result.ats?.industry_tips?.length > 0 && (
-                  <div className="card" style={{ borderLeft: '3px solid #a855f7' }}>
-                    <h3 style={{ color: '#c084fc', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
+                  <div className="card" style={{ borderLeft: '3px solid var(--status-accent)' }}>
+                    <h3 style={{ color: 'var(--status-accent)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
                       ☆ {t('results.industry_tips')}
                     </h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -1583,7 +1610,7 @@ export default function AnalyzePage() {
                 )}
 
                 {breakdownLoading && (
-                  <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-secondary)' }}>
                     {t('analyze.scores_calculating')}
                   </div>
                 )}

@@ -142,6 +142,69 @@ _ACTION_VERB_RE = re.compile(
 _GPA_RE = re.compile(
     r"\b(?:gpa|grade|cgpa|not\s*ortalamas[iı])\s*[:\-]?\s*\d", re.I,
 )
+_CERT_KEYWORD_RE = re.compile(
+    r"\b(?:certified|certification|certificate|credential|license|licence"
+    r"|sertifika|belge|aws\s+certified|microsoft\s+certified"
+    r"|google\s+cloud\s+professional|professional\s+cloud"
+    r"|cisco\s+certified|oracle\s+certified|red\s+hat\s+certified"
+    r"|hashicorp\s+certified|salesforce\s+certified"
+    r"|comptia|pmp|cissp|cisa|cism|cka|ckad|ccna|ccnp|togaf|itil"
+    r"|scrum\s+master|psm\s*[i1-3]?|csm|cfa\s+level|frm)\b",
+    re.I,
+)
+_CERT_PROVIDER_RE = re.compile(
+    r"\b(?:aws|amazon|google\s+cloud|gcp|azure|microsoft|cisco|oracle"
+    r"|red\s+hat|hashicorp|terraform|kubernetes|salesforce|comptia"
+    r"|scrum|togaf|itil|pmi)\b",
+    re.I,
+)
+_CERT_TITLE_RE = re.compile(
+    r"\b(?:solutions?\s+architect|cloud\s+practitioner|administrator"
+    r"|associate|professional|fundamentals|developer|security|network"
+    r"|devops|engineer|architect|practitioner)\b",
+    re.I,
+)
+
+
+def _strip_bullet_prefix(text: str) -> str:
+    return re.sub(r"^\s*[-*\u2022\u2013\u2014\u2023\u25aa\u25a0]\s*", "", text).strip()
+
+
+def _is_certification_line(line: str) -> bool:
+    """Return True for standalone certification credentials, conservatively."""
+    text = _strip_bullet_prefix(line)
+    if not text:
+        return False
+    if _EMAIL_RE.search(text) or _PHONE_RE.search(text) or _URL_RE.search(text):
+        return False
+    if _DATE_RANGE_RE.search(text):
+        return False
+
+    word_count = len(text.split())
+    has_keyword = bool(_CERT_KEYWORD_RE.search(text))
+    has_provider = bool(_CERT_PROVIDER_RE.search(text))
+    has_cert_title = bool(_CERT_TITLE_RE.search(text))
+    has_action = bool(_ACTION_VERB_RE.search(text))
+
+    if has_keyword and word_count <= 18:
+        return not (has_action and not re.search(r"\bcertif", text, re.I))
+    if has_provider and has_cert_title and word_count <= 12 and not has_action:
+        return True
+    return False
+
+
+def _append_certification(data: Dict, text: str) -> None:
+    cert_list = data.get("certifications")
+    if not isinstance(cert_list, list):
+        cert_list = []
+        data["certifications"] = cert_list
+    years = _YEAR_RE.findall(text)
+    issuer_match = _CERT_PROVIDER_RE.search(text)
+    cert_list.append({
+        "name": text.strip(),
+        "issuer": issuer_match.group(0) if issuer_match else "",
+        "date": years[-1] if years else "",
+    })
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -288,7 +351,27 @@ def resolve_raw_sections(
             logger.debug("rule1: moved %d education lines from %s",
                          len(edu_lines), src_key)
 
-    # ── Rule 2: URL routing ──────────────────────────────────────────
+    # Rule 1b: Certification rescue. Multi-page / multi-column extraction can
+    # keep the previous active section alive too long; move only strong,
+    # standalone credential lines out of content-heavy buckets.
+    for src_key in ("experience", "misc", "projects", "education", "skills"):
+        src = sections.get(src_key, [])
+        if not src:
+            continue
+        keep, certs = [], []
+        for line in src:
+            if _is_certification_line(line):
+                certs.append(_strip_bullet_prefix(line))
+            else:
+                keep.append(line)
+        if certs:
+            sections[src_key] = keep
+            sections.setdefault("certifications", [])
+            sections["certifications"].extend(certs)
+            logger.debug("rule1b: moved %d certification lines from %s",
+                         len(certs), src_key)
+
+    # Rule 2: URL routing
     def _is_standalone_url_line(line: str) -> bool:
         stripped = line.strip()
         if not stripped:
@@ -478,6 +561,10 @@ def resolve_raw_sections(
                 sections.setdefault("education", [])
                 sections["education"].append(line)
                 continue
+            if _is_certification_line(line):
+                sections.setdefault("certifications", [])
+                sections["certifications"].append(_strip_bullet_prefix(line))
+                continue
             if _is_skill_line(line):
                 sections.setdefault("skills", [])
                 sections["skills"].append(line)
@@ -548,6 +635,10 @@ def resolve_raw_sections(
                     _INSTITUTION_RE.search(text_low) or _YEAR_RE.search(text_low)):
                 sections.setdefault("education", [])
                 sections["education"].append(line)
+                continue
+            if _is_certification_line(line):
+                sections.setdefault("certifications", [])
+                sections["certifications"].append(_strip_bullet_prefix(line))
                 continue
             # Skills: tech keyword or delimited short tokens
             if _is_skill_line(line):
@@ -620,6 +711,7 @@ def resolve_parsed_entries(data: Dict) -> None:
     Mutates *data* in place.
     """
     _t0 = time.perf_counter()
+    _fixup_experience_to_certifications(data)
     _fixup_experience_to_education(data)
     _cleanup_skills(data)
     _enforce_projects(data)
@@ -636,6 +728,52 @@ def resolve_parsed_entries(data: Dict) -> None:
 
 
 # ── 1. Experience → Education ─────────────────────────────────────────────
+
+def _fixup_experience_to_certifications(data: Dict) -> None:
+    """Move parsed experience entries that are standalone credentials."""
+    experiences = data.get("experiences")
+    if not isinstance(experiences, list) or not experiences:
+        return
+
+    kept_exp: list = []
+    for exp in experiences:
+        if not isinstance(exp, dict):
+            kept_exp.append(exp)
+            continue
+
+        title = str(exp.get("title") or "").strip()
+        company = str(exp.get("company") or "").strip()
+        text = _dict_text(exp)
+        bullets = exp.get("bullets") or []
+        bullet_text = " ".join(str(b) for b in bullets if b)
+        has_action_bullets = bool(_ACTION_VERB_RE.search(bullet_text))
+
+        cert_from_title = _is_certification_line(title)
+        cert_from_text = _is_certification_line(text)
+        company_like_issuer = bool(_CERT_PROVIDER_RE.search(company))
+        has_company = bool(company)
+
+        should_move = False
+        if cert_from_title and not has_action_bullets:
+            should_move = (
+                not has_company
+                or company_like_issuer
+                or bool(_CERT_KEYWORD_RE.search(title))
+            )
+        elif cert_from_text and not has_action_bullets and not has_company:
+            should_move = True
+
+        if should_move:
+            cert_text = title or text
+            if company_like_issuer and company.lower() not in cert_text.lower():
+                cert_text = f"{cert_text} - {company}"
+            _append_certification(data, cert_text)
+            logger.debug("parsed: exp->cert %r", cert_text[:60])
+        else:
+            kept_exp.append(exp)
+
+    data["experiences"] = kept_exp
+
 
 def _fixup_experience_to_education(data: Dict) -> None:
     """Move experience entries that look like education (degree/gpa,
@@ -986,11 +1124,7 @@ def _route_misc_item(data: Dict, target: str, text: str) -> None:
             "location": "",
         })
     elif target == "certifications":
-        cert_list = data.get("certifications")
-        if not isinstance(cert_list, list):
-            cert_list = []
-            data["certifications"] = cert_list
-        cert_list.append({"name": text, "issuer": "", "date": ""})
+        _append_certification(data, text)
     elif target == "projects":
         proj_list = data.get("projects")
         if not isinstance(proj_list, list):
@@ -1034,6 +1168,11 @@ def _detect_structured_pattern(text: str, data: Dict) -> str | None:
     if (has_degree or has_gpa) and (has_institution or has_year):
         _route_misc_item(data, "education", text)
         return "education"
+
+    # Certifications: standalone provider credentials and explicit cert names.
+    if _is_certification_line(text):
+        _route_misc_item(data, "certifications", text)
+        return "certifications"
 
     # Skills: 3+ tech names (comma/slash-delimited)
     if len(tech_hits) >= 3 and word_count <= 20:

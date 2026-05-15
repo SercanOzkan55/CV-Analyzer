@@ -7,8 +7,17 @@ lives in storage_service.py — this file only knows about boto3.
 import logging
 import time
 
-import boto3
-from botocore.exceptions import BotoCoreError, ClientError
+try:
+    import boto3
+    from botocore.exceptions import BotoCoreError, ClientError
+except Exception:  # pragma: no cover - exercised when optional AWS deps are absent
+    boto3 = None
+
+    class BotoCoreError(Exception):
+        pass
+
+    class ClientError(Exception):
+        pass
 
 from config.aws import (
     AWS_ACCESS_KEY_ID,
@@ -42,6 +51,8 @@ _client = None
 
 def _get_client():
     global _client
+    if boto3 is None:
+        raise RuntimeError("boto3 is not installed")
     if _client is None:
         if not is_configured():
             raise RuntimeError("AWS S3 credentials are not configured")

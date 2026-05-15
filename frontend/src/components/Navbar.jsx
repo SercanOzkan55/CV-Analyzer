@@ -85,21 +85,41 @@ export default function Navbar() {
               <NavLink to="/analyze" active={location.pathname === '/analyze'}>{t('nav.analyze')}</NavLink>
               
               <div className="nav-dropdown">
-                <div className="nav-dropdown-trigger">
+                <button
+                  type="button"
+                  className="nav-dropdown-trigger"
+                  aria-haspopup="true"
+                  aria-label="Open tools navigation"
+                >
                   {t('nav.tools') || 'Tools'} <ChevronDown size={14} />
-                </div>
+                </button>
                 <div className="nav-dropdown-menu">
                   <NavLink to="/career-studio" active={location.pathname === '/career-studio'}>Career Studio</NavLink>
                   <NavLink to="/cv-builder" active={location.pathname === '/cv-builder'}>{t('nav.cv_builder')}</NavLink>
+                  <NavLink to="/template-marketplace" active={location.pathname === '/template-marketplace'}>Templates</NavLink>
                   <NavLink to="/cover-letter" active={location.pathname === '/cover-letter'}>{t('nav.cover_letter')}</NavLink>
                   <NavLink to="/interview-simulator" active={location.pathname === '/interview-simulator'}>{t('nav.interview')}</NavLink>
                   <NavLink to="/job-tracker" active={location.pathname === '/job-tracker'}>{t('nav.job_tracker')}</NavLink>
+                  <NavLink to="/data-center" active={location.pathname === '/data-center'}>Data Center</NavLink>
                 </div>
               </div>
 
               <NavLink to="/history" active={location.pathname === '/history'}>{t('nav.history')}</NavLink>
               {isBillingAdmin && (
-                <NavLink to="/admin/billing" active={location.pathname === '/admin/billing'}>Admin Page</NavLink>
+                <div className="nav-dropdown">
+                  <button
+                    type="button"
+                    className="nav-dropdown-trigger"
+                    aria-haspopup="true"
+                    aria-label="Open admin navigation"
+                  >
+                    Admin <ChevronDown size={14} />
+                  </button>
+                  <div className="nav-dropdown-menu">
+                    <NavLink to="/admin/billing" active={location.pathname === '/admin/billing'}>Billing</NavLink>
+                    <NavLink to="/admin/ops" active={location.pathname === '/admin/ops'}>Ops Center</NavLink>
+                  </div>
+                </div>
               )}
               <NavLink to="/premium" active={location.pathname === '/premium'}>
                 {planLoading ? '...' : plan === 'free' ? t('nav.premium_preview') : t('nav.premium')}

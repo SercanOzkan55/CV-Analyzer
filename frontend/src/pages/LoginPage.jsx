@@ -48,7 +48,7 @@ export default function LoginPage() {
   return (
     <div className="auth-layout">
       <Navbar />
-      <div className="auth-page">
+      <main className="auth-page" id="main-content">
         <div className="auth-card">
           <h1>{t('auth.login_title')}</h1>
           <p className="auth-subtitle">{t('auth.login_subtitle')}</p>
@@ -88,7 +88,7 @@ export default function LoginPage() {
             )}
           </p>
         </div>
-      </div>
+      </main>
     </div>
   )
 }
