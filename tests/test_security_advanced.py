@@ -3,11 +3,17 @@ from fastapi.testclient import TestClient
 
 from auth import verify_supabase_jwt
 from main import app
+import main as main_module
 
 
 # JWT tamper test: invalid signature
 @pytest.fixture
 def tampered_jwt():
+    main_module._LOCAL_USER_THROTTLE.clear()
+    main_module._LOCAL_DAILY_QUOTA.clear()
+    main_module._LOCAL_ABUSE_COUNTERS.clear()
+    main_module._LOCAL_ABUSE_BANS.clear()
+
     def _tampered_jwt(_=None):
         return {
             "user_id": "test-user-123",

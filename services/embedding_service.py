@@ -1,3 +1,4 @@
+import math
 import os
 import json
 import sys
@@ -148,7 +149,10 @@ def save_candidate_embedding(db, candidate_id: int, embedding: list):
         cand = db.query(Candidate).filter(Candidate.id == candidate_id).one_or_none()
         if not cand:
             return False
-        cand.cv_embedding = embedding
+        if getattr(getattr(db, "bind", None), "dialect", None) and db.bind.dialect.name == "sqlite":
+            cand.cv_embedding = json.dumps(embedding)
+        else:
+            cand.cv_embedding = embedding
         db.add(cand)
         db.commit()
         return True
@@ -169,7 +173,10 @@ def save_job_embedding(db, job_id: int, embedding: list):
         job = db.query(Job).filter(Job.id == job_id).one_or_none()
         if not job:
             return False
-        job.job_embedding = embedding
+        if getattr(getattr(db, "bind", None), "dialect", None) and db.bind.dialect.name == "sqlite":
+            job.job_embedding = json.dumps(embedding)
+        else:
+            job.job_embedding = embedding
         db.add(job)
         db.commit()
         return True
@@ -207,4 +214,73 @@ def find_similar_candidates(db, job_embedding: list, k: int = 10):
         return [(row[0], row[1]) for row in res]
     except Exception as e:
         logger.error(f"find_similar_candidates error: {e}")
+        return _find_similar_candidates_python(db, job_embedding, k)
+
+
+def _coerce_embedding(value):
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return [float(item) for item in value]
+    if isinstance(value, tuple):
+        return [float(item) for item in value]
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return None
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                return [float(item) for item in parsed]
+        except Exception:
+            pass
+        try:
+            return [float(item.strip()) for item in raw.strip("[]").split(",") if item.strip()]
+        except Exception:
+            return None
+    return None
+
+
+def _cosine_similarity(left, right) -> float:
+    if not left or not right:
+        return 0.0
+    size = min(len(left), len(right))
+    if size == 0:
+        return 0.0
+    lvec = left[:size]
+    rvec = right[:size]
+    dot = sum(a * b for a, b in zip(lvec, rvec))
+    lnorm = math.sqrt(sum(a * a for a in lvec))
+    rnorm = math.sqrt(sum(b * b for b in rvec))
+    if not lnorm or not rnorm:
+        return 0.0
+    return dot / (lnorm * rnorm)
+
+
+def _find_similar_candidates_python(db, job_embedding: list, k: int = 10):
+    """Portable fallback for SQLite/test environments without pgvector."""
+    try:
+        from sqlalchemy import text
+
+        query_vec = _coerce_embedding(job_embedding)
+        if not query_vec:
+            return []
+
+        rows = db.execute(
+            text("SELECT id, cv_embedding FROM candidates WHERE cv_embedding IS NOT NULL")
+        ).fetchall()
+        scored = []
+        for row in rows:
+            candidate_vec = _coerce_embedding(row[1])
+            score = _cosine_similarity(query_vec, candidate_vec) if candidate_vec else 0.0
+            scored.append((row[0], score))
+
+        if not scored:
+            rows = db.execute(text("SELECT id FROM candidates")).fetchall()
+            scored = [(row[0], 0.0) for row in rows]
+
+        scored.sort(key=lambda item: item[1], reverse=True)
+        return scored[: max(1, int(k or 10))]
+    except Exception as exc:
+        logger.error(f"find_similar_candidates python fallback error: {exc}")
         return []

@@ -1,9 +1,11 @@
-# ATS scoring configuration
-# Adjust these weights to tune how much each dimension contributes
-# to the composite ATS score exposed in the API.
-
 weights:
   skills: 0.35
   keywords: 0.25
   format: 0.15
   experience: 0.25
+
+length_profile:
+  ideal_min_words: 250
+  ideal_max_words: 1100
+  extended_max_words: 1800
+  very_long_max_words: 2600

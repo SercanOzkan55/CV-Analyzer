@@ -1,7 +1,7 @@
 from .language_service import get_recommendation
 
 
-def generate_recommendations(missing_skills, semantic_score, keyword_score, lang="en"):
+def generate_recommendations(missing_skills, semantic_score, keyword_score, lang="auto"):
     """
     Generate prioritized, multi-dimensional recommendations.
     Returns up to 5 recommendations covering all weak areas.
