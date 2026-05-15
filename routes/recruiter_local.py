@@ -259,6 +259,7 @@ async def process_linkedin_export_zip(
     job_id: int = Form(..., gt=0),
     zip_file: UploadFile = File(...),
     api_key: str = Header(..., alias="X-API-Key"),
+    chunk_size: int = Form(200, ge=50, le=500),
     db: Session = Depends(get_db),
 ):
     """
@@ -269,6 +270,7 @@ async def process_linkedin_export_zip(
     - `job_id`: Target job position ID
     - `zip_file`: LinkedIn export ZIP file
     - `X-API-Key`: API key for authentication
+    - `chunk_size`: CVs per batch (50-500, default 200)
 
     **Returns:**
     - Processing results for all CVs in the ZIP
