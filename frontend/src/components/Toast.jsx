@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback } from 'react'
+import React, { createContext, useCallback, useState } from 'react'
+import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react'
 import { addNotification } from './NotificationCenter'
 
 /**
@@ -12,6 +13,13 @@ const ToastContext = createContext(/** @type {ToastContextValue | null} */ (null
 
 let toastId = 0
 
+const toastIcons = {
+  success: CheckCircle2,
+  error: XCircle,
+  info: Info,
+  warning: AlertTriangle,
+}
+
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
 
@@ -23,7 +31,6 @@ export function ToastProvider({ children }) {
         setToasts((prev) => prev.filter((t) => t.id !== id))
       }, duration)
     }
-    // Persist to notification center
     addNotification({ title: type.charAt(0).toUpperCase() + type.slice(1), message, type })
     return id
   }, [])
@@ -35,19 +42,21 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={{ addToast, removeToast }}>
       {children}
-      <div className="toast-container">
-        {toasts.map((toast) => (
-          <div key={toast.id} className={`toast toast-${toast.type}`}>
-            <span className="toast-icon">
-              {toast.type === 'success' && '✓'}
-              {toast.type === 'error' && '✕'}
-              {toast.type === 'info' && 'ℹ'}
-              {toast.type === 'warning' && '⚠'}
-            </span>
-            <span className="toast-message">{toast.message}</span>
-            <button className="toast-close" onClick={() => removeToast(toast.id)}>×</button>
-          </div>
-        ))}
+      <div className="toast-container" aria-live="polite" aria-relevant="additions removals">
+        {toasts.map((toast) => {
+          const Icon = toastIcons[toast.type] || Info
+          return (
+            <div key={toast.id} className={`toast toast-${toast.type}`} role={toast.type === 'error' ? 'alert' : 'status'}>
+              <span className="toast-icon" aria-hidden="true">
+                <Icon size={18} strokeWidth={2} />
+              </span>
+              <span className="toast-message">{toast.message}</span>
+              <button type="button" className="toast-close" onClick={() => removeToast(toast.id)} aria-label="Dismiss notification">
+                <X size={16} />
+              </button>
+            </div>
+          )
+        })}
       </div>
     </ToastContext.Provider>
   )
@@ -55,7 +64,7 @@ export function ToastProvider({ children }) {
 
 export function useToast() {
   /** @type {ToastContextValue | null} */
-  const ctx = useContext(ToastContext)
+  const ctx = React.useContext(ToastContext)
   if (!ctx) throw new Error('useToast must be used within ToastProvider')
   return {
     ...ctx,

@@ -3,7 +3,16 @@ import logging
 import os
 import time
 
+from core.runtime_bridge import main_value
+
 _task_logger = logging.getLogger("celery.tasks")
+
+
+def _run_pipeline(cv_text, job_description, lang="en"):
+    pipeline = main_value("run_pipeline")
+    if pipeline is None:
+        from services.pipeline_runtime import run_pipeline as pipeline
+    return pipeline(cv_text, job_description, lang)
 
 try:
     from celery import Celery, Task
@@ -112,31 +121,17 @@ try:
 
         @celery_app.task(bind=True, name="analyze_pdf_task", queue="pdf_processing")
         def analyze_pdf_task(self, cv_text, job_description, lang="en"):
-            # Keep PDF and text analysis responses consistent.
-            from main import run_pipeline
-            from services.cv_autofix_service import auto_fix_cv_text
-
-            autofix = auto_fix_cv_text(
-                cv_text=cv_text,
-                job_description=job_description,
-                lang=lang,
-                use_ai=False,
-                mode="safe",
-            )
-            normalized_text = autofix.get("optimized_cv_text") or cv_text
-            return run_pipeline(normalized_text, job_description, lang)
+            # Analyze the uploaded/extracted CV faithfully. Field rewriting is
+            # reserved for the explicit auto-fix endpoint.
+            return _run_pipeline(cv_text, job_description, lang)
 
         @celery_app.task(bind=True, name="analyze_text_task", queue="ai_tasks")
         def analyze_text_task(self, cv_text, job_description, lang="en"):
-            # Import locally to avoid hard dependency at module import time.
-            from main import run_pipeline
-
-            return run_pipeline(cv_text, job_description, lang)
+            return _run_pipeline(cv_text, job_description, lang)
 
         @celery_app.task(bind=True, name="batch_recruiter_task", queue="pdf_processing")
         def batch_recruiter_task(self, cv_list, job_id, job_description, org_id, recruiter_id):
             """Process multiple CVs, analyze against a job, and save results."""
-            from main import run_pipeline
             from services.cv_autofix_service import auto_fix_cv_text
             from services.recruiter_service import save_candidate_action
             from agents.extract_agent import extract_structured
@@ -155,7 +150,7 @@ try:
                     normalized_text = autofix.get("optimized_cv_text") or cv_text
                     
                     # 2. Match Pipeline
-                    analysis = run_pipeline(normalized_text, job_description)
+                    analysis = _run_pipeline(normalized_text, job_description)
                     
                     # 3. Extract metadata if name is missing
                     if not candidate_name:
@@ -209,31 +204,19 @@ except Exception:
             return DummyResult(res)
 
     def _analyze_pdf(cv_text, job_description, lang="en"):
-        from main import run_pipeline
-        from services.cv_autofix_service import auto_fix_cv_text
-
-        autofix = auto_fix_cv_text(
-            cv_text=cv_text,
-            job_description=job_description,
-            lang=lang,
-            use_ai=False,
-            mode="safe",
-        )
-        normalized_text = autofix.get("optimized_cv_text") or cv_text
-        return run_pipeline(normalized_text, job_description, lang)
+        # Analyze the uploaded/extracted CV faithfully. Field rewriting is
+        # reserved for the explicit auto-fix endpoint.
+        return _run_pipeline(cv_text, job_description, lang)
 
     analyze_pdf_task = LocalTask(_analyze_pdf)
 
     def _analyze_text(cv_text, job_description, lang="en"):
-        from main import run_pipeline
-
-        return run_pipeline(cv_text, job_description, lang)
+        return _run_pipeline(cv_text, job_description, lang)
 
     analyze_text_task = LocalTask(_analyze_text)
 
     def _batch_recruiter(cv_list, job_id, job_description, org_id, recruiter_id):
         # Synchronous fallback for local testing
-        from main import run_pipeline
         from services.cv_autofix_service import auto_fix_cv_text
         from services.recruiter_service import save_candidate_action
         from agents.extract_agent import extract_structured
@@ -247,7 +230,7 @@ except Exception:
                 filename = cv_data.get("filename", "unknown.pdf")
                 autofix = auto_fix_cv_text(cv_text=cv_text, job_description=job_description)
                 normalized_text = autofix.get("optimized_cv_text") or cv_text
-                analysis = run_pipeline(normalized_text, job_description)
+                analysis = _run_pipeline(normalized_text, job_description)
                 
                 structured = extract_structured(cv_text)
                 name = structured.get("full_name") or filename

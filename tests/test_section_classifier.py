@@ -10,8 +10,16 @@ class TestClassifyBlock:
         lines = ["WORK EXPERIENCE", "Senior Developer at Corp 2020-2024"]
         assert classify_block(lines) == "experience"
 
+    def test_work_background_header(self):
+        lines = ["WORK BACKGROUND", "Acme", "Developer Jan 2020 to Present"]
+        assert classify_block(lines) == "experience"
+
     def test_education_header(self):
         lines = ["EDUCATION", "B.Sc. Computer Science, MIT 2014-2018"]
+        assert classify_block(lines) == "education"
+
+    def test_academic_qualifications_header(self):
+        lines = ["Academic Qualifications", "B.Tech 2015 Bharat Institute"]
         assert classify_block(lines) == "education"
 
     def test_skills_header(self):
@@ -32,6 +40,14 @@ class TestClassifyBlock:
     def test_summary_header(self):
         lines = ["SUMMARY", "Experienced developer with 5 years of Python expertise."]
         assert classify_block(lines) == "summary"
+
+    def test_executive_profile_header(self):
+        lines = ["Executive Profile", "Machine Learning Engineer skilled in NLP."]
+        assert classify_block(lines) == "summary"
+
+    def test_other_activities_header(self):
+        lines = ["Other Activities", "AI on the cloud using Google Cloud Platform."]
+        assert classify_block(lines) in ("other", "misc")
 
     def test_content_based_experience(self):
         lines = [
@@ -101,6 +117,9 @@ class TestCanonicalizeSectionKey:
     def test_alias_resolution(self):
         assert canonicalize_section_key("work experience") == "experience"
         assert canonicalize_section_key("professional experience") == "experience"
+        assert canonicalize_section_key("work background") == "experience"
+        assert canonicalize_section_key("academic qualifications") == "education"
+        assert canonicalize_section_key("executive profile") == "summary"
 
     def test_case_insensitive(self):
         assert canonicalize_section_key("EXPERIENCE") == "experience"

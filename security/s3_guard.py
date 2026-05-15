@@ -11,9 +11,9 @@ import re
 logger = logging.getLogger("security.s3_guard")
 
 # ── Key format ──────────────────────────────────────────────────────
-# user_{id}/original|optimized/{hex-uuid}.pdf|docx
+# users/user_{id}/safe_filename_{hex-uuid}.pdf|docx
 _SAFE_KEY_RE = re.compile(
-    r"^user_[a-zA-Z0-9\-_]+/(original|optimized)/[a-f0-9]+\.(pdf|docx)$"
+    r"^users/user_[a-zA-Z0-9\-_]+/[a-zA-Z0-9._-]+\.(pdf|docx)$"
 )
 
 # Path traversal in key
@@ -51,10 +51,16 @@ def enforce_ownership(key: str, user_id: str) -> None:
 
     Prevents accessing other users' files via key manipulation.
     """
-    expected_prefix = f"user_{user_id}/"
+    validate_s3_key(key)
+
+    safe_user_id = re.sub(r"[^a-zA-Z0-9\-_]", "_", str(user_id))
+    expected_prefix = f"users/user_{safe_user_id}/"
+
     if not key.startswith(expected_prefix):
         logger.warning(
-            "s3_guard:ownership_violation user=%s key=%s", user_id, redact_s3_key(key)
+            "s3_guard:ownership_violation user=%s key=%s",
+            safe_user_id,
+            redact_s3_key(key),
         )
         raise PermissionError("Access denied: key does not belong to this user")
 
