@@ -62,7 +62,7 @@ def ai_rewrite_available() -> bool:
 def rewrite_cv(
     cv_text: str,
     job_description: str = "",
-    lang: str = "en",
+    lang: str = "auto",
     tone: str = "professional",
 ) -> str:
     cv_text = _guard_text(cv_text, MAX_INPUT_CHARS, "cv_text")
@@ -80,7 +80,7 @@ def rewrite_cv(
 def rewrite_cv_for_ats(
     cv_text: str,
     job_description: str = "",
-    lang: str = "en",
+    lang: str = "auto",
     tone: str = "professional",
 ) -> str:
     cv_text = _guard_text(cv_text, MAX_INPUT_CHARS, "cv_text")
@@ -105,7 +105,7 @@ def rewrite_cv_for_ats(
 def rewrite_bullets(
     bullets: List[str],
     job_description: str = "",
-    lang: str = "en",
+    lang: str = "auto",
     tone: str = "professional",
 ) -> List[str]:
     if not isinstance(bullets, list) or not bullets:
@@ -129,7 +129,7 @@ def rewrite_bullets(
 def rewrite_cover_letter(
     cv_text: str,
     job_description: str,
-    lang: str = "en",
+    lang: str = "auto",
     tone: str = "professional",
 ) -> str:
     cv_text = _guard_text(cv_text, MAX_INPUT_CHARS, "cv_text")

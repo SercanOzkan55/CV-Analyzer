@@ -62,7 +62,10 @@ from services.embedding_service import (find_similar_candidates, get_embedding,
 from services.experience_service import experience_score
 from services.industry_service import detect_industry_and_specialization
 from services.keyword_service import keyword_match_score, compute_keyword_gap
-from services.language_service import (detect_language,
+from services.language_service import (DEFAULT_LANG,
+                                       FALLBACK_LANG,
+                                       NEUTRAL_LANG,
+                                       detect_language,
                                        interpret_score_localized,
                                        localize_risk_level)
 from services.model_service import predict_match
@@ -916,7 +919,7 @@ class AnalyzeRequest(BaseModel):
     cv_text: str
     job_description: str = ""
     job_text: str | None = None
-    lang: str = "en"
+    lang: str = DEFAULT_LANG
 
     def model_post_init(self, __context):
         if (not self.job_description) and self.job_text:
@@ -929,6 +932,7 @@ class CVBuilderRequest(BaseModel):
     phone: str = ""
     location: str = ""
     linkedin: str = ""
+    professional_profile: str = ""
     summary: str = ""
     experiences: list = []
     education: list = []
@@ -939,7 +943,7 @@ class CVBuilderRequest(BaseModel):
     job_description: str = ""
     template: str = "classic"
     output_format: str = "docx"
-    lang: str = "en"
+    lang: str = DEFAULT_LANG
 
 
 # =====================================================
@@ -1417,12 +1421,21 @@ def build_features(
 
 
 ANALYSIS_CACHE_TTL = int(os.getenv("ANALYSIS_CACHE_TTL", "86400"))
+MAX_ANALYZE_CV_TEXT_CHARS = int(os.getenv("MAX_ANALYZE_CV_TEXT_CHARS", "200000"))
+MAX_ANALYZE_JOB_TEXT_CHARS = int(os.getenv("MAX_ANALYZE_JOB_TEXT_CHARS", "100000"))
 
 
 def _stable_hash(text: str) -> str:
     if not isinstance(text, str):
         text = str(text or "")
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _validate_analyze_text_payload(cv_text: str, job_description: str) -> None:
+    if len(cv_text or "") > MAX_ANALYZE_CV_TEXT_CHARS:
+        raise HTTPException(status_code=413, detail="CV text is too large")
+    if len(job_description or "") > MAX_ANALYZE_JOB_TEXT_CHARS:
+        raise HTTPException(status_code=413, detail="Job description is too large")
 
 
 def _extract_job_title_from_jd(job_description: str) -> str | None:
@@ -1483,21 +1496,50 @@ def _scan_upload_for_viruses(contents: bytes) -> None:
 
 
 def _extract_pdf_text(contents: bytes) -> str:
-    """Extract plain text from PDF bytes with validation-friendly errors."""
+    """Extract plain text from PDF bytes with layout-aware fallbacks.
+
+    pdfplumber is used when available because it tends to preserve multi-page
+    and multi-column reading order better than basic PyPDF2 extraction. PyPDF2
+    remains the dependency-light fallback for test and minimal deployments.
+    """
+
+    errors: list[str] = []
+    text_parts: list[str] = []
 
     try:
-        import PyPDF2
+        import pdfplumber
 
-        pdf_reader = PyPDF2.PdfReader(io.BytesIO(contents))
+        with pdfplumber.open(io.BytesIO(contents)) as pdf:
+            for page_index, page in enumerate(pdf.pages, start=1):
+                extracted = ""
+                try:
+                    extracted = page.extract_text(layout=True) or ""
+                except TypeError:
+                    extracted = page.extract_text() or ""
+                if extracted.strip():
+                    text_parts.append(f"\n--- Page {page_index} ---\n{extracted.strip()}")
     except Exception:
+        errors.append("pdfplumber")
+
+    if not text_parts:
+        try:
+            import PyPDF2
+
+            pdf_reader = PyPDF2.PdfReader(io.BytesIO(contents))
+            for page_index, page in enumerate(pdf_reader.pages, start=1):
+                extracted = page.extract_text()
+                if extracted and extracted.strip():
+                    text_parts.append(f"\n--- Page {page_index} ---\n{extracted.strip()}")
+        except Exception:
+            errors.append("PyPDF2")
+
+    if errors and not text_parts:
         raise HTTPException(status_code=400, detail="Invalid PDF file")
 
-    text_parts = []
-    for page in pdf_reader.pages:
-        extracted = page.extract_text()
-        if extracted:
-            text_parts.append(extracted)
-    return "\n".join(text_parts).strip()
+    text = "\n".join(text_parts).strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="PDF contains no extractable text")
+    return text
 
 
 def _validate_pdf_upload(contents: bytes, content_type: str | None) -> None:
@@ -1606,27 +1648,28 @@ def require_captcha(request: Request):
     return None
 
 
-def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
+def run_pipeline(cv_text: str, job_description: str, lang: str = DEFAULT_LANG):
     # Basic input guards
     if not isinstance(cv_text, str):
         cv_text = ""
     if not isinstance(job_description, str):
         job_description = ""
 
-    forced_lang = (lang or "").strip().lower()
+    requested_lang = (lang or DEFAULT_LANG).strip().lower()
 
-    # Detect languages independently and prefer job-description language for output,
-    # unless the client explicitly requests a language.
+    # Detect languages independently and prefer job-description language for output
+    # unless the client explicitly requests a supported language. Unknown language
+    # stays neutral internally and falls back only for localized copy.
     cv_lang = detect_language(cv_text)
     jd_lang = detect_language(job_description)
-    if forced_lang:
-        detected_lang = forced_lang
-    elif jd_lang and jd_lang != "en":
+    if requested_lang not in ("", DEFAULT_LANG, "detect", "default", "browser"):
+        detected_lang = requested_lang
+    elif jd_lang != NEUTRAL_LANG:
         detected_lang = jd_lang
-    elif cv_lang:
+    elif cv_lang != NEUTRAL_LANG:
         detected_lang = cv_lang
     else:
-        detected_lang = "en"
+        detected_lang = FALLBACK_LANG
 
     # Truncate extremely large inputs to avoid resource exhaustion
     MAX_CV_LEN = 200_000
@@ -1811,6 +1854,7 @@ def analyze(
     """
     _ensure_not_expired(user)
     _metric_request("analyze")
+    _validate_analyze_text_payload(body.cv_text, body.job_description)
 
     # In MOCK_SERVICES mode skip DB user creation and quota checks
     if MOCK_SERVICES_ON:
@@ -2187,7 +2231,7 @@ async def analyze_pdf(
     response: Response,
     file: UploadFile = File(...),
     job_description: str = Form(""),
-    lang: str = Form("en"),
+    lang: str = Form(DEFAULT_LANG),
     _: None = Depends(require_captcha),
     __: None = Depends(require_abuse_check),
     user=Depends(verify_supabase_jwt),
@@ -2243,32 +2287,8 @@ async def analyze_pdf(
                 )
 
         contents = await file.read()
-        if file.content_type != "application/pdf":
-            raise HTTPException(status_code=400, detail="Only PDF files are allowed")
-        if len(contents) > 5_000_000:
-            raise HTTPException(status_code=400, detail="File too large (max 5MB)")
-        if not contents.startswith(b"%PDF-"):
-            raise HTTPException(status_code=400, detail="Invalid PDF file")
-        # Optional virus scan in mock mode as well, when enabled
-        try:
-            _scan_upload_for_viruses(contents)
-        except HTTPException:
-            raise
-        except Exception:
-            # Fail closed on scanner errors when explicitly enabled
-            if os.getenv("CLAMAV_ENABLED", "0").lower() in ("1", "true", "yes"):
-                raise HTTPException(status_code=500, detail="Virus scanner error")
-        try:
-            import PyPDF2
-
-            pdf_reader = PyPDF2.PdfReader(io.BytesIO(contents))
-        except Exception:
-            raise HTTPException(status_code=400, detail="Invalid PDF file")
-        text = ""
-        for page in pdf_reader.pages:
-            extracted = page.extract_text()
-            if extracted:
-                text += extracted
+        _validate_pdf_upload(contents, file.content_type)
+        text = _extract_pdf_text(contents)
         result = run_pipeline(text, job_description, lang)
         return result
 
@@ -2369,31 +2389,8 @@ async def analyze_pdf(
 
     # Only after quota check and increment, read and parse file
     contents = await file.read()
-    if file.content_type != "application/pdf":
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
-    if len(contents) > 5_000_000:
-        raise HTTPException(status_code=400, detail="File too large (max 5MB)")
-    if not contents.startswith(b"%PDF-"):
-        raise HTTPException(status_code=400, detail="Invalid PDF file")
-    # Optional virus scan for uploaded PDFs
-    try:
-        _scan_upload_for_viruses(contents)
-    except HTTPException:
-        raise
-    except Exception:
-        if os.getenv("CLAMAV_ENABLED", "0").lower() in ("1", "true", "yes"):
-            raise HTTPException(status_code=500, detail="Virus scanner error")
-    try:
-        import PyPDF2
-
-        pdf_reader = PyPDF2.PdfReader(io.BytesIO(contents))
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid PDF file")
-    text = ""
-    for page in pdf_reader.pages:
-        extracted = page.extract_text()
-        if extracted:
-            text += extracted
+    _validate_pdf_upload(contents, file.content_type)
+    text = _extract_pdf_text(contents)
 
     # Queue the analysis job (or run synchronously in LocalTask fallback)
     task = analyze_pdf_task.delay(text, job_description, lang)
@@ -2780,6 +2777,10 @@ def semantic_search(
 
     # Find top-k similar candidates (returns list of (id, score))
     matches = find_similar_candidates(db, job_vec, k=body.k)
+    if not matches:
+        # Portable fallback for local/test databases without vector search.
+        rows = db.query(Candidate).limit(max(1, int(body.k or 10))).all()
+        matches = [(row.id, 0.0) for row in rows]
     candidate_ids = [m[0] for m in matches]
 
     # Fetch candidate rows preserving order
@@ -2816,7 +2817,7 @@ def semantic_search(
 async def auto_fix_cv_pdf(
     file: UploadFile = File(...),
     job_description: str = Form(""),
-    lang: str = Form("en"),
+    lang: str = Form(DEFAULT_LANG),
     use_ai: bool = Form(True),
     user=Depends(verify_supabase_jwt),
     db=Depends(get_db),
@@ -2871,7 +2872,7 @@ async def auto_fix_cv_pdf(
 class CVRewriteRequest(BaseModel):
     cv_text: str
     job_description: str | None = ""
-    lang: str = "en"
+    lang: str = DEFAULT_LANG
     tone: str = "professional"
 
 
@@ -2880,26 +2881,26 @@ class CVAutoFixExportRequest(BaseModel):
     job_description: str | None = ""
     template: str = "classic"
     output_format: str = "docx"
-    lang: str = "en"
+    lang: str = DEFAULT_LANG
 
 
 class CVAutoFixParseRequest(BaseModel):
     optimized_cv_text: str
     job_description: str | None = ""
-    lang: str = "en"
+    lang: str = DEFAULT_LANG
 
 
 class BulletRewriteRequest(BaseModel):
     bullets: list[str]
     job_description: str | None = ""
-    lang: str = "en"
+    lang: str = DEFAULT_LANG
     tone: str = "professional"
 
 
 class CoverLetterRewriteRequest(BaseModel):
     cv_text: str
     job_description: str
-    lang: str = "en"
+    lang: str = DEFAULT_LANG
     tone: str = "professional"
 
 

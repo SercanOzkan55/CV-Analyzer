@@ -1,5 +1,3 @@
-import main as main_module
-main_module.RATE_LIMIT_ENABLED = False
 """
 Professional test conftest.py
 - Per-function isolated in-memory SQLite DB
@@ -139,7 +137,10 @@ import pytest
 
 from auth import verify_supabase_jwt
 from database import Base, get_db
+import main as main_module
 from main import app
+
+main_module.RATE_LIMIT_ENABLED = False
 
 
 # ─── Mock JWT ───
@@ -152,6 +153,32 @@ def _mock_verify_jwt(authorization: str = None):
 
 
 # ─── DB URL used by all fixtures ───
+@pytest.fixture(autouse=True)
+def _clear_local_runtime_state():
+    """Keep in-memory quotas and abuse counters isolated per test."""
+    for name in (
+        "_LOCAL_DAILY_QUOTA",
+        "_LOCAL_USER_THROTTLE",
+        "_LOCAL_ABUSE_COUNTERS",
+        "_LOCAL_ABUSE_BANS",
+    ):
+        try:
+            getattr(main_module, name).clear()
+        except Exception:
+            pass
+    yield
+    for name in (
+        "_LOCAL_DAILY_QUOTA",
+        "_LOCAL_USER_THROTTLE",
+        "_LOCAL_ABUSE_COUNTERS",
+        "_LOCAL_ABUSE_BANS",
+    ):
+        try:
+            getattr(main_module, name).clear()
+        except Exception:
+            pass
+
+
 _TEST_DB_URL = os.getenv(
     "DATABASE_URL", "postgresql+psycopg2://testuser:testpass@localhost:5433/testdb"
 )

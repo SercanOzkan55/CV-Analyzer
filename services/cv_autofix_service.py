@@ -1,5 +1,6 @@
 import difflib
 import re
+import unicodedata
 from typing import Dict, List
 
 from .ats_service import analyze_cv
@@ -18,6 +19,22 @@ SECTION_ALIASES = {
         "about",
         "objective",
         "career summary",
+        "career objective",
+        "personal profile",
+        "özet",
+        "ozet",
+        "profesyonel özet",
+        "profesyonel ozet",
+        "profil",
+        "amaç",
+        "amac",
+        "kariyer hedefi",
+        "resumen",
+        "perfil",
+        "objectif",
+        "profil professionnel",
+        "zusammenfassung",
+        "kurzprofil",
     },
     "experience": {
         "experience",
@@ -26,19 +43,102 @@ SECTION_ALIASES = {
         "employment",
         "employment history",
         "work history",
+        "career history",
+        "iş deneyimi",
+        "is deneyimi",
+        "deneyim",
+        "profesyonel deneyim",
+        "çalışma deneyimi",
+        "calisma deneyimi",
+        "experiencia",
+        "experiencia laboral",
+        "expérience",
+        "expérience professionnelle",
+        "berufserfahrung",
+        "arbeitserfahrung",
     },
-    "education": {"education", "academic background", "qualifications"},
+    "education": {
+        "education",
+        "academic background",
+        "qualifications",
+        "training",
+        "eğitim",
+        "egitim",
+        "akademik geçmiş",
+        "akademik gecmis",
+        "öğrenim",
+        "ogrenim",
+        "educación",
+        "formación",
+        "formation",
+        "ausbildung",
+        "bildung",
+    },
     "skills": {
         "skills",
         "technical skills",
         "core competencies",
         "competencies",
         "technologies",
+        "technology stack",
+        "tools",
+        "yetenekler",
+        "beceriler",
+        "teknik beceriler",
+        "yetkinlikler",
+        "habilidades",
+        "competencias",
+        "compétences",
+        "fähigkeiten",
+        "kompetenzen",
     },
-    "projects": {"projects", "project experience"},
-    "certifications": {"certifications", "certificates", "licenses"},
-    "languages": {"languages", "language skills"},
-    "contact": {"contact", "contact information"},
+    "projects": {
+        "projects",
+        "project experience",
+        "personal projects",
+        "projeler",
+        "proje deneyimi",
+        "proyectos",
+        "projets",
+        "projekte",
+    },
+    "certifications": {
+        "certifications",
+        "certificates",
+        "licenses",
+        "licences",
+        "credentials",
+        "sertifikalar",
+        "sertifika",
+        "belgeler",
+        "certificaciones",
+        "certificados",
+        "certificats",
+        "zertifikate",
+        "lizenzen",
+    },
+    "languages": {
+        "languages",
+        "language skills",
+        "diller",
+        "yabancı diller",
+        "yabanci diller",
+        "idiomas",
+        "langues",
+        "sprachen",
+    },
+    "contact": {
+        "contact",
+        "contact information",
+        "personal information",
+        "iletişim",
+        "iletisim",
+        "iletişim bilgileri",
+        "iletisim bilgileri",
+        "contacto",
+        "coordonnées",
+        "kontakt",
+    },
 }
 
 NOISE_SECTION_ALIASES = {
@@ -52,6 +152,15 @@ NOISE_SECTION_ALIASES = {
     "birth date",
     "nationality",
     "photo",
+    "referanslar",
+    "hobiler",
+    "ilgi alanları",
+    "ilgi alanlari",
+    "kişisel bilgiler",
+    "kisisel bilgiler",
+    "nacionalidad",
+    "loisirs",
+    "interessen",
 }
 
 SECTION_ORDER = [
@@ -87,11 +196,34 @@ def _guard_text(value: str, field_name: str) -> str:
 
 
 def _normalize_heading(line: str) -> str:
-    normalized = re.sub(r"[^a-zA-Z ]+", " ", line).lower()
+    normalized = unicodedata.normalize("NFKC", line or "")
+    normalized = normalized.replace("İ", "i")
+    normalized = re.sub(r"[_|/\\•·]+", " ", normalized)
+    normalized = re.sub(r"[^\w\s&+-]+", " ", normalized, flags=re.UNICODE).lower()
     return re.sub(r"\s+", " ", normalized).strip()
 
 
+def _looks_like_section_heading(line: str) -> bool:
+    stripped = (line or "").strip()
+    if not stripped:
+        return False
+    if len(stripped) > 80:
+        return False
+    if stripped.startswith(("-", "*", "•")):
+        return False
+    if re.search(r"@|https?://|\b(?:19|20)\d{2}\b.*\b(?:19|20)\d{2}|present\b", stripped, re.I):
+        return False
+    # Real headings are usually compact; long sentences are content.
+    if len(stripped.split()) > 7 and not stripped.endswith(":"):
+        return False
+    if stripped.endswith(".") and len(stripped.split()) > 2:
+        return False
+    return True
+
+
 def _canonical_section(line: str) -> str | None:
+    if not _looks_like_section_heading(line):
+        return None
     heading = _normalize_heading(line)
     if not heading:
         return None
@@ -175,7 +307,7 @@ def _extract_contact_block(header_lines: List[str], explicit_lines: List[str]) -
         if re.search(r"(?:\+?\d[\d()\- ]{7,}\d)", line):
             contacts.append(line)
             continue
-        if any(token in line.lower() for token in ("linkedin", "github", "portfolio", "http://", "https://")):
+        if any(token in line.lower() for token in ("linkedin", "github", "gitlab", "portfolio", "behance", "dribbble", "kaggle", "http://", "https://")):
             contacts.append(line)
             continue
         leftovers.append(line)
@@ -558,7 +690,7 @@ def _parse_project_entries(lines: List[str]) -> List[Dict]:
 def structured_text_to_builder_payload(
     cv_text: str,
     job_description: str = "",
-    lang: str = "en",
+    lang: str = "auto",
 ) -> Dict:
     cv_text = _guard_text(cv_text, "cv_text")
     header_lines, sections, _ = _parse_sections(cv_text)
@@ -567,7 +699,7 @@ def structured_text_to_builder_payload(
     email = ""
     phone = ""
     location = ""
-    linkedin = ""
+    professional_profile = ""
     for line in contacts:
         if not email and re.search(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", line, re.I):
             email_match = re.search(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", line, re.I)
@@ -575,8 +707,8 @@ def structured_text_to_builder_payload(
         if not phone and re.search(r"(?:\+?\d[\d()\- ]{7,}\d)", line):
             phone_match = re.search(r"(?:\+?\d[\d()\- ]{7,}\d)", line)
             phone = phone_match.group(0) if phone_match else ""
-        if not linkedin and any(token in line.lower() for token in ("linkedin", "github", "portfolio", "http://", "https://")):
-            linkedin = line
+        if not professional_profile and any(token in line.lower() for token in ("linkedin", "github", "gitlab", "portfolio", "behance", "dribbble", "http://", "https://")):
+            professional_profile = line
 
     if leftover_header:
         location = leftover_header[0]
@@ -590,7 +722,8 @@ def structured_text_to_builder_payload(
         "email": email,
         "phone": phone,
         "location": location,
-        "linkedin": linkedin,
+        "linkedin": professional_profile,
+        "professional_profile": professional_profile,
         "summary": _normalize_summary(sections.get("summary", []), leftover_header, skills),
         "experiences": _parse_experience_entries(_normalize_experience(sections.get("experience", []))),
         "education": _parse_education_entries([line for line in sections.get("education", []) if line]),
@@ -619,7 +752,7 @@ def _diff_preview(before_text: str, after_text: str) -> List[str]:
 def auto_fix_cv_text(
     cv_text: str,
     job_description: str = "",
-    lang: str = "en",
+    lang: str = "auto",
     use_ai: bool = True,
 ) -> Dict:
     cv_text = _guard_text(cv_text, "cv_text")

@@ -47,7 +47,7 @@ async function pollAnalysis(token, jobId, { timeoutMs = 60000, intervalMs = 1000
   }
 }
 
-export async function analyzePdf(token, file, jobDescription, { lang = 'en' } = {}) {
+export async function analyzePdf(token, file, jobDescription, { lang = 'auto' } = {}) {
   const fd = new FormData()
   fd.append('file', file)
   fd.append('job_description', jobDescription)
@@ -79,7 +79,7 @@ export async function analyzePdf(token, file, jobDescription, { lang = 'en' } = 
   return data
 }
 
-export async function autoFixCv(token, file, jobDescription, { lang = 'en', useAi = true } = {}) {
+export async function autoFixCv(token, file, jobDescription, { lang = 'auto', useAi = true } = {}) {
   const fd = new FormData()
   fd.append('file', file)
   fd.append('job_description', jobDescription || '')

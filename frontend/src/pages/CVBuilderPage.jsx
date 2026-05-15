@@ -203,6 +203,7 @@ export default function CVBuilderPage() {
       phone: phone.trim(),
       location: location.trim(),
       linkedin: linkedin.trim(),
+      professional_profile: linkedin.trim(),
       summary: summary.trim(),
       job_description: jobDescription.trim(),
       experiences: experiences.map(e => ({
@@ -381,8 +382,8 @@ export default function CVBuilderPage() {
                     <input type="text" value={location} onChange={e => setLocation(e.target.value)} placeholder="New York, NY" />
                   </div>
                   <div className="form-group full-width">
-                    <label>LinkedIn</label>
-                    <input type="text" value={linkedin} onChange={e => setLinkedin(e.target.value)} placeholder="linkedin.com/in/johndoe" />
+                    <label>Professional profile</label>
+                    <input type="text" value={linkedin} onChange={e => setLinkedin(e.target.value)} placeholder="github.com/johndoe, linkedin.com/in/johndoe, portfolio.example" />
                   </div>
                 </div>
               </div>

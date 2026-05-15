@@ -11,8 +11,8 @@ ATS Rules enforced:
 - Bullet points, not paragraphs
 - No graphics, icons, tables, text boxes, multi-column
 - Measurable results in experience bullets
-- Standard date formats (Mon YYYY – Mon YYYY)
-- Skills listed as "Skill – Level" (no star ratings)
+- Standard date formats (Mon YYYY - Mon YYYY)
+- Skills listed as "Skill - Level" (no star ratings)
 - No photo, DOB, marital status
 """
 
@@ -22,6 +22,8 @@ import os
 import re
 from datetime import datetime
 from io import BytesIO
+
+from .language_service import DEFAULT_LANG
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +45,7 @@ def _get_openai_client():
         return None
 
 
-def _enhance_cv_with_ai(cv_data: dict, job_description: str, lang: str = "en") -> dict:
+def _enhance_cv_with_ai(cv_data: dict, job_description: str, lang: str = DEFAULT_LANG) -> dict:
     """Use OpenAI to enhance CV content: rewrite bullets with metrics,
     tailor summary to job description, optimize keyword placement."""
 
@@ -51,7 +53,15 @@ def _enhance_cv_with_ai(cv_data: dict, job_description: str, lang: str = "en") -
     if not client:
         return _mock_enhance(cv_data, job_description, lang)
 
-    lang_instruction = "Turkish" if lang == "tr" else "English"
+    if lang == "tr":
+        lang_instruction = "Turkish"
+    elif lang == "en":
+        lang_instruction = "English"
+    else:
+        lang_instruction = (
+            "the same language as the source CV unless the job description clearly "
+            "requires a different language"
+        )
 
     prompt = f"""You are an expert ATS CV writer. Enhance the following CV data for an ATS-optimized resume.
 Language: Write everything in {lang_instruction}.
@@ -68,7 +78,7 @@ Rules:
    - Start with strong action verbs
    - Include measurable results (%, $, numbers) where possible
    - Incorporate relevant keywords from the job description
-3. Optimize the skills list: put the most relevant skills first, use "Skill – Level" format (Advanced/Intermediate/Beginner).
+3. Optimize the skills list: put the most relevant skills first, use "Skill - Level" format (Advanced/Intermediate/Beginner).
 4. Keep education as-is but ensure proper formatting.
 5. Do NOT add fake data. Only enhance what's provided.
 
@@ -86,7 +96,7 @@ Return a JSON object with these exact keys:
     }}
   ],
   "skills_categorized": {{
-    "category_name": ["Skill – Level", ...]
+    "category_name": ["Skill - Level", ...]
   }},
   "education": [
     {{
@@ -131,7 +141,7 @@ Return ONLY valid JSON, no markdown fences."""
             content = re.sub(r"\s*```$", "", content)
         enhanced = json.loads(content)
         # Merge back any fields AI didn't return
-        for key in ("full_name", "email", "phone", "location", "languages", "linkedin"):
+        for key in ("full_name", "email", "phone", "location", "languages", "linkedin", "professional_profile"):
             if key in cv_data and key not in enhanced:
                 enhanced[key] = cv_data[key]
         return enhanced
@@ -140,7 +150,7 @@ Return ONLY valid JSON, no markdown fences."""
         return _mock_enhance(cv_data, job_description, lang)
 
 
-def _mock_enhance(cv_data: dict, job_description: str, lang: str = "en") -> dict:
+def _mock_enhance(cv_data: dict, job_description: str, lang: str = DEFAULT_LANG) -> dict:
     """Fallback: return structured data without AI enhancement."""
     result = dict(cv_data)
 
@@ -264,12 +274,11 @@ def generate_docx(cv_data: dict, template: str = "classic") -> BytesIO:
         contact_parts.append(cv_data["phone"])
     if cv_data.get("location"):
         contact_parts.append(cv_data["location"])
-    if cv_data.get("linkedin"):
-        linkedin_url = cv_data["linkedin"]
-        # Ensure full URL for ATS compatibility
-        if linkedin_url and not linkedin_url.startswith("http"):
-            linkedin_url = f"https://{linkedin_url}"
-        contact_parts.append(linkedin_url)
+    profile_url = cv_data.get("professional_profile") or cv_data.get("linkedin")
+    if profile_url:
+        if profile_url and not profile_url.startswith("http"):
+            profile_url = f"https://{profile_url}"
+        contact_parts.append(profile_url)
 
     if contact_parts:
         p = doc.add_paragraph()
@@ -325,14 +334,14 @@ def generate_docx(cv_data: dict, template: str = "classic") -> BytesIO:
         if not clean_text:
             return
         # Remove any existing bullet markers 
-        clean_text = re.sub(r'^[•\-\*]\s*', '', clean_text)
+        clean_text = re.sub(r'^[-\-\*]\s*', '', clean_text)
         
         p = doc.add_paragraph()
         p.paragraph_format.left_indent = Inches(0.2)
         p.paragraph_format.first_line_indent = Inches(-0.15)
         p.paragraph_format.space_after = Pt(2)
         p.paragraph_format.space_before = Pt(0)
-        run = p.add_run(f"• {clean_text}")
+        run = p.add_run(f"- {clean_text}")
         run.font.size = Pt(10.5)
         run.font.name = font.name
 
@@ -362,7 +371,7 @@ def generate_docx(cv_data: dict, template: str = "classic") -> BytesIO:
 
             company = exp.get("company", "")
             if company:
-                sep_run = p.add_run("  —  ")
+                sep_run = p.add_run("  --  ")
                 sep_run.font.name = font.name
                 sep_run.font.size = Pt(11)
                 c_run = p.add_run(company)
@@ -375,7 +384,7 @@ def generate_docx(cv_data: dict, template: str = "classic") -> BytesIO:
             location = exp.get("location", "")
             meta_parts = []
             if start or end:
-                date_str = f"{start} – {end}" if start and end else (start or end)
+                date_str = f"{start} - {end}" if start and end else (start or end)
                 meta_parts.append(date_str)
             if location:
                 meta_parts.append(location)
@@ -411,7 +420,7 @@ def generate_docx(cv_data: dict, template: str = "classic") -> BytesIO:
 
             school = edu.get("school", "")
             if school:
-                sep_run = p.add_run("  —  ")
+                sep_run = p.add_run("  --  ")
                 sep_run.font.name = font.name
                 sep_run.font.size = Pt(11)
                 s_run = p.add_run(school)
@@ -425,7 +434,7 @@ def generate_docx(cv_data: dict, template: str = "classic") -> BytesIO:
             loc = edu.get("location", "")
             meta_parts = []
             if start or end:
-                date_str = f"{start} – {end}" if start and end else (start or end)
+                date_str = f"{start} - {end}" if start and end else (start or end)
                 meta_parts.append(date_str)
             if loc:
                 meta_parts.append(loc)
@@ -466,7 +475,7 @@ def generate_docx(cv_data: dict, template: str = "classic") -> BytesIO:
             p.paragraph_format.space_before = Pt(2)
             c_name = cert.get("name", "")
             # Clean special characters for ATS
-            c_name = c_name.replace("?", "–").replace("\u2019", "'").replace("\u201c", '"').replace("\u201d", '"')
+            c_name = c_name.replace("?", "-").replace("\u2019", "'").replace("\u201c", '"').replace("\u201d", '"')
             c_issuer = cert.get("issuer", "")
             c_date = cert.get("date", "")
             run = p.add_run(c_name)
@@ -479,7 +488,7 @@ def generate_docx(cv_data: dict, template: str = "classic") -> BytesIO:
             if c_date:
                 meta.append(c_date)
             if meta:
-                sep_run = p.add_run(f"  —  {', '.join(meta)}")
+                sep_run = p.add_run(f"  --  {', '.join(meta)}")
                 sep_run.font.name = font.name
                 sep_run.font.size = Pt(10.5)
 
@@ -515,7 +524,7 @@ def generate_docx(cv_data: dict, template: str = "classic") -> BytesIO:
         lang_parts = []
         for l in languages:
             if isinstance(l, dict):
-                lang_parts.append(f"{l.get('name', '')} – {l.get('level', '')}")
+                lang_parts.append(f"{l.get('name', '')} - {l.get('level', '')}")
             else:
                 lang_parts.append(str(l))
         run = p.add_run(", ".join(lang_parts))
@@ -578,9 +587,9 @@ def generate_pdf(cv_data: dict, template: str = "classic") -> BytesIO:
         if not text:
             return ""
         # Replace common Unicode chars with latin-1 equivalents
-        text = text.replace("\u2022", "-")   # bullet •
-        text = text.replace("\u2013", "-")   # en dash –
-        text = text.replace("\u2014", "-")   # em dash —
+        text = text.replace("\u2022", "-")   # bullet -
+        text = text.replace("\u2013", "-")   # en dash -
+        text = text.replace("\u2014", "-")   # em dash --
         text = text.replace("\u2018", "'")   # left single quote
         text = text.replace("\u2019", "'")   # right single quote
         text = text.replace("\u201c", '"')   # left double quote
@@ -603,11 +612,11 @@ def generate_pdf(cv_data: dict, template: str = "classic") -> BytesIO:
         contact_parts.append(cv_data["phone"])
     if cv_data.get("location"):
         contact_parts.append(cv_data["location"])
-    if cv_data.get("linkedin"):
-        linkedin_url = cv_data["linkedin"]
-        if linkedin_url and not linkedin_url.startswith("http"):
-            linkedin_url = f"https://{linkedin_url}"
-        contact_parts.append(linkedin_url)
+    profile_url = cv_data.get("professional_profile") or cv_data.get("linkedin")
+    if profile_url:
+        if profile_url and not profile_url.startswith("http"):
+            profile_url = f"https://{profile_url}"
+        contact_parts.append(profile_url)
     if contact_parts:
         pdf.set_font(font_family, "", 10)
         # multi_cell prevents long contact lines from overflowing/cropping.
@@ -650,7 +659,7 @@ def generate_pdf(cv_data: dict, template: str = "classic") -> BytesIO:
         if not clean_text:
             return
         # Remove any existing bullet markers
-        clean_text = re.sub(r'^[•\-\*]\s*', '', clean_text)
+        clean_text = re.sub(r'^[-\-\*]\s*', '', clean_text)
         
         pdf.set_font(font_family, "", 10)
         pdf.set_x(pdf.l_margin + 3)
@@ -684,7 +693,7 @@ def generate_pdf(cv_data: dict, template: str = "classic") -> BytesIO:
             location = exp.get("location", "")
             meta_parts = []
             if start or end:
-                date_str = f"{start} – {end}" if start and end else (start or end)
+                date_str = f"{start} - {end}" if start and end else (start or end)
                 meta_parts.append(date_str)
             if location:
                 meta_parts.append(location)
@@ -718,7 +727,7 @@ def generate_pdf(cv_data: dict, template: str = "classic") -> BytesIO:
             s = edu.get("start_date", "")
             e = edu.get("end_date", "")
             if s or e:
-                date_str = f"{s} – {e}" if s and e else (s or e)
+                date_str = f"{s} - {e}" if s and e else (s or e)
                 meta.append(date_str)
             loc = edu.get("location", "")
             if loc:
@@ -825,7 +834,7 @@ def build_cv(
     job_description: str,
     template: str = "classic",
     output_format: str = "docx",
-    lang: str = "en",
+    lang: str = DEFAULT_LANG,
     plan: str = "free",
 ) -> dict:
     """

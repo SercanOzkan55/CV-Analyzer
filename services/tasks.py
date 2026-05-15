@@ -82,14 +82,14 @@ try:
         celery_app.Task = DBLoggingTask
 
         @celery_app.task(bind=True, name="analyze_pdf_task", queue="pdf_processing")
-        def analyze_pdf_task(self, cv_text, job_description, lang="en"):
+        def analyze_pdf_task(self, cv_text, job_description, lang="auto"):
             # Keep PDF and text analysis responses consistent.
             from main import run_pipeline
 
             return run_pipeline(cv_text, job_description, lang)
 
         @celery_app.task(bind=True, name="analyze_text_task", queue="ai_tasks")
-        def analyze_text_task(self, cv_text, job_description, lang="en"):
+        def analyze_text_task(self, cv_text, job_description, lang="auto"):
             # Import locally to avoid hard dependency at module import time.
             from main import run_pipeline
 
@@ -122,14 +122,14 @@ except Exception:
                 res = e
             return DummyResult(res)
 
-    def _analyze_pdf(cv_text, job_description, lang="en"):
+    def _analyze_pdf(cv_text, job_description, lang="auto"):
         from main import run_pipeline
 
         return run_pipeline(cv_text, job_description, lang)
 
     analyze_pdf_task = LocalTask(_analyze_pdf)
 
-    def _analyze_text(cv_text, job_description, lang="en"):
+    def _analyze_text(cv_text, job_description, lang="auto"):
         from main import run_pipeline
 
         return run_pipeline(cv_text, job_description, lang)

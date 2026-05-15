@@ -1,6 +1,14 @@
 import { useNavigate } from "react-router-dom";
 
-export default function BlogCard({ post }) {
+type BlogPost = {
+  slug: string;
+  image: string;
+  category: string;
+  title: string;
+  summary: string;
+};
+
+export default function BlogCard({ post }: { post: BlogPost }) {
   const navigate = useNavigate();
   return (
     <div
