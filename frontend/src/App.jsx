@@ -35,6 +35,9 @@ const PricingPage = lazy(() => import("./pages/PricingPage"))
 const PremiumPage = lazy(() => import("./pages/PremiumPage"))
 const CVBuilderPage = lazy(() => import("./pages/CVBuilderPage"))
 const AdminBillingPage = lazy(() => import("./pages/AdminBillingPage"))
+const OpsCenterPage = lazy(() => import("./pages/OpsCenterPage"))
+const DataCenterPage = lazy(() => import("./pages/DataCenterPage"))
+const TemplateMarketplacePage = lazy(() => import("./pages/TemplateMarketplacePage"))
 const PrivacyPage = lazy(() => import("./pages/PrivacyPage"))
 const TermsPage = lazy(() => import("./pages/TermsPage"))
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"))
@@ -126,6 +129,9 @@ function AnimatedRoutes() {
         <Route path="/interview-simulator" element={<PrivateRoute><PageTransition><InterviewSimulatorPage /></PageTransition></PrivateRoute>} />
         <Route path="/job-tracker" element={<PrivateRoute><PageTransition><JobTrackerPage /></PageTransition></PrivateRoute>} />
         <Route path="/admin/billing" element={<AdminBillingRoute><PageTransition><AdminBillingPage /></PageTransition></AdminBillingRoute>} />
+        <Route path="/admin/ops" element={<AdminBillingRoute><PageTransition><OpsCenterPage /></PageTransition></AdminBillingRoute>} />
+        <Route path="/data-center" element={<PrivateRoute><PageTransition><DataCenterPage /></PageTransition></PrivateRoute>} />
+        <Route path="/template-marketplace" element={<PrivateRoute><PageTransition><TemplateMarketplacePage /></PageTransition></PrivateRoute>} />
         <Route path="/pricing" element={PRIVATE_MODE ? <PrivateRoute><PageTransition><PricingPage /></PageTransition></PrivateRoute> : <PageTransition><PricingPage /></PageTransition>} />
         <Route path="/privacy" element={<PageTransition><PrivacyPage /></PageTransition>} />
         <Route path="/terms" element={<PageTransition><TermsPage /></PageTransition>} />

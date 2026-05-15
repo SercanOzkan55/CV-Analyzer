@@ -56,7 +56,7 @@ export default function RegisterPage() {
   return (
     <div className="auth-layout">
       <Navbar />
-      <div className="auth-page">
+      <main className="auth-page" id="main-content">
         <div className="auth-card">
           <h1>{t('auth.register_title')}</h1>
           <p className="auth-subtitle">{t('auth.register_subtitle')}</p>
@@ -94,7 +94,7 @@ export default function RegisterPage() {
             {t('auth.has_account')} <Link to="/login" className="link-btn">{t('nav.login')}</Link>
           </p>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

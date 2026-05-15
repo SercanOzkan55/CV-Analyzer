@@ -7,6 +7,8 @@ API routes should import for file-storage operations.
 
 import logging
 import uuid
+import re
+from pathlib import Path
 from typing import Literal
 
 from config.aws import is_configured
@@ -21,21 +23,30 @@ STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "s3").lower()
 
 logger = logging.getLogger(__name__)
 
-Folder = Literal["original", "optimized"]
-
-
 # ── Key builder ─────────────────────────────────────────────────────
 
-def build_key(user_id: str, folder: Folder, extension: str = "pdf") -> str:
-    """Build a safe, unique S3 key.
+def sanitize_filename(filename: str) -> str:
+    if not filename:
+        return "cv"
 
-    Pattern: user_{user_id}/original|optimized/{uuid}.pdf
-    """
-    ext = extension.lower().strip(".")
-    if ext not in ("pdf", "docx"):
-        ext = "pdf"
-    file_id = uuid.uuid4().hex
-    return f"user_{user_id}/{folder}/{file_id}.{ext}"
+    name = Path(filename).name
+    name = re.sub(r"[^a-zA-Z0-9._-]", "_", name)
+    return name[:120]
+
+
+def build_user_cv_key(user_id: str, filename: str) -> str:
+    safe_user_id = re.sub(r"[^a-zA-Z0-9\-_]", "_", str(user_id))
+
+    safe_filename = sanitize_filename(filename)
+    unique_id = uuid.uuid4().hex[:12]
+
+    extension = Path(safe_filename).suffix.lower()
+    if extension not in (".pdf", ".docx"):
+        extension = ".pdf"
+
+    stem = Path(safe_filename).stem[:80] or "cv"
+
+    return f"users/user_{safe_user_id}/{stem}_{unique_id}{extension}"
 
 
 # ── Uploads ─────────────────────────────────────────────────────────
@@ -65,8 +76,7 @@ def upload_original_cv(
     """Store the user's original uploaded CV.  Returns the S3 key."""
     safe_uid = validate_user_id(user_id)
     ct = _validate_upload(file_bytes, content_type, filename)
-    ext = "docx" if "wordprocessingml" in ct else "pdf"
-    key = build_key(safe_uid, "original", ext)
+    key = build_user_cv_key(safe_uid, filename)
     
     if STORAGE_BACKEND == "local":
         local_storage_service.upload(file_bytes, key, ct)
@@ -86,8 +96,7 @@ def upload_optimized_cv(
     """Store an optimized / generated CV.  Returns the S3 key."""
     safe_uid = validate_user_id(user_id)
     ct = _validate_upload(file_bytes, content_type, filename)
-    ext = "docx" if "wordprocessingml" in ct else "pdf"
-    key = build_key(safe_uid, "optimized", ext)
+    key = build_user_cv_key(safe_uid, filename)
     
     if STORAGE_BACKEND == "local":
         local_storage_service.upload(file_bytes, key, ct)

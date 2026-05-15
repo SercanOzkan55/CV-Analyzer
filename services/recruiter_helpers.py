@@ -67,8 +67,7 @@ def _validate_pdf_upload(contents: bytes, content_type: str | None) -> None:
         )
 
     try:
-        from main import _scan_upload_for_viruses
-
+        from services.pdf_runtime import _scan_upload_for_viruses
         _scan_upload_for_viruses(contents)
     except HTTPException:
         raise

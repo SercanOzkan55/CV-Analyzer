@@ -275,21 +275,21 @@ export default function DashboardPage() {
     },
     {
       icon: History,
-      iconColor: '#a78bfa',
+      iconColor: 'var(--status-accent)',
       title: t('nav.history'),
       desc: 'Geçmiş analizleri görün',
       to: '/history',
     },
     {
       icon: Briefcase,
-      iconColor: '#34d399',
+      iconColor: 'var(--status-success)',
       title: 'Career Studio',
       desc: 'Kariyer hedeflerinizi planlayın',
       to: '/career-studio',
     },
     {
       icon: FileText,
-      iconColor: '#f472b6',
+      iconColor: 'var(--color-accent-pink)',
       title: 'CV Oluştur',
       desc: 'Profesyonel CV hazırlayın',
       to: '/cv-builder',
@@ -403,7 +403,7 @@ export default function DashboardPage() {
 
           <DBStatCard
             icon={Crown}
-            iconColor={plan === 'free' ? 'var(--color-text-muted)' : '#fbbf24'}
+            iconColor={plan === 'free' ? 'var(--color-text-muted)' : 'var(--status-warning)'}
             value={planLabel}
             label={t('dashboard.plan')}
           >
@@ -421,7 +421,7 @@ export default function DashboardPage() {
 
           <DBStatCard
             icon={Award}
-            iconColor="#a78bfa"
+            iconColor="var(--status-accent)"
             value={history.length > 0 ? `${Math.round(bestScore)}%` : '--'}
             label="En İyi Skor"
             progress={bestScore}
@@ -580,7 +580,7 @@ export default function DashboardPage() {
             >
               <div className="db-section-header">
                 <div className="db-section-title">
-                  <Star size={15} style={{ color: '#eab308' }} />
+                  <Star size={15} style={{ color: 'var(--status-warning)' }} />
                   Favoriler
                 </div>
                 <Link to="/history" className="link-btn">Tümü →</Link>
@@ -598,7 +598,7 @@ export default function DashboardPage() {
             >
               <div className="db-section-header">
                 <div className="db-section-title">
-                  <Lightbulb size={15} style={{ color: '#f59e0b' }} />
+                  <Lightbulb size={15} style={{ color: 'var(--status-warning)' }} />
                   Öneriler
                 </div>
               </div>

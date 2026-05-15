@@ -40,19 +40,19 @@ export default function OnboardingModal() {
     },
     {
       icon: stepIcons[1],
-      color: '#a78bfa',
+      color: 'var(--status-accent)',
       title: t('onboarding.step2_title'),
       desc: t('onboarding.step2_desc'),
     },
     {
       icon: stepIcons[2],
-      color: '#34d399',
+      color: 'var(--status-success)',
       title: t('onboarding.step3_title'),
       desc: t('onboarding.step3_desc'),
     },
     {
       icon: stepIcons[3],
-      color: '#f472b6',
+      color: 'var(--color-accent-pink)',
       title: t('onboarding.step4_title'),
       desc: t('onboarding.step4_desc'),
     },
@@ -104,10 +104,12 @@ export default function OnboardingModal() {
 
           <div className="onboarding-dots">
             {steps.map((_, i) => (
-              <span
+              <button
+                type="button"
                 key={i}
                 className={`onboarding-dot ${i === step ? 'active' : ''}`}
                 onClick={() => setStep(i)}
+                aria-label={`Onboarding step ${i + 1}`}
               />
             ))}
           </div>

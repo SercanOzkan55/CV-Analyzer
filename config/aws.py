@@ -52,7 +52,7 @@ ALLOWED_CONTENT_TYPES = frozenset(
 
 # Max upload size: 5 MB by default. Keep request body slightly higher for
 # multipart form overhead via MAX_REQUEST_BODY_BYTES in main.py.
-MAX_UPLOAD_BYTES = _int_env("MAX_UPLOAD_BYTES", 5 * 1024 * 1024, minimum=128 * 1024)
+MAX_UPLOAD_BYTES = _int_env("MAX_UPLOAD_BYTES", 5_000_000, minimum=128 * 1024)
 
 # Presigned URL default expiry: 60 seconds; never long-lived.
 PRESIGNED_URL_EXPIRY = _int_env("PRESIGNED_URL_EXPIRY", 60, minimum=5, maximum=60)

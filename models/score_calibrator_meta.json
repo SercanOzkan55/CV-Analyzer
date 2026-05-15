@@ -1,0 +1,32 @@
+{
+  "type": "ridge_regression",
+  "intercept": 8.060261010435694,
+  "coefficients": [
+    0.016613932457130085,
+    0.04977111334902183,
+    0.6366164499503525,
+    0.0,
+    0.0,
+    -0.3373110978124761,
+    3.8852352991645844,
+    2.5449104732630006
+  ],
+  "feature_names": [
+    "keyword_score",
+    "skill_score",
+    "ats_score",
+    "content_score",
+    "layout_score",
+    "missing_count",
+    "cv_length_k",
+    "jd_length_k"
+  ],
+  "alpha": 1.0,
+  "metrics": {
+    "mae": 5.477,
+    "rmse": 6.843,
+    "r2": 0.6916,
+    "loo_cv_mae": 6.028,
+    "n_samples": 79
+  }
+}

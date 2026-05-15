@@ -89,11 +89,18 @@ export default function SettingsPage() {
     <div className="app-layout">
       <Navbar />
       <main className="main-content" id="main-content">
-        <h1>{t('settings.title')}</h1>
+        <div className="page-header product-page-header">
+          <div>
+            <span className="product-page-kicker">{planLoading ? t('common.loading') : planLabel}</span>
+            <h1>{t('settings.title')}</h1>
+            <p className="product-page-subtitle">{t('settings.profile_subtitle')}</p>
+          </div>
+          <Link to="/profile" className="btn-outline btn-sm">{t('profile.title')}</Link>
+        </div>
 
         <div className="settings-grid">
           {/* Profile */}
-          <div className="card">
+          <div className="card product-card">
             <h2>{t('settings.profile')}</h2>
             <p className="text-muted">{t('settings.profile_subtitle')}</p>
             <div className="settings-field">
@@ -103,7 +110,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Change Password */}
-          <div className="card">
+          <div className="card product-card">
             <h2>{t('settings.change_password')}</h2>
             <form onSubmit={handlePasswordChange}>
               <div className="settings-field">
@@ -122,7 +129,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Preferences */}
-          <div className="card">
+          <div className="card product-card">
             <h2>{t('settings.preferences')}</h2>
             <div className="settings-field">
               <label>{t('settings.language')}</label>
@@ -153,7 +160,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Plan */}
-          <div className="card">
+          <div className="card product-card">
             <h2>{t('settings.plan_management')}</h2>
             <div className="plan-badge-row">
               <span className="plan-badge">{planLoading ? '...' : planLabel}</span>
@@ -168,7 +175,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Danger Zone */}
-          <div className="card card-danger">
+          <div className="card card-danger product-card">
             <h2>{t('settings.danger_zone')}</h2>
             <p className="text-muted">{t('settings.delete_account_desc')}</p>
             <button className="btn-danger" onClick={handleDeleteAccount} disabled={deleteLoading}>

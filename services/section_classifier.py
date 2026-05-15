@@ -202,6 +202,7 @@ _HEADER_HINTS: Dict[str, re.Pattern] = {
         r"^(?:summary|professional\s+summary|profile|about(?:\s+me)?|objective"
         r"|career\s+summary|career\s+objective|personal\s+statement"
         r"|personal\s+profile|personal\s+summary|executive\s+summary"
+        r"|executive\s+profile"
         r"|personal\s+information|introduction|personal"
         # TR
         r"|[öo]zet|profil|ki[şs]isel\s+bilgiler|kariyer\s+[öo]zeti"
@@ -254,7 +255,7 @@ _HEADER_HINTS: Dict[str, re.Pattern] = {
     ),
     "experience": re.compile(
         r"^(?:experience|work\s+experience|professional\s+experience|employment"
-        r"|employment\s+history|work\s+history|career\s+history|professional\s+background|industrial\s+training(?:\s+attended)?|training"
+        r"|employment\s+history|work\s+history|work\s+background|career\s+history|professional\s+background|industrial\s+training(?:\s+attended)?|trainings?|training"
         # TR
         r"|deneyim|i[sş]\s*deneyimi|mesleki\s*deneyim"
         # FR
@@ -307,7 +308,7 @@ _HEADER_HINTS: Dict[str, re.Pattern] = {
         re.I,
     ),
     "education": re.compile(
-        r"^(?:education|academic\s+background|educational\s+background|qualifications|academic|academics"
+        r"^(?:education|academic\s+background|academic\s+qualifications|educational\s+background|qualifications|academic|academics"
         # TR
         r"|e[gğ]itim|akademik\s*ge[cç]mi[sş]"
         # FR
@@ -464,7 +465,7 @@ _HEADER_HINTS: Dict[str, re.Pattern] = {
         re.I,
     ),
     "other": re.compile(
-        r"^(?:achievements|awards|volunteer|activities|publications|misc|other|personal\s+details)$",
+        r"^(?:achievements|awards|volunteer|activities|other\s+activities|publications|misc|other|personal\s+details)$",
         re.I,
     ),
     "certifications": re.compile(
@@ -987,7 +988,7 @@ _GLOBAL_ALIASES: Dict[str, str] = {
     "career objective": "summary", "personal": "summary",
     "personal statement": "summary", "personal profile": "summary",
     "professional summary": "summary", "executive summary": "summary",
-    "career summary": "summary", "introduction": "summary",
+    "executive profile": "summary", "career summary": "summary", "introduction": "summary",
     # TR
     "özet": "summary", "kişisel bilgiler": "summary",
     "kariyer özeti": "summary",
@@ -1105,7 +1106,9 @@ _GLOBAL_ALIASES: Dict[str, str] = {
     "work": "experience", "employment": "experience",
     "work experience": "experience", "professional experience": "experience",
     "career history": "experience", "work history": "experience",
+    "work background": "experience",
     "employment history": "experience", "professional background": "experience",
+    "training": "experience", "trainings": "experience",
     # TR
     "deneyim": "experience", "iş deneyimi": "experience",
     "mesleki deneyim": "experience",
@@ -1175,7 +1178,7 @@ _GLOBAL_ALIASES: Dict[str, str] = {
 
     # ── education ────────────────────────────────────────────────────
     "academic": "education", "academics": "education",
-    "qualifications": "education",
+    "qualifications": "education", "academic qualifications": "education",
     "studies": "education", "academic background": "education", "educational background": "education",
     # TR
     "eğitim": "education", "akademik geçmiş": "education",
@@ -2995,12 +2998,14 @@ def detect_sections(
         "objective": "summary", "personal": "summary", "introduction": "summary",
         "personal statement": "summary", "personal profile": "summary",
         "professional summary": "summary", "executive summary": "summary",
-        "career summary": "summary", "career objective": "summary",
+        "executive profile": "summary", "career summary": "summary", "career objective": "summary",
         "personal information": "summary",
         "work": "experience", "employment": "experience", "work experience": "experience",
         "professional experience": "experience", "career history": "experience",
-        "work history": "experience", "employment history": "experience",
-        "academic": "education", "academics": "education", "qualifications": "education", "educational background": "education",
+        "work history": "experience", "work background": "experience",
+        "employment history": "experience", "training": "experience", "trainings": "experience",
+        "academic": "education", "academics": "education", "qualifications": "education",
+        "academic qualifications": "education", "educational background": "education",
         "technical skills": "skills", "core competencies": "skills", "skill set": "skills", "skills set": "skills",
         "competencies": "skills", "technologies": "skills",
         "project": "projects",
@@ -3012,7 +3017,8 @@ def detect_sections(
         "personal interest": "interests", "personal interests": "interests",
         "hobbies": "interests",
         "volunteer": "misc", "awards": "misc", "achievements": "misc",
-        "publications": "misc", "activities": "misc", "other": "misc",
+        "publications": "misc", "activities": "misc",
+        "other activities": "misc", "other": "misc",
     }
 
     # Pre-process: tag each block with its header hint and content lines

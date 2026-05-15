@@ -114,6 +114,33 @@ def _sections_from_classifier(text: str) -> tuple[List[str], Dict[str, List[str]
     if not header_from_classifier and contact_lines:
         sections["contact"] = []
 
+    # Some visual CVs start with name/title lines and no contact block.  If the
+    # classifier scores those short leading lines as interests/misc, rescue them
+    # into the header so name parsing can still see them.
+    if not header_lines:
+        known_headers = {str(v).strip() for v in (section_titles or {}).values() if str(v).strip()}
+        leading_header: list[str] = []
+        for raw_line in text.split("\n"):
+            stripped = (raw_line or "").strip()
+            if not stripped or stripped == "multi_col_fixed":
+                continue
+            if stripped in known_headers:
+                break
+            if len(stripped.split()) <= 6:
+                leading_header.append(stripped)
+            if len(leading_header) >= 4:
+                break
+        if leading_header:
+            header_lines.extend(leading_header)
+            leading_set = {line.lower() for line in leading_header}
+            for key in list(sections.keys()):
+                if key == "contact":
+                    continue
+                sections[key] = [
+                    line for line in sections.get(key, [])
+                    if line.strip().lower() not in leading_set
+                ]
+
     # Enforce canonical section order regardless of PDF layout
     _SECTION_ORDER = [
         "summary",
@@ -534,6 +561,55 @@ def extract_structured(cv_text: str) -> Dict:
         from services.cv_autofix_service import guess_name_from_lines
         first_raw = [l.strip() for l in raw.split("\n")[:8] if l.strip()]
         name = guess_name_from_lines(first_raw, limit=8)
+
+    def _bad_name_candidate(value: str) -> bool:
+        low = (value or "").lower().strip()
+        if not low:
+            return True
+        if any(ch.isdigit() for ch in low) or any(tok in low for tok in ("@", "http", "www.", "/", "|")):
+            return True
+        if low in {"skills", "communication", "languages", "education", "projects", "sql", "java"}:
+            return True
+        return False
+
+    def _looks_like_person_name(value: str) -> bool:
+        text_value = (value or "").strip()
+        words = text_value.split()
+        if not (2 <= len(words) <= 4):
+            return False
+        if any(ch.isdigit() for ch in text_value) or any(ch in text_value for ch in "@/|:"):
+            return False
+        return any(ch.islower() for ch in text_value) or text_value.isupper()
+
+    _job_title_re = re.compile(
+        r"\b(?:engineer|developer|analyst|designer|architect|manager|researcher"
+        r"|intern|consultant|specialist|student|officer|assistant)\b",
+        re.I,
+    )
+    if _bad_name_candidate(name):
+        raw_lines = [l.strip() for l in raw.split("\n") if l.strip()]
+        known_headers = {str(v).strip().lower() for v in (section_titles or {}).values()}
+        skip_headers = known_headers | {
+            "multi_col_fixed", "communication", "skills", "languages",
+            "education", "projects", "personal information", "personal profile",
+            "summary", "experience", "work background",
+        }
+        for idx, candidate in enumerate(raw_lines[:60]):
+            if candidate.lower() in skip_headers:
+                continue
+            if not _looks_like_person_name(candidate):
+                continue
+            next_line = raw_lines[idx + 1] if idx + 1 < len(raw_lines) else ""
+            if next_line and _job_title_re.search(next_line):
+                name = candidate
+                if not title_lines:
+                    title_lines = [next_line]
+                for sec_key in ("interests", "misc", "education", "skills"):
+                    sections[sec_key] = [
+                        line for line in sections.get(sec_key, [])
+                        if line.strip().lower() not in {candidate.lower(), next_line.lower()}
+                    ]
+                break
 
     # Extract email, phone, location, linkedin from contacts
     # GUARD: only extract fields that are still empty
