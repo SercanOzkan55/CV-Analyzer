@@ -595,6 +595,11 @@ def _parse_sections(cv_text: str) -> tuple[list[str], Dict[str, List[str]], List
 
         canonical = _canonical_section(raw_line)
         if canonical:
+            if canonical in {"references", "interests"}:
+                dropped_sections.append(canonical)
+                current = None
+                dropping = True
+                continue
             current = canonical
             dropping = False
             continue
@@ -1579,7 +1584,7 @@ def _render_structured_sections(
         values = [value for value in (structured_sections.get(key) or []) if value]
         if not values:
             continue
-        output_lines.append(SECTION_TITLES[key])
+        output_lines.append(SECTION_TITLES.get(key, key.upper()))
         output_lines.extend(values)
         output_lines.append("")
 
@@ -2066,6 +2071,14 @@ def _parse_experience_entries(lines: List[str]) -> List[Dict]:
             if len(parts) > 1:
                 current["location"] = parts[1].strip()
             continue
+
+        if current.get("company") and current.get("title"):
+            # In PDF text, experience descriptions often lose their bullet
+            # marker. Long/action-like continuation lines belong to the
+            # current role; short lines are more likely the next company/title.
+            if len(line.split()) >= 5 or _starts_with_action_verb(line):
+                current["bullets"].append(line)
+                continue
 
         if current.get("bullets") or (current.get("company") and current.get("title")):
             entries.append(current)
@@ -2592,6 +2605,7 @@ def structured_text_to_builder_payload(
 
     # Convert to legacy CVModel for backward compatibility
     model = schema.to_cv_model()
+    model.skills = _normalize_list_section([str(skill) for skill in (model.skills or [])])
     model.ensure_skills_categorized()
     return model
 
@@ -2669,6 +2683,73 @@ def _collect_applied_changes(
     return changes
 
 
+def _verify_section_preservation(
+    cv_text: str,
+    structured_sections: Dict[str, List[str]],
+) -> set:
+    """Detect sections present in the original CV but missing from pipeline output.
+
+    Returns a set of canonical section keys that were lost during processing.
+    Ignores 'contact' and 'interests' which are intentionally handled separately.
+    """
+    _, orig_sections, _ = _parse_sections(cv_text)
+    original_keys = {
+        k for k, v in orig_sections.items()
+        if k not in {"contact", "interests"}
+        and any((line or "").strip() for line in v)
+    }
+    structured_keys = {k for k, v in structured_sections.items() if v}
+    return original_keys - structured_keys
+
+
+def _restore_lost_sections(
+    cv_text: str,
+    structured_sections: Dict[str, List[str]],
+    section_order: List[str],
+    orig_name: str | None,
+    orig_title_lines: List[str],
+    orig_contacts: List[str],
+) -> tuple[str, Dict[str, List[str]], List[str], List[str]]:
+    """Restore sections that were lost during pipeline processing.
+
+    Parses the original CV text to recover content for any sections that exist
+    in the source but are missing from the pipeline output.  Returns the
+    updated (text, structured_sections, section_order, restoration_warnings).
+    """
+    lost = _verify_section_preservation(cv_text, structured_sections)
+    if not lost:
+        return (
+            _render_structured_sections(
+                orig_name, orig_title_lines, orig_contacts,
+                structured_sections, section_order,
+            ),
+            structured_sections,
+            section_order,
+            [],
+        )
+
+    _, orig_sections, _ = _parse_sections(cv_text)
+    restoration_warnings: List[str] = []
+
+    for lost_key in lost:
+        orig_lines = [line for line in orig_sections.get(lost_key, []) if (line or "").strip()]
+        if orig_lines:
+            structured_sections[lost_key] = orig_lines
+            if lost_key not in section_order:
+                section_order.append(lost_key)
+            title = SECTION_TITLES.get(lost_key, lost_key.upper())
+            restoration_warnings.append(
+                f"{title} section was not detected by the pipeline and was restored from the original CV."
+            )
+            logger.info("restore_lost_section: %s (%d lines)", lost_key, len(orig_lines))
+
+    rebuilt_text = _render_structured_sections(
+        orig_name, orig_title_lines, orig_contacts,
+        structured_sections, section_order,
+    )
+    return rebuilt_text, structured_sections, section_order, restoration_warnings
+
+
 def auto_fix_cv_text(
     cv_text: str,
     job_description: str = "",
@@ -2686,6 +2767,7 @@ def auto_fix_cv_text(
     extracted = extract_fn(cv_text)
     normalized = normalize_fn(extracted)
     is_multi_column = extracted.get("_multi_column_detected", False)
+    _, _, raw_dropped_sections = _parse_sections(cv_text)
 
     from services.extraction_validator import validate_extraction
     quality = validate_extraction(cv_text, normalized)
@@ -2722,8 +2804,9 @@ def auto_fix_cv_text(
         detected_mode = "rebuild"
 
     # ═══ GENERATE STRUCTURED TEXT FROM PIPELINE JSON ═══
-    dropped_sections: List[str] = []
+    dropped_sections: List[str] = list(raw_dropped_sections)
     skills_inferred = False
+    _restore_warns: List[str] = []
 
     if detected_mode == "preserve":
         # Minimal rewrite: just standardize headings on original text
@@ -2740,6 +2823,25 @@ def auto_fix_cv_text(
         build_mode = "balanced" if detected_mode == "light_fix" else "strict"
         optimized_text, structured_sections, dropped_sections, section_order = (
             _pipeline_to_structured_text(normalized, job_description, mode=build_mode)
+        )
+        dropped_sections = sorted(set(raw_dropped_sections) | set(dropped_sections))
+
+        # ═══ SECTION PRESERVATION: restore any sections lost by the pipeline ═══
+        _pipe_name = normalized.get("full_name", "")
+        _pipe_title = normalized.get("title", "")
+        _pipe_contacts = [v for v in [
+            normalized.get("email", ""),
+            normalized.get("phone", ""),
+            normalized.get("location", ""),
+            normalized.get("linkedin", ""),
+        ] if v]
+        optimized_text, structured_sections, section_order, _restore_warns = (
+            _restore_lost_sections(
+                cv_text, structured_sections, section_order,
+                orig_name=_pipe_name,
+                orig_title_lines=[_pipe_title] if _pipe_title else [],
+                orig_contacts=_pipe_contacts,
+            )
         )
 
     # ═══ KEYWORD BOOSTING ═══
@@ -2769,7 +2871,7 @@ def auto_fix_cv_text(
 
     # ═══ AI REWRITE (optional) ═══
     used_ai = False
-    warnings: List[str] = []
+    warnings: List[str] = list(_restore_warns) if detected_mode != "preserve" else []
     best_score = float(before_ats.get("overall_score", 0) or 0)
     current_ats = analyze_cv(optimized_text, job_description, lang=lang)
     current_score = float(current_ats.get("overall_score", 0) or 0)
@@ -2825,8 +2927,27 @@ def auto_fix_cv_text(
     # ═══ FINAL SCORING ═══
     after_ats = analyze_cv(optimized_text, job_description, lang=lang)
 
-    # Fallback: if optimization hurt the score, use minimal rewrite
-    if float(after_ats.get("overall_score", 0) or 0) < float(before_ats.get("overall_score", 0) or 0):
+    # Fallback: section-aware score regression guard
+    # Only fall back to minimal rewrite when the structured output BOTH
+    # loses sections AND drops the score significantly (>3 points).
+    # Small score drops are acceptable when section integrity is preserved,
+    # because the structured output has better formatting and ATS compliance.
+    after_score = float(after_ats.get("overall_score", 0) or 0)
+    before_score = float(before_ats.get("overall_score", 0) or 0)
+    score_regression = before_score - after_score
+
+    # Check if sections were lost in the structured output
+    lost_in_structured = _verify_section_preservation(cv_text, structured_sections)
+    sections_preserved = len(lost_in_structured) == 0
+
+    # Tolerate small score drops (≤3) when all sections are preserved
+    SECTION_SAFE_TOLERANCE = 3.0
+    use_fallback = (
+        score_regression > 0
+        and (score_regression > SECTION_SAFE_TOLERANCE or not sections_preserved)
+    )
+
+    if use_fallback:
         fallback_text = _minimal_heading_rewrite(cv_text)
         fallback_text = _ensure_identity_header(
             fallback_text,
@@ -2835,10 +2956,28 @@ def auto_fix_cv_text(
             fallback_contacts=orig_contacts,
         )
         fallback_ats = analyze_cv(fallback_text, job_description, lang=lang)
-        if float(fallback_ats.get("overall_score", 0) or 0) >= float(after_ats.get("overall_score", 0) or 0):
+        if float(fallback_ats.get("overall_score", 0) or 0) >= after_score:
             optimized_text = fallback_text
             after_ats = fallback_ats
-            warnings.append("Structured rewrite scored lower than the source CV, so the safer non-regression output was used.")
+            if lost_in_structured:
+                warnings.append(
+                    f"Structured rewrite lost sections ({', '.join(sorted(lost_in_structured))}) "
+                    f"and scored lower (score drop: {round(score_regression, 1)}), "
+                    f"so the safer non-regression output was used."
+                )
+            else:
+                warnings.append(
+                    f"Structured rewrite scored lower than the source CV "
+                    f"(score drop: {round(score_regression, 1)}), "
+                    f"so the safer non-regression output was used."
+                )
+    elif score_regression > 0 and sections_preserved:
+        # Structured output preserved all sections but score dropped slightly
+        # — this is acceptable, log it as info
+        warnings.append(
+            f"Structured rewrite has a minor score change ({round(-score_regression, 1)} points) "
+            f"but all {len(structured_sections)} sections are preserved. Using the structured output."
+        )
 
     # ═══ APPLIED CHANGES ═══
     score_delta = round(

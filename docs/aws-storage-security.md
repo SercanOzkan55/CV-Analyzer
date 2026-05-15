@@ -9,8 +9,7 @@ CV files contain sensitive personal data. Use this checklist before production.
 - Disable ACL usage.
 - Enable versioning only if you have a clear recovery need; otherwise rely on backups and short retention.
 - Add lifecycle rules:
-  - `user_*/original/*`: expire after 90 days by default.
-  - `user_*/optimized/*`: expire after 90 days by default.
+  - `users/*`: expire after 90 days by default.
   - `tmp/*` or `quarantine/*`: expire after 1 day.
   - incomplete multipart uploads: abort after 1 day.
 
@@ -88,7 +87,7 @@ The app now supports IAM role credentials, so static `AWS_ACCESS_KEY_ID` and
     {
       "ID": "expire-user-cvs",
       "Status": "Enabled",
-      "Filter": { "Prefix": "user_" },
+      "Filter": { "Prefix": "users/" },
       "Expiration": { "Days": 90 },
       "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 1 }
     }

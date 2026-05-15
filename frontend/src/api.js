@@ -747,6 +747,68 @@ export async function billingAdminListFeedback(token, adminToken, { limit = 50 }
   return res.json()
 }
 
+export async function adminOpsHealth(token, adminToken) {
+  const res = await fetch(`${BASE}/api/v1/admin/ops/health`, {
+    method: 'GET',
+    headers: withBillingAdminHeaders(token, adminToken, false),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Ops health failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function adminOpsCost(token, adminToken) {
+  const res = await fetch(`${BASE}/api/v1/admin/ops/cost`, {
+    method: 'GET',
+    headers: withBillingAdminHeaders(token, adminToken, false),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Ops cost failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function adminOpsSecurity(token, adminToken) {
+  const res = await fetch(`${BASE}/api/v1/admin/ops/security`, {
+    method: 'GET',
+    headers: withBillingAdminHeaders(token, adminToken, false),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Ops security failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function adminOpsEmailTest(token, adminToken, payload = {}) {
+  const res = await fetch(`${BASE}/api/v1/admin/ops/email/test`, {
+    method: 'POST',
+    headers: withBillingAdminHeaders(token, adminToken, true),
+    body: JSON.stringify(payload || {}),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Email test failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function adminParserRegression(token, adminToken, payload = {}) {
+  const res = await fetch(`${BASE}/api/v1/admin/parser/regression`, {
+    method: 'POST',
+    headers: withBillingAdminHeaders(token, adminToken, true),
+    body: JSON.stringify(payload || {}),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Parser regression failed: ${res.status}`)
+  }
+  return res.json()
+}
+
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // CV Optimizer â€” Rewrite + Keyword Optimization + Score Breakdown
@@ -963,6 +1025,93 @@ export async function sendReminderTest(token, reminderId) {
   return _reminderJson(token, `/api/v1/reminders/${reminderId}/send-test`, 'POST')
 }
 
+export async function fetchMyDataSummary(token) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/me/data-summary`, { headers })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Data summary failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function exportMyData(token, { includeRaw = false } = {}) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/me/data-export?include_raw=${includeRaw ? 'true' : 'false'}`, { headers })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Data export failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function deleteMyData(token, scope = 'stored_cvs') {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const params = new URLSearchParams({ scope, confirm: 'DELETE' })
+  const res = await fetch(`${BASE}/api/v1/me/data?${params.toString()}`, { method: 'DELETE', headers })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Data delete failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function fetchTemplateMarketplace(token) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/cv-builder/template-marketplace`, { headers })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Template marketplace failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function fetchDemoSampleWorkspace() {
+  const res = await fetch(`${BASE}/api/v1/demo/sample-workspace`)
+  if (!res.ok) throw new Error(`Demo workspace failed: ${res.status}`)
+  return res.json()
+}
+
+export async function checkJobDescriptionQuality(token, jobDescription, jdSkills = []) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/job-description/quality`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ job_description: jobDescription, jd_skills: jdSkills }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `JD quality failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function diffCvText(token, originalText, optimizedText) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/cv/diff`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ original_text: originalText, optimized_text: optimizedText }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `CV diff failed: ${res.status}`)
+  }
+  return res.json()
+}
+
 
 // ¦¦ Recruiter SaaS Batch Hub ¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦
 
@@ -986,6 +1135,31 @@ export async function recruiterDashboardActions(token, jobId) {
   const res = await fetch(`${BASE}/api/v1/recruiter/dashboard/actions/${jobId}`, { headers });
   if (!res.ok) throw new Error('Failed to fetch candidates');
   return res.json();
+}
+
+export async function recruiterPipeline(token, jobId) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/recruiter/pipeline/${jobId}`, { headers })
+  if (!res.ok) throw new Error('Failed to fetch pipeline')
+  return res.json()
+}
+
+export async function recruiterUpdateActionStage(token, actionId, payload) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/recruiter/dashboard/actions/${actionId}/stage`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(payload || {}),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || 'Failed to update pipeline stage')
+  }
+  return res.json()
 }
 
 export async function recruiterSaaSBatchUpload(token, jobId, files) {

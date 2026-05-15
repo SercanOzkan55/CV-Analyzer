@@ -11,6 +11,7 @@ from sqlalchemy import or_, select, text
 
 from auth import verify_supabase_jwt
 from config.aws import MAX_UPLOAD_BYTES
+from core.runtime_bridge import main_module
 from database import get_db
 from models import (
     Analysis,
@@ -55,7 +56,7 @@ from services.tasks import batch_recruiter_task
 
 logger = logging.getLogger("app.recruiter")
 
-_MAX_BATCH_FILES = int(os.getenv("RECRUITER_MAX_BATCH_FILES", "100"))
+_MAX_BATCH_FILES = int(os.getenv("RECRUITER_MAX_BATCH_FILES", "50"))
 
 
 def _format_bytes(value: int) -> str:
@@ -67,8 +68,7 @@ def _format_bytes(value: int) -> str:
 
 
 def _main():
-    import main
-    return main
+    return main_module()
 
 
 def _get_limiter():
@@ -117,7 +117,41 @@ def _pipeline(cv_text: str, job_description: str, lang: str = ""):
 def _billable_usage(db, recruiter: User | None, endpoint: str, response: Response | None = None):
     return _main()._consume_billable_usage(db, recruiter, endpoint, response=response)
 
+
+def _serialize_action(action: CandidateAction) -> dict:
+    snapshot = {}
+    if action.analysis_snapshot:
+        try:
+            snapshot = json.loads(action.analysis_snapshot)
+        except Exception:
+            snapshot = {}
+    return {
+        "id": action.id,
+        "job_id": action.job_id,
+        "candidate_name": action.candidate_name,
+        "candidate_email": action.candidate_email,
+        "action": action.action,
+        "stage": action.action,
+        "final_score": action.final_score,
+        "ats_score": action.ats_score,
+        "email_sent": action.email_sent,
+        "email_sent_at": str(action.email_sent_at) if action.email_sent_at else None,
+        "notes": action.notes,
+        "created_at": str(action.created_at) if action.created_at else None,
+        "analysis_snapshot": snapshot,
+    }
+
 router = APIRouter(prefix="/api/v1/recruiter")
+
+_ALLOWED_CANDIDATE_STAGES = {
+    "pending",
+    "shortlist",
+    "interview",
+    "offer",
+    "accepted",
+    "rejected",
+    "withdrawn",
+}
 
 _GENERIC_DOMAINS = {
     "gmail.com",
@@ -153,6 +187,11 @@ class RecruiterActionRequest(BaseModel):
     action: str
     analysis_snapshot: dict | None = None
     template_id: int | None = None
+
+
+class RecruiterStageUpdateRequest(BaseModel):
+    stage: str
+    notes: str | None = None
 
 
 # Response models for consistent API contracts
@@ -628,6 +667,11 @@ async def recruiter_batch_rank(
             status_code=400,
             detail=f"Maximum {_MAX_BATCH_FILES} CV files allowed",
         )
+    for upload in files:
+        filename = (upload.filename or "").lower()
+        content_type = (upload.content_type or "").lower()
+        if not filename.endswith(".pdf") or content_type not in {"application/pdf", "application/x-pdf"}:
+            raise HTTPException(status_code=400, detail="Only PDF files are allowed")
 
     jd_text = await _resolve_job_description_text(job_description, jd_file)
     if not jd_text:
@@ -1164,8 +1208,9 @@ def recruiter_dashboard_action(body: RecruiterActionRequest, db=Depends(get_db),
     if not org_id:
         raise HTTPException(status_code=400, detail="Recruiter has no organization")
 
-    if body.action not in ("accepted", "rejected", "pending"):
-        raise HTTPException(status_code=400, detail="action must be 'accepted', 'rejected', or 'pending'")
+    stage = str(body.action or "").strip().lower()
+    if stage not in _ALLOWED_CANDIDATE_STAGES:
+        raise HTTPException(status_code=400, detail=f"action must be one of {', '.join(sorted(_ALLOWED_CANDIDATE_STAGES))}")
 
     final_score = body.final_score
     ats_score = body.ats_score
@@ -1190,19 +1235,20 @@ def recruiter_dashboard_action(body: RecruiterActionRequest, db=Depends(get_db),
         cv_text=body.cv_text,
         final_score=final_score,
         ats_score=ats_score,
-        action=body.action,
+        action=stage,
         analysis_snapshot=body.analysis_snapshot,
     )
 
     response_data = {
         "id": record.id,
         "action": record.action,
+        "stage": record.action,
         "candidate_name": record.candidate_name,
         "final_score": record.final_score,
         "ats_score": record.ats_score,
     }
 
-    if body.action == "accepted" and body.template_id:
+    if stage == "accepted" and body.template_id:
         tpl = _rc_get_tpl(db, body.template_id, org_id)
         if tpl:
             variables = {"name": body.candidate_name, "email": body.candidate_email or ""}
@@ -1220,18 +1266,61 @@ def recruiter_dashboard_actions(job_id: int, db=Depends(get_db), recruiter=Depen
 
     actions = _rc_get_actions(db, job_id, org_id)
     return {
-        "actions": [
-            {
-                "id": a.id,
-                "candidate_name": a.candidate_name,
-                "candidate_email": a.candidate_email,
-                "action": a.action,
-                "final_score": a.final_score,
-                "email_sent": a.email_sent,
-                "created_at": str(a.created_at),
-            }
-            for a in actions
-        ]
+        "actions": [_serialize_action(a) for a in actions]
+    }
+
+
+@router.put("/dashboard/actions/{action_id}/stage")
+def recruiter_update_action_stage(
+    action_id: int,
+    body: RecruiterStageUpdateRequest,
+    db=Depends(get_db),
+    recruiter=Depends(recruiter_required),
+):
+    org_id = recruiter.organization_id
+    if not org_id:
+        raise HTTPException(status_code=400, detail="Recruiter has no organization")
+
+    stage = str(body.stage or "").strip().lower()
+    if stage not in _ALLOWED_CANDIDATE_STAGES:
+        raise HTTPException(status_code=400, detail=f"stage must be one of {', '.join(sorted(_ALLOWED_CANDIDATE_STAGES))}")
+
+    record = (
+        db.query(CandidateAction)
+        .filter(CandidateAction.id == action_id, CandidateAction.organization_id == org_id)
+        .first()
+    )
+    if not record:
+        raise HTTPException(status_code=404, detail="Candidate action not found")
+
+    record.action = stage
+    if body.notes is not None:
+        record.notes = str(body.notes or "")[:2000]
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    _log_event("candidate_stage_updated", action_id=record.id, stage=stage, recruiter_id=recruiter.id)
+    return {"action": _serialize_action(record)}
+
+
+@router.get("/pipeline/{job_id}")
+def recruiter_pipeline(job_id: int, db=Depends(get_db), recruiter=Depends(recruiter_required)):
+    org_id = recruiter.organization_id
+    if not org_id:
+        raise HTTPException(status_code=400, detail="Recruiter has no organization")
+
+    actions = _rc_get_actions(db, job_id, org_id)
+    grouped = {stage: [] for stage in ("pending", "shortlist", "interview", "offer", "accepted", "rejected", "withdrawn")}
+    for action in actions:
+        stage = str(action.action or "pending").lower()
+        grouped.setdefault(stage, []).append(_serialize_action(action))
+
+    return {
+        "job_id": job_id,
+        "stages": [
+            {"stage": stage, "count": len(items), "actions": items}
+            for stage, items in grouped.items()
+        ],
     }
 
 

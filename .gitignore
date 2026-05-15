@@ -47,6 +47,7 @@ mobile/node_modules/
 mobile/.expo/devices.json
 
 # Project artifacts
+*.zip
 .local_quota.json
 mock_dev.db
 *.db
@@ -71,6 +72,7 @@ storage_data/
 
 # Dev scratch files
 _dev_scratch/
+tools/node-v*/
 tmp_*.py
 tmp_*.json
 *_trace.txt
