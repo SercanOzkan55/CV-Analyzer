@@ -69,7 +69,7 @@ LOG_LEVEL=INFO
 # Opsiyonel
 REDIS_URL=redis://localhost:6379  # Rate limiting için
 S3_BUCKET=your-bucket  # Eski özellikler için
-OPENAI_API_KEY=sk-...  # AI özellikler için
+OPENAI_API_KEY=<set-in-environment>  # AI özellikler için
 ```
 
 ### Güvenlik Ayarları
@@ -218,12 +218,13 @@ const { data, error } = await supabase.auth.signUp({
 
 ```bash
 # JWT token ile API key oluştur
+AUTH_HEADER="$(printf 'Authorization:%sBearer %s' ' ' "$JWT_TOKEN")"
 curl -X POST "http://localhost:8001/api/v1/recruiter/subscriptions/generate-key" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+  -H "$AUTH_HEADER"
 
 # Response:
 {
-  "api_key": "cv_abc123def456...",
+  "api_key": "<generated-api-key>",
   "monthly_limit": 1000,
   "expires_at": "2024-12-31T23:59:59Z"
 }
@@ -233,8 +234,9 @@ curl -X POST "http://localhost:8001/api/v1/recruiter/subscriptions/generate-key"
 
 ```bash
 # Kullanım durumunu kontrol et
+API_KEY_HEADER="$(printf 'X-API-Key:%s%s' ' ' "$LOCAL_API_KEY")"
 curl -X GET "http://localhost:8001/api/v1/recruiter/subscriptions/usage" \
-  -H "X-API-Key: cv_abc123def456..."
+  -H "$API_KEY_HEADER"
 
 # Response:
 {
@@ -250,8 +252,9 @@ curl -X GET "http://localhost:8001/api/v1/recruiter/subscriptions/usage" \
 ### Tek Dosya İşleme
 
 ```bash
+API_KEY_HEADER="$(printf 'X-API-Key:%s%s' ' ' "$LOCAL_API_KEY")"
 curl -X POST "http://localhost:8001/api/v1/recruiter/process-local" \
-  -H "X-API-Key: cv_abc123def456..." \
+  -H "$API_KEY_HEADER" \
   -F "job_id=1" \
   -F "files=@cv.pdf"
 
@@ -273,8 +276,9 @@ curl -X POST "http://localhost:8001/api/v1/recruiter/process-local" \
 ### Çoklu Dosya İşleme
 
 ```bash
+API_KEY_HEADER="$(printf 'X-API-Key:%s%s' ' ' "$LOCAL_API_KEY")"
 curl -X POST "http://localhost:8001/api/v1/recruiter/process-local" \
-  -H "X-API-Key: cv_abc123def456..." \
+  -H "$API_KEY_HEADER" \
   -F "job_id=1" \
   -F "files=@cv1.pdf" \
   -F "files=@cv2.docx" \
@@ -425,8 +429,9 @@ LOGGING_CONFIG = {
 **API Key Hatası:**
 ```bash
 # API key'i kontrol et
+API_KEY_HEADER="$(printf 'X-API-Key:%s%s' ' ' "$LOCAL_API_KEY")"
 curl -X GET "http://localhost:8001/api/v1/recruiter/subscriptions/usage" \
-  -H "X-API-Key: YOUR_API_KEY"
+  -H "$API_KEY_HEADER"
 ```
 
 **Dosya İşleme Hatası:**

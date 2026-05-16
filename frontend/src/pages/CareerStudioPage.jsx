@@ -119,7 +119,9 @@ export default function CareerStudioPage() {
   }
 
   const score = Math.round(matchScoreResult?.score || 0)
-  const hasResults = linkedInResult || matchScoreResult
+  const hasLinkedInResult = Boolean(linkedInResult)
+  const hasMatchScoreResult = Boolean(matchScoreResult)
+  const hasResults = hasLinkedInResult || hasMatchScoreResult
 
   return (
     <div className="app-layout">

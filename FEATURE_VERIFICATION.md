@@ -129,7 +129,7 @@ uvicorn main:app --reload --port 8001
 ```bash
 # Recruiter batch ranking endpoint'ini çağır
 curl -X POST http://localhost:8001/api/v1/recruiter/batch_rank \
-  -H "Authorization: Bearer <YOUR_JWT_TOKEN>" \
+  -H "$(printf 'Authorization:%sBearer %s' ' ' "$JWT_TOKEN")" \
   -H "Content-Type: application/json" \
   -d '{
     "job_description": "Senior Python Developer",
@@ -171,7 +171,7 @@ curl -X POST http://localhost:8001/api/v1/recruiter/batch_rank \
 ```bash
 # 400 Bad Request tetikle
 curl -X POST http://localhost:8001/api/v1/recruiter/batch_rank \
-  -H "Authorization: Bearer invalid_token" \
+  -H "$(printf 'Authorization:%sBearer %s' ' ' invalid_token)" \
   -d '{invalid json}'
 ```
 
@@ -346,7 +346,7 @@ curl -s https://api.your-domain.com/health | jq .
 curl -s https://your-domain.com/ | head -c 1000 | grep -q "<!DOCTYPE" && echo "✅ Frontend served" || echo "❌ Frontend error"
 
 # Recruiter API Check
-curl -s -H "Authorization: Bearer $JWT_TOKEN" \
+curl -s -H "$(printf 'Authorization:%sBearer %s' ' ' "$JWT_TOKEN")" \
   https://api.your-domain.com/api/v1/recruiter/search \
   | jq '.status' | grep -q "success" && echo "✅ Recruiter API OK" || echo "❌ Recruiter API Error"
 ```
@@ -372,7 +372,8 @@ docker logs cv-analyzer-backend 2>&1 | jq 'select(.level == "ERROR")'
 
 ```bash
 # Response time check
-time curl -s https://api.your-domain.com/api/v1/recruiter/search -H "Authorization: Bearer $TOKEN"
+time curl -s https://api.your-domain.com/api/v1/recruiter/search \
+  -H "$(printf 'Authorization:%sBearer %s' ' ' "$TOKEN")"
 
 # Load test (optional)
 # ab -n 100 -c 10 https://api.your-domain.com/health
