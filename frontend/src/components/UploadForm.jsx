@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { analyzePdf } from '../api'
+import { CV_UPLOAD_ACCEPT, isSupportedCvUpload } from '../utils/fileTypes'
 
 export default function UploadForm({ setResult, token }) {
   const [file, setFile] = useState(null)
@@ -10,7 +11,8 @@ export default function UploadForm({ setResult, token }) {
   async function handleAnalyze(e) {
     e.preventDefault()
     setError(null)
-    if (!file) return setError('Please select a PDF file')
+    if (!file) return setError('Please select a CV file')
+    if (!isSupportedCvUpload(file)) return setError('Please select a PDF, DOCX, or TXT file')
 
     try {
       setLoading(true)
@@ -26,10 +28,10 @@ export default function UploadForm({ setResult, token }) {
   return (
     <form onSubmit={handleAnalyze} className="upload-form">
       <label>
-        PDF seç
+        CV seç
         <input
           type="file"
-          accept="application/pdf"
+          accept={CV_UPLOAD_ACCEPT}
           onChange={(e) => setFile(e.target.files[0])}
         />
       </label>

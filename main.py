@@ -8,10 +8,10 @@ import os
 MOCK_SERVICES_ON = os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes")
 import hashlib
 import hmac
-import io
 import json
 import os
 import smtplib
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -42,7 +42,7 @@ from alembic.script import ScriptDirectory
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from starlette.concurrency import run_in_threadpool
-from sqlalchemy import select, text
+from sqlalchemy import text
 
 try:
     from redis import Redis
@@ -75,10 +75,15 @@ from services.skill_service import skill_coverage_score
 from services.tasks import analyze_pdf_task, analyze_text_task, celery_app
 from services.cv_builder_service import build_cv, get_available_templates
 from services.billing_service import get_entitlements, is_feature_enabled
-from services.cv_autofix_service import auto_fix_cv_text, structured_text_to_builder_payload
-from services import rewrite_service
+from services.cv_autofix_service import auto_fix_cv_text
+from services import stripe_webhook_service, upload_service
 from services.ats_config import get_ats_weights
-from database import engine
+from routes.feedback import create_router as create_feedback_router
+from routes.rewrite import create_router as create_rewrite_router
+from routes.recruiter import create_router as create_recruiter_router
+from routes.user_dashboard import create_router as create_user_dashboard_router
+from routes.workspace import create_router as create_workspace_router
+from schemas.rewrite import ScoreBreakdownRequest
 
 # FastAPI docs hardening for production
 if os.getenv("ENV", "dev") == "prod":
@@ -194,6 +199,60 @@ _LOCAL_DAILY_QUOTA = _load_local_quota()
 _LOCAL_USER_THROTTLE = {}
 _LOCAL_ABUSE_COUNTERS = {}
 _LOCAL_ABUSE_BANS = {}
+_LOCAL_FEATURE_STORE_FILE = os.path.join(os.path.dirname(__file__), ".local_feature_store.json")
+_LOCAL_FEATURE_STORE_LOCK = threading.Lock()
+
+
+def _load_feature_store() -> dict:
+    try:
+        with open(_LOCAL_FEATURE_STORE_FILE, "r", encoding="utf-8") as f:
+            data = json.loads(f.read() or "{}")
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+_LOCAL_FEATURE_STORE = _load_feature_store()
+
+
+def _save_feature_store() -> None:
+    try:
+        with open(_LOCAL_FEATURE_STORE_FILE, "w", encoding="utf-8") as f:
+            f.write(json.dumps(_LOCAL_FEATURE_STORE, ensure_ascii=False, indent=2, default=str))
+    except Exception:
+        pass
+
+
+def _feature_user_key(db_user: User | None, fallback: str | None = None) -> str:
+    value = getattr(db_user, "supabase_id", None) or fallback or getattr(db_user, "email", None)
+    return str(value or "anonymous")
+
+
+def _feature_bucket(user_key: str, bucket_name: str) -> list:
+    users = _LOCAL_FEATURE_STORE.setdefault("users", {})
+    user_store = users.setdefault(str(user_key), {})
+    bucket = user_store.setdefault(bucket_name, [])
+    if not isinstance(bucket, list):
+        bucket = []
+        user_store[bucket_name] = bucket
+    return bucket
+
+
+def _next_feature_id(bucket: list) -> int:
+    max_id = 0
+    for item in bucket:
+        try:
+            max_id = max(max_id, int(item.get("id") or 0))
+        except Exception:
+            pass
+    return max_id + 1
+
+
+def _current_db_user(user: dict, db) -> User:
+    _ensure_not_expired(user)
+    supabase_id = (user or {}).get("user_id") or "mock-user"
+    email = (user or {}).get("email") or "dev@example.com"
+    return get_or_create_user(db, str(supabase_id), str(email))
 
 
 def _metric_request(endpoint: str):
@@ -217,21 +276,26 @@ def _metric_quota_hit(endpoint: str, reason: str):
         pass
 
 # CORS middleware
+_ENV_NAME = os.getenv("ENV", "dev").strip().lower()
+_configured_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "https://yourdomain.com").split(",")
+    if origin.strip()
+]
+_dev_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    "https://localhost:5173",
+    "https://127.0.0.1:5173",
+    "https://localhost:5174",
+    "https://127.0.0.1:5174",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
-        "https://localhost:5173",
-        "https://127.0.0.1:5173",
-        "https://localhost:5174",
-        "https://127.0.0.1:5174",
-        os.getenv("CORS_ORIGINS", "https://yourdomain.com"),
-    ],
-    # Accept any localhost/127.0.0.1 dev origin regardless of port.
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_origins=(_configured_origins if _ENV_NAME == "prod" else _dev_origins + _configured_origins),
+    allow_origin_regex=None if _ENV_NAME == "prod" else r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -1423,6 +1487,9 @@ def build_features(
 ANALYSIS_CACHE_TTL = int(os.getenv("ANALYSIS_CACHE_TTL", "86400"))
 MAX_ANALYZE_CV_TEXT_CHARS = int(os.getenv("MAX_ANALYZE_CV_TEXT_CHARS", "200000"))
 MAX_ANALYZE_JOB_TEXT_CHARS = int(os.getenv("MAX_ANALYZE_JOB_TEXT_CHARS", "100000"))
+CLAMAV_ENABLED = upload_service.CLAMAV_ENABLED
+CLAMAV_HOST = upload_service.CLAMAV_HOST
+CLAMAV_PORT = upload_service.CLAMAV_PORT
 
 
 def _stable_hash(text: str) -> str:
@@ -1457,138 +1524,56 @@ def _extract_job_title_from_jd(job_description: str) -> str | None:
     return first[:120]
 
 
-CLAMAV_ENABLED = os.getenv("CLAMAV_ENABLED", "0").lower() in ("1", "true", "yes")
-CLAMAV_HOST = os.getenv("CLAMAV_HOST", "localhost")
-CLAMAV_PORT = int(os.getenv("CLAMAV_PORT", "3310") or "3310")
-
-
 def _scan_upload_for_viruses(contents: bytes) -> None:
-    """Scan uploaded file bytes with ClamAV when enabled.
-
-    This uses the clamd network daemon if available. In environments
-    without CLAMAV_ENABLED, the function is a no-op.
-    """
-
-    if not CLAMAV_ENABLED:
-        return
-
-    try:
-        import clamd
-    except Exception:
-        raise HTTPException(status_code=500, detail="Virus scanning backend unavailable")
-
-    try:
-        client = clamd.ClamdNetworkSocket(host=CLAMAV_HOST, port=CLAMAV_PORT)
-        result = client.instream(io.BytesIO(contents))
-    except Exception:
-        raise HTTPException(status_code=500, detail="Virus scan failed")
-
-    try:
-        _name, (status, signature) = next(iter(result.items()))
-    except Exception:
-        status, signature = None, None
-
-    if status != "OK":
-        detail = "File failed virus scan"
-        if signature:
-            detail = f"Malware detected: {signature}"
-        raise HTTPException(status_code=400, detail=detail)
+    return upload_service.scan_upload_for_viruses(contents)
 
 
 def _extract_pdf_text(contents: bytes) -> str:
-    """Extract plain text from PDF bytes with layout-aware fallbacks.
+    return upload_service.extract_pdf_text(contents)
 
-    pdfplumber is used when available because it tends to preserve multi-page
-    and multi-column reading order better than basic PyPDF2 extraction. PyPDF2
-    remains the dependency-light fallback for test and minimal deployments.
-    """
 
-    errors: list[str] = []
-    text_parts: list[str] = []
+def _extract_docx_text(contents: bytes) -> str:
+    return upload_service.extract_docx_text(contents)
 
-    try:
-        import pdfplumber
 
-        with pdfplumber.open(io.BytesIO(contents)) as pdf:
-            for page_index, page in enumerate(pdf.pages, start=1):
-                extracted = ""
-                try:
-                    extracted = page.extract_text(layout=True) or ""
-                except TypeError:
-                    extracted = page.extract_text() or ""
-                if extracted.strip():
-                    text_parts.append(f"\n--- Page {page_index} ---\n{extracted.strip()}")
-    except Exception:
-        errors.append("pdfplumber")
-
-    if not text_parts:
-        try:
-            import PyPDF2
-
-            pdf_reader = PyPDF2.PdfReader(io.BytesIO(contents))
-            for page_index, page in enumerate(pdf_reader.pages, start=1):
-                extracted = page.extract_text()
-                if extracted and extracted.strip():
-                    text_parts.append(f"\n--- Page {page_index} ---\n{extracted.strip()}")
-        except Exception:
-            errors.append("PyPDF2")
-
-    if errors and not text_parts:
-        raise HTTPException(status_code=400, detail="Invalid PDF file")
-
-    text = "\n".join(text_parts).strip()
-    if not text:
-        raise HTTPException(status_code=400, detail="PDF contains no extractable text")
-    return text
+def _extract_plain_text(contents: bytes) -> str:
+    return upload_service.extract_plain_text(contents)
 
 
 def _validate_pdf_upload(contents: bytes, content_type: str | None) -> None:
-    """Apply upload security checks for PDF files."""
+    return upload_service.validate_pdf_upload(
+        contents,
+        content_type,
+        virus_scanner=_scan_upload_for_viruses,
+    )
 
-    if content_type != "application/pdf":
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
-    if len(contents) > 5_000_000:
-        raise HTTPException(status_code=400, detail="File too large (max 5MB)")
-    if not contents.startswith(b"%PDF-"):
-        raise HTTPException(status_code=400, detail="Invalid PDF file")
 
-    try:
-        _scan_upload_for_viruses(contents)
-    except HTTPException:
-        raise
-    except Exception:
-        if os.getenv("CLAMAV_ENABLED", "0").lower() in ("1", "true", "yes"):
-            raise HTTPException(status_code=500, detail="Virus scanner error")
+def _extract_upload_text(
+    contents: bytes,
+    content_type: str | None = "",
+    filename: str | None = "",
+    *,
+    max_size: int = 5_000_000,
+) -> str:
+    return upload_service.extract_upload_text(
+        contents,
+        content_type,
+        filename,
+        max_size=max_size,
+        virus_scanner=_scan_upload_for_viruses,
+        pdf_extractor=_extract_pdf_text,
+        docx_extractor=_extract_docx_text,
+        text_extractor=_extract_plain_text,
+    )
 
 
 async def _resolve_job_description_text(
     job_description: str = "", jd_file: UploadFile | None = None
 ) -> str:
-    """Resolve JD text from direct input or uploaded file (txt/pdf)."""
-
-    direct = (job_description or "").strip()
-    if direct:
-        return direct
-
-    if jd_file is None:
-        raise HTTPException(status_code=400, detail="Job description is required")
-
-    contents = await jd_file.read()
-    if len(contents) > 1_000_000:
-        raise HTTPException(status_code=400, detail="Job description file too large")
-
-    ctype = (jd_file.content_type or "").lower()
-    if ctype == "application/pdf":
-        if not contents.startswith(b"%PDF-"):
-            raise HTTPException(status_code=400, detail="Invalid JD PDF file")
-        return _extract_pdf_text(contents)
-
-    if ctype in ("text/plain", "application/octet-stream", ""):
-        return contents.decode("utf-8", errors="ignore").strip()
-
-    raise HTTPException(
-        status_code=400,
-        detail="Unsupported JD file type (use text/plain or application/pdf)",
+    return await upload_service.resolve_job_description_text(
+        job_description,
+        jd_file,
+        upload_text_extractor=_extract_upload_text,
     )
 
 
@@ -1752,7 +1737,7 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = DEFAULT_LANG):
         prediction, confidence, risk_level, explanation = predict_match(features)
     except Exception as e:
         # If model runner failed, log and return conservative defaults
-        print("Model prediction error:", str(e))
+        logger.exception("model prediction failed")
         prediction, confidence, risk_level, explanation = (
             50.0,
             50.0,
@@ -2037,10 +2022,10 @@ def analyze(
         db.add(analysis_record)
         db.commit()
         db.refresh(analysis_record)
-    except Exception as e:
+    except Exception:
         db.rollback()
         _metric_error("analyze", "db_insert")
-        print("DB INSERT ERROR:", str(e))
+        logger.exception("analysis insert failed")
         raise
 
     # --- Auto-save candidate and its embedding for later semantic retrieval ---
@@ -2238,7 +2223,7 @@ async def analyze_pdf(
     db=Depends(get_db),
 ):
     """
-    Analyze PDF CV against job description with JWT authentication.
+    Analyze a CV upload against job description with JWT authentication.
     User must provide valid Supabase JWT token in Authorization header.
     """
     from fastapi import HTTPException
@@ -2287,8 +2272,7 @@ async def analyze_pdf(
                 )
 
         contents = await file.read()
-        _validate_pdf_upload(contents, file.content_type)
-        text = _extract_pdf_text(contents)
+        text = _extract_upload_text(contents, file.content_type, file.filename)
         result = run_pipeline(text, job_description, lang)
         return result
 
@@ -2389,8 +2373,7 @@ async def analyze_pdf(
 
     # Only after quota check and increment, read and parse file
     contents = await file.read()
-    _validate_pdf_upload(contents, file.content_type)
-    text = _extract_pdf_text(contents)
+    text = _extract_upload_text(contents, file.content_type, file.filename)
 
     # Queue the analysis job (or run synchronously in LocalTask fallback)
     task = analyze_pdf_task.delay(text, job_description, lang)
@@ -2516,6 +2499,86 @@ def get_history(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
     return records
 
 
+def _analysis_payload(record: Analysis, include_raw: bool = False) -> dict:
+    return {
+        "id": getattr(record, "id", None),
+        "analysis_id": getattr(record, "id", None),
+        "user_id": getattr(record, "user_id", None),
+        "organization_id": getattr(record, "organization_id", None),
+        "similarity_score": float(getattr(record, "similarity_score", 0) or 0),
+        "final_score": float(getattr(record, "similarity_score", 0) or 0),
+        "interpretation": getattr(record, "interpretation", "") or "",
+        "confidence": float(getattr(record, "confidence", 0) or 0),
+        "risk_level": getattr(record, "risk_level", "") or "",
+        "domain_id": getattr(record, "domain_id", None),
+        "industry_id": getattr(record, "industry_id", None),
+        "specialization_id": getattr(record, "specialization_id", None),
+        "job_title": getattr(record, "job_title", None),
+        "created_at": (
+            getattr(record, "created_at", None).isoformat()
+            if getattr(record, "created_at", None) is not None
+            else None
+        ),
+    }
+
+
+@app.get("/api/v1/benchmark/global")
+def get_global_benchmark(db=Depends(get_db)):
+    """Return lightweight global score stats for public pricing/benchmark UI."""
+    from sqlalchemy import func
+
+    try:
+        total, avg_score, max_score = (
+            db.query(
+                func.count(Analysis.id),
+                func.avg(Analysis.similarity_score),
+                func.max(Analysis.similarity_score),
+            ).one()
+        )
+    except Exception:
+        total, avg_score, max_score = 0, 0, 0
+
+    return {
+        "total_analyses": int(total or 0),
+        "average_score": round(float(avg_score or 0), 2),
+        "top_score": round(float(max_score or 0), 2),
+        "sample_size": int(total or 0),
+    }
+
+
+@app.get("/api/v1/benchmark/professions")
+def get_profession_benchmarks(db=Depends(get_db)):
+    """Return job-title grouped benchmark stats when enough history exists."""
+    from sqlalchemy import func
+
+    try:
+        rows = (
+            db.query(
+                Analysis.job_title,
+                func.count(Analysis.id).label("count"),
+                func.avg(Analysis.similarity_score).label("avg_score"),
+            )
+            .filter(Analysis.job_title.isnot(None))
+            .group_by(Analysis.job_title)
+            .order_by(func.count(Analysis.id).desc())
+            .limit(25)
+            .all()
+        )
+    except Exception:
+        rows = []
+
+    return {
+        "professions": [
+            {
+                "name": row.job_title or "General",
+                "count": int(row.count or 0),
+                "average_score": round(float(row.avg_score or 0), 2),
+            }
+            for row in rows
+        ]
+    }
+
+
 @app.get("/api/v1/benchmark/{analysis_id}")
 def get_benchmark(analysis_id: int, user=Depends(verify_supabase_jwt), db=Depends(get_db)):
     """Return peer-group benchmark for a user's own analysis."""
@@ -2546,122 +2609,37 @@ def get_benchmark(analysis_id: int, user=Depends(verify_supabase_jwt), db=Depend
     }
 
 
-@app.get("/api/v1/usage")
-def get_usage(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
-    """Return usage counters for UI usage widgets."""
-    _ensure_not_expired(user)
-
-    if MOCK_SERVICES_ON:
-        mock_user_id = (user or {}).get("user_id") if isinstance(user, dict) else None
-        if not mock_user_id:
-            mock_user_id = "mock-user"
-        mock_email = (user or {}).get("email") if isinstance(user, dict) else None
-        db_user = get_or_create_user(db, str(mock_user_id), mock_email or "dev@example.com")
-        effective_plan = _resolve_effective_plan(db, db_user)
-        daily_limit = _resolve_daily_limit_for_plan(effective_plan)
-        redis_quota = _get_daily_quota_status(str(mock_user_id), limit=daily_limit)
-        if redis_quota is None:
-            return {
-                "plan_type": effective_plan,
-                "role": db_user.role or "individual",
-                "source": "mock",
-                "daily": {
-                    "used": int(db_user.daily_usage or 0),
-                    "limit": daily_limit,
-                    "remaining": max(0, int(daily_limit - int(db_user.daily_usage or 0))),
-                },
-                "monthly": {
-                    "used": int(db_user.monthly_usage or 0),
-                    "limit": int(USER_PLAN_LIMITS_MONTHLY.get(effective_plan, USER_PLAN_LIMITS_MONTHLY["free"])),
-                    "remaining": max(
-                        0,
-                        int(USER_PLAN_LIMITS_MONTHLY.get(effective_plan, USER_PLAN_LIMITS_MONTHLY["free"])) - int(db_user.monthly_usage or 0),
-                    ),
-                },
-            }
-        return {
-            "plan_type": effective_plan,
-            "role": db_user.role or "individual",
-            "source": "redis",
-            "daily": {
-                "used": redis_quota["used"],
-                "limit": redis_quota["limit"],
-                "remaining": redis_quota["remaining"],
-            },
-            "monthly": {
-                "used": int(db_user.monthly_usage or 0),
-                "limit": int(USER_PLAN_LIMITS_MONTHLY.get(effective_plan, USER_PLAN_LIMITS_MONTHLY["free"])),
-                "remaining": max(
-                    0,
-                    int(USER_PLAN_LIMITS_MONTHLY.get(effective_plan, USER_PLAN_LIMITS_MONTHLY["free"])) - int(db_user.monthly_usage or 0),
-                ),
-            },
-        }
-
-    supabase_id = user.get("user_id")
-    email = user.get("email")
-    db_user = get_or_create_user(db, supabase_id, email)
-
-    plan_type = db_user.plan_type or "free"
-    user_daily_limit = USER_PLAN_LIMITS_DAILY.get(plan_type, USER_PLAN_LIMITS_DAILY["free"])
-    user_monthly_limit = USER_PLAN_LIMITS_MONTHLY.get(
-        plan_type, USER_PLAN_LIMITS_MONTHLY["free"]
+app.include_router(
+    create_user_dashboard_router(
+        verify_supabase_jwt=verify_supabase_jwt,
+        get_db=get_db,
+        ensure_not_expired=_ensure_not_expired,
+        get_or_create_user=get_or_create_user,
+        current_db_user=_current_db_user,
+        resolve_effective_plan=_resolve_effective_plan,
+        resolve_daily_limit_for_plan=_resolve_daily_limit_for_plan,
+        get_daily_quota_status=_get_daily_quota_status,
+        mock_services_on=MOCK_SERVICES_ON,
+        user_plan_limits_monthly=USER_PLAN_LIMITS_MONTHLY,
     )
+)
 
-    redis_quota = _get_daily_quota_status(
-        db_user.supabase_id or str(db_user.id),
-        limit=_resolve_daily_limit_for_plan(plan_type),
+
+app.include_router(
+    create_workspace_router(
+        verify_supabase_jwt=verify_supabase_jwt,
+        get_db=get_db,
+        current_db_user=_current_db_user,
+        resolve_effective_plan=_resolve_effective_plan,
+        analysis_payload=_analysis_payload,
+        feature_user_key=_feature_user_key,
+        feature_bucket=_feature_bucket,
+        next_feature_id=_next_feature_id,
+        save_feature_store=_save_feature_store,
+        feature_store_lock=_LOCAL_FEATURE_STORE_LOCK,
+        feature_store=_LOCAL_FEATURE_STORE,
     )
-
-    if redis_quota is not None:
-        daily_used = redis_quota["used"]
-        daily_limit = redis_quota["limit"]
-        daily_remaining = redis_quota["remaining"]
-        source = "redis"
-    else:
-        daily_used = int(db_user.daily_usage or 0)
-        daily_limit = int(user_daily_limit)
-        daily_remaining = max(0, daily_limit - daily_used)
-        source = "db"
-
-    monthly_used = int(db_user.monthly_usage or 0)
-    monthly_limit = int(user_monthly_limit)
-
-    return {
-        "plan_type": plan_type,
-        "role": db_user.role or "individual",
-        "source": source,
-        "daily": {
-            "used": daily_used,
-            "limit": daily_limit,
-            "remaining": daily_remaining,
-        },
-        "monthly": {
-            "used": monthly_used,
-            "limit": monthly_limit,
-            "remaining": max(0, monthly_limit - monthly_used),
-        },
-    }
-
-
-@app.get("/api/v1/me")
-def get_me(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
-    """Return authenticated user's profile: role, plan, email."""
-    _ensure_not_expired(user)
-    if MOCK_SERVICES_ON:
-        mock_user_id = (user or {}).get("user_id") if isinstance(user, dict) else None
-        mock_email = (user or {}).get("email") if isinstance(user, dict) else None
-        db_user = get_or_create_user(db, str(mock_user_id or "mock-user"), mock_email or "dev@example.com")
-    else:
-        supabase_id = user.get("user_id")
-        email = user.get("email")
-        db_user = get_or_create_user(db, supabase_id, email)
-    return {
-        "role": db_user.role or "individual",
-        "plan_type": db_user.plan_type or "free",
-        "email": db_user.email,
-        "organization_id": db_user.organization_id,
-    }
+)
 
 
 @app.get("/api/v1/benchmark/specializations")
@@ -2822,7 +2800,7 @@ async def auto_fix_cv_pdf(
     user=Depends(verify_supabase_jwt),
     db=Depends(get_db),
 ):
-    """Extract a CV from PDF and rewrite it into a cleaner ATS-friendly format."""
+    """Extract a CV upload and rewrite it into a cleaner ATS-friendly format."""
 
     _ensure_not_expired(user)
     _metric_request("cv-auto-fix")
@@ -2834,8 +2812,7 @@ async def auto_fix_cv_pdf(
         db_user = get_or_create_user(db, supabase_id, email)
 
     contents = await file.read()
-    _validate_pdf_upload(contents, file.content_type)
-    cv_text = _extract_pdf_text(contents)
+    cv_text = _extract_upload_text(contents, file.content_type, file.filename)
 
     try:
         result = await run_in_threadpool(
@@ -2855,7 +2832,7 @@ async def auto_fix_cv_pdf(
 
     try:
         audit_payload = {
-            "source": "pdf",
+            "source": "upload",
             "used_ai": bool(result.get("used_ai")),
             "score_delta": float(result.get("score_delta", 0.0)),
         }
@@ -2869,50 +2846,6 @@ async def auto_fix_cv_pdf(
     return result
 
 
-class CVRewriteRequest(BaseModel):
-    cv_text: str
-    job_description: str | None = ""
-    lang: str = DEFAULT_LANG
-    tone: str = "professional"
-
-
-class CVAutoFixExportRequest(BaseModel):
-    optimized_cv_text: str
-    job_description: str | None = ""
-    template: str = "classic"
-    output_format: str = "docx"
-    lang: str = DEFAULT_LANG
-
-
-class CVAutoFixParseRequest(BaseModel):
-    optimized_cv_text: str
-    job_description: str | None = ""
-    lang: str = DEFAULT_LANG
-
-
-class BulletRewriteRequest(BaseModel):
-    bullets: list[str]
-    job_description: str | None = ""
-    lang: str = DEFAULT_LANG
-    tone: str = "professional"
-
-
-class CoverLetterRewriteRequest(BaseModel):
-    cv_text: str
-    job_description: str
-    lang: str = DEFAULT_LANG
-    tone: str = "professional"
-
-
-class FeedbackRequest(BaseModel):
-    category: str = "bug"
-    message: str
-    page: str | None = ""
-    lang: str | None = ""
-    score: int | None = None
-    context: dict | None = None
-
-
 def _ensure_ai_rewrite_allowed(db, db_user: User):
     plan = _resolve_effective_plan(db, db_user)
     if not is_feature_enabled(plan, "ai_rewrite"):
@@ -2920,303 +2853,33 @@ def _ensure_ai_rewrite_allowed(db, db_user: User):
     return plan
 
 
-@app.post("/api/v1/rewrite/cv")
-def rewrite_cv_endpoint(
-    body: CVRewriteRequest,
-    user=Depends(verify_supabase_jwt),
-    db=Depends(get_db),
-):
-    _ensure_not_expired(user)
-
-    supabase_id = user.get("user_id")
-    email = user.get("email")
-    db_user = get_or_create_user(db, supabase_id, email)
-    plan = _ensure_ai_rewrite_allowed(db, db_user)
-
-    try:
-        text = rewrite_service.rewrite_cv(
-            cv_text=body.cv_text,
-            job_description=body.job_description or "",
-            lang=body.lang,
-            tone=body.tone,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-
-    try:
-        audit_log(
-            "ai_rewrite_cv",
-            user_id=db_user.id,
-            organization_id=db_user.organization_id,
-            plan=plan,
-        )
-    except Exception:
-        pass
-
-    return {"result": text, "plan": plan}
-
-
-@app.post("/api/v1/cv/auto-fix/export")
-def export_auto_fixed_cv(
-    body: CVAutoFixExportRequest,
-    user=Depends(verify_supabase_jwt),
-    db=Depends(get_db),
-):
-    from fastapi.responses import StreamingResponse
-
-    _ensure_not_expired(user)
-
-    if body.output_format not in ("docx", "pdf"):
-        raise HTTPException(status_code=400, detail="output_format must be 'docx' or 'pdf'")
-
-    supabase_id = user.get("user_id")
-    email = user.get("email")
-    db_user = get_or_create_user(db, supabase_id, email)
-    effective_plan = _resolve_effective_plan(db, db_user)
-
-    cv_data = structured_text_to_builder_payload(
-        body.optimized_cv_text,
-        job_description=body.job_description or "",
-        lang=body.lang,
+app.include_router(
+    create_feedback_router(
+        verify_supabase_jwt=verify_supabase_jwt,
+        get_db=get_db,
+        ensure_not_expired=_ensure_not_expired,
+        get_or_create_user=get_or_create_user,
+        append_feedback_record=_append_feedback_record,
+        read_feedback_records=_read_feedback_records,
+        send_feedback_email=_send_feedback_email,
+        audit_log=audit_log,
     )
-    cv_data["template"] = body.template
-    cv_data["output_format"] = body.output_format
+)
 
-    result = build_cv(
-        cv_data=cv_data,
-        job_description=body.job_description or "",
-        template=body.template,
-        output_format=body.output_format,
-        lang=body.lang,
-        plan=effective_plan,
+
+app.include_router(
+    create_rewrite_router(
+        verify_supabase_jwt=verify_supabase_jwt,
+        get_db=get_db,
+        ensure_not_expired=_ensure_not_expired,
+        get_or_create_user=get_or_create_user,
+        resolve_effective_plan=_resolve_effective_plan,
+        ensure_ai_rewrite_allowed=_ensure_ai_rewrite_allowed,
+        current_db_user=_current_db_user,
+        audit_log=audit_log,
+        run_pipeline=run_pipeline,
     )
-
-    try:
-        audit_log(
-            "cv_auto_fix_export",
-            user_id=db_user.id,
-            organization_id=db_user.organization_id,
-            output_format=body.output_format,
-            template=body.template,
-        )
-    except Exception:
-        pass
-
-    return StreamingResponse(
-        result["buffer"],
-        media_type=result["content_type"],
-        headers={"Content-Disposition": f'attachment; filename="{result["filename"]}"'},
-    )
-
-
-@app.post("/api/v1/cv/auto-fix/parse")
-def parse_auto_fixed_cv(
-    body: CVAutoFixParseRequest,
-    user=Depends(verify_supabase_jwt),
-    db=Depends(get_db),
-):
-    _ensure_not_expired(user)
-
-    supabase_id = user.get("user_id")
-    email = user.get("email")
-    db_user = get_or_create_user(db, supabase_id, email)
-
-    try:
-        builder_payload = structured_text_to_builder_payload(
-            body.optimized_cv_text,
-            job_description=body.job_description or "",
-            lang=body.lang,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    try:
-        audit_log(
-            "cv_auto_fix_parse",
-            user_id=db_user.id,
-            organization_id=db_user.organization_id,
-            lang=body.lang,
-        )
-    except Exception:
-        pass
-
-    return {"builder_payload": builder_payload}
-
-
-@app.post("/api/v1/feedback")
-def submit_feedback(
-    body: FeedbackRequest,
-    user=Depends(verify_supabase_jwt),
-    db=Depends(get_db),
-):
-    _ensure_not_expired(user)
-
-    message = str(body.message or "").strip()
-    if len(message) < 5:
-        raise HTTPException(status_code=400, detail="Feedback message is too short")
-    if len(message) > 3000:
-        raise HTTPException(status_code=400, detail="Feedback message is too long")
-
-    category = str(body.category or "bug").strip().lower()
-    allowed_categories = {"bug", "feature", "ux", "other"}
-    if category not in allowed_categories:
-        category = "other"
-
-    score = body.score
-    if score is not None and (score < 1 or score > 5):
-        raise HTTPException(status_code=400, detail="score must be between 1 and 5")
-
-    supabase_id = user.get("user_id")
-    email = user.get("email")
-    db_user = get_or_create_user(db, supabase_id, email)
-
-    payload = {
-        "timestamp": datetime.utcnow().isoformat() + "Z",
-        "user_id": str(db_user.id) if getattr(db_user, "id", None) is not None else None,
-        "supabase_id": supabase_id,
-        "email": email,
-        "category": category,
-        "page": str(body.page or "").strip()[:120],
-        "lang": str(body.lang or "").strip()[:12],
-        "score": score,
-        "message": message,
-        "context": body.context if isinstance(body.context, dict) else {},
-    }
-
-    _append_feedback_record(payload)
-    emailed = _send_feedback_email(payload)
-
-    try:
-        audit_log(
-            "user_feedback",
-            user_id=payload.get("user_id"),
-            organization_id=getattr(db_user, "organization_id", None),
-            category=category,
-            page=payload.get("page"),
-            score=score,
-        )
-    except Exception:
-        pass
-
-    return {"ok": True, "message": "Feedback received", "emailed": emailed}
-
-
-@app.get("/api/v1/feedback")
-def list_feedback(
-    limit: int = Query(default=50, ge=1, le=200),
-    user=Depends(verify_supabase_jwt),
-    db=Depends(get_db),
-):
-    _ensure_not_expired(user)
-
-    supabase_id = user.get("user_id")
-    email = user.get("email")
-    db_user = get_or_create_user(db, supabase_id, email)
-    role = (getattr(db_user, "role", "individual") or "individual").lower()
-
-    include_all = role == "recruiter"
-    items = _read_feedback_records(
-        limit=limit,
-        supabase_id=str(supabase_id) if supabase_id else None,
-        include_all=include_all,
-    )
-
-    # Hide sensitive fields from API consumers.
-    cleaned = []
-    for row in items:
-        cleaned.append(
-            {
-                "timestamp": row.get("timestamp"),
-                "category": row.get("category"),
-                "page": row.get("page"),
-                "lang": row.get("lang"),
-                "score": row.get("score"),
-                "message": row.get("message"),
-                "context": row.get("context") or {},
-                "submitter": row.get("email") if include_all else None,
-            }
-        )
-
-    return {"items": cleaned, "count": len(cleaned), "scope": "all" if include_all else "self"}
-
-
-@app.post("/api/v1/rewrite/bullets")
-def rewrite_bullets_endpoint(
-    body: BulletRewriteRequest,
-    user=Depends(verify_supabase_jwt),
-    db=Depends(get_db),
-):
-    _ensure_not_expired(user)
-
-    supabase_id = user.get("user_id")
-    email = user.get("email")
-    db_user = get_or_create_user(db, supabase_id, email)
-    plan = _ensure_ai_rewrite_allowed(db, db_user)
-
-    try:
-        bullets = rewrite_service.rewrite_bullets(
-            bullets=body.bullets,
-            job_description=body.job_description or "",
-            lang=body.lang,
-            tone=body.tone,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-
-    try:
-        audit_log(
-            "ai_rewrite_bullets",
-            user_id=db_user.id,
-            organization_id=db_user.organization_id,
-            plan=plan,
-            bullet_count=len(body.bullets or []),
-        )
-    except Exception:
-        pass
-
-    return {"results": bullets, "plan": plan}
-
-
-@app.post("/api/v1/rewrite/cover-letter")
-def rewrite_cover_letter_endpoint(
-    body: CoverLetterRewriteRequest,
-    user=Depends(verify_supabase_jwt),
-    db=Depends(get_db),
-):
-    _ensure_not_expired(user)
-
-    supabase_id = user.get("user_id")
-    email = user.get("email")
-    db_user = get_or_create_user(db, supabase_id, email)
-    plan = _ensure_ai_rewrite_allowed(db, db_user)
-
-    try:
-        letter = rewrite_service.rewrite_cover_letter(
-            cv_text=body.cv_text,
-            job_description=body.job_description,
-            lang=body.lang,
-            tone=body.tone,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-
-    try:
-        audit_log(
-            "ai_rewrite_cover_letter",
-            user_id=db_user.id,
-            organization_id=db_user.organization_id,
-            plan=plan,
-        )
-    except Exception:
-        pass
-
-    return {"result": letter, "plan": plan}
+)
 
 
 # =====================================================
@@ -4149,20 +3812,7 @@ async def stripe_webhook(request: Request, db=Depends(get_db)):
     Verifies Stripe signature and processes event.
     In development (MOCK_SERVICES=true), signature validation is skipped for testing.
     """
-    def _get_secret_or_file(env_name: str, file_env_name: str, default: str = "") -> str:
-        value = os.getenv(env_name, "").strip()
-        if value:
-            return value
-        file_path = os.getenv(file_env_name, "").strip()
-        if not file_path:
-            return default
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                return f.read().strip() or default
-        except Exception:
-            return default
-
-    STRIPE_WEBHOOK_SECRET = _get_secret_or_file(
+    STRIPE_WEBHOOK_SECRET = stripe_webhook_service.get_secret_or_file(
         "STRIPE_WEBHOOK_SECRET", "STRIPE_WEBHOOK_SECRET_FILE", "test_secret"
     )
     IS_TEST_MODE = MOCK_SERVICES_ON
@@ -4170,30 +3820,25 @@ async def stripe_webhook(request: Request, db=Depends(get_db)):
     payload = await request.body()
     sig_header = request.headers.get("Stripe-Signature", "")
 
-    try:
-        event = json.loads(payload)
-    except Exception as e:
-        return JSONResponse(status_code=400, content={"error": f"Invalid JSON: {str(e)}"})
-
     # Signature verification (skip in test mode)
     if not IS_TEST_MODE and STRIPE_WEBHOOK_SECRET != "test_secret":
         try:
-            expected_sig = hmac.new(
-                STRIPE_WEBHOOK_SECRET.encode(), payload, hashlib.sha256
-            ).hexdigest()
-            provided_sig = ""
-            for part in sig_header.split(","):
-                part = part.strip()
-                if part.startswith("v1="):
-                    provided_sig = part.split("=", 1)[1]
-                    break
-            if not provided_sig or not hmac.compare_digest(expected_sig, provided_sig):
-                return JSONResponse(status_code=401, content={"error": "Invalid signature"})
-        except Exception as e:
-            return JSONResponse(
-                status_code=400,
-                content={"error": f"Signature verification failed: {str(e)}"},
+            stripe_webhook_service.verify_stripe_signature(
+                payload=payload,
+                sig_header=sig_header,
+                secret=STRIPE_WEBHOOK_SECRET,
+                tolerance_seconds=int(os.getenv("STRIPE_WEBHOOK_TOLERANCE_SECONDS", "300")),
             )
+        except stripe_webhook_service.StripeSignatureVerificationError as e:
+            return JSONResponse(
+                status_code=e.status_code,
+                content={"error": str(e)},
+            )
+
+    try:
+        event = stripe_webhook_service.load_event(payload)
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
 
     # Process event type
     event_type = event.get("type", "")
@@ -4352,8 +3997,8 @@ async def stripe_webhook(request: Request, db=Depends(get_db)):
                         stripe_subscription_id=str(obj.get("id") or ""),
                         subscription_status=status,
                     )
-            except Exception as e:
-                print(f"Error updating billing status: {str(e)}")
+            except Exception:
+                logger.exception("error updating billing status")
                 db.rollback()
 
     elif event_type == "customer.subscription.deleted":
@@ -4400,8 +4045,8 @@ async def stripe_webhook(request: Request, db=Depends(get_db)):
                     stripe_subscription_id=str(obj.get("id") or ""),
                     subscription_status="canceled",
                 )
-            except Exception as e:
-                print(f"Error canceling subscription: {str(e)}")
+            except Exception:
+                logger.exception("error canceling subscription")
                 db.rollback()
 
     try:
@@ -4412,351 +4057,24 @@ async def stripe_webhook(request: Request, db=Depends(get_db)):
     return {"status": "success", "event_type": event_type}
 
 
-# =====================================================
-# RECRUITER DASHBOARD ENDPOINTS
-# =====================================================
-
-
-def recruiter_required(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
-    """Dependency: verify caller is a recruiter by checking DB record."""
-    supabase_id = user.get("user_id")
-    if not supabase_id:
-        raise HTTPException(status_code=401, detail="Invalid user payload")
-
-    db_user = db.query(User).filter(User.supabase_id == supabase_id).first()
-    if not db_user or db_user.role != "recruiter":
-        raise HTTPException(status_code=403, detail="Recruiter role required")
-    return db_user
-
-
-@app.get("/api/v1/recruiter/candidates")
-def recruiter_candidates(
-    limit: int = 20, db=Depends(get_db), recruiter=Depends(recruiter_required)
-):
-    """Return recent candidate analyses for the recruiter's organization."""
-    org_id = recruiter.organization_id
-    if not org_id:
-        raise HTTPException(status_code=400, detail="Recruiter has no organization")
-
-    # Find analyses belonging to users in the organization
-    users_subq = db.query(User.id).filter(User.organization_id == org_id).subquery()
-    records = (
-        db.query(Analysis)
-        .filter(Analysis.user_id.in_(select(users_subq.c.id)))
-        .order_by(Analysis.id.desc())
-        .limit(limit)
-        .all()
+app.include_router(
+    create_recruiter_router(
+        verify_supabase_jwt=verify_supabase_jwt,
+        get_db=get_db,
+        get_or_create_user=get_or_create_user,
+        require_abuse_check=require_abuse_check,
+        feature_user_key=_feature_user_key,
+        feature_bucket=_feature_bucket,
+        next_feature_id=_next_feature_id,
+        save_feature_store=_save_feature_store,
+        feature_store_lock=_LOCAL_FEATURE_STORE_LOCK,
+        resolve_job_description_text=_resolve_job_description_text,
+        extract_upload_text=_extract_upload_text,
+        run_pipeline=run_pipeline,
+        audit_log=audit_log,
+        env_name=_ENV_NAME,
     )
-
-    result = []
-    for r in records:
-        result.append(
-            {
-                "analysis_id": getattr(r, "id", None),
-                "user_id": getattr(r, "user_id", None),
-                "similarity_score": getattr(r, "similarity_score", None),
-                "interpretation": getattr(r, "interpretation", None),
-                "confidence": getattr(r, "confidence", None),
-                "risk_level": getattr(r, "risk_level", None),
-                "domain_id": getattr(r, "domain_id", None),
-                "industry_id": getattr(r, "industry_id", None),
-                "specialization_id": getattr(r, "specialization_id", None),
-                "created_at": getattr(r, "created_at", None),
-            }
-        )
-
-    return {"candidates": result}
-
-
-@app.get("/api/v1/recruiter/top_candidates")
-def recruiter_top_candidates(
-    limit: int = 10,
-    min_score: float = 0.0,
-    start_date: str | None = None,
-    end_date: str | None = None,
-    db=Depends(get_db),
-    recruiter=Depends(recruiter_required),
-):
-    """Return top N candidates for recruiter's org ordered by score.
-
-    Optional filters: `min_score`, `start_date` and `end_date` (ISO format).
-    """
-    org_id = recruiter.organization_id
-    if not org_id:
-        raise HTTPException(status_code=400, detail="Recruiter has no organization")
-
-    users_subq = db.query(User.id).filter(User.organization_id == org_id).subquery()
-
-    query = db.query(Analysis).filter(Analysis.user_id.in_(select(users_subq.c.id)))
-
-    # Apply score filter
-    try:
-        if min_score is not None:
-            query = query.filter(Analysis.similarity_score >= float(min_score))
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid min_score")
-
-    # Date filters (expect ISO-8601 strings)
-    from datetime import datetime as _dt
-
-    if start_date:
-        try:
-            sd = _dt.fromisoformat(start_date)
-            query = query.filter(Analysis.created_at >= sd)
-        except Exception:
-            raise HTTPException(
-                status_code=400, detail="Invalid start_date format; expected ISO-8601"
-            )
-
-    if end_date:
-        try:
-            ed = _dt.fromisoformat(end_date)
-            query = query.filter(Analysis.created_at <= ed)
-        except Exception:
-            raise HTTPException(
-                status_code=400, detail="Invalid end_date format; expected ISO-8601"
-            )
-
-    records = query.order_by(Analysis.similarity_score.desc()).limit(limit).all()
-
-    result = []
-    for r in records:
-        result.append(
-            {
-                "analysis_id": getattr(r, "id", None),
-                "user_id": getattr(r, "user_id", None),
-                "final_score": getattr(r, "similarity_score", None),
-                "interpretation": getattr(r, "interpretation", None),
-                "created_at": getattr(r, "created_at", None),
-            }
-        )
-
-    return {"top_candidates": result}
-
-
-@app.get("/api/v1/recruiter/candidate/{analysis_id}")
-def recruiter_candidate_detail(
-    analysis_id: int, db=Depends(get_db), recruiter=Depends(recruiter_required)
-):
-    """Return full analysis detail for a single candidate (scoped to org)."""
-    org_id = recruiter.organization_id
-    if not org_id:
-        raise HTTPException(status_code=400, detail="Recruiter has no organization")
-
-    # Load analysis and ensure it belongs to a user in the org
-    analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
-    if not analysis:
-        raise HTTPException(status_code=404, detail="Analysis not found")
-
-    user = db.query(User).filter(User.id == analysis.user_id).first()
-    if not user or user.organization_id != org_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    # Build response payload
-    payload = {
-        "analysis_id": getattr(analysis, "id", None),
-        "user_id": getattr(analysis, "user_id", None),
-        "final_score": getattr(analysis, "similarity_score", None),
-        "interpretation": getattr(analysis, "interpretation", None),
-        "confidence": getattr(analysis, "confidence", None),
-        "risk_level": getattr(analysis, "risk_level", None),
-        "domain_id": getattr(analysis, "domain_id", None),
-        "industry_id": getattr(analysis, "industry_id", None),
-        "specialization_id": getattr(analysis, "specialization_id", None),
-        "created_at": getattr(analysis, "created_at", None),
-        "raw": {"ats": getattr(analysis, "ats", None)},
-    }
-
-    return payload
-
-
-def _is_postgres_engine() -> bool:
-    try:
-        url = getattr(engine, "url", None)
-        if not url:
-            return False
-        return str(url.get_backend_name()).startswith("postgres")
-    except Exception:
-        return False
-
-
-@app.get("/api/v1/recruiter/search")
-def recruiter_search(
-    q: str,
-    limit: int = 20,
-    db=Depends(get_db),
-    recruiter=Depends(recruiter_required),
-):
-    """Full-text search over candidates for a recruiter's organization.
-
-    Uses PostgreSQL tsvector/ts_rank when available; falls back to a
-    simple LIKE-based search on other databases so tests and SQLite
-    environments continue to work.
-    """
-
-    org_id = recruiter.organization_id
-    if not org_id:
-        raise HTTPException(status_code=400, detail="Recruiter has no organization")
-
-    q = (q or "").strip()
-    if not q:
-        raise HTTPException(status_code=400, detail="Query q is required")
-
-    results: list[dict] = []
-
-    try:
-        if _is_postgres_engine():
-            # Use PostgreSQL full-text search with ranking.
-            sql = text(
-                """
-                SELECT id, organization_id, cv_text,
-                       ts_rank_cd(
-                           to_tsvector('english', coalesce(cv_text, '')),
-                           plainto_tsquery(:q)
-                       ) AS rank
-                FROM candidates
-                WHERE organization_id = :org_id
-                  AND to_tsvector('english', coalesce(cv_text, '')) @@ plainto_tsquery(:q)
-                ORDER BY rank DESC
-                LIMIT :limit
-                """
-            )
-            rows = db.execute(sql, {"q": q, "org_id": org_id, "limit": int(limit)}).fetchall()
-            for row in rows:
-                results.append(
-                    {
-                        "id": row[0],
-                        "organization_id": row[1],
-                        "cv_preview": (row[2][:200] + "...") if row[2] and len(row[2]) > 200 else row[2],
-                        "rank": float(row[3]),
-                    }
-                )
-        else:
-            # Generic LIKE-based search for non-Postgres engines.
-            pattern = f"%{q}%"
-            from models import Candidate
-
-            rows = (
-                db.query(Candidate)
-                .filter(Candidate.organization_id == org_id)
-                .filter(Candidate.cv_text.ilike(pattern))
-                .limit(limit)
-                .all()
-            )
-            for r in rows:
-                results.append(
-                    {
-                        "id": getattr(r, "id", None),
-                        "organization_id": getattr(r, "organization_id", None),
-                        "cv_preview": (
-                            (r.cv_text[:200] + "...")
-                            if getattr(r, "cv_text", None) and len(r.cv_text) > 200
-                            else getattr(r, "cv_text", None)
-                        ),
-                    }
-                )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Search error: {e}")
-
-    return {"results": results}
-
-
-@app.post("/api/v1/recruiter/batch-rank")
-async def recruiter_batch_rank(
-    request: Request,
-    files: list[UploadFile] = File(...),
-    job_description: str = Form(""),
-    jd_file: UploadFile | None = File(None),
-    _: None = Depends(require_abuse_check),
-    recruiter=Depends(recruiter_required),
-):
-    """Batch-rank up to 50 CV PDFs against a job description.
-
-    Input can include JD text (`job_description`) or JD file (`jd_file` as txt/pdf).
-    Returns sorted ranking and recruiter analytics summary.
-    """
-
-    if not files:
-        raise HTTPException(status_code=400, detail="At least one CV file is required")
-    if len(files) > 50:
-        raise HTTPException(status_code=400, detail="Maximum 50 CV files allowed")
-
-    jd_text = await _resolve_job_description_text(job_description, jd_file)
-    if not jd_text:
-        raise HTTPException(status_code=400, detail="Job description is empty")
-
-    ranked = []
-    skill_counts: dict[str, int] = {}
-
-    for idx, upload in enumerate(files):
-        contents = await upload.read()
-        _validate_pdf_upload(contents, upload.content_type)
-        cv_text = _extract_pdf_text(contents)
-        if not cv_text:
-            raise HTTPException(
-                status_code=400,
-                detail=f"CV contains no extractable text: {upload.filename or (idx + 1)}",
-            )
-
-        result = run_pipeline(cv_text, jd_text)
-        detected_skills = result.get("detected_skills") or []
-        for s in detected_skills:
-            key = str(s or "").strip().lower()
-            if key:
-                skill_counts[key] = skill_counts.get(key, 0) + 1
-
-        ranked.append(
-            {
-                "candidate_name": (upload.filename or f"candidate_{idx + 1}").replace(
-                    ".pdf", ""
-                ),
-                "file_name": upload.filename or f"candidate_{idx + 1}.pdf",
-                "final_score": float(result.get("final_score") or 0.0),
-                "ats_score": float(result.get("ats_score") or 0.0),
-                "skill_score": float(result.get("skill_score") or 0.0),
-                "missing_skills": result.get("missing_skills") or [],
-                "keyword_gap": result.get("keyword_gap") or {},
-                "score_breakdown": result.get("score_breakdown") or {},
-                "recommendations": result.get("recommendations") or [],
-            }
-        )
-
-    ranked.sort(key=lambda x: x["final_score"], reverse=True)
-    for i, row in enumerate(ranked, start=1):
-        row["rank"] = i
-
-    total = len(ranked)
-    avg_score = round(sum(r["final_score"] for r in ranked) / max(1, total), 2)
-    distribution = {
-        "high": sum(1 for r in ranked if r["final_score"] >= 75),
-        "medium": sum(1 for r in ranked if 50 <= r["final_score"] < 75),
-        "low": sum(1 for r in ranked if r["final_score"] < 50),
-    }
-    top_skills = sorted(skill_counts.items(), key=lambda kv: kv[1], reverse=True)[:10]
-
-    try:
-        audit_log(
-            "recruiter_batch_rank",
-            recruiter_id=getattr(recruiter, "id", None),
-            organization_id=getattr(recruiter, "organization_id", None),
-            cv_count=total,
-            avg_score=avg_score,
-        )
-    except Exception:
-        pass
-
-    return {
-        "total_candidates": total,
-        "job_description_preview": jd_text[:300],
-        "ranking": ranked,
-        "analytics": {
-            "avg_score": avg_score,
-            "top_skills": [
-                {"skill": skill, "count": count} for skill, count in top_skills
-            ],
-            "candidate_distribution": distribution,
-        },
-    }
+)
 
 
 @app.get("/api/v1/task-status/{task_id}")
@@ -4797,6 +4115,49 @@ RATE_LIMIT_IP_CV_BUILDER_PER_MIN = int(
 RATE_LIMIT_USER_CV_BUILDER_PER_MIN = int(
     os.getenv("RATE_LIMIT_USER_CV_BUILDER_PER_MIN", "5")
 )
+
+
+@app.get("/api/v1/fonts")
+def list_fonts():
+    return {
+        "fonts": [
+            {"id": "arial", "name": "Arial", "ats_safe": True},
+            {"id": "calibri", "name": "Calibri", "ats_safe": True},
+            {"id": "times", "name": "Times New Roman", "ats_safe": True},
+            {"id": "helvetica", "name": "Helvetica", "ats_safe": True},
+        ]
+    }
+
+
+@app.get("/api/v1/cv-builder/template-marketplace")
+def cv_template_marketplace(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
+    db_user = _current_db_user(user, db)
+    plan = _resolve_effective_plan(db, db_user)
+    allowed = set(get_available_templates(plan))
+    catalog = [
+        ("classic", "Classic", "General", "Simple ATS-safe format for most roles.", ["ATS", "General", "Entry to senior"]),
+        ("modern", "Modern", "Product", "Clean hierarchy for SaaS, product, and operations roles.", ["SaaS", "Product", "Operations"]),
+        ("executive", "Executive", "Leadership", "Focused on impact, strategy, and leadership outcomes.", ["Leadership", "Director", "Executive"]),
+        ("professional", "Professional", "Corporate", "Conservative corporate layout with strong readability.", ["Finance", "Consulting", "Corporate"]),
+        ("creative", "Creative", "Portfolio", "A tasteful format for design, marketing, and portfolio-led roles.", ["Design", "Marketing", "Portfolio"]),
+        ("corporate", "Corporate", "Enterprise", "Enterprise-ready template for formal hiring processes.", ["Enterprise", "Procurement", "Operations"]),
+        ("tech", "Tech", "Engineering", "Dense technical skills and project-friendly structure.", ["Engineering", "Data", "Security"]),
+        ("consulting", "Consulting", "Consulting", "Case-impact focused structure for consulting applications.", ["Consulting", "Strategy", "MBA"]),
+    ]
+    return {
+        "plan": plan,
+        "templates": [
+            {
+                "id": template_id,
+                "name": name,
+                "category": category,
+                "description": description,
+                "best_for": tags,
+                "available": template_id in allowed,
+            }
+            for template_id, name, category, description, tags in catalog
+        ],
+    }
 
 
 @app.get("/api/v1/cv-builder/templates")

@@ -1,6 +1,14 @@
 import React, { createContext, useContext, useState, useCallback } from 'react'
+import { addNotification } from './NotificationCenter'
 
-const ToastContext = createContext(null)
+/**
+ * @typedef {'success' | 'error' | 'info' | 'warning'} ToastType
+ * @typedef {Object} ToastContextValue
+ * @property {(message: string, type?: ToastType, duration?: number) => number} addToast
+ * @property {(id: number) => void} removeToast
+ */
+
+const ToastContext = createContext(/** @type {ToastContextValue | null} */ (null))
 
 let toastId = 0
 
@@ -15,6 +23,8 @@ export function ToastProvider({ children }) {
         setToasts((prev) => prev.filter((t) => t.id !== id))
       }, duration)
     }
+    // Persist to notification center
+    addNotification({ title: type.charAt(0).toUpperCase() + type.slice(1), message, type })
     return id
   }, [])
 
@@ -44,7 +54,14 @@ export function ToastProvider({ children }) {
 }
 
 export function useToast() {
+  /** @type {ToastContextValue | null} */
   const ctx = useContext(ToastContext)
   if (!ctx) throw new Error('useToast must be used within ToastProvider')
-  return ctx
+  return {
+    ...ctx,
+    success: (msg, duration) => ctx.addToast(msg, 'success', duration),
+    error: (msg, duration) => ctx.addToast(msg, 'error', duration),
+    info: (msg, duration) => ctx.addToast(msg, 'info', duration),
+    warning: (msg, duration) => ctx.addToast(msg, 'warning', duration),
+  }
 }

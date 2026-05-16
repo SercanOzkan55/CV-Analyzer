@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import List, Optional
 
@@ -8,6 +9,8 @@ load_dotenv()
 
 MAX_INPUT_CHARS = int(os.getenv("REWRITE_MAX_INPUT_CHARS", "8000") or "8000")
 MAX_OUTPUT_CHARS = int(os.getenv("REWRITE_MAX_OUTPUT_CHARS", "4000") or "4000")
+MOCK_SERVICES_ON = os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes")
+logger = logging.getLogger(__name__)
 
 
 def _guard_text(value: str, max_chars: int, field_name: str) -> str:
@@ -31,9 +34,13 @@ def _select_provider() -> str:
     changing call sites.
     """
 
-    provider = os.getenv("REWRITE_PROVIDER", "mock").strip().lower()
+    provider = os.getenv("REWRITE_PROVIDER", "auto").strip().lower()
     if not provider:
-        provider = "mock"
+        provider = "auto"
+    if provider == "auto":
+        if (not MOCK_SERVICES_ON) and os.getenv("OPENAI_API_KEY"):
+            return "openai"
+        return "mock"
     return provider
 
 
@@ -50,13 +57,51 @@ def _generate(prompt: str, max_tokens: int = 512) -> str:
     if provider == "mock":
         return _mock_generate(prompt, max_tokens=max_tokens)
 
-    # Placeholders for real providers; intentionally do not hard-code
-    # OpenAI or any single vendor at this layer.
-    raise RuntimeError("AI rewrite provider is not configured")
+    if provider == "openai":
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY is required for rewrite provider 'openai'")
+        try:
+            from openai import OpenAI
+
+            client = OpenAI(api_key=api_key)
+            model = os.getenv("REWRITE_OPENAI_MODEL", "gpt-4o-mini")
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a precise CV, ATS, and career writing assistant. "
+                            "Preserve facts, never invent employers, dates, degrees, "
+                            "certifications, metrics, or skills, and match the requested language."
+                        ),
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=float(os.getenv("REWRITE_TEMPERATURE", "0.25")),
+                max_tokens=max_tokens,
+            )
+            text = (response.choices[0].message.content or "").strip()
+            if not text:
+                raise RuntimeError("AI rewrite provider returned an empty response")
+            return text[:MAX_OUTPUT_CHARS]
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            logger.warning("OpenAI rewrite provider failed: %s", exc)
+            raise RuntimeError("AI rewrite provider request failed")
+
+    raise RuntimeError(f"AI rewrite provider '{provider}' is not configured")
 
 
 def ai_rewrite_available() -> bool:
     return _select_provider() != "mock"
+
+
+def generate_text(prompt: str, max_tokens: int = 512) -> str:
+    prompt = _guard_text(prompt, MAX_INPUT_CHARS, "prompt")
+    return _generate(prompt, max_tokens=max_tokens)
 
 
 def rewrite_cv(

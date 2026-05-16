@@ -83,7 +83,9 @@ export default function LoginPage() {
           </form>
 
           <p className="auth-switch">
-            {t('auth.no_account')} <Link to="/register" className="link-btn">{t('nav.register')}</Link>
+            {!(import.meta.env.VITE_PRIVATE_MODE === 'true' || import.meta.env.VITE_REGISTRATION_DISABLED === 'true') && (
+              <>{t('auth.no_account')} <Link to="/register" className="link-btn">{t('nav.register')}</Link></>
+            )}
           </p>
         </div>
       </div>
