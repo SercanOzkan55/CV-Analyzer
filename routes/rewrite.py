@@ -4,8 +4,9 @@ import difflib
 import json
 from collections.abc import Callable
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
+from starlette.concurrency import run_in_threadpool
 
 from schemas.rewrite import (
     BulletRewriteRequest,
@@ -21,9 +22,10 @@ from schemas.rewrite import (
     SummarySuggestionRequest,
 )
 from services import rewrite_service
-from services.cv_autofix_service import structured_text_to_builder_payload
+from services.cv_autofix_service import auto_fix_cv_text, structured_text_to_builder_payload
 from services.cv_builder_service import build_cv
 from services.keyword_service import compute_keyword_gap
+from services.language_service import DEFAULT_LANG
 
 
 def create_router(
@@ -37,6 +39,12 @@ def create_router(
     current_db_user: Callable,
     audit_log: Callable,
     run_pipeline: Callable,
+    rate_limit: Callable,
+    analyze_pdf_rate_limit_per_min: int,
+    extract_upload_text: Callable,
+    metric_request: Callable,
+    mock_services_on: bool,
+    logger,
 ) -> APIRouter:
     router = APIRouter()
 
@@ -71,6 +79,61 @@ def create_router(
             pass
 
         return {"result": text, "plan": plan}
+
+    @router.post("/api/v1/cv/auto-fix")
+    @rate_limit(f"{analyze_pdf_rate_limit_per_min}/minute")
+    async def auto_fix_cv_pdf(
+        file: UploadFile = File(...),
+        job_description: str = Form(""),
+        lang: str = Form(DEFAULT_LANG),
+        use_ai: bool = Form(True),
+        user=Depends(verify_supabase_jwt),
+        db=Depends(get_db),
+    ):
+        """Extract a CV upload and rewrite it into a cleaner ATS-friendly format."""
+
+        ensure_not_expired(user)
+        metric_request("cv-auto-fix")
+
+        db_user = None
+        if not mock_services_on:
+            supabase_id = user.get("user_id")
+            email = user.get("email")
+            db_user = get_or_create_user(db, supabase_id, email)
+
+        contents = await file.read()
+        cv_text = extract_upload_text(contents, file.content_type, file.filename)
+
+        try:
+            result = await run_in_threadpool(
+                auto_fix_cv_text,
+                cv_text=cv_text,
+                job_description=job_description,
+                lang=lang,
+                use_ai=use_ai,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except RuntimeError as e:
+            raise HTTPException(status_code=503, detail=str(e))
+        except Exception as e:
+            logger.exception("auto_fix_cv_text unexpected error")
+            raise HTTPException(status_code=500, detail=f"Auto-fix error: {e}")
+
+        try:
+            audit_payload = {
+                "source": "upload",
+                "used_ai": bool(result.get("used_ai")),
+                "score_delta": float(result.get("score_delta", 0.0)),
+            }
+            if db_user is not None:
+                audit_payload["user_id"] = db_user.id
+                audit_payload["organization_id"] = db_user.organization_id
+            audit_log("cv_auto_fix", **audit_payload)
+        except Exception:
+            pass
+
+        return result
 
     @router.post("/api/v1/rewrite/cv")
     def rewrite_cv_endpoint(
