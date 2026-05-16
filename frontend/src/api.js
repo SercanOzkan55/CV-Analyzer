@@ -1,9 +1,5 @@
 ﻿const DEFAULT_BASE = (() => {
   if (typeof window === 'undefined') return 'http://127.0.0.1:8001'
-  const host = window.location.hostname
-  if (host === 'localhost' || host === '127.0.0.1') {
-    return 'http://127.0.0.1:8001'
-  }
   return ''
 })()
 

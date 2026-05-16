@@ -13,7 +13,6 @@ import {
   recruiterSaaSBatchUpload, 
   downloadRecruiterReport 
 } from '../api'
-import { CV_UPLOAD_ACCEPT, isSupportedCvUpload } from '../utils/fileTypes'
 
 export default function RecruiterHubPage() {
   const { t } = useLanguage()
@@ -69,7 +68,7 @@ export default function RecruiterHubPage() {
   }
 
   const handleFileChange = (e) => {
-    const selected = Array.from(e.target.files || []).filter(isSupportedCvUpload)
+    const selected = Array.from(e.target.files)
     setUploadFiles(prev => [...prev, ...selected])
   }
 
@@ -269,7 +268,7 @@ export default function RecruiterHubPage() {
                     hidden 
                     ref={fileInputRef} 
                     onChange={handleFileChange}
-                    accept={CV_UPLOAD_ACCEPT}
+                    accept=".pdf"
                   />
                 </div>
 

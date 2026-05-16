@@ -1,101 +1,33 @@
-# UI QA Review Skill
+---
+name: ui-qa-review
+description: QA Review Agent workflow for checking frontend UI regression risk, build/lint/typecheck/tests, accessibility, responsive behavior, light/dark theme compatibility, reduced-motion behavior, and browser verification. Use after UI implementation or before shipping frontend changes.
+---
 
-Use this skill after frontend changes, UI polish passes, route restorations, or API contract fixes that affect visible screens.
+# QA Review Agent
 
-## Role
+Review UI changes like a release gate. Focus on regressions, validation evidence, accessibility, and responsive behavior.
 
-Act as a frontend QA, accessibility, and regression reviewer.
+## Tool Preference
 
-## Mission
+- Use browser/Playwright MCP when available for live inspection, screenshots, keyboard checks, and viewport checks.
+- If MCP browser tools are unavailable, use local dev server, build output, test logs, and code inspection.
 
-Catch visual, responsive, accessibility, route, console, and network regressions before final response.
+## QA Checklist
 
-## Required Checks
+1. Confirm changed files are scoped to the requested UI work.
+2. Run project validation: build, tests, lint/typecheck when available.
+3. Inspect accessibility: focus visibility, labels, alt text, semantic landmarks, contrast-sensitive color changes, and keyboard navigation.
+4. Inspect light and dark theme compatibility for changed surfaces.
+5. Inspect responsive behavior at mobile, tablet, and desktop widths.
+6. Check reduced-motion behavior when animation or transition rules changed.
+7. Check loading, empty, error, authenticated/unauthenticated, and permission-gated states when relevant.
+8. Look for regressions in routes, navigation, modals, upload controls, forms, tables, dashboards, and persistent UI like navbar/footer/toasts.
 
-Run available commands:
+## Output
 
-```bash
-cd frontend
-npm test
-npm run build
-```
+Return findings first:
 
-If backend/API contracts changed:
-
-```bash
-python -m pytest
-```
-
-If typecheck is available:
-
-```bash
-npx tsc --noEmit
-```
-
-If it is unavailable because dependencies/network are missing, report that clearly.
-
-## Browser QA
-
-When browser access is available:
-
-- Open local app.
-- Check changed routes.
-- Check desktop around `1440x900`.
-- Check mobile around `390x844`.
-- Check console errors.
-- Check network 404/500 responses.
-- Check refresh/deep-link behavior.
-- Check authenticated redirects.
-- Check loading, empty, and error states.
-
-For authenticated routes, use only safe test credentials provided by the user. Do not hardcode, store, or print credentials.
-
-## Visual Regression Checklist
-
-Check:
-
-- Text overflow.
-- Nav overcrowding.
-- Cards inside cards.
-- Broken spacing.
-- Low contrast.
-- Missing focus styles.
-- Buttons without clear states.
-- Tables/lists too dense or misaligned.
-- Empty states that look broken.
-- Loading states that block forever.
-- Mobile horizontal scroll.
-- Modals/drawers off-screen.
-- Animations that feel slow/noisy.
-
-## API Regression Checklist
-
-Check:
-
-- Frontend does not parse HTML as JSON.
-- Local static frontend calls backend API, not itself.
-- Missing user data returns a stable empty response.
-- Auth failures are clear.
-- Provider failures return `503`, not generic crashes.
-- Unsupported uploads return clear `400` errors.
-
-## Accessibility Checklist
-
-Check:
-
-- Interactive elements are keyboard reachable.
-- Focus states are visible.
-- Color contrast is readable.
-- Icon-only buttons have accessible labels or tooltips.
-- Form errors are near fields.
-- Reduced motion is respected.
-
-## Output Requirement
-
-Final response must include:
-
-- Routes/screens reviewed.
-- Desktop/mobile result.
-- Console/network errors found.
-- Commands run and results.
-- Remaining risks/manual review needed.
+- `Blockers`: must fix before shipping.
+- `Non-blocking risks`: acceptable or deferred risks.
+- `Validation`: commands and browser checks performed.
+- `Ship recommendation`: ship / ship with notes / do not ship.

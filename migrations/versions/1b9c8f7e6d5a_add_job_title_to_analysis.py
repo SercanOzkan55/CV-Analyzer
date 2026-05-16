@@ -18,8 +18,19 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("analysis", sa.Column("job_title", sa.String(), nullable=True))
-    op.create_index("ix_analysis_job_title", "analysis", ["job_title"], unique=False)
+    # Check if 'job_title' column already exists
+    from sqlalchemy import inspect
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    columns = [col['name'] for col in inspector.get_columns('analysis')]
+    if 'job_title' not in columns:
+        op.add_column("analysis", sa.Column("job_title", sa.String(), nullable=True))
+        op.create_index("ix_analysis_job_title", "analysis", ["job_title"], unique=False)
+    else:
+        # Only create index if not exists
+        indexes = [ix['name'] for ix in inspector.get_indexes('analysis')]
+        if 'ix_analysis_job_title' not in indexes:
+            op.create_index("ix_analysis_job_title", "analysis", ["job_title"], unique=False)
 
 
 def downgrade() -> None:

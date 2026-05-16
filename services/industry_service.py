@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from .domain_service import detect_or_create_domain
 from .embedding_service import get_embedding
 from .naming_service import generate_primary_name, generate_specialization_name
+from utils.centroid import update_centroid
 
 load_dotenv()
 
@@ -132,62 +133,8 @@ def detect_industry_and_specialization(job_text, embedding=None):
 # CENTROID UPDATE FUNCTIONS
 # ==========================================================
 def update_industry_centroid(cur, industry_id, embedding):
-
-    cur.execute(
-        "SELECT centroid, sample_count FROM industries WHERE id = %s;", (industry_id,)
-    )
-
-    row = cur.fetchone()
-    if not row:
-        return
-
-    centroid, count = row
-    # Fix string centroid issue (some DB rows may store centroid as text)
-    if isinstance(centroid, str):
-        centroid = json.loads(centroid)
-    centroid = list(centroid)
-
-    updated = [
-        (float(c) * count + float(e)) / (count + 1) for c, e in zip(centroid, embedding)
-    ]
-
-    cur.execute(
-        """
-        UPDATE industries
-        SET centroid = %s,
-            sample_count = sample_count + 1
-        WHERE id = %s;
-    """,
-        (updated, industry_id),
-    )
+    update_centroid(cur, "industries", industry_id, embedding)
 
 
 def update_specialization_centroid(cur, specialization_id, embedding):
-
-    cur.execute(
-        "SELECT centroid, sample_count FROM specializations WHERE id = %s;",
-        (specialization_id,),
-    )
-
-    row = cur.fetchone()
-    if not row:
-        return
-
-    centroid, count = row
-    if isinstance(centroid, str):
-        centroid = json.loads(centroid)
-    centroid = list(centroid)
-
-    updated = [
-        (float(c) * count + float(e)) / (count + 1) for c, e in zip(centroid, embedding)
-    ]
-
-    cur.execute(
-        """
-        UPDATE specializations
-        SET centroid = %s,
-            sample_count = sample_count + 1
-        WHERE id = %s;
-    """,
-        (updated, specialization_id),
-    )
+    update_centroid(cur, "specializations", specialization_id, embedding)

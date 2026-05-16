@@ -78,7 +78,7 @@ export default function ProfilePage() {
           </motion.div>
 
           <motion.div className="profile-stat-card" variants={itemVariants}>
-            <TrendingUp size={20} style={{ color: '#a78bfa' }} />
+            <TrendingUp size={20} style={{ color: 'var(--status-accent)' }} />
             <div className="profile-stat-body">
               <span className="profile-stat-value">{bestScore > 0 ? `${Math.round(bestScore)}%` : '—'}</span>
               <span className="profile-stat-label">{t('profile.best_score')}</span>
@@ -86,7 +86,7 @@ export default function ProfilePage() {
           </motion.div>
 
           <motion.div className="profile-stat-card" variants={itemVariants}>
-            <FileText size={20} style={{ color: '#34d399' }} />
+            <FileText size={20} style={{ color: 'var(--status-success)' }} />
             <div className="profile-stat-body">
               <span className="profile-stat-value">{avgScore > 0 ? `${avgScore}%` : '—'}</span>
               <span className="profile-stat-label">{t('profile.avg_score')}</span>
@@ -94,7 +94,7 @@ export default function ProfilePage() {
           </motion.div>
 
           <motion.div className="profile-stat-card" variants={itemVariants}>
-            <Calendar size={20} style={{ color: '#f472b6' }} />
+            <Calendar size={20} style={{ color: 'var(--color-accent-pink)' }} />
             <div className="profile-stat-body">
               <span className="profile-stat-value">{memberSince}</span>
               <span className="profile-stat-label">{t('profile.member_since')}</span>
@@ -104,7 +104,7 @@ export default function ProfilePage() {
 
         <div className="profile-details-grid">
           <motion.div
-            className="card"
+            className="card product-card"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.4 }}
@@ -133,7 +133,7 @@ export default function ProfilePage() {
           </motion.div>
 
           <motion.div
-            className="card"
+            className="card product-card"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.4 }}

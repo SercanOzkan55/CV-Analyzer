@@ -7,8 +7,11 @@ Professional test conftest.py
 """
 
 import os
+from pathlib import Path
+import shutil
 import sys
 import types
+import uuid
 
 import alembic.command
 import alembic.config
@@ -30,11 +33,13 @@ _service_stubs = [
     (
         "services.model_service",
         {
+            "is_mock": lambda: os.getenv("MOCK_SERVICES", "1") == "1",
+            "predict_hire": lambda features: (False, 0.5),
             "predict_match": lambda features: (
-                80.0,
-                90.0,
-                "Low Risk",
-                {"note": "stub"},
+                50.0,
+                50.0,
+                "High Risk",
+                {"mock": "test mode", "features_count": len(features)},
             ),
         },
     ),
@@ -53,6 +58,8 @@ _service_stubs = [
             ),
             "save_job_embedding": lambda db, jid, vec: True,
             "save_candidate_embedding": lambda db, cid, vec: True,
+            "EMBEDDING_CACHE_TTL": 604800,
+            "_EMBED_MAX_CALLS_PER_MIN": 60,
         },
     ),
     (
@@ -63,6 +70,21 @@ _service_stubs = [
                 "domain_name": "Other",
             },
             "get_domain_similarity": lambda i, e: 0.0,
+            "ALLOWED_DOMAINS": [
+                "Engineering & Technology",
+                "Retail & Sales",
+                "Healthcare",
+                "Finance",
+                "Education",
+                "Logistics",
+                "Hospitality",
+                "Manufacturing",
+                "Construction",
+                "Creative & Media",
+                "Government",
+                "General Labor",
+                "Other",
+            ],
         },
     ),
     (
@@ -70,21 +92,10 @@ _service_stubs = [
         {
             "detect_industry_and_specialization": lambda j, e=None: {
                 "industry_id": 1,
-                "industry_name": "Other",
+                "industry_name": "Technology",
                 "specialization_id": 1,
-                "specialization_name": "General",
+                "specialization_name": "Software Development",
             },
-        },
-    ),
-    (
-        "services.skill_service",
-        {
-            "extract_skills": lambda text: {
-                "technical_skills": ["python", "sql"],
-                "soft_skills": ["communication"],
-                "all_skills": ["python", "sql", "communication"],
-            },
-            "skill_coverage_score": lambda cv, jd: (70.0, ["kubernetes"]),
         },
     ),
 ]
@@ -137,10 +148,16 @@ import pytest
 
 from auth import verify_supabase_jwt
 from database import Base, get_db
-import main as main_module
 from main import app
+import main as main_module
 
 main_module.RATE_LIMIT_ENABLED = False
+# Disable IP-level global rate limit for tests (avoids 429 cascade across tests)
+main_module._IP_GLOBAL_LIMIT_PER_MIN = 0
+# Disable abuse protection for tests (fingerprint accumulation causes false 429s)
+main_module.ABUSE_PROTECTION_ENABLED = False
+# Disable CPU guard for tests (test runner itself pushes CPU to 100%)
+main_module._CPU_USAGE_LIMIT = 100.0
 
 
 # ─── Mock JWT ───
@@ -153,32 +170,6 @@ def _mock_verify_jwt(authorization: str = None):
 
 
 # ─── DB URL used by all fixtures ───
-@pytest.fixture(autouse=True)
-def _clear_local_runtime_state():
-    """Keep in-memory quotas and abuse counters isolated per test."""
-    for name in (
-        "_LOCAL_DAILY_QUOTA",
-        "_LOCAL_USER_THROTTLE",
-        "_LOCAL_ABUSE_COUNTERS",
-        "_LOCAL_ABUSE_BANS",
-    ):
-        try:
-            getattr(main_module, name).clear()
-        except Exception:
-            pass
-    yield
-    for name in (
-        "_LOCAL_DAILY_QUOTA",
-        "_LOCAL_USER_THROTTLE",
-        "_LOCAL_ABUSE_COUNTERS",
-        "_LOCAL_ABUSE_BANS",
-    ):
-        try:
-            getattr(main_module, name).clear()
-        except Exception:
-            pass
-
-
 _TEST_DB_URL = os.getenv(
     "DATABASE_URL", "postgresql+psycopg2://testuser:testpass@localhost:5433/testdb"
 )
@@ -209,8 +200,6 @@ def _ensure_test_db_ready():
             _ACTIVE_TEST_DB_URL,
             connect_args={"check_same_thread": False},
         )
-
-    from sqlalchemy import text
 
     # Postgres ENUM types
     if not _is_sqlite_url(_ACTIVE_TEST_DB_URL):
@@ -252,6 +241,14 @@ def _ensure_test_db_ready():
         except Exception:
             pass
 
+    # SQLite fallback uses a file so app/TestClient connections share state.
+    # Start each test session from an empty schema in case a prior run crashed.
+    if _is_sqlite_url(_ACTIVE_TEST_DB_URL):
+        try:
+            Base.metadata.drop_all(bind=_engine)
+        except Exception:
+            pass
+
     # Always create missing model tables from SQLAlchemy metadata
     Base.metadata.create_all(bind=_engine)
     yield
@@ -263,6 +260,22 @@ def _ensure_test_db_ready():
 
 
 # ─── Per-function fixtures ───
+
+
+@pytest.fixture(scope="function")
+def tmp_path():
+    """Workspace-local tmp_path replacement for sandboxed Windows test runs."""
+    base = Path.cwd() / "test_tmp"
+    path = base / f"tmp_{uuid.uuid4().hex}"
+    path.mkdir(parents=True, exist_ok=False)
+    try:
+        yield path
+    finally:
+        shutil.rmtree(path, ignore_errors=True)
+        try:
+            base.rmdir()
+        except OSError:
+            pass
 
 
 @pytest.fixture(scope="function")
@@ -311,6 +324,12 @@ def db_session():
 
 
 @pytest.fixture(scope="function")
+def db(db_session):
+    """Backward-compatible alias for integration tests that request `db`."""
+    return db_session
+
+
+@pytest.fixture(scope="function")
 def client(db_session):
     """TestClient with DB + JWT overrides."""
 
@@ -342,3 +361,55 @@ def sample_texts():
         "Increase revenue and manage team."
     )
     return cv, job
+
+
+@pytest.fixture(scope="function")
+def recruiter_user(db_session):
+    """Create a recruiter user that matches the default mocked JWT subject."""
+    from models import Organization, User
+
+    org = Organization(
+        name="Test Organization",
+        domain=f"test-{uuid.uuid4().hex[:8]}.example.com",
+        plan_type="pro",
+        billing_status="active",
+    )
+    db_session.add(org)
+    db_session.commit()
+
+    user = User(
+        supabase_id="test-user-123",
+        email="testuser@example.com",
+        organization_id=org.id,
+        role="recruiter",
+        plan_type="pro",
+        billing_status="active",
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    return {
+        "user_id": user.id,
+        "supabase_id": user.supabase_id,
+        "email": user.email,
+        "organization_id": user.organization_id,
+        "org": org,
+        "token": "mock-jwt-token",
+    }
+
+
+@pytest.fixture(scope="function")
+def test_job(db_session, recruiter_user):
+    """Create a recruiter job owned by the shared recruiter fixture."""
+    from models import RecruiterJob
+
+    job = RecruiterJob(
+        title="Senior Python Developer",
+        description="Looking for experienced Python developer with FastAPI experience",
+        organization_id=recruiter_user["organization_id"],
+        created_by=recruiter_user["user_id"],
+    )
+    db_session.add(job)
+    db_session.commit()
+
+    return job

@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "CV Analyzer",
+    "slug": "cv-analyzer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#6366f1"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cvanalyzer.app",
+      "infoPlist": {
+        "NSDocumentPickerUsageDescription": "CV dosyalarını yüklemek için dosya erişimi gereklidir."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#6366f1"
+      },
+      "package": "com.cvanalyzer.app",
+      "permissions": [
+        "READ_EXTERNAL_STORAGE"
+      ]
+    },
+    "extra": {
+      "apiUrl": ""
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-font"
+    ]
+  }
+}

@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import api from '../api'
-import { CV_UPLOAD_ACCEPT, isSupportedCvUpload } from '../utils/fileTypes'
 import './BatchUploadLocalMode.css'
 
 /**
@@ -28,10 +27,12 @@ export const BatchUploadLocalMode = ({
     e.preventDefault()
     setDragOver(false)
 
-    const dropped = Array.from(e.dataTransfer.files).filter(isSupportedCvUpload)
+    const dropped = Array.from(e.dataTransfer.files).filter((f) =>
+      f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.txt')
+    )
 
     if (dropped.length === 0) {
-      setError('Only PDF, DOCX, and TXT files are supported')
+      setError('Only PDF and TXT files are supported')
       return
     }
 
@@ -44,10 +45,12 @@ export const BatchUploadLocalMode = ({
   }
 
   const handleInputChange = (e) => {
-    const selected = Array.from(e.target.files || []).filter(isSupportedCvUpload)
+    const selected = Array.from(e.target.files || []).filter((f) =>
+      f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.txt')
+    )
 
     if (selected.length === 0) {
-      setError('Only PDF, DOCX, and TXT files are supported')
+      setError('Only PDF and TXT files are supported')
       return
     }
 
@@ -131,6 +134,7 @@ export const BatchUploadLocalMode = ({
       // Individual file processing
       if (files.length > 500) {
         setError('Maximum 500 files per upload')
+        setProcessing(false)
         return
       }
 
@@ -335,7 +339,7 @@ export const BatchUploadLocalMode = ({
                     ref={inputRef}
                     type="file"
                     multiple
-                    accept={CV_UPLOAD_ACCEPT}
+                    accept="application/pdf,.txt,.docx"
                     onChange={handleInputChange}
                     hidden
                   />

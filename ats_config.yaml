@@ -1,11 +1,43 @@
+# ATS scoring configuration
+# Adjust these weights to tune how much each dimension contributes
+# to the composite ATS score exposed in the API.
+
 weights:
   skills: 0.35
   keywords: 0.25
   format: 0.15
   experience: 0.25
 
-length_profile:
-  ideal_min_words: 250
-  ideal_max_words: 1100
-  extended_max_words: 1800
-  very_long_max_words: 2600
+# Category-level scoring weights used in ats_scoring.py (score_cv).
+# Can also be set via ATS_WEIGHT_<KEY> env vars.
+scoring_weights:
+  structure: 0.18
+  keywords: 0.14
+  experience: 0.18
+  education: 0.10
+  languages: 0.05
+  ats: 0.18
+  length: 0.09
+  soft_skills: 0.08
+
+# Canonical section ordering enforced during normalize step
+section_order:
+  - header
+  - summary
+  - experience
+  - projects
+  - education
+  - skills
+  - certifications
+  - languages
+  - interests
+  - misc
+  - contact
+
+# Normalize & formatting rules
+rules:
+  keep_gpa_with_education: true
+  force_single_column: true
+  keep_bullets: true
+  max_line_length: 90
+  detect_multi_column: true

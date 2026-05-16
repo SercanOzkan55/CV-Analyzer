@@ -17,7 +17,7 @@ export default function AboutPage() {
     <PageTransition>
       <div className="main-content about-page">
         {/* Hero Section */}
-        <motion.div
+        <motion.div 
           className="about-hero"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -29,7 +29,7 @@ export default function AboutPage() {
 
         <div className="about-grid">
           {/* Mission & Vision */}
-          <motion.div
+          <motion.div 
             className="card mission-card"
             whileHover={{ y: -5 }}
             initial={{ opacity: 0, x: -20 }}
@@ -41,7 +41,7 @@ export default function AboutPage() {
             <p>{t('about.mission_text')}</p>
           </motion.div>
 
-          <motion.div
+          <motion.div 
             className="card vision-card"
             whileHover={{ y: -5 }}
             initial={{ opacity: 0, x: 20 }}
@@ -55,7 +55,7 @@ export default function AboutPage() {
         </div>
 
         {/* Founder Section */}
-        <motion.section
+        <motion.section 
           className="about-story section-alt"
           initial={{ opacity: 0, scale: 0.98 }}
           whileInView={{ opacity: 1, scale: 1 }}
@@ -63,16 +63,16 @@ export default function AboutPage() {
           style={{ padding: '60px 32px', background: 'var(--bg-card)', border: '1px solid var(--color-border)' }}
         >
           <div className="story-content">
-            <motion.div
+            <motion.div 
               className="founder-avatar"
               whileHover={{ scale: 1.05 }}
-              style={{
-                width: '120px',
-                height: '120px',
-                borderRadius: '50%',
-                background: 'var(--color-accent-glow)',
-                display: 'flex',
-                alignItems: 'center',
+              style={{ 
+                width: '120px', 
+                height: '120px', 
+                borderRadius: '50%', 
+                background: 'var(--color-accent-glow)', 
+                display: 'flex', 
+                alignItems: 'center', 
                 justifyContent: 'center',
                 fontSize: '48px',
                 marginBottom: '24px',
@@ -82,14 +82,14 @@ export default function AboutPage() {
             >
               👨‍💻
             </motion.div>
-
+            
             <h2 style={{ fontSize: '2rem', marginBottom: '12px' }}>{t('about.story_title')}</h2>
-            <div style={{
-              background: 'var(--color-accent-glow)',
-              color: 'var(--color-accent)',
-              padding: '6px 16px',
-              borderRadius: '99px',
-              fontSize: '0.85rem',
+            <div style={{ 
+              background: 'var(--color-accent-glow)', 
+              color: 'var(--color-accent)', 
+              padding: '6px 16px', 
+              borderRadius: '99px', 
+              fontSize: '0.85rem', 
               fontWeight: '700',
               marginBottom: '24px',
               letterSpacing: '0.05em',
@@ -112,10 +112,10 @@ export default function AboutPage() {
               <a href="mailto:ozkansercan55@gmail.com" className="btn-outline" style={{ borderRadius: 'var(--radius-md)' }}>
                 <Mail size={20} /> Mail
               </a>
-              <a
-                href="/cv_sercan_ozkan.pdf"
-                download
-                className="btn-primary"
+              <a 
+                href="/cv_sercan_ozkan.pdf" 
+                download 
+                className="btn-primary" 
                 style={{ borderRadius: 'var(--radius-md)', padding: '12px 24px' }}
               >
                 <Zap size={20} /> {t('about.download_cv')}
@@ -129,7 +129,7 @@ export default function AboutPage() {
           <h2 className="section-title" style={{ marginTop: '60px' }}>{t('about.values_title')}</h2>
           <div className="values-grid">
             {values.map((v, i) => (
-              <motion.div
+              <motion.div 
                 key={i}
                 className="value-card card"
                 initial={{ opacity: 0, y: 20 }}

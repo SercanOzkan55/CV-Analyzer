@@ -1,219 +1,192 @@
 # CV Analyzer
 
-CV Analyzer is a FastAPI + React application for CV/resume analysis, ATS scoring, CV rewriting, CV building, recruiter ranking, and SaaS-style usage/billing flows.
+CV Analyzer is an AI-assisted resume intelligence platform for candidate screening, ATS scoring, job-description matching, CV improvement, recruiter workflows, and product-grade analytics. The application combines a React/Vite frontend, a FastAPI backend, a multi-stage CV parsing pipeline, local/mock development modes, and production-oriented security, billing, and storage integrations.
 
-The README intentionally reflects the current repository state, including known architecture debt. Older README versions described routes, folders, and mobile/TypeScript setup that did not match the codebase.
+## Contents
 
-## Current Status
+- [What It Does](#what-it-does)
+- [Product Surfaces](#product-surfaces)
+- [System Architecture](#system-architecture)
+- [Core Flows](#core-flows)
+- [Technology Stack](#technology-stack)
+- [Quick Start](#quick-start)
+- [Environment Configuration](#environment-configuration)
+- [Validation Commands](#validation-commands)
+- [Main API Areas](#main-api-areas)
+- [Project Structure](#project-structure)
+- [Security And CI](#security-and-ci)
+- [UI Workflow](#ui-workflow)
 
-- Backend: FastAPI application, currently still concentrated in `main.py`.
-- Frontend: React 18 + Vite application using mostly JS/JSX, with some TS/TSX files present.
-- Styling: a large legacy `frontend/src/style.css` plus `frontend/src/tailwind.css` using Tailwind CSS v4 packages. There is no `tailwind.config.js` in the current frontend.
-- Tests: backend pytest suite and frontend Vitest suite are present.
-- Mobile: a `mobile/` directory exists, but it is not currently a complete active mobile app in this repository because it has no `mobile/package.json`.
-- API namespace: active product endpoints are under `/api/v1/...`, plus `/stripe/webhook`.
-- Architecture debt: `routes/`, `schemas/`, `core/`, `middleware/`, `agents/`, and `config/` currently contain only cache/placeholder content. New backend work must fill these modules instead of adding more feature code to `main.py`.
+## What It Does
 
-## Architecture Guardrails For Contributors And Agents
+CV Analyzer helps individual users and recruiters turn unstructured resumes into actionable, comparable, and exportable hiring intelligence.
 
-The most important rule:
+Key capabilities:
 
-> Do not add new feature code to `main.py`.
+- Parse PDF, DOCX, TXT, and structured CV data into a normalized schema.
+- Score resumes for ATS readiness, keyword match, semantic relevance, skills, experience, layout, and content quality.
+- Compare CVs against job descriptions and surface actionable gaps.
+- Provide recruiter ranking, batch processing, candidate actions, reports, and email templates.
+- Generate and preview CV Builder output in HTML, PDF, DOCX, and related formats.
+- Support SaaS concerns such as authentication, plans, quotas, billing hooks, usage history, favorites, templates, sharing, and audits.
+- Run locally in mock mode without requiring every production integration.
 
-`main.py` should be treated as the FastAPI composition root: app creation, middleware setup, router registration, global handlers, metrics, and startup/shutdown wiring. New API endpoints, schemas, business logic, upload parsing, AI provider calls, recruiter workflows, dashboard aggregation, billing behavior, and persistence helpers must live in domain modules.
+## Product Surfaces
 
-Required backend pattern for new work:
-
-```text
-routes/<domain>.py      # APIRouter endpoints only
-schemas/<domain>.py     # Pydantic request/response contracts
-services/<domain>.py    # business behavior and provider integrations
-tests/test_<domain>.py  # contract, regression, security tests
-```
-
-Read these before backend or agent-driven work:
-
-- [Repository Agent Instructions](AGENTS.md)
-- [Backend Architecture And Modularization Guide](docs/backend-architecture.md)
-- [Agent Workflow For Safe Product Changes](docs/agent-workflow.md)
-
-Parser/upload work must stay general across PDF, DOCX, TXT, multiple languages, multi-page CVs, and multi-column layouts. Do not fix parser bugs with one-language or one-sample special cases.
-
-## Product Capabilities
-
-### Individual CV Analysis
-
-- Upload CV files for analysis.
-- Supported upload formats: PDF, DOCX, TXT.
-- Compare CV content against an optional job description.
-- Return match score, ATS score, missing skills, keyword gaps, recommendations, risk level, language-aware interpretation, and history records.
-
-### CV Auto-Fix And Rewrite
-
-- Auto-fix CV text into a cleaner ATS-friendly structure.
-- Export optimized CV output as PDF or DOCX.
-- Rewrite CVs, bullets, cover letters, and profile-style content.
-- Uses a mock provider in local/test mode.
-- Uses OpenAI when configured with `OPENAI_API_KEY` and rewrite provider settings.
-
-### CV Builder
-
-- Generate and preview CV documents.
-- List available templates by plan.
-- Expose a template marketplace-style API for the frontend.
-- Expose basic ATS-safe font options.
-
-### Recruiter Workflows
-
-- Organization-scoped candidate listing.
-- Top candidate ranking.
-- Candidate detail lookup.
-- Candidate search.
-- Batch ranking for multiple CV uploads.
-- Recruiter jobs, pipeline/action tracking, templates, reports, and batch upload support.
-
-### Dashboard And User Data
-
-- Usage summary.
-- Usage history and streaks.
-- Analysis history.
-- Benchmarks.
-- Favorites.
-- JD templates.
-- Notes.
-- Sharing links.
-- Data summary/export/delete endpoints.
-- Reminders.
-
-### Billing And SaaS
-
-- Stripe checkout session creation.
-- Stripe customer portal session creation.
-- Contact sales flow.
-- Premium trial activation.
-- Admin plan updates.
-- Stripe webhook endpoint with signature verification.
-
-## Technology Stack
-
-### Backend
-
-| Area | Current implementation |
+| Surface | Purpose |
 | --- | --- |
-| Web framework | FastAPI |
-| Language | Python |
-| ORM/database access | SQLAlchemy |
-| Migrations | Alembic |
-| Database target | PostgreSQL, with pgvector support |
-| Auth | Supabase JWT verification |
-| Rate limiting | SlowAPI/limits, Redis when available |
-| Background jobs | Celery when Redis is reachable; local synchronous fallback otherwise |
-| CV parsing | pdfplumber/PyPDF2 for PDF, python-docx for DOCX, UTF-8 text for TXT |
-| ML/scoring | scikit-learn/joblib model path plus deterministic scoring services |
-| AI providers | OpenAI client when configured; mock fallback |
-| Billing | Stripe-oriented billing service and webhook flow |
-| Testing | pytest |
+| Landing and auth | Public entry, login, registration, password recovery |
+| Dashboard | Usage, streaks, history, insights, favorites, account status |
+| Analyze | Single CV upload, parsing, scoring, job-description matching |
+| Recruiter | Candidate/job workflows, batch ranking, reports, templates |
+| Settings and profile | Account preferences, profile data, privacy/export controls |
+| Ops and data center | Operational/admin surfaces where enabled |
+| Mobile app | React Native/Expo client scaffold for core flows |
 
-### Frontend
-
-| Area | Current implementation |
-| --- | --- |
-| Framework | React 18 |
-| Build tool | Vite |
-| Language | Mostly JS/JSX; some TS/TSX support files exist |
-| Styling | Legacy CSS in `frontend/src/style.css` plus Tailwind v4 CSS import |
-| UI libraries | lucide-react, framer-motion |
-| Auth client | Supabase JS |
-| Testing | Vitest + Testing Library + jsdom |
-
-### Not Currently Active As Documented
-
-These were previously overstated in the README:
-
-- `spaCy`, `NLTK`, and `transformers` are not required by `requirements.txt` and are not part of the current active backend dependency set.
-- The primary frontend entry is `frontend/src/App.jsx`, not `App.tsx`.
-- There is no current `frontend/tailwind.config.js`; Tailwind v4 can run without the old config file.
-- `mobile/` exists, but it is not a complete active Expo app in the current repo state.
-- `routes/` and `schemas/` exist but are not yet populated with real modules. They are the target for the next refactor.
-
-## System Flow
+## System Architecture
 
 ```mermaid
-flowchart LR
-    User["User / Recruiter"] --> Frontend["React + Vite frontend"]
-    Frontend --> API["FastAPI backend /api/v1"]
-    API --> Auth["Supabase JWT verification"]
-    API --> Upload["Upload parser: PDF / DOCX / TXT"]
-    API --> Scoring["ATS, keyword, skill, experience scoring"]
-    API --> AI["OpenAI or mock rewrite provider"]
-    API --> DB["PostgreSQL / pgvector"]
-    API --> Redis["Redis when available"]
-    API --> Stripe["Stripe billing and webhook"]
-    API --> Frontend
+flowchart TB
+  user["User / Recruiter"] --> web["React + Vite Web App"]
+  user --> mobile["React Native / Expo App"]
+
+  web --> api["FastAPI Backend"]
+  mobile --> api
+
+  api --> auth["Supabase Auth / JWT Verification"]
+  api --> quota["Plan, Quota, Usage, Billing Guards"]
+  api --> parser["CV Parsing Pipeline"]
+  api --> scoring["ATS, Semantic, Keyword, Skill, Experience Scoring"]
+  api --> recruiter["Recruiter and Batch Workflows"]
+  api --> builder["CV Builder and Rendering"]
+  api --> storage["Storage Layer"]
+
+  parser --> pdf["PDF / DOCX / Text Extraction"]
+  parser --> normalize["Section Classification and Normalization"]
+  parser --> schema["Canonical CV Schema"]
+
+  scoring --> ml["Local ML Models"]
+  scoring --> embeddings["Embeddings / AI Features"]
+
+  storage --> db["SQL Database"]
+  storage --> s3["S3-Compatible Object Storage"]
+  quota --> redis["Redis or Local Fallback"]
+
+  api --> observability["Metrics, Logs, Health Checks"]
 ```
 
-## CV Analysis Flow
+The backend is intentionally split into route modules and shared runtime modules so the application can grow without keeping every API and lifecycle concern inside `main.py`.
+
+## Core Flows
+
+### CV Analysis Flow
 
 ```mermaid
 sequenceDiagram
-    participant U as User
-    participant F as Frontend
-    participant B as FastAPI
-    participant P as Upload Parser
-    participant S as Scoring Pipeline
-    participant D as Database
+  participant U as User
+  participant FE as Frontend
+  participant API as FastAPI
+  participant Auth as Auth Guard
+  participant Parser as Parser Pipeline
+  participant Score as Scoring Services
+  participant DB as Database
+  participant Store as Object Storage
 
-    U->>F: Upload CV and optional job description
-    F->>B: POST /api/v1/analyze-pdf
-    B->>B: Verify JWT, rate limits, quota
-    B->>P: Extract text from PDF/DOCX/TXT
-    P-->>B: Plain CV text
-    B->>S: Run matching and ATS pipeline
-    S-->>B: Scores, gaps, recommendations
-    B->>D: Save analysis/history where applicable
-    B-->>F: JSON result
-    F-->>U: Dashboard/result view
+  U->>FE: Upload CV and job description
+  FE->>API: POST /api/v1/analyze-pdf
+  API->>Auth: Verify JWT or mock user
+  Auth-->>API: User context
+  API->>Parser: Extract text and detect sections
+  Parser->>Parser: Normalize contact, education, experience, skills
+  Parser-->>API: Canonical CV data
+  API->>Score: ATS, semantic, keyword, skill, experience scoring
+  Score-->>API: Scores and recommendations
+  API->>Store: Store source file when configured
+  API->>DB: Persist analysis, usage, history
+  API-->>FE: Analysis result
+  FE-->>U: Scorecards, recommendations, gaps, exports
 ```
 
-## Local Setup
+### Parser Pipeline
+
+```mermaid
+flowchart LR
+  file["CV file"] --> extract["Text extraction"]
+  extract --> layout["Layout-aware cleanup"]
+  layout --> sections["Section classifier"]
+  sections --> resolver["Section resolver"]
+  resolver --> fields["Field extraction"]
+  fields --> normalize["Normalization"]
+  normalize --> validate["Schema validation"]
+  validate --> result["Canonical CV payload"]
+
+  sections -. handles .-> multi["Multi-page and multi-column CVs"]
+  resolver -. prevents .-> drift["Section drift, e.g. certificate vs experience mixups"]
+```
+
+### Recruiter Batch Flow
+
+```mermaid
+flowchart TD
+  start["Recruiter uploads CV batch"] --> guard["Auth, plan, quota checks"]
+  guard --> parse["Parse every CV"]
+  parse --> rank["Rank candidates against job description"]
+  rank --> review["Review candidate cards and dense tables"]
+  review --> action["Shortlist, reject, email, export"]
+  action --> report["CSV / XLSX / HTML reports"]
+  report --> audit["Usage, actions, and audit trail"]
+```
+
+### Local Development Request Flow
+
+```mermaid
+flowchart LR
+  browser["Browser: http://127.0.0.1:5173"] --> vite["Vite dev server"]
+  vite -- "/api proxy" --> backend["FastAPI: http://127.0.0.1:8001"]
+  backend --> mock["Mock services when MOCK_SERVICES=true"]
+  backend --> sqlite["Local SQLite mock_dev.db"]
+  backend --> ui["JSON response to frontend"]
+```
+
+If the frontend is running but the backend is not running on port `8001`, API calls under `/api/v1/*` will fail in the browser console. Start the backend first, then refresh the app.
+
+## Technology Stack
+
+| Layer | Tools |
+| --- | --- |
+| Web frontend | React 18, Vite, Vitest, CSS design tokens |
+| Mobile | React Native, Expo, TypeScript |
+| Backend | Python 3.12, FastAPI, SQLAlchemy, Alembic |
+| Parsing and scoring | Custom parser services, section classifier, ML models, ATS scoring |
+| Data | SQLite for mock/local, PostgreSQL-compatible production database |
+| Auth | Supabase JWT verification |
+| Storage | Local storage fallback, S3-compatible object storage |
+| Ops | Docker, health checks, metrics, Gitleaks, dependency audits |
+
+## Quick Start
 
 ### Prerequisites
 
-- Python 3.11 or 3.12.
-- Node.js. This workspace also contains a bundled Node runtime under `tools/node-v24.14.0-win-x64`.
-- PostgreSQL for full database-backed development.
-- Redis for Celery/rate-limit paths that require it. The app has fallbacks for some local/test flows.
+- Python 3.12+
+- Node.js 20+ or the bundled project Node runtime under `tools/`
+- Git
+- Optional: Docker and Docker Compose
+- Optional production integrations: Supabase, Redis, S3, Stripe, OpenAI
 
 ### Backend
 
 ```bash
 python -m venv .venv
-.venv\Scripts\activate
+.\.venv\Scripts\activate
 python -m pip install --upgrade pip
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
+python -m uvicorn main:app --host 127.0.0.1 --port 8001
 ```
 
-Configure environment variables in `.env` or your shell. At minimum, local development normally needs:
-
-```bash
-DATABASE_URL=postgresql+psycopg2://user:password@localhost:5432/cv_analyzer
-SUPABASE_JWT_SECRET=...
-OPENAI_API_KEY=...        # optional unless real AI provider output is required
-STRIPE_SECRET_KEY=...     # optional unless billing is tested
-STRIPE_WEBHOOK_SECRET=... # optional unless webhook verification is tested
-```
-
-Run the backend:
-
-```bash
-python -m uvicorn main:app --host 127.0.0.1 --port 8001 --reload
-```
-
-Health checks:
+Health check:
 
 ```bash
 curl http://127.0.0.1:8001/health
-curl http://127.0.0.1:8001/ready
 ```
 
 ### Frontend
@@ -224,358 +197,172 @@ npm install
 npm run dev
 ```
 
-The frontend defaults to the configured `VITE_API_BASE_URL`. In local static/dev use, the app is expected to call the backend at `http://127.0.0.1:8001`.
+Open:
 
-Production build:
+```text
+http://127.0.0.1:5173/
+```
+
+### One-Screen Local Flow
+
+```mermaid
+flowchart TB
+  setup["Install Python and Node dependencies"] --> env["Create .env from .env.example"]
+  env --> backend["Start FastAPI on :8001"]
+  backend --> frontend["Start Vite on :5173"]
+  frontend --> login["Open app and log in"]
+  login --> analyze["Upload a CV on /analyze"]
+  analyze --> validate["Review scorecards and browser console"]
+```
+
+## Environment Configuration
+
+Start from the sample file:
+
+```bash
+copy .env.example .env
+```
+
+Important development variables:
+
+```env
+ENV=development
+MOCK_SERVICES=true
+MOCK_DATABASE_URL=sqlite:///./mock_dev.db
+PORT=8001
+```
+
+Production-style deployments should configure real values for:
+
+- `DATABASE_URL`
+- `SUPABASE_URL`
+- `SUPABASE_JWT_SECRET`
+- `OPENAI_API_KEY`
+- `REDIS_URL`
+- `S3_BUCKET_NAME`
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `STRIPE_SECRET_KEY`
+
+Never commit real secrets. The repository includes Gitleaks scanning in CI.
+
+## Validation Commands
+
+### Frontend
 
 ```bash
 cd frontend
-npm run build
-```
-
-Static SPA fallback server used by this workspace:
-
-```bash
-python scripts/spa_static_server.py --directory frontend/dist --host 127.0.0.1 --port 5173
-```
-
-## Testing
-
-Backend:
-
-```bash
-python -m py_compile main.py services/rewrite_service.py
-python -m pytest
-```
-
-Frontend:
-
-```bash
-cd frontend
+npx tsc --noEmit
 npm test
 npm run build
 ```
 
-Type checking:
+### Backend
 
 ```bash
-npx tsc --noEmit
+python -m pytest --collect-only -q
+python -m pytest tests/test_section_classifier.py tests/test_section_resolver.py tests/test_tasks.py -q --tb=short
 ```
 
-Note: type checking requires TypeScript tooling to be installed in the relevant workspace. If network access is blocked and TypeScript is missing, this command may not be available.
-
-## Main API Endpoints
-
-This is not a full OpenAPI reference. Run the backend and open `http://127.0.0.1:8001/docs` for the generated API docs.
-
-### Core Analysis
-
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `POST` | `/api/v1/analyze` | Analyze pasted CV text against a job description |
-| `POST` | `/api/v1/analyze-async` | Queue or locally run text analysis |
-| `POST` | `/api/v1/analyze-pdf` | Analyze uploaded PDF/DOCX/TXT CV |
-| `GET` | `/api/v1/analysis/{job_id}` | Fetch async analysis/job result |
-| `GET` | `/api/v1/history` | Fetch analysis history |
-| `GET` | `/api/v1/history/export` | Export history as CSV |
-
-### Dashboard/User Data
-
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `GET` | `/api/v1/usage` | Current usage/quota summary |
-| `GET` | `/api/v1/usage-history` | Daily usage history |
-| `GET` | `/api/v1/usage-streak` | Current and longest usage streak |
-| `GET` | `/api/v1/insights` | Dashboard insight summary |
-| `GET` | `/api/v1/me` | Current user profile |
-| `GET` | `/api/v1/me/data-summary` | User data summary |
-| `GET` | `/api/v1/me/data-export` | User data export |
-| `DELETE` | `/api/v1/me/data` | User data deletion flow |
-
-### Favorites, Notes, Sharing, Templates, Reminders
-
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `GET` | `/api/v1/favorites` | List favorites |
-| `GET` | `/api/v1/favorites/ids` | List favorite analysis IDs |
-| `POST` | `/api/v1/favorites/toggle` | Toggle a favorite |
-| `GET` | `/api/v1/jd-templates` | List job description templates |
-| `POST` | `/api/v1/jd-templates` | Create job description template |
-| `DELETE` | `/api/v1/jd-templates/{template_id}` | Delete job description template |
-| `POST` | `/api/v1/notes` | Save analysis note |
-| `GET` | `/api/v1/notes/{analysis_id}` | Fetch analysis note |
-| `DELETE` | `/api/v1/notes/{analysis_id}` | Delete analysis note |
-| `POST` | `/api/v1/share` | Create share link |
-| `GET` | `/api/v1/shared/{share_token}` | Fetch shared analysis |
-| `DELETE` | `/api/v1/share/{share_token}` | Remove share link |
-| `GET` | `/api/v1/reminders` | List reminders |
-| `POST` | `/api/v1/reminders` | Create reminder |
-| `PUT` | `/api/v1/reminders/{reminder_id}` | Update reminder |
-| `DELETE` | `/api/v1/reminders/{reminder_id}` | Delete reminder |
-
-### Rewrite, Auto-Fix, Interview, Matching
-
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `POST` | `/api/v1/cv/auto-fix` | Extract and optimize uploaded CV |
-| `POST` | `/api/v1/cv/auto-fix/export` | Export optimized CV as PDF/DOCX |
-| `POST` | `/api/v1/cv/auto-fix/parse` | Parse optimized text into builder payload |
-| `POST` | `/api/v1/rewrite/cv` | Rewrite CV text |
-| `POST` | `/api/v1/rewrite/bullets` | Rewrite bullet points |
-| `POST` | `/api/v1/rewrite/cover-letter` | Generate/rewrite cover letter |
-| `POST` | `/api/v1/cv/rewrite` | Compatibility alias for CV rewrite |
-| `POST` | `/api/v1/cv/optimize-keywords` | Optimize CV keywords |
-| `POST` | `/api/v1/cv/diff` | Compare original and optimized text |
-| `POST` | `/api/v1/score/breakdown` | Return score breakdown |
-| `POST` | `/api/v1/job/match-score` | Return match score for CV/JD text |
-| `POST` | `/api/v1/interview/questions` | Generate interview questions |
-| `POST` | `/api/v1/interview/evaluate` | Evaluate interview answer |
-| `POST` | `/api/v1/linkedin/optimize` | Generate LinkedIn-style optimization output |
-
-### Recruiter
-
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `GET` | `/api/v1/recruiter/candidates` | List organization candidates |
-| `GET` | `/api/v1/recruiter/top_candidates` | List top ranked candidates |
-| `GET` | `/api/v1/recruiter/candidate/{analysis_id}` | Candidate detail |
-| `GET` | `/api/v1/recruiter/search` | Search organization candidates |
-| `POST` | `/api/v1/recruiter/batch-rank` | Batch rank uploaded CVs |
-| `GET` | `/api/v1/recruiter/jobs` | List recruiter jobs |
-| `POST` | `/api/v1/recruiter/jobs` | Create recruiter job |
-| `GET` | `/api/v1/recruiter/dashboard/actions/{job_id}` | List job actions |
-| `GET` | `/api/v1/recruiter/pipeline/{job_id}` | Pipeline view |
-| `PUT` | `/api/v1/recruiter/dashboard/actions/{action_id}/stage` | Update action stage |
-| `POST` | `/api/v1/recruiter/dashboard/action` | Create dashboard action |
-| `POST` | `/api/v1/recruiter/dashboard/preview` | Preview candidate ranking |
-| `POST` | `/api/v1/recruiter/dashboard/rank` | Rank one candidate |
-| `POST` | `/api/v1/recruiter/dashboard/batch-upload` | Batch upload for recruiter dashboard |
-| `GET` | `/api/v1/recruiter/report/{job_id}` | Export recruiter report |
-| `GET` | `/api/v1/recruiter/templates` | List recruiter message templates |
-| `POST` | `/api/v1/recruiter/templates` | Create recruiter template |
-| `DELETE` | `/api/v1/recruiter/templates/{template_id}` | Delete recruiter template |
-| `POST` | `/api/v1/recruiter/templates/preview` | Preview recruiter template |
-| `POST` | `/api/v1/recruiter/send-email` | Queue/send recruiter email intent |
-
-### CV Builder
-
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `GET` | `/api/v1/fonts` | List available font options |
-| `GET` | `/api/v1/cv-builder/template-marketplace` | List template catalog |
-| `GET` | `/api/v1/cv-builder/templates` | List templates available to plan |
-| `POST` | `/api/v1/cv-builder/generate` | Generate CV document |
-| `POST` | `/api/v1/cv-builder/preview` | Generate CV preview |
-| `POST` | `/api/v1/cv-builder/suggest-summary` | Suggest professional summaries |
-
-### Billing And Webhooks
-
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `POST` | `/api/v1/billing/checkout-session` | Create Stripe checkout session |
-| `POST` | `/api/v1/billing/portal-session` | Create Stripe portal session |
-| `POST` | `/api/v1/billing/contact-sales` | Contact sales request |
-| `POST` | `/api/v1/billing/activate-trial` | Activate premium trial |
-| `GET` | `/api/v1/billing/admin/me` | Admin identity summary |
-| `GET` | `/api/v1/billing/admin/users` | Admin user list |
-| `GET` | `/api/v1/billing/admin/feedback` | Admin feedback list |
-| `POST` | `/api/v1/billing/admin/set-user-plan` | Admin plan update |
-| `POST` | `/stripe/webhook` | Stripe webhook receiver |
-
-## API Examples
-
-### Analyze Uploaded CV
+### API Smoke Test
 
 ```bash
-curl -X POST http://127.0.0.1:8001/api/v1/analyze-pdf \
-  -H "Authorization: Bearer YOUR_SUPABASE_JWT" \
-  -F "file=@resume.pdf" \
-  -F "job_description=Looking for a backend engineer with Python and SQL" \
-  -F "lang=en"
+curl http://127.0.0.1:8001/health
+curl http://127.0.0.1:5173/api/v1/usage
 ```
 
-Typical response fields include:
+## Main API Areas
 
-```json
-{
-  "final_score": 82.5,
-  "ats_score": 78.0,
-  "skill_score": 86.0,
-  "missing_skills": ["docker"],
-  "keyword_gap": {},
-  "recommendations": []
-}
-```
+| Area | Example endpoints |
+| --- | --- |
+| Analysis | `POST /api/v1/analyze-pdf`, `GET /api/v1/usage-history` |
+| Dashboard | `GET /api/v1/usage`, `GET /api/v1/insights`, `GET /api/v1/favorites` |
+| CV Builder | `GET /api/v1/cv-builder/templates`, `POST /api/v1/cv-builder/preview-html` |
+| Recruiter | Recruiter job, batch, candidate, template, export, and report routes |
+| Billing and plans | Plan, entitlement, quota, and usage guard routes |
+| User data | Profile, export, deletion, notes, templates, saved data |
+| System | Health, readiness, metrics, operational checks |
 
-### Analyze Text
+API documentation is available when the backend is running:
 
-```bash
-curl -X POST http://127.0.0.1:8001/api/v1/analyze \
-  -H "Content-Type: application/json" \
-  -d '{
-    "cv_text": "Python developer with SQL experience",
-    "job_description": "Backend role requiring Python and SQL",
-    "lang": "en"
-  }'
-```
-
-### Recruiter Batch Ranking
-
-```bash
-curl -X POST http://127.0.0.1:8001/api/v1/recruiter/batch-rank \
-  -H "Authorization: Bearer YOUR_SUPABASE_JWT" \
-  -F "job_description=Senior backend engineer, Python, APIs, PostgreSQL" \
-  -F "files=@candidate_1.pdf" \
-  -F "files=@candidate_2.docx"
-```
-
-### CV Auto-Fix
-
-```bash
-curl -X POST http://127.0.0.1:8001/api/v1/cv/auto-fix \
-  -H "Authorization: Bearer YOUR_SUPABASE_JWT" \
-  -F "file=@resume.docx" \
-  -F "job_description=Product manager role with SaaS experience" \
-  -F "lang=en" \
-  -F "use_ai=true"
+```text
+http://127.0.0.1:8001/docs
 ```
 
 ## Project Structure
 
-Current high-level repository structure:
-
 ```text
 cv-analyzer/
-  main.py                         # Current FastAPI app/composition root; still contains legacy route code
-  auth.py                         # Supabase JWT verification helpers
-  database.py                     # SQLAlchemy engine/session setup
-  models.py                       # SQLAlchemy models
-  requirements.txt                # Minimal active backend dependencies
-  requirements_full.txt           # Larger captured environment, not the default install target
-  alembic.ini
-  migrations/                     # Alembic migration versions
-  services/                       # Active business/scoring/rewrite/billing services
-  tests/                          # Backend pytest suite
-  frontend/
-    package.json
-    vite.config.js
-    tsconfig.json
-    public/
-    src/
-      App.jsx
-      main.jsx
-      api.js
-      style.css
-      tailwind.css
-      blog/
-      components/
-      context/
-      hooks/
-      i18n/
-      pages/
-      utils/
-      __tests__/
-  docs/
-    README.md
-    backend-architecture.md
-    agent-workflow.md
-    deploy.md
-    usage.md
-  .codex/
-    skills/
-  routes/                         # Target for future APIRouter modules; currently not populated
-  schemas/                        # Target for future Pydantic schemas; currently not populated
-  core/                           # Target for future config/security/dependency modules
-  middleware/                     # Target for future middleware modules
-  scripts/
-  sample_cvs/
+  agents/                 Parser and extraction agent code
+  core/                   App lifecycle, metrics, runtime, quota, shared dependencies
+  frontend/               React/Vite web application
+  mobile/                 React Native/Expo app scaffold
+  routes/                 FastAPI route modules
+  services/               Parsing, scoring, storage, billing, email, user services
+  security/               Storage and request security helpers
+  tests/                  Pytest coverage for parser, tasks, routes, services
+  .codex/skills/          Product design, frontend, and UI QA workflows
+  .github/workflows/      CI, security, dependency scanning
 ```
 
-## Active Service Modules
+## Security And CI
 
-Important current backend services include:
+```mermaid
+flowchart TD
+  push["Push or pull request"] --> checkout["Checkout repository"]
+  checkout --> safe["Mark workspace as Git safe.directory"]
+  safe --> gitleaks["Gitleaks secret scan"]
+  checkout --> python["Python tests and audits"]
+  checkout --> node["Frontend typecheck, tests, build, npm audit"]
+  checkout --> docker["Container and dependency scans"]
+  gitleaks --> result["CI status"]
+  python --> result
+  node --> result
+  docker --> result
+```
 
-- `services/ats_service.py`
-- `services/billing_service.py`
-- `services/cv_autofix_service.py`
-- `services/cv_builder_service.py`
-- `services/domain_service.py`
-- `services/embedding_service.py`
-- `services/experience_service.py`
-- `services/industry_service.py`
-- `services/keyword_service.py`
-- `services/language_service.py`
-- `services/model_service.py`
-- `services/recommendation_service.py`
-- `services/rewrite_service.py`
-- `services/scoring_service.py`
-- `services/skill_service.py`
-- `services/tasks.py`
+Security notes:
 
-## Security Notes
+- `.env` files, databases, model artifacts, local scratch data, sample CV files, and large archives are ignored.
+- Gitleaks uses `.gitleaks.toml` and redacts findings in CI logs.
+- The security workflow marks the GitHub workspace as a safe Git directory before running the Docker-based Gitleaks scan.
+- S3 and storage helpers include guardrails for bucket access, path safety, and local fallback behavior.
 
-- JWT auth is handled through Supabase token verification.
-- Recruiter endpoints must remain organization-scoped.
-- Upload endpoints must validate size and supported file types before parsing.
-- Production CORS should not allow arbitrary localhost origins.
-- Stripe webhooks must use Stripe-style timestamped signature verification.
-- Secrets must remain in environment variables or secure secret stores, never in committed files.
+## UI Workflow
 
-## CI
+The repository includes a Codex-oriented multi-agent UI workflow:
 
-The GitHub Actions workflow is in `.github/workflows/ci.yml`.
+```mermaid
+flowchart LR
+  design["Product Designer Agent"] --> implement["Frontend Implementation Agent"]
+  implement --> qa["QA Review Agent"]
+  qa --> summary["Coordinator Summary"]
+```
 
-Current intended checks:
+Files:
 
-- Backend tests on Python 3.11 and 3.12.
-- PostgreSQL service with pgvector image.
-- Alembic migrations.
-- Full pytest suite.
-- Frontend `npm test`.
-- Frontend `npm run build`.
-- Git safe-directory configuration for scanners that inspect the repository.
+- `AGENTS.md`
+- `.codex/skills/design-review/SKILL.md`
+- `.codex/skills/frontend-implementation/SKILL.md`
+- `.codex/skills/frontend-ui-polish/SKILL.md`
+- `.codex/skills/ui-qa-review/SKILL.md`
 
-## Deployment
+The workflow is intentionally conservative:
 
-See [docs/deploy.md](docs/deploy.md) for deployment notes.
+- Do not redesign the whole product at once.
+- Prefer shared design tokens and reusable styles.
+- Preserve backend, auth, API, routing, and business logic.
+- Run typecheck, tests, and build after UI changes.
+- Use browser QA where possible for desktop and mobile viewports.
 
-At a high level:
+## Development Notes
 
-- Configure production environment variables.
-- Use PostgreSQL with migrations applied.
-- Configure Supabase JWT settings.
-- Configure OpenAI only when real rewrite/embedding behavior is required.
-- Configure Stripe keys and webhook secret for billing flows.
-- Serve the frontend build through an SPA-capable static server or platform.
-- Route API traffic to the FastAPI backend.
+- Frontend dev server: `http://127.0.0.1:5173`
+- Backend dev server: `http://127.0.0.1:8001`
+- Vite proxies `/api/*` to the backend.
+- Mock mode is useful for UI and parser development without full production services.
+- If API calls show `500` in the browser, first confirm the backend is running and healthy.
 
-## Known Technical Debt
+## License
 
-These are intentional, documented next steps:
-
-1. Extract upload/parsing helpers from `main.py` into `services/upload_service.py` and `services/parsing_service.py`.
-2. Extract rewrite endpoints into `routes/rewrite.py` and `schemas/rewrite.py`.
-3. Extract dashboard/user/favorites/notes/reminders endpoints into proper route/schema/service modules.
-4. Extract recruiter endpoints into `routes/recruiter.py`, `schemas/recruiter.py`, and `services/recruiter_service.py`.
-5. Move local feature-store style behavior into database-backed models and Alembic migrations.
-6. Replace remaining `datetime.utcnow()` usage with timezone-aware UTC helpers.
-7. Add a CI guard that fails when new `@app.get`, `@app.post`, `@app.put`, or `@app.delete` decorators are added directly to `main.py`.
-8. Expand browser QA coverage for authenticated routes.
-
-## Contributing Rules
-
-- Do not add feature code to `main.py`.
-- Keep route contracts stable unless intentionally versioned.
-- Add regression tests for parser bugs.
-- Keep frontend API calls centralized in `frontend/src/api.js`.
-- Do not remove restored product features such as Blog, Cover Letter, Career Studio, Compare, CV Builder, Recruiter, Dashboard, Settings, and Profile.
-- Run backend and frontend checks before handing off a change.
-
-## Useful Links
-
-- FastAPI docs: https://fastapi.tiangolo.com/
-- React docs: https://react.dev/
-- Vite docs: https://vite.dev/
-- Supabase docs: https://supabase.com/docs
-- Stripe docs: https://docs.stripe.com/
-- OpenAI docs: https://platform.openai.com/docs/
+This project is licensed under the MIT License.

@@ -1,5 +1,56 @@
 {
-  "version": "v1.0.0",
-  "path": "resume_model.pkl",
-  "sha256": "acb5a8596c429148ffcc52bc70f5935d66bf47a1d98e57f2f3e32d1b71958bc1"
+  "version": "v3.0.0",
+  "features": [
+    "semantic",
+    "keyword",
+    "skill",
+    "experience",
+    "missing_count",
+    "missing_ratio",
+    "semantic_skill_interaction",
+    "keyword_skill_interaction",
+    "balance_score",
+    "bullet_score",
+    "section_count",
+    "section_presence_score",
+    "formatting_score",
+    "length_score",
+    "contact_score",
+    "action_verb_score",
+    "achievement_score",
+    "has_summary",
+    "has_skills",
+    "has_experience",
+    "has_education",
+    "has_projects",
+    "domain_similarity",
+    "title_match",
+    "seniority_match",
+    "soft_skill_score",
+    "readability_score",
+    "keyword_density",
+    "education_quality"
+  ],
+  "n_features": 29,
+  "dataset": {
+    "source": "my_real_data.csv",
+    "samples": 5,
+    "test_size": 0.2,
+    "hire_threshold": 70.0
+  },
+  "training": {
+    "early_stopping": true,
+    "cross_validation": "5-fold",
+    "score_available": true
+  },
+  "score_model": {
+    "path": "resume_model.pkl",
+    "sha256": "ec259f21bf893f691c2743c25eb3a50ea1633ecbef2b9630252ecda62503a18d",
+    "type": "XGBRegressor"
+  },
+  "hire_model": {
+    "path": "hire_model.pkl",
+    "sha256": "df09084f8222bcf1f8df77d856ebe982e0dce65a9a7ae0ad519a88cfc0ede32f",
+    "type": "XGBClassifier"
+  }
 }

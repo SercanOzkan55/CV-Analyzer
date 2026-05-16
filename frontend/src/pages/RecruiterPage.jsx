@@ -33,7 +33,6 @@ import {
   exportBatchToCSV, exportBatchToHTML, exportBatchToJSON,
   exportDecisionsToCSV, exportUsageStatsToCSV
 } from '../utils/exportUtils'
-import { CV_UPLOAD_ACCEPT, isSupportedCvUpload } from '../utils/fileTypes'
 import CameraScanModal from '../components/CameraScanModal'
 
 function SortIcon({ sortKey, sortConfig }) {
@@ -43,10 +42,31 @@ function SortIcon({ sortKey, sortConfig }) {
     : <ChevronDown size={13} className="sort-icon sorted" style={{ color: 'var(--color-accent)', opacity: 1 }} />
 }
 
+function SortHeader({ sortKey, sortConfig, onSort, children }) {
+  const isSorted = sortConfig.key === sortKey
+  const ariaSort = isSorted
+    ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending')
+    : 'none'
+
+  return (
+    <th className={`th-sortable ${isSorted ? 'sorted' : ''}`} aria-sort={ariaSort}>
+      <button
+        type="button"
+        className="th-sort-button"
+        onClick={() => onSort(sortKey)}
+      >
+        <span className="th-inner">
+          {children} <SortIcon sortKey={sortKey} sortConfig={sortConfig} />
+        </span>
+      </button>
+    </th>
+  )
+}
+
 function getScoreColor(score) {
-  if (score >= 75) return '#22c55e'
-  if (score >= 50) return '#eab308'
-  return '#ef4444'
+  if (score >= 75) return 'var(--status-success)'
+  if (score >= 50) return 'var(--status-warning)'
+  return 'var(--status-danger)'
 }
 
 function assessJobDescriptionQuality(text) {
@@ -92,9 +112,9 @@ function getJdQualityMeta(quality) {
       label: 'Invalid JD',
       title: 'Job description is invalid',
       message: 'Enter a real role description before ranking candidates. Match scores are disabled for meaningless text.',
-      color: '#ef4444',
-      background: 'rgba(239, 68, 68, 0.10)',
-      border: 'rgba(239, 68, 68, 0.35)',
+      color: 'var(--status-danger)',
+      background: 'var(--status-danger-bg)',
+      border: 'var(--status-danger-border)',
     }
   }
   if (status === 'weak') {
@@ -103,9 +123,9 @@ function getJdQualityMeta(quality) {
       label: 'Weak JD',
       title: 'Job description is too short',
       message: 'Add responsibilities, required skills, seniority, and role context. Match scores may be capped.',
-      color: '#eab308',
-      background: 'rgba(234, 179, 8, 0.10)',
-      border: 'rgba(234, 179, 8, 0.35)',
+      color: 'var(--status-warning)',
+      background: 'var(--status-warning-bg)',
+      border: 'var(--status-warning-border)',
     }
   }
   return null
@@ -943,24 +963,24 @@ export default function RecruiterPage() {
           style={{
             display: 'flex', alignItems: 'center', gap: 16,
             padding: '18px 22px', borderRadius: 14,
-            border: '2px solid #a78bfa',
-            background: 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(99,102,241,0.10))',
+            border: '2px solid var(--status-accent-border)',
+            background: 'var(--status-accent-bg)',
             cursor: 'pointer', marginBottom: 20,
             transition: 'all 0.2s',
-            boxShadow: '0 2px 12px rgba(139,92,246,0.15)',
+            boxShadow: 'var(--shadow-sm)',
           }}
-          whileHover={{ scale: 1.01, boxShadow: '0 4px 20px rgba(139,92,246,0.25)' }}
+          whileHover={{ scale: 1.01, boxShadow: 'var(--shadow-md)' }}
         >
-          <Camera size={32} style={{ color: '#a78bfa', flexShrink: 0 }} />
+          <Camera size={32} style={{ color: 'var(--status-accent)', flexShrink: 0 }} />
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 16, color: '#c4b5fd' }}>
+            <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--status-accent)' }}>
               📷 {t('recruiter.scan_cv') || 'Fiziksel CV Tara'}
             </div>
-            <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 3 }}>
+            <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 3 }}>
               {t('recruiter.scan_cv_desc') || 'Kamera ile kağıt CV tarayın → anlık OCR + ATS analizi + PDF çıktısı'}
             </div>
           </div>
-          <ChevronDown size={20} style={{ color: '#a78bfa', transform: 'rotate(-90deg)' }} />
+          <ChevronDown size={20} style={{ color: 'var(--status-accent)', transform: 'rotate(-90deg)' }} />
         </motion.div>
 
         {/* ── Batch Ranking Form ────────────── */}
@@ -1011,11 +1031,11 @@ export default function RecruiterPage() {
             <div className="recruiter-form-row">
               <div className="recruiter-form-group recruiter-file-group">
                 <label>{t('recruiter.jd_file_label')}</label>
-                <input type="file" accept={CV_UPLOAD_ACCEPT} onChange={e => setJdFile(e.target.files?.[0] || null)} className="admin-input" disabled={!!jdText.trim()} style={jdText.trim() ? { opacity: 0.4 } : {}} />
+                <input type="file" accept=".txt,.pdf,text/plain,application/pdf" onChange={e => setJdFile(e.target.files?.[0] || null)} className="admin-input" disabled={!!jdText.trim()} style={jdText.trim() ? { opacity: 0.4 } : {}} />
               </div>
               <div className="recruiter-form-group recruiter-file-group">
                 <label>{t('recruiter.cv_upload_label')}</label>
-                <input type="file" multiple accept={CV_UPLOAD_ACCEPT} onChange={e => setCvFiles(Array.from(e.target.files || []).filter(isSupportedCvUpload).slice(0, 5000))} className="admin-input" />
+                <input type="file" multiple accept="application/pdf,.pdf" onChange={e => setCvFiles(Array.from(e.target.files || []).slice(0, 5000))} className="admin-input" />
               </div>
             </div>
             <motion.button
@@ -1029,11 +1049,11 @@ export default function RecruiterPage() {
               {batchLoading ? t('recruiter.ranking_in_progress') : t('recruiter.run_batch_ranking')}
             </motion.button>
             {batchLoading && batchProgress.total > 0 && (
-              <div style={{ marginTop: 16, padding: '12px', backgroundColor: 'rgba(100, 150, 255, 0.1)', borderRadius: 8, border: '1px solid rgba(100, 150, 255, 0.2)' }}>
+              <div style={{ marginTop: 16, padding: '12px', backgroundColor: 'var(--status-accent-bg)', borderRadius: 8, border: '1px solid var(--status-accent-border)' }}>
                 <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 8, color: 'var(--text-secondary)' }}>
                   {Math.round((batchProgress.processed / batchProgress.total) * 100)}% - {batchProgress.processed}/{batchProgress.total} CVs
                 </div>
-                <div style={{ height: 6, backgroundColor: 'rgba(100, 150, 255, 0.2)', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ height: 6, backgroundColor: 'var(--bg-input)', borderRadius: 3, overflow: 'hidden' }}>
                   <div 
                     style={{
                       height: '100%',
@@ -1240,7 +1260,7 @@ export default function RecruiterPage() {
                       disabled={bulkProcessing}
                       whileHover={!bulkProcessing ? { scale: 1.03 } : {}}
                       whileTap={!bulkProcessing ? { scale: 0.97 } : {}}
-                      style={{ color: '#22c55e', borderColor: '#22c55e33', opacity: bulkProcessing ? 0.6 : 1, cursor: bulkProcessing ? 'not-allowed' : 'pointer' }}
+                      style={{ color: 'var(--status-success)', borderColor: 'var(--status-success-border)', opacity: bulkProcessing ? 0.6 : 1, cursor: bulkProcessing ? 'not-allowed' : 'pointer' }}
                     >
                       {bulkProcessing ? <Loader size={13} className="spin" /> : <ThumbsUp size={13} />} Accept ({bulkSelected.size})
                     </motion.button>
@@ -1250,7 +1270,7 @@ export default function RecruiterPage() {
                       disabled={bulkProcessing}
                       whileHover={!bulkProcessing ? { scale: 1.03 } : {}}
                       whileTap={!bulkProcessing ? { scale: 0.97 } : {}}
-                      style={{ color: '#ef4444', borderColor: '#ef444433', opacity: bulkProcessing ? 0.6 : 1, cursor: bulkProcessing ? 'not-allowed' : 'pointer' }}
+                      style={{ color: 'var(--status-danger)', borderColor: 'var(--status-danger-border)', opacity: bulkProcessing ? 0.6 : 1, cursor: bulkProcessing ? 'not-allowed' : 'pointer' }}
                     >
                       {bulkProcessing ? <Loader size={13} className="spin" /> : <ThumbsDown size={13} />} Reject ({bulkSelected.size})
                     </motion.button>
@@ -1304,10 +1324,17 @@ export default function RecruiterPage() {
                 <table className="data-table data-table-elite admin-table">
                   <thead>
                     <tr>
-                      <th style={{ width: 36, textAlign: 'center', cursor: 'pointer' }} onClick={toggleBulkSelectAll}>
-                        {bulkSelected.size === (batchResult?.ranking?.length || 0) && bulkSelected.size > 0
-                          ? <CheckSquare size={15} style={{ color: 'var(--color-accent)' }} />
-                          : <Square size={15} style={{ color: 'var(--color-text-secondary)' }} />}
+                      <th style={{ width: 36, textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn-icon table-select-button"
+                          onClick={toggleBulkSelectAll}
+                          aria-label={bulkSelected.size === (batchResult?.ranking?.length || 0) && bulkSelected.size > 0 ? 'Clear candidate selection' : 'Select all candidates'}
+                        >
+                          {bulkSelected.size === (batchResult?.ranking?.length || 0) && bulkSelected.size > 0
+                            ? <CheckSquare size={15} style={{ color: 'var(--color-accent)' }} />
+                            : <Square size={15} style={{ color: 'var(--color-text-secondary)' }} />}
+                        </button>
                       </th>
                       <th>#</th>
                       <th>{t('recruiter.candidates')}</th>
@@ -1329,10 +1356,17 @@ export default function RecruiterPage() {
                         transition={{ delay: i * 0.04, duration: 0.3 }}
                         style={bulkSelected.has(i) ? { background: 'rgba(167,139,250,0.06)' } : {}}
                       >
-                        <td style={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => toggleBulkSelect(i)}>
-                          {bulkSelected.has(i)
-                            ? <CheckSquare size={15} style={{ color: 'var(--color-accent)' }} />
-                            : <Square size={15} style={{ color: 'var(--color-text-secondary)' }} />}
+                        <td style={{ textAlign: 'center' }}>
+                          <button
+                            type="button"
+                            className="btn-icon table-select-button"
+                            onClick={() => toggleBulkSelect(i)}
+                            aria-label={`${bulkSelected.has(i) ? 'Deselect' : 'Select'} ${r.candidate_name || r.filename || 'candidate'}`}
+                          >
+                            {bulkSelected.has(i)
+                              ? <CheckSquare size={15} style={{ color: 'var(--color-accent)' }} />
+                              : <Square size={15} style={{ color: 'var(--color-text-secondary)' }} />}
+                          </button>
                         </td>
                         <td>
                           <span className={`rank-num ${i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : ''}`}>
@@ -1352,7 +1386,7 @@ export default function RecruiterPage() {
                           {(() => {
                             const rowMeta = getJdQualityMeta(getRowJdQuality(r, batchResult))
                             if (!rowMeta) {
-                              return <span style={{ color: '#22c55e', fontSize: '0.78rem', fontWeight: 700 }}>OK</span>
+                              return <span style={{ color: 'var(--status-success)', fontSize: '0.78rem', fontWeight: 700 }}>OK</span>
                             }
                             return (
                               <span
@@ -1378,7 +1412,7 @@ export default function RecruiterPage() {
                         </td>
                         <td>
                           {(r.strengths || []).filter(s => typeof s === 'string' && isNaN(Number(s))).slice(0, 2).map((s, si) => (
-                            <span key={si} style={{ display: 'inline-block', padding: '2px 7px', borderRadius: 6, background: '#22c55e18', color: '#22c55e', fontSize: '0.72rem', marginRight: 3 }}>
+                            <span key={si} style={{ display: 'inline-block', padding: '2px 7px', borderRadius: 6, background: 'var(--status-success-bg)', color: 'var(--status-success)', fontSize: '0.72rem', marginRight: 3 }}>
                               {s}
                             </span>
                           ))}
@@ -1391,6 +1425,7 @@ export default function RecruiterPage() {
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
                               title="Preview"
+                              aria-label={`Preview ${r.candidate_name || r.filename || 'candidate'}`}
                             >
                               <Eye size={13} />
                             </motion.button>
@@ -1410,7 +1445,8 @@ export default function RecruiterPage() {
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
                               title="Open PDF"
-                              style={{ color: '#ef4444', borderColor: '#ef444433' }}
+                              aria-label={`Open PDF for ${r.candidate_name || r.filename || 'candidate'}`}
+                              style={{ color: 'var(--status-danger)', borderColor: 'var(--status-danger-border)' }}
                             >
                               <FileText size={13} />
                             </motion.button>
@@ -1420,7 +1456,8 @@ export default function RecruiterPage() {
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
                               title="Accept"
-                              style={candidateActions[r.candidate_name] === 'accepted' ? { background: '#22c55e', color: '#fff', borderColor: '#22c55e' } : {}}
+                              aria-label={`Accept ${r.candidate_name || r.filename || 'candidate'}`}
+                              style={candidateActions[r.candidate_name] === 'accepted' ? { background: 'var(--status-success)', color: '#fff', borderColor: 'var(--status-success)' } : {}}
                             >
                               <ThumbsUp size={13} />
                             </motion.button>
@@ -1430,7 +1467,8 @@ export default function RecruiterPage() {
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
                               title="Reject"
-                              style={candidateActions[r.candidate_name] === 'rejected' ? { background: '#ef4444', color: '#fff', borderColor: '#ef4444' } : {}}
+                              aria-label={`Reject ${r.candidate_name || r.filename || 'candidate'}`}
+                              style={candidateActions[r.candidate_name] === 'rejected' ? { background: 'var(--status-danger)', color: '#fff', borderColor: 'var(--status-danger)' } : {}}
                             >
                               <ThumbsDown size={13} />
                             </motion.button>
@@ -1440,6 +1478,7 @@ export default function RecruiterPage() {
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
                               title="Send Email"
+                              aria-label={`Send email to ${r.candidate_name || r.filename || 'candidate'}`}
                             >
                               <Mail size={13} />
                             </motion.button>
@@ -1561,15 +1600,15 @@ export default function RecruiterPage() {
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th className={`th-sortable ${sortConfig.key === 'name' ? 'sorted' : ''}`} onClick={() => handleSort('name')}>
-                      <div className="th-inner">{t('recruiter.candidates')} <SortIcon sortKey="name" sortConfig={sortConfig} /></div>
-                    </th>
-                    <th className={`th-sortable ${sortConfig.key === 'score' ? 'sorted' : ''}`} onClick={() => handleSort('score')}>
-                      <div className="th-inner">{t('dashboard.score')} <SortIcon sortKey="score" sortConfig={sortConfig} /></div>
-                    </th>
-                    <th className={`th-sortable ${sortConfig.key === 'date' ? 'sorted' : ''}`} onClick={() => handleSort('date')}>
-                      <div className="th-inner">{t('dashboard.date')} <SortIcon sortKey="date" sortConfig={sortConfig} /></div>
-                    </th>
+                    <SortHeader sortKey="name" sortConfig={sortConfig} onSort={handleSort}>
+                      {t('recruiter.candidates')}
+                    </SortHeader>
+                    <SortHeader sortKey="score" sortConfig={sortConfig} onSort={handleSort}>
+                      {t('dashboard.score')}
+                    </SortHeader>
+                    <SortHeader sortKey="date" sortConfig={sortConfig} onSort={handleSort}>
+                      {t('dashboard.date')}
+                    </SortHeader>
                     <th></th>
                   </tr>
                 </thead>
@@ -1673,8 +1712,8 @@ export default function RecruiterPage() {
                           <td>
                             <span style={{
                               padding: '3px 10px', borderRadius: 6, fontWeight: 600, fontSize: '0.8rem',
-                              background: a.action === 'accepted' ? '#22c55e18' : a.action === 'rejected' ? '#ef444418' : '#eab30818',
-                              color: a.action === 'accepted' ? '#22c55e' : a.action === 'rejected' ? '#ef4444' : '#eab308',
+                              background: a.action === 'accepted' ? 'var(--status-success-bg)' : a.action === 'rejected' ? 'var(--status-danger-bg)' : 'var(--status-warning-bg)',
+                              color: a.action === 'accepted' ? 'var(--status-success)' : a.action === 'rejected' ? 'var(--status-danger)' : 'var(--status-warning)',
                             }}>
                               {a.action}
                             </span>
@@ -1697,7 +1736,7 @@ export default function RecruiterPage() {
                           </td>
                           <td>
                             {a.email_sent
-                              ? <Check size={14} style={{ color: '#22c55e' }} />
+                              ? <Check size={14} style={{ color: 'var(--status-success)' }} />
                               : <X size={14} style={{ color: 'var(--color-text-secondary)', opacity: 0.4 }} />}
                           </td>
                           <td className="text-muted">{a.created_at ? new Date(a.created_at).toLocaleDateString() : '-'}</td>
@@ -1769,8 +1808,8 @@ export default function RecruiterPage() {
                           <span style={{
                             display: 'inline-block', marginTop: 4, padding: '2px 8px', borderRadius: 6,
                             fontSize: '0.75rem', fontWeight: 600,
-                            background: tpl.template_type === 'accept' ? '#22c55e18' : tpl.template_type === 'reject' ? '#ef444418' : '#6366f118',
-                            color: tpl.template_type === 'accept' ? '#22c55e' : tpl.template_type === 'reject' ? '#ef4444' : '#6366f1',
+                            background: tpl.template_type === 'accept' ? 'var(--status-success-bg)' : tpl.template_type === 'reject' ? 'var(--status-danger-bg)' : 'var(--status-accent-bg)',
+                            color: tpl.template_type === 'accept' ? 'var(--status-success)' : tpl.template_type === 'reject' ? 'var(--status-danger)' : 'var(--status-accent)',
                           }}>
                             {tpl.template_type}
                           </span>
@@ -1779,10 +1818,10 @@ export default function RecruiterPage() {
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: 4 }}>
-                          <motion.button className="btn-outline btn-sm" onClick={() => handlePreviewTemplate(tpl)} whileHover={{ scale: 1.05 }} title="Preview">
+                          <motion.button className="btn-outline btn-sm" onClick={() => handlePreviewTemplate(tpl)} whileHover={{ scale: 1.05 }} title="Preview" aria-label={`Preview template ${tpl.name || tpl.id}`}>
                             <Eye size={13} />
                           </motion.button>
-                          <motion.button className="btn-outline btn-sm" onClick={() => handleDeleteTemplate(tpl.id)} whileHover={{ scale: 1.05 }} title="Delete" style={{ color: '#ef4444' }}>
+                          <motion.button className="btn-outline btn-sm" onClick={() => handleDeleteTemplate(tpl.id)} whileHover={{ scale: 1.05 }} title="Delete" aria-label={`Delete template ${tpl.name || tpl.id}`} style={{ color: 'var(--status-danger)' }}>
                             <Trash2 size={13} />
                           </motion.button>
                         </div>
@@ -1800,13 +1839,13 @@ export default function RecruiterPage() {
                   <div className="admin-card-header">
                     <Eye size={18} className="admin-card-icon" />
                     <h2>Template Preview</h2>
-                    <button className="btn-ghost btn-sm" onClick={() => setTplPreview(null)}><X size={14} /></button>
+                    <button type="button" className="btn-ghost btn-sm" onClick={() => setTplPreview(null)} aria-label="Close template preview"><X size={14} /></button>
                   </div>
                   <div style={{ padding: 16, background: 'var(--color-bg)', borderRadius: 8, marginTop: 12 }}>
                     <div style={{ fontWeight: 600, marginBottom: 8 }}>Subject: {tplPreview.rendered_subject}</div>
                     <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{tplPreview.rendered_body}</div>
                     {tplPreview.missing_vars?.length > 0 && (
-                      <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 6, color: '#eab308', fontSize: '0.85rem' }}>
+                      <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 6, color: 'var(--status-warning)', fontSize: '0.85rem' }}>
                         <AlertTriangle size={14} /> Missing variables: {tplPreview.missing_vars.join(', ')}
                       </div>
                     )}
@@ -1981,18 +2020,18 @@ export default function RecruiterPage() {
                     display: 'flex', alignItems: 'center', gap: 10,
                     padding: '8px 14px', borderBottom: '1px solid var(--color-border)',
                     fontSize: '0.85rem',
-                    background: p.status === 'sent' ? 'rgba(34,197,94,0.04)' : p.status === 'error' ? 'rgba(239,68,68,0.04)' : 'transparent',
+                    background: p.status === 'sent' ? 'var(--status-success-bg)' : p.status === 'error' ? 'var(--status-danger-bg)' : 'transparent',
                   }}>
                     <div style={{ width: 18, flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
                       {p.status === 'pending' && <Square size={14} style={{ color: 'var(--color-text-secondary)', opacity: 0.4 }} />}
                       {p.status === 'sending' && <Loader size={14} style={{ color: 'var(--color-accent)', animation: 'spin 1s linear infinite' }} />}
-                      {p.status === 'sent' && <Check size={14} style={{ color: '#22c55e' }} />}
-                      {p.status === 'error' && <X size={14} style={{ color: '#ef4444' }} />}
+                      {p.status === 'sent' && <Check size={14} style={{ color: 'var(--status-success)' }} />}
+                      {p.status === 'error' && <X size={14} style={{ color: 'var(--status-danger)' }} />}
                     </div>
                     <span style={{ flex: 1, fontWeight: 500 }}>{p.name}</span>
                     <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.8rem' }}>{p.email || '(no email)'}</span>
-                    {p.status === 'sent' && <span style={{ color: '#22c55e', fontSize: '0.75rem', fontWeight: 600 }}>Sent</span>}
-                    {p.status === 'error' && <span style={{ color: '#ef4444', fontSize: '0.75rem', fontWeight: 600 }}>{p.error}</span>}
+                    {p.status === 'sent' && <span style={{ color: 'var(--status-success)', fontSize: '0.75rem', fontWeight: 600 }}>Sent</span>}
+                    {p.status === 'error' && <span style={{ color: 'var(--status-danger)', fontSize: '0.75rem', fontWeight: 600 }}>{p.error}</span>}
                   </div>
                 ))}
               </div>
@@ -2058,7 +2097,7 @@ export default function RecruiterPage() {
                 onClick={confirmAction}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                style={{ flex: 1, background: actionModal.action === 'accepted' ? '#22c55e' : '#ef4444', borderColor: actionModal.action === 'accepted' ? '#22c55e' : '#ef4444' }}
+                style={{ flex: 1, background: actionModal.action === 'accepted' ? 'var(--status-success)' : 'var(--status-danger)', borderColor: actionModal.action === 'accepted' ? 'var(--status-success)' : 'var(--status-danger)' }}
               >
                 {actionModal.action === 'accepted' ? <ThumbsUp size={16} /> : <ThumbsDown size={16} />}
                 Confirm {actionModal.action === 'accepted' ? 'Acceptance' : 'Rejection'}

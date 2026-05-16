@@ -1,5 +1,5 @@
 import React from 'react'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 
 const variants = {
   initial: { opacity: 0, y: 10 },
@@ -8,13 +8,22 @@ const variants = {
 }
 
 export default function PageTransition({ children }) {
+  const shouldReduceMotion = useReducedMotion()
+  const activeVariants = shouldReduceMotion
+    ? {
+        initial: { opacity: 1 },
+        animate: { opacity: 1 },
+        exit: { opacity: 1 },
+      }
+    : variants
+
   return (
     <motion.div
-      variants={variants}
+      variants={activeVariants}
       initial="initial"
       animate="animate"
       exit="exit"
-      transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+      transition={{ duration: shouldReduceMotion ? 0 : 0.28, ease: [0.4, 0, 0.2, 1] }}
       style={{ minHeight: '100vh' }}
     >
       {children}

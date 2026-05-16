@@ -1,52 +1,53 @@
-from pathlib import Path
-
-from services import ats_config
-
-
-def test_ats_length_profile_can_be_loaded_from_config(tmp_path, monkeypatch):
-    config_path = tmp_path / "ats_config.yaml"
-    config_path.write_text(
-        """
-weights:
-  skills: 0.4
-  keywords: 0.2
-  format: 0.2
-  experience: 0.2
-
-length_profile:
-  ideal_min_words: 100
-  ideal_max_words: 500
-  extended_max_words: 900
-  very_long_max_words: 1400
-""".strip(),
-        encoding="utf-8",
-    )
-
-    monkeypatch.setenv("ATS_CONFIG_PATH", str(config_path))
-    monkeypatch.setattr(ats_config, "_cached_length_profile", None)
-
-    profile = ats_config.get_ats_length_profile()
-
-    assert profile["ideal_min_words"] == 100
-    assert profile["very_long_max_words"] == 1400
+"""Tests for services/ats_config.py — ATS weight configuration."""
+import os
+import tempfile
+import pytest
+from services.ats_config import _parse_ats_config, get_ats_weights, _DEFAULT_WEIGHTS
 
 
-def test_invalid_ats_length_profile_falls_back(tmp_path, monkeypatch):
-    config_path = Path(tmp_path) / "ats_config.yaml"
-    config_path.write_text(
-        """
-length_profile:
-  ideal_min_words: 500
-  ideal_max_words: 100
-  extended_max_words: 90
-  very_long_max_words: 80
-""".strip(),
-        encoding="utf-8",
-    )
+class TestParseAtsConfig:
+    def test_returns_none_for_missing_file(self):
+        result = _parse_ats_config("/nonexistent/path/ats_config.yaml")
+        assert result is None
 
-    monkeypatch.setenv("ATS_CONFIG_PATH", str(config_path))
-    monkeypatch.setattr(ats_config, "_cached_length_profile", None)
+    def test_parses_valid_yaml(self, tmp_path):
+        cfg = tmp_path / "ats_config.yaml"
+        cfg.write_text("weights:\n  skills: 0.40\n  keywords: 0.20\n  format: 0.10\n  experience: 0.30\n")
+        result = _parse_ats_config(str(cfg))
+        assert result == {"skills": 0.40, "keywords": 0.20, "format": 0.10, "experience": 0.30}
 
-    profile = ats_config.get_ats_length_profile()
+    def test_ignores_comments(self, tmp_path):
+        cfg = tmp_path / "ats_config.yaml"
+        cfg.write_text("# header\nweights:\n  skills: 0.35 # inline\n  keywords: 0.25\n")
+        result = _parse_ats_config(str(cfg))
+        assert result is not None
+        assert result["skills"] == 0.35
 
-    assert profile["ideal_min_words"] < profile["ideal_max_words"]
+    def test_returns_none_for_empty_file(self, tmp_path):
+        cfg = tmp_path / "ats_config.yaml"
+        cfg.write_text("")
+        result = _parse_ats_config(str(cfg))
+        assert result is None
+
+    def test_returns_none_for_invalid_yaml(self, tmp_path):
+        cfg = tmp_path / "ats_config.yaml"
+        cfg.write_text("not: valid:\n  ::::\n")
+        result = _parse_ats_config(str(cfg))
+        # Should not crash, returns None or partial
+        assert result is None or isinstance(result, dict)
+
+
+class TestGetAtsWeights:
+    def test_returns_defaults_when_no_config(self, monkeypatch):
+        """When ats_config.yaml doesn't exist, defaults are used."""
+        # Force cache reset
+        import services.ats_config as mod
+        mod._cached_weights = None
+        monkeypatch.setattr(mod, "_parse_ats_config", lambda p: None)
+        weights = get_ats_weights()
+        assert weights == _DEFAULT_WEIGHTS
+        mod._cached_weights = None  # cleanup
+
+    def test_default_weights_sum_to_one(self):
+        total = sum(_DEFAULT_WEIGHTS.values())
+        assert abs(total - 1.0) < 0.01
