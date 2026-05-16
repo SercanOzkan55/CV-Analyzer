@@ -93,11 +93,12 @@ def test_favorites_require_analysis_ownership(client, db_session):
 
 def test_admin_endpoint_rate_limits_after_token_check(client, monkeypatch):
     import main
+    from core import http_runtime
 
     monkeypatch.setattr(main, "_ADMIN_TOKEN", "x" * 40)
     monkeypatch.setattr(main, "_ADMIN_RATE_LIMIT_PER_MIN", 1)
     monkeypatch.setattr(main, "_ADMIN_IP_ALLOWLIST", [])
-    main._admin_rate_hits.clear()
+    http_runtime._admin_rate_hits.clear()
 
     headers = {"Authorization": f"Bearer {'x' * 40}"}
     first = client.get("/admin/status", headers=headers)
@@ -109,11 +110,12 @@ def test_admin_endpoint_rate_limits_after_token_check(client, monkeypatch):
 
 def test_admin_endpoint_rejects_ip_outside_allowlist(client, monkeypatch):
     import main
+    from core import http_runtime
 
     monkeypatch.setattr(main, "_ADMIN_TOKEN", "x" * 40)
     monkeypatch.setattr(main, "_ADMIN_RATE_LIMIT_PER_MIN", 20)
     monkeypatch.setattr(main, "_ADMIN_IP_ALLOWLIST", [ipaddress.ip_network("203.0.113.10/32")])
-    main._admin_rate_hits.clear()
+    http_runtime._admin_rate_hits.clear()
 
     response = client.get(
         "/admin/status",
@@ -125,12 +127,13 @@ def test_admin_endpoint_rejects_ip_outside_allowlist(client, monkeypatch):
 
 def test_billing_admin_uses_same_ip_allowlist(client, monkeypatch):
     import main
+    from core import http_runtime
 
     monkeypatch.setenv("BILLING_ADMIN_TOKEN", "billing-secret")
     monkeypatch.setenv("BILLING_ADMIN_ALLOWED_EMAILS", "testuser@example.com")
     monkeypatch.setattr(main, "_ADMIN_RATE_LIMIT_PER_MIN", 20)
     monkeypatch.setattr(main, "_ADMIN_IP_ALLOWLIST", [ipaddress.ip_network("203.0.113.10/32")])
-    main._admin_rate_hits.clear()
+    http_runtime._admin_rate_hits.clear()
 
     response = client.get(
         "/api/v1/billing/admin/me",

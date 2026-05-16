@@ -11,9 +11,15 @@ import re
 logger = logging.getLogger("security.s3_guard")
 
 # ── Key format ──────────────────────────────────────────────────────
-# users/user_{id}/safe_filename_{hex-uuid}.pdf|docx
+# Supported key formats:
+# - users/user_{id}/safe_filename_{hex-uuid}.pdf|docx
+# - user_{id}/original/{hex}.pdf|docx and user_{id}/optimized/{hex}.pdf|docx
 _SAFE_KEY_RE = re.compile(
-    r"^users/user_[a-zA-Z0-9\-_]+/[a-zA-Z0-9._-]+\.(pdf|docx)$"
+    r"^(?:"
+    r"users/user_[a-zA-Z0-9\-_]+/[a-zA-Z0-9._-]+\.(pdf|docx)"
+    r"|"
+    r"user_[a-zA-Z0-9\-_]+/(original|optimized)/[a-zA-Z0-9._-]+\.(pdf|docx)"
+    r")$"
 )
 
 # Path traversal in key
@@ -54,9 +60,12 @@ def enforce_ownership(key: str, user_id: str) -> None:
     validate_s3_key(key)
 
     safe_user_id = re.sub(r"[^a-zA-Z0-9\-_]", "_", str(user_id))
-    expected_prefix = f"users/user_{safe_user_id}/"
+    expected_prefixes = (
+        f"users/user_{safe_user_id}/",
+        f"user_{safe_user_id}/",
+    )
 
-    if not key.startswith(expected_prefix):
+    if not key.startswith(expected_prefixes):
         logger.warning(
             "s3_guard:ownership_violation user=%s key=%s",
             safe_user_id,

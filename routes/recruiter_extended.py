@@ -32,6 +32,9 @@ logger = logging.getLogger("app.recruiter.extended")
 
 router = APIRouter(prefix="/api/v1/recruiter")
 
+RANKING_EXPORT_FIELDS = ["name", "email", "final_score", "ats_score", "action", "created_at"]
+CANDIDATE_EXPORT_FIELDS = ["name", "email", "phone", "created_at"]
+
 
 # ════════════════════════════════════════════════════════════════════════════
 # FEATURE 4: PAGINATION WITH OFFSET - Updated endpoints with pagination
@@ -242,12 +245,6 @@ def recruiter_export_rankings(
             detail="Failed to retrieve rankings"
         )
     
-    if not actions:
-        raise HTTPException(
-            status_code=404,
-            detail="No candidates found for this job"
-        )
-    
     # Prepare data
     data = [
         {
@@ -264,10 +261,9 @@ def recruiter_export_rankings(
     if format == "csv":
         # Generate CSV
         output = io.StringIO()
-        if data:
-            writer = csv.DictWriter(output, fieldnames=data[0].keys())
-            writer.writeheader()
-            writer.writerows(data)
+        writer = csv.DictWriter(output, fieldnames=RANKING_EXPORT_FIELDS)
+        writer.writeheader()
+        writer.writerows(data)
         
         _log_event("recruiter.export_rankings", org_id=org_id, job_id=job_id, format="csv", count=len(data))
         logger.info("export_rankings: csv exported job_id=%d count=%d", job_id, len(data))
@@ -338,10 +334,9 @@ def recruiter_export_candidates(
     if format == "csv":
         # Generate CSV
         output = io.StringIO()
-        if data:
-            writer = csv.DictWriter(output, fieldnames=data[0].keys())
-            writer.writeheader()
-            writer.writerows(data)
+        writer = csv.DictWriter(output, fieldnames=CANDIDATE_EXPORT_FIELDS)
+        writer.writeheader()
+        writer.writerows(data)
         
         _log_event("recruiter.export_candidates", org_id=org_id, format="csv", count=len(data))
         logger.info("export_candidates: csv exported org_id=%s count=%d", org_id, len(data))

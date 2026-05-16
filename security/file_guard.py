@@ -55,7 +55,7 @@ def validate_file_upload(
         raise ValueError("File is too small or empty")
     if size > MAX_FILE_SIZE:
         logger.warning("file_guard:too_large size=%d limit=%d", size, MAX_FILE_SIZE)
-        raise ValueError(f"File exceeds {MAX_FILE_SIZE // (1024 * 1024)} MB limit")
+        raise ValueError(f"File too large; exceeds {MAX_FILE_SIZE // (1024 * 1024)} MB limit")
 
     # ── 2. Extension ────────────────────────────────────────────────
     ext = _extract_extension(filename)
@@ -103,7 +103,7 @@ async def read_upload_limited(upload_file, max_bytes: int = MAX_UPLOAD_BYTES) ->
                 getattr(upload_file, "filename", None),
                 max_bytes,
             )
-            raise ValueError(f"File exceeds {max_bytes // (1024 * 1024)} MB limit")
+            raise ValueError(f"File too large; exceeds {max_bytes // (1024 * 1024)} MB limit")
     return bytes(data)
 
 

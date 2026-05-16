@@ -218,6 +218,7 @@ class PaginationMeta(BaseModel):
 
 class CandidatesResponse(BaseModel):
     candidates: list[CandidatePreview]
+    data: list[CandidatePreview] | None = None
     total: int | None = None
     pagination: PaginationMeta | None = None
 
@@ -402,7 +403,7 @@ def recruiter_candidates(
         hasMore=(offset + limit) < total_count
     )
 
-    return CandidatesResponse(candidates=candidates, total=total_count, pagination=pagination)
+    return CandidatesResponse(candidates=candidates, data=candidates, total=total_count, pagination=pagination)
 
 
 @router.get("/top_candidates")
