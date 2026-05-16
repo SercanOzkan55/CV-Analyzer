@@ -19,6 +19,18 @@ def upgrade():
     # Create pgvector extension if missing
     op.execute("CREATE EXTENSION IF NOT EXISTS vector;")
 
+    # Fresh CI/dev databases may not have the legacy jobs table because early
+    # Alembic revisions were written as production baselines. Create the small
+    # table shape needed by the embedding migration without touching existing
+    # production tables.
+    op.execute(
+        "CREATE TABLE IF NOT EXISTS jobs ("
+        "id serial PRIMARY KEY,"
+        "raw_text text,"
+        "created_at timestamptz DEFAULT now()"
+        ");"
+    )
+
     # Create candidates table (if the project does not already manage it)
     op.execute(
         "CREATE TABLE IF NOT EXISTS candidates ("
