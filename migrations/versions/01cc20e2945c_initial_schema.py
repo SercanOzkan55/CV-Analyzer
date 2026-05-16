@@ -27,14 +27,56 @@ def upgrade() -> None:
     drop those tables because they are not tracked by SQLAlchemy's
     ``Base.metadata`` (they're managed via raw SQL in ``setup_db.py``).
 
-    We intentionally leave this migration as a no-op so that Alembic can
-    stamp the database without altering anything. Future migrations should
-    explicitly create or modify tables declared by the ORM.
+    The migration now creates only missing ORM baseline tables so fresh CI
+    databases can run the full Alembic chain without touching existing tables.
     """
-    # no operations; the existing schema is already correct for our
-    # current models (users and analysis) and the legacy tables are handled
-    # outside of Alembic.
-    pass
+    # The existing production schema is already correct; fresh databases need
+    # these minimum tables before later incremental migrations run.
+    bind = op.get_bind()
+    existing_tables = set(sa.inspect(bind).get_table_names())
+
+    if "app_users" not in existing_tables and "users" not in existing_tables:
+        op.create_table(
+            "app_users",
+            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column("supabase_id", sa.String(), nullable=False),
+            sa.Column("email", sa.String(), nullable=False),
+            sa.Column("plan_type", sa.String(), server_default="free", nullable=False),
+            sa.Column(
+                "billing_status",
+                sa.String(),
+                server_default="trialing",
+                nullable=False,
+            ),
+            sa.Column("stripe_customer_id", sa.String(), nullable=True),
+            sa.Column("daily_usage", sa.Integer(), server_default="0", nullable=True),
+            sa.Column("monthly_usage", sa.Integer(), server_default="0", nullable=True),
+            sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=True),
+            sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now(), nullable=True),
+            sa.PrimaryKeyConstraint("id"),
+        )
+
+    if "analysis" not in existing_tables:
+        op.create_table(
+            "analysis",
+            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column("user_id", sa.Integer(), nullable=True),
+            sa.Column("similarity_score", sa.Float(), nullable=False),
+            sa.Column("interpretation", sa.Text(), nullable=False),
+            sa.Column("confidence", sa.Float(), nullable=True),
+            sa.Column("risk_level", sa.Text(), nullable=True),
+            sa.Column("domain_id", sa.Integer(), nullable=True),
+            sa.Column("industry_id", sa.Integer(), nullable=True),
+            sa.Column("specialization_id", sa.Integer(), nullable=True),
+            sa.Column("result", sa.JSON(), nullable=True),
+            sa.Column(
+                "created_at",
+                sa.TIMESTAMP(timezone=False),
+                server_default=sa.func.now(),
+                nullable=True,
+            ),
+            sa.PrimaryKeyConstraint("id"),
+        )
 
 
 def downgrade() -> None:
