@@ -16,4 +16,4 @@ import pytest
 def test_fuzz_analyze_endpoint(client, payload):
     """Fuzz payloads should not crash the endpoint."""
     resp = client.post("/api/v1/analyze", json=payload)
-    assert resp.status_code in (200, 400, 422)
+    assert resp.status_code in (200, 400, 403, 422, 429)

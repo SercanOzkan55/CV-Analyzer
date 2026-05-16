@@ -1,0 +1,74 @@
+# Version control
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+coverage.xml
+.coverage
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node / Frontend dev
+frontend/node_modules/
+mobile/node_modules/
+node_modules/
+
+# Test & debug artifacts
+_test_*.py
+_debug_*.py
+_trace_*.py
+_bulk_*.json
+_bandit_*.txt
+_fix_*.py
+test_debug*.py
+test_out.txt
+test_results_*.txt
+pytest_*.txt
+err_trace.txt
+debug_*.txt
+debug_*.py
+*.db
+.pytest_test.db
+
+# Docs & markdown (not needed in image)
+PR_DESCRIPTION.md
+TEST_*.md
+docker-secrets.md
+docs/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Dev scratch (moved debug/test one-offs)
+_dev_scratch/
+
+# Locust / load testing
+locustfile.py
+
+# Feedback & logs (runtime data)
+feedback_records.jsonl
+logs/

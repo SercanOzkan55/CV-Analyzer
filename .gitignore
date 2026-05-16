@@ -1,34 +1,95 @@
+# Environment
 .env
 .env.*
 !.env.example
-!.env.test
 
-.venv/
-venv/
-node_modules/
-frontend/node_modules/
-mobile/node_modules/
-
-frontend/dist/
-frontend/.vite/
-
+# Python
 *.pyc
 __pycache__/
+**/__pycache__/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Testing & Coverage
 .pytest_cache/
+.pytest_test.db
+test_tmp/
+.pytest_tmp*/
+pytest_tmp*/
+coverage.xml
+.coverage
+htmlcov/
+*.pytest_test.db
+pytest_*.txt
+
+# Linting
 .ruff_cache/
+.mypy_cache/
 
+# IDE
 .vscode/
-.DS_Store
+.idea/
 
+# OS
+.DS_Store
+Thumbs.db
+
+# Frontend
+node_modules/
+frontend/node_modules/
+frontend/.vite/
+.vite/
+frontend/dist/
+mobile/node_modules/
+mobile/.expo/devices.json
+
+# Project artifacts
+*.zip
 .local_quota.json
+mock_dev.db
 *.db
 *.sqlite
 *.sqlite3
+*.pkl
+*.onnx
+model_metadata.json
+feedback_records.jsonl
+requirements_full.txt
+backups/
+storage/
+storage_data/
+*.sql.gz
+*.sql.gz.gpg
+*.sql.gz.sha256
+*.sql.gz.gpg.sha256
+
+# Logs
 *.log
 *.err.log
 
+# Dev scratch files
 _dev_scratch/
-tools/
-*.zip
+tools/node-v*/
+tmp_*.py
 tmp_*.json
-tmp_*.md
+*_trace.txt
+skill_debug*.json
+batch_full_results.json
+cv_*_raw.txt
+cv_*_extracted.txt
+sample_cvs/
+my_real_data.csv
+sample_training_data.csv
+test_cv_real.txt
+test_real_cv.py
+test_ultra_fast.py
+stress_test_batch.py
+main_backup.py
+clean_api_js.py
+deep_clean_api.py
+fix_api_js.py
+restore_legacy_api.py
+scratch_trace.py

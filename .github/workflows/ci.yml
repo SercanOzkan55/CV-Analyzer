@@ -2,18 +2,58 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [ main, master ]
   pull_request:
-    branches: [main, master]
+    branches: [ main, master ]
 
+# ── Lint & Static Analysis ──
 jobs:
-  backend:
-    name: Backend / Python ${{ matrix.python-version }}
+  lint:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-lint-${{ hashFiles('**/requirements.txt') }}
+
+      - name: Install lint tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff mypy bandit[toml] types-requests types-PyYAML types-redis
+
+      - name: Ruff lint
+        run: ruff check . --select E9,F63,F7,F82 --exclude FEATURE_IMPLEMENTATIONS.py --output-format=github
+
+      - name: Ruff format check
+        continue-on-error: true
+        run: ruff format --check .
+
+      - name: Bandit security scan
+        continue-on-error: true
+        run: bandit -c pyproject.toml -r . --severity-level medium -f json -o bandit-report.json
+
+      - name: Upload Bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+
+      - name: Mypy type check
+        continue-on-error: true
+        run: mypy . --config-file pyproject.toml
+
+  # ── Backend Tests ──
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
     services:
       postgres:
         image: ankane/pgvector:postgres-15
@@ -24,46 +64,125 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U testuser -d testdb"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          --health-cmd "pg_isready -U testuser" --health-interval 10s --health-timeout 5s --health-retries 5
     env:
       DATABASE_URL: postgresql+psycopg2://testuser:testpass@localhost:5432/testdb
       ENV: test
-      MOCK_SERVICES: "1"
+    strategy:
+      matrix:
+        python-version: ["3.12"]
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Mark workspace as safe for git-based scanners
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: pip
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+
+      - name: Install postgresql client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest-cov
+
+      - name: Wait for Postgres
+        run: |
+          for i in {1..30}; do
+            pg_isready -h localhost -p 5432 -U testuser && break || sleep 2
+          done
+
+      - name: Run Alembic migrations
+        run: python -m alembic upgrade heads
+
+      - name: Ensure pgvector extension and index
+        env:
+          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
+        run: |
+          psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          psql "$DATABASE_URL" -c "CREATE INDEX IF NOT EXISTS idx_candidates_cv_embedding_ivfflat ON candidates USING ivfflat (cv_embedding vector_cosine_ops) WITH (lists = 100);"
+
+      - name: Run tests with coverage
+        run: pytest --cov=. --cov-report=xml --cov-report=term --cov-fail-under=60 --maxfail=3 --disable-warnings -v
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: backend
+          fail_ci_if_error: false
+        if: always()
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+      - name: Upload pytest results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-results
+          path: .pytest_cache
+
+  # ── Benchmark Quality Gate ──
+  benchmark:
+    runs-on: ubuntu-latest
+    needs: lint
+    env:
+      ENV: test
+      TFIDF_ENABLED: "1"
+      SEMANTIC_BLEND_WEIGHT: "0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-bench-${{ hashFiles('**/requirements.txt') }}
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Wait for Postgres
+      - name: Run benchmark regression tests
         run: |
-          for i in {1..30}; do
-            pg_isready -h localhost -p 5432 -U testuser -d testdb && break
-            sleep 2
-          done
+          python -m pytest tests/benchmark/ -v --tb=short --maxfail=5 2>&1 | tee benchmark-output.txt
 
-      - name: Run Alembic migrations
-        run: python -m alembic upgrade heads
+      - name: Run full benchmark suite
+        run: |
+          python scripts/run_benchmark.py 2>&1 | tee benchmark-report.txt
+          # Fail if any entry is out of range
+          grep -q "\[OK\] All entries within expected ranges" benchmark-report.txt
 
-      - name: Run backend tests
-        run: python -m pytest
+      - name: Upload benchmark report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-report
+          path: |
+            benchmark-report.txt
+            benchmark-output.txt
 
+  # ── Frontend Build Check ──
   frontend:
-    name: Frontend
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -71,18 +190,92 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '24'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run frontend tests
+      - name: Lint (if configured)
+        run: npm run lint --if-present
+
+      - name: Type check (if configured)
+        run: npm run typecheck --if-present
+
+      - name: Build
+        run: npm run build
+
+      - name: Run tests with coverage
         run: npm test
 
-      - name: Build frontend
-        run: npm run build
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          directory: ./frontend/coverage
+          flags: frontend
+          fail_ci_if_error: false
+        if: always()
+
+  # ── Docker Build ──
+  docker:
+    runs-on: ubuntu-latest
+    needs: [test, frontend, benchmark]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and test Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          tags: cv-analyzer:${{ github.sha }}
+
+      - name: Run container health check
+        run: |
+          container_id=$(docker run --rm -d -p 8001:8001 \
+            -e ENV=test -e MOCK_SERVICES=1 \
+            cv-analyzer:${{ github.sha }})
+          trap 'docker stop "$container_id"' EXIT
+          sleep 5
+          curl -f http://localhost:8001/health
+
+  # ── Security Scanning ──
+  security:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'trivy'
+        if: always()
+
+      - name: Upload Trivy report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-scan-report
+          path: trivy-results.sarif
+        if: always()

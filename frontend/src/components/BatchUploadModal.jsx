@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import api from '../api'
-import { CV_UPLOAD_ACCEPT, isSupportedCvUpload } from '../utils/fileTypes'
 import BatchUploadProgress from './BatchUploadProgress'
 import './BatchUploadModal.css'
 
@@ -26,10 +25,12 @@ export const BatchUploadModal = ({ isOpen, onClose, onSuccess = null, jobs = [] 
     e.preventDefault()
     setDragOver(false)
 
-    const dropped = Array.from(e.dataTransfer.files).filter(isSupportedCvUpload)
+    const dropped = Array.from(e.dataTransfer.files).filter((f) =>
+      f.type === 'application/pdf'
+    )
 
     if (dropped.length === 0) {
-      setUploadError('Only PDF, DOCX, and TXT files are supported')
+      setUploadError('Only PDF files are supported')
       return
     }
 
@@ -42,10 +43,12 @@ export const BatchUploadModal = ({ isOpen, onClose, onSuccess = null, jobs = [] 
   }
 
   const handleInputChange = (e) => {
-    const selected = Array.from(e.target.files || []).filter(isSupportedCvUpload)
+    const selected = Array.from(e.target.files || []).filter((f) =>
+      f.type === 'application/pdf'
+    )
 
     if (selected.length === 0) {
-      setUploadError('Only PDF, DOCX, and TXT files are supported')
+      setUploadError('Only PDF files are supported')
       return
     }
 
@@ -208,7 +211,7 @@ export const BatchUploadModal = ({ isOpen, onClose, onSuccess = null, jobs = [] 
                       ref={inputRef}
                       type="file"
                       multiple
-                      accept={CV_UPLOAD_ACCEPT}
+                      accept="application/pdf"
                       onChange={handleInputChange}
                       hidden
                     />

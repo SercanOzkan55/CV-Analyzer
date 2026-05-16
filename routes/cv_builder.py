@@ -1,351 +1,279 @@
-import os
-from datetime import datetime
+"""CV builder endpoints.
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+This router was extracted from main.py to reduce application bootstrap size.
+It intentionally pulls transitional shared symbols from the already-loading
+main module; later passes can move those shared helpers into services.
+"""
+
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from services.cv_builder_service import build_cv, get_available_templates
-from services.language_service import DEFAULT_LANG
+from auth import verify_supabase_jwt
+from database import get_db
+from models import User
+from services import rewrite_service
+from core.runtime_bridge import main_module as _main_module
+from services.ai_feature_service import ensure_ai_rewrite_allowed as _ensure_ai_rewrite_allowed
+from services.cv_builder_service import build_cv, compile_cv_model, get_available_templates
 
 
-def create_router(
-    *,
-    verify_supabase_jwt,
-    get_db,
-    rate_limit,
-    require_captcha,
-    require_abuse_check,
-    current_db_user,
-    ensure_not_expired,
-    metric_request,
-    get_or_create_user,
-    resolve_effective_plan,
-    consume_user_rate_limit,
-    consume_daily_quota,
-    resolve_daily_limit_for_plan,
-    is_premium_plan,
-    audit_log,
-    mock_services_on: bool,
-    user_plan_limits_daily: dict,
-) -> APIRouter:
-    router = APIRouter()
-
-    class CVBuilderRequest(BaseModel):
-        full_name: str
-        email: str = ""
-        phone: str = ""
-        location: str = ""
-        linkedin: str = ""
-        professional_profile: str = ""
-        summary: str = ""
-        experiences: list = []
-        education: list = []
-        skills: list = []
-        certifications: list = []
-        projects: list = []
-        languages: list = []
-        job_description: str = ""
-        template: str = "classic"
-        output_format: str = "docx"
-        lang: str = DEFAULT_LANG
-
-    # =====================================================
-    # CV BUILDER
-    # =====================================================
-
-    RATE_LIMIT_IP_CV_BUILDER_PER_MIN = int(
-        os.getenv("RATE_LIMIT_IP_CV_BUILDER_PER_MIN", "10")
-    )
-    RATE_LIMIT_USER_CV_BUILDER_PER_MIN = int(
-        os.getenv("RATE_LIMIT_USER_CV_BUILDER_PER_MIN", "5")
-    )
+logger = logging.getLogger("app.cv_builder")
 
 
-    @router.get("/api/v1/fonts")
-    def list_fonts():
-        return {
-            "fonts": [
-                {"id": "arial", "name": "Arial", "ats_safe": True},
-                {"id": "calibri", "name": "Calibri", "ats_safe": True},
-                {"id": "times", "name": "Times New Roman", "ats_safe": True},
-                {"id": "helvetica", "name": "Helvetica", "ats_safe": True},
-            ]
-        }
+def _legacy(name: str):
+    return getattr(_main_module(), name)
 
 
-    @router.get("/api/v1/cv-builder/template-marketplace")
-    def cv_template_marketplace(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
-        db_user = current_db_user(user, db)
-        plan = resolve_effective_plan(db, db_user)
-        allowed = set(get_available_templates(plan))
-        catalog = [
-            ("classic", "Classic", "General", "Simple ATS-safe format for most roles.", ["ATS", "General", "Entry to senior"]),
-            ("modern", "Modern", "Product", "Clean hierarchy for SaaS, product, and operations roles.", ["SaaS", "Product", "Operations"]),
-            ("executive", "Executive", "Leadership", "Focused on impact, strategy, and leadership outcomes.", ["Leadership", "Director", "Executive"]),
-            ("professional", "Professional", "Corporate", "Conservative corporate layout with strong readability.", ["Finance", "Consulting", "Corporate"]),
-            ("creative", "Creative", "Portfolio", "A tasteful format for design, marketing, and portfolio-led roles.", ["Design", "Marketing", "Portfolio"]),
-            ("corporate", "Corporate", "Enterprise", "Enterprise-ready template for formal hiring processes.", ["Enterprise", "Procurement", "Operations"]),
-            ("tech", "Tech", "Engineering", "Dense technical skills and project-friendly structure.", ["Engineering", "Data", "Security"]),
-            ("consulting", "Consulting", "Consulting", "Case-impact focused structure for consulting applications.", ["Consulting", "Strategy", "MBA"]),
-        ]
-        return {
-            "plan": plan,
-            "templates": [
-                {
-                    "id": template_id,
-                    "name": name,
-                    "category": category,
-                    "description": description,
-                    "best_for": tags,
-                    "available": template_id in allowed,
-                }
-                for template_id, name, category, description, tags in catalog
-            ],
-        }
+def get_or_create_user(*args, **kwargs):
+    return _legacy("get_or_create_user")(*args, **kwargs)
 
 
-    @router.get("/api/v1/cv-builder/templates")
-    def cv_builder_templates(
-        request: Request,
-        user=Depends(verify_supabase_jwt),
-        db=Depends(get_db),
-    ):
-        """Return available CV templates for the user's plan."""
-        ensure_not_expired(user)
-
-        if mock_services_on:
-            # Even in mock mode, respect actual user plan for templates
-            supabase_id = user.get("user_id")
-            email = user.get("email") 
-            db_user = get_or_create_user(db, supabase_id, email)
-            plan = resolve_effective_plan(db, db_user)
-            # Fallback to free if no plan resolved
-            if not plan or plan == "unknown":
-                plan = "free"
-        else:
-            supabase_id = user.get("user_id")
-            email = user.get("email")
-            db_user = get_or_create_user(db, supabase_id, email)
-            plan = resolve_effective_plan(db, db_user)
-
-        templates = get_available_templates(plan)
-        return {
-            "templates": templates,
-            "plan": plan,
-        }
+def _ensure_not_expired(*args, **kwargs):
+    return _legacy("_ensure_not_expired")(*args, **kwargs)
 
 
-    @router.post("/api/v1/cv-builder/generate")
-    @rate_limit(f"{RATE_LIMIT_IP_CV_BUILDER_PER_MIN}/minute")
-    async def cv_builder_generate(
-        request: Request,
-        response: Response,
-        body: CVBuilderRequest,
-        _: None = Depends(require_captcha),
-        __: None = Depends(require_abuse_check),
-        user=Depends(verify_supabase_jwt),
-        db=Depends(get_db),
-    ):
-        """
-        Generate an ATS-optimized CV document (DOCX or PDF).
-        Uses the same daily quota as analyze-pdf.
-        """
-        from fastapi.responses import StreamingResponse
+def _resolve_effective_plan(*args, **kwargs):
+    return _legacy("_resolve_effective_plan")(*args, **kwargs)
 
-        ensure_not_expired(user)
-        metric_request("cv-builder")
 
-        # Validate output format
-        if body.output_format not in ("docx", "pdf"):
-            raise HTTPException(status_code=400, detail="output_format must be 'docx' or 'pdf'")
+def _is_premium_plan(*args, **kwargs):
+    return _legacy("_is_premium_plan")(*args, **kwargs)
 
-        # Validate name
-        if not body.full_name or not body.full_name.strip():
-            raise HTTPException(status_code=400, detail="full_name is required")
 
-        # ---- MOCK MODE ----
-        if mock_services_on:
-            mock_user_id = (user or {}).get("user_id") if isinstance(user, dict) else None
-            if not mock_user_id:
-                mock_user_id = "mock-user"
-            mock_email = (user or {}).get("email") if isinstance(user, dict) else None
-            mock_db_user = get_or_create_user(db, str(mock_user_id), mock_email or "dev@example.com")
-            mock_plan = resolve_effective_plan(db, mock_db_user)
+def _consume_billable_usage(*args, **kwargs):
+    return _legacy("_consume_billable_usage")(*args, **kwargs)
 
-            user_throttle = consume_user_rate_limit(
-                str(mock_user_id), RATE_LIMIT_USER_CV_BUILDER_PER_MIN, "cv-builder"
-            )
-            if user_throttle is not None:
-                response.headers["X-User-RateLimit-Limit"] = str(user_throttle["limit"])
-                response.headers["X-User-RateLimit-Used"] = str(user_throttle["used"])
-                response.headers["X-User-RateLimit-Remaining"] = str(
-                    user_throttle["remaining"]
-                )
-                if not user_throttle["allowed"]:
-                    raise HTTPException(
-                        status_code=429,
-                        detail=f"User rate limit exceeded ({user_throttle['limit']}/minute)",
-                    )
 
-            # Premium users: unlimited CV generation (skip quota)
-            if not is_premium_plan(mock_plan):
-                redis_quota = consume_daily_quota(
-                    str(mock_user_id), limit=resolve_daily_limit_for_plan(mock_plan)
-                )
-                if redis_quota is not None:
-                    response.headers["X-Daily-Limit"] = str(redis_quota["limit"])
-                    response.headers["X-Daily-Used"] = str(redis_quota["used"])
-                    response.headers["X-Daily-Remaining"] = str(redis_quota["remaining"])
-                    if not redis_quota["allowed"]:
-                        raise HTTPException(
-                            status_code=403,
-                            detail=f"Daily limit reached ({redis_quota['limit']}/day)",
-                        )
+def audit_log(*args, **kwargs):
+    return _legacy("audit_log")(*args, **kwargs)
 
-            cv_data = body.model_dump()
-            result = build_cv(
-                cv_data=cv_data,
-                job_description=body.job_description,
-                template=body.template,
-                output_format=body.output_format,
-                lang=body.lang,
-                plan=mock_plan,
-            )
 
-            return StreamingResponse(
-                result["buffer"],
-                media_type=result["content_type"],
-                headers={
-                    "Content-Disposition": f'attachment; filename="{result["filename"]}"'
-                },
-            )
+def _max_response_body_bytes() -> int:
+    return int(getattr(_main_module(), "_MAX_RESPONSE_BODY_BYTES", 50 * 1024 * 1024))
 
-        # ---- NORMAL MODE ----
-        supabase_id = user.get("user_id")
-        email = user.get("email")
-        db_user = get_or_create_user(db, supabase_id, email)
-        effective_plan = resolve_effective_plan(db, db_user)
+router = APIRouter(tags=["cv-builder"])
 
-        # Per-user throttle
-        user_throttle = consume_user_rate_limit(
-            db_user.supabase_id or str(db_user.id),
-            RATE_LIMIT_USER_CV_BUILDER_PER_MIN,
-            "cv-builder",
-        )
-        if user_throttle is not None:
-            response.headers["X-User-RateLimit-Limit"] = str(user_throttle["limit"])
-            response.headers["X-User-RateLimit-Used"] = str(user_throttle["used"])
-            response.headers["X-User-RateLimit-Remaining"] = str(
-                user_throttle["remaining"]
-            )
-            if not user_throttle["allowed"]:
-                raise HTTPException(
-                    status_code=429,
-                    detail=f"User rate limit exceeded ({user_throttle['limit']}/minute)",
-                )
+class CVBuilderRequest(BaseModel):
+    full_name: str
+    email: str = ""
+    phone: str = ""
+    location: str = ""
+    linkedin: str = ""
+    summary: str = ""
+    experiences: list = []
+    education: list = []
+    skills: list = []
+    certifications: list = []
+    projects: list = []
+    languages: list = []
+    social_links: list = []
+    job_description: str = ""
+    template: str = "classic"
+    output_format: str = "docx"
+    lang: str = "en"
+    font_family: str = ""
 
-        # Daily quota (shared with analyze)
-        if db_user.last_reset is None or db_user.last_reset.date() < datetime.utcnow().date():
-            db_user.daily_usage = 0
-            db_user.last_reset = datetime.utcnow()
 
-        if db_user.role != "recruiter" and not is_premium_plan(effective_plan):
-            user_daily_limit = user_plan_limits_daily.get(
-                db_user.plan_type or "free", user_plan_limits_daily["free"]
-            )
-            redis_quota = consume_daily_quota(
-                db_user.supabase_id or str(db_user.id),
-                limit=resolve_daily_limit_for_plan(db_user.plan_type),
-            )
-            if redis_quota is not None:
-                response.headers["X-Daily-Limit"] = str(redis_quota["limit"])
-                response.headers["X-Daily-Used"] = str(redis_quota["used"])
-                response.headers["X-Daily-Remaining"] = str(redis_quota["remaining"])
-                if not redis_quota["allowed"]:
-                    raise HTTPException(
-                        status_code=403,
-                        detail=f"Daily limit reached ({redis_quota['limit']}/day)",
-                    )
-            elif (db_user.daily_usage or 0) >= user_daily_limit:
-                raise HTTPException(status_code=403, detail="Daily quota exceeded")
+class CVSummarySuggestRequest(BaseModel):
+    summary: str
+    job_description: str = ""
+    lang: str = "en"
+    count: int = 3
 
-            db_user.daily_usage = (db_user.daily_usage or 0) + 1
-            db_user.monthly_usage = (db_user.monthly_usage or 0) + 1
-            db.add(db_user)
-            db.commit()
 
-        # Build the CV
-        cv_data = body.model_dump()
+def _cv_builder_payload(body: CVBuilderRequest) -> dict:
+    """Convert CV builder request models into the dict expected by the renderer."""
+    data = body.model_dump()
+    data["experiences"] = data.get("experiences") or []
+    data["projects"] = data.get("projects") or []
+    data["languages"] = data.get("languages") or []
+    data["language"] = data.get("lang") or "en"
+    data["template"] = body.template
+    data["output_format"] = body.output_format
+    return data
+
+
+def _resolve_request_user(db, user_payload: dict) -> User:
+    supabase_id = user_payload.get("user_id")
+    email = user_payload.get("email")
+    if not supabase_id:
+        raise HTTPException(status_code=401, detail="Invalid user payload")
+    return get_or_create_user(db, supabase_id, email)
+
+
+@router.get("/api/v1/cv-builder/templates")
+def cv_builder_templates(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
+    _ensure_not_expired(user)
+    db_user = _resolve_request_user(db, user)
+    plan = _resolve_effective_plan(db, db_user)
+    templates = get_available_templates(plan)
+    return {"plan": plan, "templates": templates}
+
+
+@router.get("/api/v1/cv-builder/template-marketplace")
+def cv_builder_template_marketplace(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
+    _ensure_not_expired(user)
+    db_user = _resolve_request_user(db, user)
+    plan = _resolve_effective_plan(db, db_user)
+    available = set(get_available_templates(plan))
+    catalog = [
+        {
+            "id": "classic",
+            "name": "Classic ATS",
+            "category": "ATS",
+            "best_for": ["software", "engineering", "operations"],
+            "description": "Single-column, high compatibility template for applicant tracking systems.",
+            "available": "classic" in available,
+        },
+        {
+            "id": "modern",
+            "name": "Modern Compact",
+            "category": "General",
+            "best_for": ["early-career", "product", "business"],
+            "description": "Compact layout for stronger scanability without decorative columns.",
+            "available": "modern" in available,
+        },
+        {
+            "id": "executive",
+            "name": "Executive",
+            "category": "Leadership",
+            "best_for": ["manager", "director", "senior"],
+            "description": "Achievement-forward layout for leadership and senior profiles.",
+            "available": "executive" in available,
+        },
+    ]
+    return {"plan": plan, "templates": catalog}
+
+
+@router.post("/api/v1/cv-builder/preview")
+def cv_builder_preview(
+    body: CVBuilderRequest,
+    user=Depends(verify_supabase_jwt),
+    db=Depends(get_db),
+):
+    _ensure_not_expired(user)
+    db_user = _resolve_request_user(db, user)
+    plan = _resolve_effective_plan(db, db_user)
+
+    payload = _cv_builder_payload(body)
+    cv_model = compile_cv_model(payload)
+    template = body.template if body.template in get_available_templates(plan) else "classic"
+    return {
+        "template": template,
+        "enhanced_data": cv_model.model_dump(),
+        "cache_hit": False,
+    }
+
+
+@router.post("/api/v1/cv-builder/preview-html")
+def cv_builder_preview_html(
+    body: CVBuilderRequest,
+    user=Depends(verify_supabase_jwt),
+    db=Depends(get_db),
+):
+    _ensure_not_expired(user)
+    _resolve_request_user(db, user)
+
+    payload = _cv_builder_payload(body)
+    cv_model = compile_cv_model(payload)
+    try:
+        from renderers.preview_renderer import render_html_preview
+
+        html = render_html_preview(cv_model, body.template, font_override=body.font_family)
+    except Exception:
+        logger.exception("CV builder HTML preview failed")
+        raise HTTPException(status_code=500, detail="CV preview failed")
+
+    return {
+        "template": body.template,
+        "html": html,
+        "enhanced_data": cv_model.model_dump(),
+    }
+
+
+@router.post("/api/v1/cv-builder/generate")
+def cv_builder_generate(
+    body: CVBuilderRequest,
+    response: Response,
+    user=Depends(verify_supabase_jwt),
+    db=Depends(get_db),
+):
+    _ensure_not_expired(user)
+    if body.output_format not in ("docx", "pdf", "html", "typst"):
+        raise HTTPException(status_code=400, detail="Unsupported output_format")
+
+    db_user = _resolve_request_user(db, user)
+    plan = _resolve_effective_plan(db, db_user)
+    font_family = body.font_family if _is_premium_plan(plan) else ""
+    _consume_billable_usage(db, db_user, "cv-builder-generate", response=response)
+
+    try:
         result = build_cv(
-            cv_data=cv_data,
-            job_description=body.job_description,
+            cv_data=_cv_builder_payload(body),
+            job_description=body.job_description or "",
             template=body.template,
             output_format=body.output_format,
             lang=body.lang,
-            plan=effective_plan,
+            plan=plan,
+            font_family=font_family,
         )
+    except RuntimeError as exc:
+        if "overloaded" in str(exc).lower():
+            raise HTTPException(status_code=503, detail=str(exc))
+        raise HTTPException(status_code=500, detail="CV generation failed")
+    except Exception:
+        logger.exception("CV builder generation failed")
+        raise HTTPException(status_code=500, detail="CV generation failed")
 
-        response_stream = StreamingResponse(
-            result["buffer"],
-            media_type=result["content_type"],
-            headers={
-                "Content-Disposition": f'attachment; filename="{result["filename"]}"'
-            },
+    buf = result["buffer"]
+    if hasattr(buf, "getbuffer") and buf.getbuffer().nbytes > _max_response_body_bytes():
+        raise HTTPException(status_code=413, detail="Generated file too large")
+
+    try:
+        audit_log(
+            "cv_builder_generate",
+            user_id=db_user.id,
+            organization_id=db_user.organization_id,
+            output_format=body.output_format,
+            template=body.template,
+            plan=plan,
         )
+    except Exception:
+        pass
 
-        try:
-            audit_log(
-                "cv_builder_generate",
-                user_id=db_user.id,
-                organization_id=db_user.organization_id,
-                output_format=body.output_format,
-                template=body.template,
-                plan=effective_plan,
-            )
-        except Exception:
-            pass
-
-        return response_stream
+    return StreamingResponse(
+        buf,
+        media_type=result["content_type"],
+        headers={"Content-Disposition": f'attachment; filename="{result["filename"]}"'},
+    )
 
 
-    @router.post("/api/v1/cv-builder/preview")
-    @rate_limit(f"{RATE_LIMIT_IP_CV_BUILDER_PER_MIN}/minute")
-    async def cv_builder_preview(
-        request: Request,
-        response: Response,
-        body: CVBuilderRequest,
-        user=Depends(verify_supabase_jwt),
-        db=Depends(get_db),
-    ):
-        """
-        Preview: enhance CV data with AI and return structured JSON
-        (no document generation, no quota consumption).
-        """
-        ensure_not_expired(user)
+@router.post("/api/v1/cv-builder/suggest-summary")
+def cv_builder_suggest_summary(
+    body: CVSummarySuggestRequest,
+    response: Response,
+    user=Depends(verify_supabase_jwt),
+    db=Depends(get_db),
+):
+    _ensure_not_expired(user)
+    db_user = _resolve_request_user(db, user)
+    plan = _ensure_ai_rewrite_allowed(db, db_user)
+    _consume_billable_usage(db, db_user, "cv-builder-suggest-summary", response=response)
 
-        if mock_services_on:
-            plan = "free"
-        else:
-            supabase_id = user.get("user_id")
-            email = user.get("email")
-            db_user = get_or_create_user(db, supabase_id, email)
-            plan = resolve_effective_plan(db, db_user)
+    count = max(1, min(int(body.count or 3), 5))
+    try:
+        suggestions = rewrite_service.suggest_summaries(
+            summary=body.summary,
+            job_description=body.job_description or "",
+            lang=body.lang,
+            count=count,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
-        from services.cv_builder_service import _enhance_cv_with_ai, _mock_enhance
+    return {"suggestions": suggestions, "plan": plan}
 
-        cv_data = body.model_dump()
-        if mock_services_on:
-            enhanced = _mock_enhance(cv_data, body.job_description, body.lang)
-        else:
-            enhanced = _enhance_cv_with_ai(cv_data, body.job_description, body.lang)
 
-        # Remove non-serializable fields
-        enhanced.pop("buffer", None)
-
-        return {
-            "enhanced_data": enhanced,
-            "available_templates": get_available_templates(plan),
-            "plan": plan,
-        }
-
-    return router

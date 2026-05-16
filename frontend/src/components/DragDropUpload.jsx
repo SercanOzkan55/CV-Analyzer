@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react'
 import { useLanguage } from '../i18n/LanguageContext'
-import { CV_UPLOAD_ACCEPT, isSupportedCvUpload } from '../utils/fileTypes'
 
 export default function DragDropUpload({ onFileSelect, file, onRemove }) {
   const { t } = useLanguage()
@@ -11,7 +10,7 @@ export default function DragDropUpload({ onFileSelect, file, onRemove }) {
     e.preventDefault()
     setDragOver(false)
     const dropped = e.dataTransfer.files[0]
-    if (isSupportedCvUpload(dropped)) {
+    if (dropped?.type === 'application/pdf') {
       onFileSelect(dropped)
     }
   }
@@ -45,7 +44,7 @@ export default function DragDropUpload({ onFileSelect, file, onRemove }) {
       <input
         ref={inputRef}
         type="file"
-        accept={CV_UPLOAD_ACCEPT}
+        accept="application/pdf"
         onChange={handleInputChange}
         hidden
       />

@@ -1,113 +1,33 @@
-# Frontend Implementation Skill
+---
+name: frontend-implementation
+description: Frontend Implementation Agent workflow for applying small, safe, design-system-aligned UI changes in React/Vite applications. Use when Codex needs to implement UI improvements after design review without redesigning the product.
+---
 
-Use this skill when implementing frontend UI, routing, shared components, page styles, API wrappers, responsive behavior, or product polish.
+# Frontend Implementation Agent
 
-## Role
+Implement only high-confidence changes that align with the existing design system and reduce risk.
 
-Act as a senior frontend engineer working in an existing production app.
+## Operating Rules
 
-## Mission
+- Read nearby components, CSS, tokens, and tests before editing.
+- Prefer existing components, CSS variables, spacing scale, icons, and interaction patterns.
+- Keep changes narrow: fix layout, accessibility, copy clarity, responsive behavior, or obvious visual consistency issues.
+- Avoid broad redesigns, new dependencies, theme rewrites, and unrelated refactors.
+- Preserve existing user flows and API contracts.
 
-Implement safe, design-system-aligned improvements while preserving all existing functionality.
+## Implementation Checklist
 
-## Core Rules
+1. Locate the smallest component/style surface that owns the issue.
+2. Check existing class names, design tokens, responsive breakpoints, and shared components.
+3. Make the minimal change that solves the issue across desktop and mobile.
+4. Add or update focused tests when behavior, routing, accessibility, or component contracts change.
+5. Run the appropriate validation commands from `AGENTS.md`.
 
-- Do not remove features.
-- Do not rewrite the whole app.
-- Do not introduce unnecessary dependencies.
-- Use existing React/Vite patterns.
-- Keep API calls centralized in `frontend/src/api.js`.
-- Keep shared logic in utilities/components.
-- Preserve business logic, auth behavior, routing, and backend contracts.
-- If backend changes are needed, use the backend modularization skill and do not add feature logic to `main.py`.
+## Output
 
-## Shared Ownership
+Report:
 
-Use shared files for repeated behavior:
-
-- File upload types: `frontend/src/utils/fileTypes.js`.
-- Score/status colors: shared utility or token file.
-- Route/API calls: `frontend/src/api.js`.
-- Shared UI states: reusable components.
-- Translations: `frontend/src/i18n/*.json`.
-
-Avoid duplicating:
-
-- Accepted file extensions.
-- Hard-coded status colors.
-- Button/card/table styling.
-- Empty/loading/error state markup.
-
-## UI Implementation Checklist
-
-Before editing:
-
-- Identify affected routes/pages.
-- Identify shared components.
-- Identify existing CSS/tokens.
-- Check whether a central fix solves multiple pages.
-
-During editing:
-
-- Keep changes scoped.
-- Prefer shared component improvements.
-- Keep responsive layouts stable.
-- Keep text from overflowing.
-- Preserve keyboard focus states.
-- Respect `prefers-reduced-motion`.
-
-After editing:
-
-```bash
-cd frontend
-npm test
-npm run build
-```
-
-If backend API contracts are touched:
-
-```bash
-python -m pytest
-```
-
-## Navigation Rules
-
-Do not crowd the top navbar.
-
-Use:
-- Primary nav for core workflows.
-- Menus/secondary nav for less frequent tools.
-- Authenticated layout for product screens.
-
-Do not:
-- Add every page as a top-level nav item.
-- Remove Blog/Cover Letter/Career Studio/Compare/CV Builder/Recruiter tools to simplify layout.
-
-## Visual Rules
-
-Prefer:
-
-- Clean light theme.
-- Consistent spacing.
-- Clear card hierarchy.
-- Subtle hover/focus/active states.
-- Fast, purposeful transitions.
-- Accessible contrast.
-
-Avoid:
-
-- Hard-coded one-off colors.
-- Excessive gradients.
-- Heavy shadows.
-- Decorative animations everywhere.
-- Nested cards.
-- Huge hero-style UI in operational screens.
-
-## Output Requirement
-
-Final response must include:
-
-- Screens/components changed.
-- Shared utilities/components updated.
-- Commands run and results.
-- Remaining UI risks or recommendations.
+- Files changed.
+- Why each change is safe.
+- Validation commands run and their results.
+- Any deferred design questions.

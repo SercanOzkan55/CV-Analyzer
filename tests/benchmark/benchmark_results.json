@@ -1,0 +1,603 @@
+{
+  "timestamp": "2026-04-22T22:27:56",
+  "dataset_version": "1.0.0",
+  "results": [
+    {
+      "id": "B001",
+      "name": "Senior Python Dev - Perfect Match",
+      "category": "high_match",
+      "scores": {
+        "keyword_score": 74.27,
+        "ats_overall": 89.72,
+        "final_score": 90.41,
+        "content_score": 67.9,
+        "keyword_coverage_pct": 81.82,
+        "missing_keywords_count": 3,
+        "strong_keywords_count": 10,
+        "weak_keywords_count": 9
+      },
+      "timing_ms": {
+        "keyword": 292.2,
+        "compare": 1.3,
+        "ats": 355.1,
+        "final": 0.0,
+        "total": 648.6
+      },
+      "checks": {
+        "keyword_score": {
+          "actual": 74.27,
+          "expected_min": 60,
+          "expected_max": 100,
+          "in_range": true,
+          "range_error": 0.0
+        },
+        "ats_score": {
+          "actual": 89.72,
+          "expected_min": 75,
+          "expected_max": 100,
+          "in_range": true,
+          "range_error": 0.0
+        },
+        "final_score": {
+          "actual": 90.41,
+          "expected_min": 75,
+          "expected_max": 100,
+          "in_range": true,
+          "range_error": 0.0
+        }
+      },
+      "errors": {
+        "keyword_score": 0.0,
+        "ats_score": 0.0,
+        "final_score": 0.0
+      }
+    },
+    {
+      "id": "B002",
+      "name": "Junior Frontend Dev - Role Mismatch",
+      "category": "low_match",
+      "scores": {
+        "keyword_score": 8.92,
+        "ats_overall": 69.1,
+        "final_score": 62.77,
+        "content_score": 10.55,
+        "keyword_coverage_pct": 0.0,
+        "missing_keywords_count": 19,
+        "strong_keywords_count": 0,
+        "weak_keywords_count": 3
+      },
+      "timing_ms": {
+        "keyword": 227.5,
+        "compare": 2.0,
+        "ats": 242.8,
+        "final": 0.0,
+        "total": 472.4
+      },
+      "checks": {
+        "keyword_score": {
+          "actual": 8.92,
+          "expected_min": 0,
+          "expected_max": 25,
+          "in_range": true,
+          "range_error": 0.0
+        },
+        "ats_score": {
+          "actual": 69.1,
+          "expected_min": 50,
+          "expected_max": 85,
+          "in_range": true,
+          "range_error": 0.0
+        },
+        "final_score": {
+          "actual": 62.77,
+          "expected_min": 30,
+          "expected_max": 65,
+          "in_range": true,
+          "range_error": 0.0
+        }
+      },
+      "errors": {
+        "keyword_score": 0.0,
+        "ats_score": 0.0,
+        "final_score": 0.0
+      }
+    },
+    {
+      "id": "B003",
+      "name": "Data Scientist - Moderate Match",
+      "category": "medium_match",
+      "scores": {
+        "keyword_score": 50.96,
+        "ats_overall": 82.77,
+        "final_score": 81.77,
+        "content_score": 44.58,
+        "keyword_coverage_pct": 55.56,
+        "missing_keywords_count": 9,
+        "strong_keywords_count": 8,
+        "weak_keywords_count": 10
+      },
+      "timing_ms": {
+        "keyword": 471.7,
+        "compare": 2.1,
+        "ats": 525.1,
+        "final": 0.0,
+        "total": 998.9
+      },
+      "checks": {
+        "keyword_score": {
+          "actual": 50.96,
+          "expected_min": 40,
+          "expected_max": 75,
+          "in_range": true,
+          "range_error": 0.0
+        },
+        "ats_score": {
+          "actual": 82.77,
+          "expected_min": 70,
+          "expected_max": 95,
+          "in_range": true,
+          "range_error": 0.0
+        },
+        "final_score": {
+          "actual": 81.77,
+          "expected_min": 65,
+          "expected_max": 90,
+          "in_range": true,
+          "range_error": 0.0
+        }
+      },
+      "errors": {
+        "keyword_score": 0.0,
+        "ats_score": 0.0,
+        "final_score": 0.0
+      }
+    },
+    {
+      "id": "B004",
+      "name": "Fresh Graduate - No Experience",
+      "category": "entry_level",
+      "scores": {
+        "keyword_score": 22.93,
+        "ats_overall": 45.16,
+        "final_score": 34.78,
+        "content_score": 13.76,
+        "keyword_coverage_pct": 33.33,
+        "missing_keywords_count": 12,
+        "strong_keywords_count": 0,
+        "weak_keywords_count": 6
+      },
+      "timing_ms": {
+        "keyword": 89.6,
+        "compare": 1.3,
+        "ats": 117.7,
+        "final": 0.0,
+        "total": 208.6
+      },
+      "checks": {
+        "keyword_score": {
+          "actual": 22.93,
+          "expected_min": 15,
+          "expected_max": 55,
+          "in_range": true,
+          "range_error": 0.0
+        },
+        "ats_score": {
+          "actual": 45.16,
+          "expected_min": 35,
+          "expected_max": 75,
+          "in_range": true,
+          "range_error": 0.0
+        },
+        "final_score": {
+          "actual": 34.78,
+          "expected_min": 25,
+          "expected_max": 65,
+          "in_range": true,
+          "range_error": 0.0
+        }
+      },
+      "errors": {
+        "keyword_score": 0.0,
+        "ats_score": 0.0,
+        "final_score": 0.0
+      }
+    },
+    {
+      "id": "B005",
+      "name": "Overqualified Manager - Mismatch Level",
+      "category": "overqualified",
+      "scores": {
+        "keyword_score": 19.17,
+        "ats_overall": 78.66,
+        "final_score": 76.81,
+        "content_score": 45.9,
+        "keyword_coverage_pct": 22.22,
+        "missing_keywords_count": 13,
+        "strong_keywords_count": 2,
+        "weak_keywords_count": 3
+      },
+      "timing_ms": {
+        "keyword": 380.8,
+        "compare": 2.2,
+        "ats": 419.5,
+        "final": 0.0,
+        "total": 802.5
+      },
+      "checks": {
+        "keyword_score": {
+          "actual": 19.17,
+          "expected_min": 10,
+          "expected_max": 40,
+          "in_range": true,
+          "range_error": 0.0
+        },
+        "ats_score": {
+          "actual": 78.66,
+          "expected_min": 70,
+          "expected_max": 95,
+          "in_range": true,
+          "range_error": 0.0
+        },
+        "final_score": {
+          "actual": 76.81,
+          "expected_min": 40,
+          "expected_max": 85,
+          "in_range": true,
+          "range_error": 0.0
+        }
+      },
+      "errors": {
+        "keyword_score": 0.0,
+        "ats_score": 0.0,
+        "final_score": 0.0
+      }
+    },
+    {
+      "id": "B006",
+      "name": "Career Changer - Non-Tech to Tech",
+      "category": "career_change",
+      "scores": {
+        "keyword_score": 62.89,
+        "ats_overall": 82.43,
+        "final_score": 84.04,
+        "content_score": 59.73,
+        "keyword_coverage_pct": 75.0,
+        "missing_keywords_count": 4,
+        "strong_keywords_count": 5,
+        "weak_keywords_count": 7
+      },
+      "timing_ms": {
+        "keyword": 146.2,
+        "compare": 0.7,
+        "ats": 158.7,
+        "final": 0.0,
+        "total": 305.7
+      },
+      "checks": {
+        "keyword_score": {
+          "actual": 62.89,
+          "expected_min": 40,
+          "expected_max": 75,
+          "in_range": true,
+          "range_error": 0.0
+        },
+        "ats_score": {
+          "actual": 82.43,
+          "expected_min": 55,
+          "expected_max": 85,
+          "in_range": true,
+          "range_error": 0.0
+        },
+        "final_score": {
+          "actual": 84.04,
+          "expected_min": 50,
+          "expected_max": 90,
+          "in_range": true,
+          "range_error": 0.0
+        }
+      },
+      "errors": {
+        "keyword_score": 0.0,
+        "ats_score": 0.0,
+        "final_score": 0.0
+      }
+    },
+    {
+      "id": "B007",
+      "name": "Keyword Stuffed CV - Spam Detection",
+      "category": "spam",
+      "scores": {
+        "keyword_score": 85.11,
+        "ats_overall": 53.56,
+        "final_score": 54.15,
+        "content_score": 31.07,
+        "keyword_coverage_pct": 80.0,
+        "missing_keywords_count": 1,
+        "strong_keywords_count": 8,
+        "weak_keywords_count": 1
+      },
+      "timing_ms": {
+        "keyword": 7.2,
+        "compare": 0.2,
+        "ats": 15.0,
+        "final": 0.0,
+        "total": 22.5
+      },
+      "checks": {
+        "keyword_score": {
+          "actual": 85.11,
+          "expected_min": 50,
+          "expected_max": 100,
+          "in_range": true,
+          "range_error": 0.0
+        },
+        "ats_score": {
+          "actual": 53.56,
+          "expected_min": 20,
+          "expected_max": 55,
+          "in_range": true,
+          "range_error": 0.0
+        },
+        "final_score": {
+          "actual": 54.15,
+          "expected_min": 25,
+          "expected_max": 55,
+          "in_range": true,
+          "range_error": 0.0
+        }
+      },
+      "errors": {
+        "keyword_score": 0.0,
+        "ats_score": 0.0,
+        "final_score": 0.0
+      }
+    },
+    {
+      "id": "B008",
+      "name": "Minimal CV - Missing Sections",
+      "category": "minimal",
+      "scores": {
+        "keyword_score": 22.14,
+        "ats_overall": 38.87,
+        "final_score": 32.72,
+        "content_score": 13.28,
+        "keyword_coverage_pct": 28.57,
+        "missing_keywords_count": 5,
+        "strong_keywords_count": 0,
+        "weak_keywords_count": 2
+      },
+      "timing_ms": {
+        "keyword": 3.9,
+        "compare": 0.2,
+        "ats": 4.0,
+        "final": 0.0,
+        "total": 8.1
+      },
+      "checks": {
+        "keyword_score": {
+          "actual": 22.14,
+          "expected_min": 15,
+          "expected_max": 50,
+          "in_range": true,
+          "range_error": 0.0
+        },
+        "ats_score": {
+          "actual": 38.87,
+          "expected_min": 15,
+          "expected_max": 45,
+          "in_range": true,
+          "range_error": 0.0
+        },
+        "final_score": {
+          "actual": 32.72,
+          "expected_min": 15,
+          "expected_max": 50,
+          "in_range": true,
+          "range_error": 0.0
+        }
+      },
+      "errors": {
+        "keyword_score": 0.0,
+        "ats_score": 0.0,
+        "final_score": 0.0
+      }
+    },
+    {
+      "id": "B009",
+      "name": "No JD - Standalone CV Analysis",
+      "category": "no_jd",
+      "scores": {
+        "keyword_score": 0.0,
+        "ats_overall": 87.39,
+        "final_score": 87.86,
+        "content_score": 43.67,
+        "keyword_coverage_pct": 0.0,
+        "missing_keywords_count": 0,
+        "strong_keywords_count": 0,
+        "weak_keywords_count": 0
+      },
+      "timing_ms": {
+        "keyword": 0.0,
+        "compare": 0.0,
+        "ats": 3.2,
+        "final": 0.0,
+        "total": 3.2
+      },
+      "checks": {
+        "keyword_score": {
+          "actual": 0.0,
+          "expected_min": 0,
+          "expected_max": 0,
+          "in_range": true,
+          "range_error": 0.0
+        },
+        "ats_score": {
+          "actual": 87.39,
+          "expected_min": 70,
+          "expected_max": 95,
+          "in_range": true,
+          "range_error": 0.0
+        },
+        "final_score": {
+          "actual": 87.86,
+          "expected_min": 65,
+          "expected_max": 95,
+          "in_range": true,
+          "range_error": 0.0
+        }
+      },
+      "errors": {
+        "keyword_score": 0.0,
+        "ats_score": 0.0,
+        "final_score": 0.0
+      }
+    },
+    {
+      "id": "B010",
+      "name": "Turkish CV - Backend Developer JD",
+      "category": "multilingual",
+      "scores": {
+        "keyword_score": 23.45,
+        "ats_overall": 47.24,
+        "final_score": 35.2,
+        "content_score": 14.07,
+        "keyword_coverage_pct": 23.53,
+        "missing_keywords_count": 37,
+        "strong_keywords_count": 8,
+        "weak_keywords_count": 6
+      },
+      "timing_ms": {
+        "keyword": 690.6,
+        "compare": 4.7,
+        "ats": 812.4,
+        "final": 0.0,
+        "total": 1507.7
+      },
+      "checks": {
+        "keyword_score": {
+          "actual": 23.45,
+          "expected_min": 15,
+          "expected_max": 50,
+          "in_range": true,
+          "range_error": 0.0
+        },
+        "ats_score": {
+          "actual": 47.24,
+          "expected_min": 35,
+          "expected_max": 65,
+          "in_range": true,
+          "range_error": 0.0
+        },
+        "final_score": {
+          "actual": 35.2,
+          "expected_min": 25,
+          "expected_max": 55,
+          "in_range": true,
+          "range_error": 0.0
+        }
+      },
+      "errors": {
+        "keyword_score": 0.0,
+        "ats_score": 0.0,
+        "final_score": 0.0
+      }
+    }
+  ],
+  "report": {
+    "summary": {
+      "total_entries": 10,
+      "all_metrics_in_range": 10,
+      "overall_pass_rate_pct": 100.0
+    },
+    "metrics": {
+      "keyword_score": {
+        "mae": 0.0,
+        "mse": 0.0,
+        "rmse": 0.0,
+        "in_range_count": 10,
+        "total_checked": 10,
+        "in_range_pct": 100.0
+      },
+      "ats_score": {
+        "mae": 0.0,
+        "mse": 0.0,
+        "rmse": 0.0,
+        "in_range_count": 10,
+        "total_checked": 10,
+        "in_range_pct": 100.0
+      },
+      "final_score": {
+        "mae": 0.0,
+        "mse": 0.0,
+        "rmse": 0.0,
+        "in_range_count": 10,
+        "total_checked": 10,
+        "in_range_pct": 100.0
+      }
+    },
+    "category_breakdown": {
+      "high_match": {
+        "total": 1,
+        "all_in_range": 1,
+        "pass_rate_pct": 100.0
+      },
+      "low_match": {
+        "total": 1,
+        "all_in_range": 1,
+        "pass_rate_pct": 100.0
+      },
+      "medium_match": {
+        "total": 1,
+        "all_in_range": 1,
+        "pass_rate_pct": 100.0
+      },
+      "entry_level": {
+        "total": 1,
+        "all_in_range": 1,
+        "pass_rate_pct": 100.0
+      },
+      "overqualified": {
+        "total": 1,
+        "all_in_range": 1,
+        "pass_rate_pct": 100.0
+      },
+      "career_change": {
+        "total": 1,
+        "all_in_range": 1,
+        "pass_rate_pct": 100.0
+      },
+      "spam": {
+        "total": 1,
+        "all_in_range": 1,
+        "pass_rate_pct": 100.0
+      },
+      "minimal": {
+        "total": 1,
+        "all_in_range": 1,
+        "pass_rate_pct": 100.0
+      },
+      "no_jd": {
+        "total": 1,
+        "all_in_range": 1,
+        "pass_rate_pct": 100.0
+      },
+      "multilingual": {
+        "total": 1,
+        "all_in_range": 1,
+        "pass_rate_pct": 100.0
+      }
+    },
+    "keyword_coverage_distribution": {
+      "mean": 50.0,
+      "min": 22.22,
+      "max": 81.82,
+      "count": 8
+    },
+    "timing": {
+      "avg_ms": 497.8,
+      "max_ms": 1507.7,
+      "min_ms": 3.2
+    },
+    "failures": []
+  }
+}

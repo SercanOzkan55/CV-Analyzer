@@ -17,6 +17,11 @@ _PLAN_DEFAULTS = {
         "ai_rewrite": True,
         "recruiter_dashboard": True,
     },
+    "admin": {
+        "daily_cv_limit": 999999,
+        "ai_rewrite": True,
+        "recruiter_dashboard": True,
+    },
 }
 
 

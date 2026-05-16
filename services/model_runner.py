@@ -43,6 +43,26 @@ def explain_prediction(model, features):
         "semantic_skill_interaction",
         "keyword_skill_interaction",
         "balance_score",
+        "bullet_score",
+        "section_count",
+        "section_presence_score",
+        "formatting_score",
+        "length_score",
+        "contact_score",
+        "action_verb_score",
+        "achievement_score",
+        "has_summary",
+        "has_skills",
+        "has_experience",
+        "has_education",
+        "has_projects",
+        "domain_similarity",
+        "title_match",
+        "seniority_match",
+        "soft_skill_score",
+        "readability_score",
+        "keyword_density",
+        "education_quality",
     ]
     importances = getattr(model, "feature_importances_", None)
     if importances is None:
@@ -88,14 +108,31 @@ def main():
         model = joblib.load(model_path)
 
         trees = getattr(model, "estimators_", None)
-        if not trees:
-            # fallback: try predict directly
-            pred = float(model.predict([features])[0])
-            std = 0.0
-        else:
+        if trees:
+            # RandomForest: per-tree prediction for confidence
             preds = [tree.predict([features])[0] for tree in trees]
             pred = float(np.mean(preds))
             std = float(np.std(preds))
+        else:
+            # XGBoost or other model: single prediction
+            pred = float(model.predict([features])[0])
+            std = 0.0
+            # If XGBoost, try to get prediction variance from iteration results
+            if hasattr(model, "get_booster"):
+                try:
+                    import xgboost as xgb
+
+                    dmat = xgb.DMatrix([features])
+                    n_trees = model.get_booster().num_boosted_rounds()
+                    if n_trees > 10:
+                        early_pred = float(
+                            model.get_booster().predict(
+                                dmat, iteration_range=(0, n_trees // 2)
+                            )[0]
+                        )
+                        std = abs(pred - early_pred) * 0.5
+                except Exception:
+                    pass
 
         confidence = calibrate_confidence(std)
         risk = get_risk_level(pred, confidence)

@@ -1,0 +1,168 @@
+### Recruiter API Batch Upload & WebSocket Tests
+### REST Client for testing recruiter endpoints
+
+@baseUrl = http://localhost:8001/api/v1/recruiter
+@authToken = Bearer YOUR_JWT_TOKEN
+@orgId = 1
+@jobId = 1
+@taskId = placeholder_task_id
+
+###
+### SETUP: Get Auth Token (if needed)
+POST http://localhost:8001/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "recruiter@example.com",
+  "password": "password"
+}
+
+###
+### TEST 1: List Jobs (Pagination)
+GET @baseUrl/jobs?limit=10&offset=0
+Authorization: @authToken
+Content-Type: application/json
+
+###
+### TEST 2: Get Candidates with Pagination
+GET @baseUrl/candidates?limit=20&offset=0
+Authorization: @authToken
+Content-Type: application/json
+
+###
+### TEST 3: Test Pagination Limit Validation (should pass for 1-1000)
+GET @baseUrl/candidates?limit=500&offset=0
+Authorization: @authToken
+Content-Type: application/json
+
+###
+### TEST 4: Test Pagination Limit Validation (should fail for >1000)
+GET @baseUrl/candidates?limit=1500&offset=0
+Authorization: @authToken
+Content-Type: application/json
+
+###
+### TEST 5: Search with Pagination
+GET @baseUrl/search?query=python&limit=50&offset=0&job_id=1
+Authorization: @authToken
+Content-Type: application/json
+
+###
+### TEST 6: Export Candidates as CSV
+GET @baseUrl/export/candidates?format=csv
+Authorization: @authToken
+Content-Type: application/json
+
+###
+### TEST 7: Export Candidates as JSON
+GET @baseUrl/export/candidates?format=json
+Authorization: @authToken
+Content-Type: application/json
+
+###
+### TEST 8: Export Rankings as CSV
+GET @baseUrl/export/rankings?format=csv&job_id=1
+Authorization: @authToken
+Content-Type: application/json
+
+###
+### TEST 9: Export Rankings as JSON
+GET @baseUrl/export/rankings?format=json&job_id=1
+Authorization: @authToken
+Content-Type: application/json
+
+###
+### TEST 10: Bulk Email Endpoint (Email Validation)
+POST @baseUrl/send-email-bulk
+Authorization: @authToken
+Content-Type: application/json
+
+{
+  "subject": "Job Opportunity",
+  "body": "We have an exciting opportunity for you",
+  "recipients": [
+    {
+      "candidate_id": 1,
+      "email": "candidate1@example.com"
+    },
+    {
+      "candidate_id": 2,
+      "email": "invalid-email"
+    }
+  ]
+}
+
+###
+### TEST 11: Bulk Email - Max Recipients (100 limit)
+POST @baseUrl/send-email-bulk
+Authorization: @authToken
+Content-Type: application/json
+
+{
+  "subject": "Bulk Test",
+  "body": "Testing bulk email with 101 recipients",
+  "recipients": [
+    {
+      "candidate_id": 1,
+      "email": "candidate1@example.com"
+    }
+  ]
+}
+
+###
+### TEST 12: Batch Upload CVs (Must be multipart form-data)
+### NOTE: This requires actual PDF files. Run via curl:
+### 
+### curl -X POST \
+###   -H "Authorization: Bearer YOUR_TOKEN" \
+###   -F "job_id=1" \
+###   -F "files=@/path/to/cv1.pdf" \
+###   -F "files=@/path/to/cv2.pdf" \
+###   http://localhost:8001/api/v1/recruiter/dashboard/batch-upload
+
+POST @baseUrl/dashboard/batch-upload
+Authorization: @authToken
+
+{
+  "job_id": 1,
+  "files": "Binary PDF files here"
+}
+
+###
+### TEST 13: WebSocket Batch Upload Progress
+### NOTE: This requires WebSocket client. 
+### 
+### Via JavaScript:
+### 
+### const ws = new WebSocket('ws://localhost:8001/api/v1/recruiter/ws/batch-upload/YOUR_TASK_ID');
+### ws.onmessage = (event) => {
+###   const data = JSON.parse(event.data);
+###   console.log('Progress:', data);
+###   // Expected: { status, processed, total, percent, current_file, error? }
+### };
+
+GRAPHQL ws://localhost:8001/api/v1/recruiter/ws/batch-upload/@taskId
+
+###
+### TEST 14: Rate Limiting Check (60 requests/minute)
+GET @baseUrl/candidates
+Authorization: @authToken
+
+# Make multiple requests quickly to trigger 429 Too Many Requests
+
+###
+### TEST 15: Permission Check (Cross-org isolation)
+GET @baseUrl/candidates
+Authorization: Bearer DIFFERENT_ORG_TOKEN
+
+# Should not return candidates from different organization
+
+###
+### NOTES:
+### - All GET endpoints support pagination: ?limit=1-1000&offset=0+
+### - Rate limiting: 60 requests/minute per endpoint
+### - Batch upload: Max 50 files, 5MB per file, PDF/TXT/DOCX only
+### - WebSocket: Auto-closes when status = SUCCESS or FAILURE
+### - All timestamps in UTC ISO 8601 format
+### - Error responses include 'detail' field with error message
+
