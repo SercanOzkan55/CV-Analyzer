@@ -27,7 +27,7 @@ export default function SettingsPage() {
   const isBillingAdmin = !!user?.email && billingAdminEmails.includes(String(user.email).toLowerCase())
 
   useEffect(() => {
-    document.title = `${t('nav.settings')} - CV Analyzer`
+    document.title = `${t('nav.settings')} — CV Analyzer`
   }, [t])
 
   async function handlePasswordChange(e) {
@@ -129,11 +129,11 @@ export default function SettingsPage() {
               <div className="radio-group">
                 <label className={`radio-option ${lang === 'en' ? 'active' : ''}`}>
                   <input type="radio" name="lang" value="en" checked={lang === 'en'} onChange={() => setLang('en')} />
-                  EN English
+                  🇬🇧 English
                 </label>
                 <label className={`radio-option ${lang === 'tr' ? 'active' : ''}`}>
                   <input type="radio" name="lang" value="tr" checked={lang === 'tr'} onChange={() => setLang('tr')} />
-                  TR Turkce
+                  🇹🇷 Türkçe
                 </label>
               </div>
             </div>
@@ -142,11 +142,11 @@ export default function SettingsPage() {
               <div className="radio-group">
                 <label className={`radio-option ${theme === 'dark' ? 'active' : ''}`}>
                   <input type="radio" name="theme" value="dark" checked={theme === 'dark'} onChange={() => setTheme('dark')} />
-                  Dark {t('settings.dark_mode')}
+                  🌙 {t('settings.dark_mode')}
                 </label>
                 <label className={`radio-option ${theme === 'light' ? 'active' : ''}`}>
                   <input type="radio" name="theme" value="light" checked={theme === 'light'} onChange={() => setTheme('light')} />
-                  Light {t('settings.light_mode')}
+                  ☀️ {t('settings.light_mode')}
                 </label>
               </div>
             </div>

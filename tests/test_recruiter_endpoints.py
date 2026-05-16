@@ -403,7 +403,7 @@ def test_recruiter_batch_rank_requires_jd_text_or_file(client, db_session, monke
     assert "Job description is required" in resp.json().get("detail", "")
 
 
-def test_recruiter_batch_rank_rejects_non_pdf_cv(client, db_session, monkeypatch):
+def test_recruiter_batch_rank_accepts_text_cv(client, db_session, monkeypatch):
     monkeypatch.setattr(main_module, "run_pipeline", _mock_pipeline)
     monkeypatch.setattr(main_module, "CLAMAV_ENABLED", False)
     org_a, _, recruiter, _, _ = _setup_two_orgs(db_session)
@@ -425,5 +425,31 @@ def test_recruiter_batch_rank_rejects_non_pdf_cv(client, db_session, monkeypatch
         data={"job_description": "Python"},
         files=files,
     )
+    assert resp.status_code == 200
+    assert resp.json()["total_candidates"] == 1
+
+
+def test_recruiter_batch_rank_rejects_unsupported_cv(client, db_session, monkeypatch):
+    monkeypatch.setattr(main_module, "run_pipeline", _mock_pipeline)
+    monkeypatch.setattr(main_module, "CLAMAV_ENABLED", False)
+    _, _, recruiter, _, _ = _setup_two_orgs(db_session)
+
+    client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
+        "user_id": recruiter.supabase_id,
+        "email": recruiter.email,
+    }
+
+    files = [
+        (
+            "files",
+            ("candidate_1.exe", b"not a cv", "application/x-msdownload"),
+        )
+    ]
+
+    resp = client.post(
+        "/api/v1/recruiter/batch-rank",
+        data={"job_description": "Python"},
+        files=files,
+    )
     assert resp.status_code == 400
-    assert "Only PDF files are allowed" in resp.json().get("detail", "")
+    assert "Unsupported file type" in resp.json().get("detail", "")
