@@ -27,9 +27,12 @@ def recruiter_user(db_session):
 
     # Create user
     user = User(
-        supabase_id="test-recruiter-123",
-        email="recruiter@example.com",
-        organization_id=org.id
+        supabase_id="test-user-123",
+        email="testuser@example.com",
+        organization_id=org.id,
+        role="recruiter",
+        plan_type="pro",
+        billing_status="active",
     )
     db_session.add(user)
     db_session.commit()
@@ -39,7 +42,7 @@ def recruiter_user(db_session):
         "supabase_id": user.supabase_id,
         "email": user.email,
         "organization_id": user.organization_id,
-        "token": "Bearer mock-jwt-token"
+        "token": "mock-jwt-token"
     }
 
 
@@ -52,7 +55,7 @@ def test_job(db_session, recruiter_user):
         title="Senior Python Developer",
         description="Looking for experienced Python developer with FastAPI experience",
         organization_id=recruiter_user["organization_id"],
-        user_id=recruiter_user["user_id"]
+        created_by=recruiter_user["user_id"],
     )
     db_session.add(job)
     db_session.commit()
@@ -357,7 +360,7 @@ def test_download_csv_success(client, recruiter_user, test_job, sample_pdf_file)
     response = client.get(f"/api/v1/downloads/{download_id}")
 
     assert response.status_code == 200
-    assert response.headers["content-type"] == "text/csv"
+    assert response.headers["content-type"].startswith("text/csv")
     assert "attachment" in response.headers.get("content-disposition", "")
     assert b"name" in response.content  # CSV headers
 
@@ -386,7 +389,7 @@ def test_download_json_success(client, recruiter_user, test_job, sample_pdf_file
     response = client.get(f"/api/v1/downloads/{download_id}")
 
     assert response.status_code == 200
-    assert response.headers["content-type"] == "application/json"
+    assert response.headers["content-type"].startswith("application/json")
     data = response.json()
     assert "results" in data
     assert "metadata" in data

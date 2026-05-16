@@ -49,6 +49,26 @@ def build_user_cv_key(user_id: str, filename: str) -> str:
     return f"users/user_{safe_user_id}/{stem}_{unique_id}{extension}"
 
 
+def build_key(user_id: str, category: Literal["original", "optimized"] = "original", extension: str = "pdf") -> str:
+    """Backward-compatible key builder used by older storage tests."""
+    suffix = extension.lower().lstrip(".")
+    if suffix not in ("pdf", "docx"):
+        suffix = "pdf"
+    safe_user_id = re.sub(r"[^a-zA-Z0-9\-_]", "_", str(user_id))
+    unique_id = uuid.uuid4().hex[:12]
+    safe_category = category if category in ("original", "optimized") else "original"
+    return f"user_{safe_user_id}/{safe_category}/{unique_id}.{suffix}"
+
+
+def _storage_extension(filename: str | None, content_type: str | None) -> str:
+    suffix = Path(filename or "").suffix.lower().lstrip(".")
+    if suffix in ("pdf", "docx"):
+        return suffix
+    if content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        return "docx"
+    return "pdf"
+
+
 # ── Uploads ─────────────────────────────────────────────────────────
 
 def _validate_upload(
@@ -76,7 +96,7 @@ def upload_original_cv(
     """Store the user's original uploaded CV.  Returns the S3 key."""
     safe_uid = validate_user_id(user_id)
     ct = _validate_upload(file_bytes, content_type, filename)
-    key = build_user_cv_key(safe_uid, filename)
+    key = build_key(safe_uid, "original", _storage_extension(filename, ct))
     
     if STORAGE_BACKEND == "local":
         local_storage_service.upload(file_bytes, key, ct)
@@ -96,7 +116,7 @@ def upload_optimized_cv(
     """Store an optimized / generated CV.  Returns the S3 key."""
     safe_uid = validate_user_id(user_id)
     ct = _validate_upload(file_bytes, content_type, filename)
-    key = build_user_cv_key(safe_uid, filename)
+    key = build_key(safe_uid, "optimized", _storage_extension(filename, ct))
     
     if STORAGE_BACKEND == "local":
         local_storage_service.upload(file_bytes, key, ct)

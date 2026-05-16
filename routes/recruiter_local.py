@@ -141,7 +141,7 @@ async def get_subscription_usage(
 @router.post("/process-local")
 async def process_cvs_local_mode(
     job_id: int = Form(..., gt=0),
-    files: List[UploadFile] = File(...),
+    files: List[UploadFile] | None = File(None),
     api_key: str = Header(..., alias="X-API-Key"),
     db: Session = Depends(get_db),
 ):
@@ -165,6 +165,8 @@ async def process_cvs_local_mode(
     """
     # Validate API key and quota
     subscription = validate_api_key(api_key, db)
+    if not files:
+        raise HTTPException(status_code=400, detail="At least one file is required")
     check_monthly_quota(subscription, len(files))
 
     # Validate job belongs to organization

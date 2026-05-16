@@ -58,6 +58,8 @@ _service_stubs = [
             ),
             "save_job_embedding": lambda db, jid, vec: True,
             "save_candidate_embedding": lambda db, cid, vec: True,
+            "EMBEDDING_CACHE_TTL": 604800,
+            "_EMBED_MAX_CALLS_PER_MIN": 60,
         },
     ),
     (
@@ -68,6 +70,21 @@ _service_stubs = [
                 "domain_name": "Other",
             },
             "get_domain_similarity": lambda i, e: 0.0,
+            "ALLOWED_DOMAINS": [
+                "Engineering & Technology",
+                "Retail & Sales",
+                "Healthcare",
+                "Finance",
+                "Education",
+                "Logistics",
+                "Hospitality",
+                "Manufacturing",
+                "Construction",
+                "Creative & Media",
+                "Government",
+                "General Labor",
+                "Other",
+            ],
         },
     ),
     (
@@ -75,21 +92,10 @@ _service_stubs = [
         {
             "detect_industry_and_specialization": lambda j, e=None: {
                 "industry_id": 1,
-                "industry_name": "Other",
+                "industry_name": "Technology",
                 "specialization_id": 1,
-                "specialization_name": "General",
+                "specialization_name": "Software Development",
             },
-        },
-    ),
-    (
-        "services.skill_service",
-        {
-            "extract_skills": lambda text: {
-                "technical_skills": ["python", "sql"],
-                "soft_skills": ["communication"],
-                "all_skills": ["python", "sql", "communication"],
-            },
-            "skill_coverage_score": lambda cv, jd: (70.0, ["kubernetes"]),
         },
     ),
 ]
@@ -318,6 +324,12 @@ def db_session():
 
 
 @pytest.fixture(scope="function")
+def db(db_session):
+    """Backward-compatible alias for integration tests that request `db`."""
+    return db_session
+
+
+@pytest.fixture(scope="function")
 def client(db_session):
     """TestClient with DB + JWT overrides."""
 
@@ -349,3 +361,55 @@ def sample_texts():
         "Increase revenue and manage team."
     )
     return cv, job
+
+
+@pytest.fixture(scope="function")
+def recruiter_user(db_session):
+    """Create a recruiter user that matches the default mocked JWT subject."""
+    from models import Organization, User
+
+    org = Organization(
+        name="Test Organization",
+        domain=f"test-{uuid.uuid4().hex[:8]}.example.com",
+        plan_type="pro",
+        billing_status="active",
+    )
+    db_session.add(org)
+    db_session.commit()
+
+    user = User(
+        supabase_id="test-user-123",
+        email="testuser@example.com",
+        organization_id=org.id,
+        role="recruiter",
+        plan_type="pro",
+        billing_status="active",
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    return {
+        "user_id": user.id,
+        "supabase_id": user.supabase_id,
+        "email": user.email,
+        "organization_id": user.organization_id,
+        "org": org,
+        "token": "mock-jwt-token",
+    }
+
+
+@pytest.fixture(scope="function")
+def test_job(db_session, recruiter_user):
+    """Create a recruiter job owned by the shared recruiter fixture."""
+    from models import RecruiterJob
+
+    job = RecruiterJob(
+        title="Senior Python Developer",
+        description="Looking for experienced Python developer with FastAPI experience",
+        organization_id=recruiter_user["organization_id"],
+        created_by=recruiter_user["user_id"],
+    )
+    db_session.add(job)
+    db_session.commit()
+
+    return job

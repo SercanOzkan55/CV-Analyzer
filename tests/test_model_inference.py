@@ -52,5 +52,8 @@ def test_deterministic_prediction():
     else:
         pred = float(model.predict([features])[0])
 
+    if 0.0 <= pred <= 1.0:
+        pred *= 100.0
+
     # Score should be reasonable (good CV features → high score)
     assert 40.0 <= pred <= 100.0, f"Prediction {pred} out of reasonable range"

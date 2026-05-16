@@ -163,6 +163,59 @@ _cors_origins = [
     if origin.strip()
 ]
 _CSRF_PROTECTION_ENABLED = os.getenv("CSRF_PROTECTION_ENABLED", "0").lower() in ("1", "true", "yes")
+_UNSAFE_CSRF_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+_CSRF_COOKIE_NAMES = ("csrf_token", "XSRF-TOKEN")
+_CSRF_HEADER_NAMES = ("x-csrf-token", "x-xsrf-token")
+_SECURITY_HEADERS = {
+    "Strict-Transport-Security": "max-age=63072000; includeSubDomains",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Cache-Control": "no-store",
+}
+
+
+def _csrf_cookie_token(request: Request) -> str:
+    for name in _CSRF_COOKIE_NAMES:
+        token = request.cookies.get(name)
+        if token:
+            return token
+    return ""
+
+
+def _csrf_header_token(request: Request) -> str:
+    for name in _CSRF_HEADER_NAMES:
+        token = request.headers.get(name)
+        if token:
+            return token
+    return ""
+
+
+def _is_cookie_auth_state_changing_request(request: Request) -> bool:
+    if request.method.upper() not in _UNSAFE_CSRF_METHODS:
+        return False
+    auth_header = (request.headers.get("authorization") or "").strip().lower()
+    if auth_header.startswith("bearer "):
+        return False
+    cookie_header = request.headers.get("cookie") or ""
+    if not cookie_header:
+        return False
+    if bool(main_value("_CSRF_PROTECTION_ENABLED", _CSRF_PROTECTION_ENABLED)):
+        return True
+    lower_cookie = cookie_header.lower()
+    return "csrf_token=" in lower_cookie or "xsrf-token=" in lower_cookie
+
+
+def _has_valid_csrf_token(request: Request) -> bool:
+    cookie_token = _csrf_cookie_token(request)
+    header_token = _csrf_header_token(request)
+    return bool(cookie_token and header_token and hmac.compare_digest(cookie_token, header_token))
+
+
+def _apply_security_headers(response):
+    for header, value in _SECURITY_HEADERS.items():
+        response.headers.setdefault(header, value)
+    return response
 
 
 def _safe_log_message(message) -> str:
@@ -683,6 +736,12 @@ def register_http_runtime(app, app_logger):
     )
 
     @app.middleware("http")
+    async def csrf_middleware(request: Request, call_next):
+        if _is_cookie_auth_state_changing_request(request) and not _has_valid_csrf_token(request):
+            return JSONResponse(status_code=403, content={"detail": "CSRF token missing or invalid"})
+        return await call_next(request)
+
+    @app.middleware("http")
     async def logging_middleware(request: Request, call_next):
         request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
         start_time = current_time()
@@ -779,3 +838,8 @@ def register_http_runtime(app, app_logger):
                 (request.headers.get("user-agent") or "-")[:200],
             )
         return response
+
+    @app.middleware("http")
+    async def security_headers_middleware(request: Request, call_next):
+        response = await call_next(request)
+        return _apply_security_headers(response)
