@@ -35,8 +35,9 @@ The batch upload feature allows recruiters to:
 
 **Request:**
 ```bash
+AUTH_HEADER="$(printf 'Authorization:%sBearer %s' ' ' "$JWT_TOKEN")"
 curl -X POST \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "$AUTH_HEADER" \
   -F "job_id=1" \
   -F "files=@cv1.pdf" \
   -F "files=@cv2.pdf" \

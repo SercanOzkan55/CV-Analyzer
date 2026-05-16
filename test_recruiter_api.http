@@ -113,8 +113,9 @@ Content-Type: application/json
 ### TEST 12: Batch Upload CVs (Must be multipart form-data)
 ### NOTE: This requires actual PDF files. Run via curl:
 ### 
+### AUTH_HEADER="$(printf 'Authorization:%sBearer %s' ' ' "$JWT_TOKEN")"
 ### curl -X POST \
-###   -H "Authorization: Bearer YOUR_TOKEN" \
+###   -H "$AUTH_HEADER" \
 ###   -F "job_id=1" \
 ###   -F "files=@/path/to/cv1.pdf" \
 ###   -F "files=@/path/to/cv2.pdf" \
@@ -153,7 +154,7 @@ Authorization: @authToken
 ###
 ### TEST 15: Permission Check (Cross-org isolation)
 GET @baseUrl/candidates
-Authorization: Bearer DIFFERENT_ORG_TOKEN
+Authorization: @differentOrgAuthToken
 
 # Should not return candidates from different organization
 

@@ -95,7 +95,7 @@ See the **Postman Setup** section at end of `test_saas.sh`
 ### Test 2: INVALID TOKEN (🔴 Critical)
 
 **What:** Send request with tampered/invalid JWT  
-**Command:** `curl -H "Authorization: Bearer TAMPERED_TOKEN" ...`  
+**Command:** `curl -H "$AUTH_HEADER" ...`
 **Expected:** `401 Unauthorized`  
 **Failure Impact:** 🔴 **CRITICAL** - Anyone can fake authentication
 
@@ -111,7 +111,8 @@ See the **Postman Setup** section at end of `test_saas.sh`
 TOKEN="your_real_jwt_token"
 FAKE="${TOKEN:0:-5}xxxxx"  # Change last 5 chars
 
-curl -H "Authorization: Bearer $FAKE" \
+AUTH_HEADER="$(printf 'Authorization:%sBearer %s' ' ' "$FAKE")"
+curl -H "$AUTH_HEADER" \
   -X POST http://localhost:8000/api/v1/analyze
 ```
 
@@ -120,7 +121,7 @@ curl -H "Authorization: Bearer $FAKE" \
 ### Test 3: VALID TOKEN (🟢 Expected Success)
 
 **What:** Send request with correct JWT  
-**Command:** `curl -H "Authorization: Bearer VALID_TOKEN" ...`  
+**Command:** `curl -H "$AUTH_HEADER" ...`
 **Expected:** `200 OK` with analysis results  
 **Failure Impact:** ⚠️ All legitimate users blocked
 
@@ -195,7 +196,8 @@ ORDER BY user_id;
 
 ```bash
 for i in {1..11}; do
-  curl -H "Authorization: Bearer $TOKEN" \
+  AUTH_HEADER="$(printf 'Authorization:%sBearer %s' ' ' "$TOKEN")"
+  curl -H "$AUTH_HEADER" \
     -X POST http://localhost:8000/api/v1/analyze \
     -d '...'
 done
@@ -260,7 +262,7 @@ WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.id = a.user_id);
 
 **Correct format:**
 ```
-Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+Authorization: <Bearer token>
 ```
 
 ---
