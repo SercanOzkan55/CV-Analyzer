@@ -56,7 +56,7 @@ jobs:
     needs: lint
     services:
       postgres:
-        image: ankane/pgvector:postgres-15
+        image: pgvector/pgvector:pg15
         env:
           POSTGRES_USER: testuser
           POSTGRES_PASSWORD: testpass
@@ -271,7 +271,8 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Upload Trivy results to Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
+        continue-on-error: true
         with:
           sarif_file: 'trivy-results.sarif'
           category: 'trivy'
