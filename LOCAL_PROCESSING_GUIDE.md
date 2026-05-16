@@ -48,7 +48,7 @@ Local processing mode allows organizations to:
 **Response:**
 ```json
 {
-  "api_key": "cv_abc123def456...",
+  "api_key": "<generated-api-key>",
   "monthly_limit": 1000,
   "monthly_usage": 0,
   "expires_at": "2024-12-31T23:59:59Z",
