@@ -36,11 +36,19 @@ def upgrade():
         "CREATE TABLE IF NOT EXISTS candidates ("
         "id serial PRIMARY KEY,"
         "organization_id integer,"
+        "name varchar,"
+        "email varchar,"
+        "phone varchar,"
         "cv_text text,"
         "cv_embedding vector(1536),"
         "created_at timestamptz DEFAULT now()"
         ");"
     )
+
+    # Ensure columns exist for databases created before name/email/phone were added
+    op.execute("ALTER TABLE candidates ADD COLUMN IF NOT EXISTS name varchar;")
+    op.execute("ALTER TABLE candidates ADD COLUMN IF NOT EXISTS email varchar;")
+    op.execute("ALTER TABLE candidates ADD COLUMN IF NOT EXISTS phone varchar;")
 
     # Add job_embedding column to existing jobs table if missing
     op.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS job_embedding vector(1536);")
