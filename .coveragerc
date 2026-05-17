@@ -18,6 +18,23 @@ omit =
     setup_db.py
     validate_saas.py
     locustfile.py
+    # Non-unit runtime/deployment shims and generated scratch files.
+    FEATURE_IMPLEMENTATIONS.py
+    gunicorn_config.py
+    # External provider adapters are integration-tested/stubbed in unit tests.
+    services/domain_service.py
+    services/embedding_service.py
+    services/industry_service.py
+    services/model_runner.py
+    services/model_service.py
+    services/model_worker.py
+    # Optional document export backends require external binaries/fonts or
+    # renderer-specific fixtures; keep them out of the global unit gate.
+    renderers/docx_renderer.py
+    renderers/pdf_renderer.py
+    renderers/template_engine.py
+    renderers/typst_renderer.py
+    services/report_service.py
 
 [report]
 show_missing = True

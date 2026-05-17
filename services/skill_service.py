@@ -572,7 +572,7 @@ def extract_skills(text: str) -> dict:
         # 2) Global token scan with heuristics (catch inline or bullet lists)
         raw_tokens = re.findall(r"\b[A-Za-z0-9\+\#\.\-]{2,}\b", text)
         for tok in raw_tokens:
-            tok_clean = tok.strip().strip(".,;:\()[]")
+            tok_clean = tok.strip().strip(".,;:()[]")
             tok_low = tok_clean.lower()
             if not tok_low or tok_low in found or tok_low in STOPWORDS:
                 continue
