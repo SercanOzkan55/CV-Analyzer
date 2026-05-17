@@ -243,12 +243,24 @@ jobs:
 
       - name: Run container health check
         run: |
-          container_id=$(docker run --rm -d -p 8001:8001 \
-            -e ENV=test -e MOCK_SERVICES=1 \
+          container_id=$(docker run -d -p 8001:8001 \
+            -e ENV=test -e MOCK_SERVICES=1 -e GUNICORN_WORKERS=1 \
             cv-analyzer:${{ github.sha }})
-          trap 'docker stop "$container_id"' EXIT
-          sleep 5
-          curl -f http://localhost:8001/health
+          trap 'docker rm -f "$container_id" >/dev/null 2>&1 || true' EXIT
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8001/health; then
+              exit 0
+            fi
+            if ! docker ps -q --filter "id=$container_id" | grep -q .; then
+              echo "Container exited before becoming healthy"
+              docker logs "$container_id" || true
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "Container did not become healthy in time"
+          docker logs "$container_id" || true
+          exit 1
 
   # ── Security Scanning ──
   security:
