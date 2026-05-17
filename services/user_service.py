@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 
 from fastapi import HTTPException
+from sqlalchemy.exc import SQLAlchemyError
 
 from models import Analysis, Organization, User
 from core.quota import (
@@ -63,6 +64,9 @@ def get_or_create_user(db, supabase_id: str, email: str):
                     db.add(user)
                     db.commit()
                     db.refresh(user)
+        except SQLAlchemyError as exc:
+            db.rollback()
+            logger.warning("Organization auto-assignment skipped: %s", exc)
         except Exception:
             pass
 
