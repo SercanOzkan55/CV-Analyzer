@@ -33,7 +33,20 @@ def _analysis(db, owner: User, score: float = 72.0) -> Analysis:
     return row
 
 
+def _clear_rate_limit_state():
+    """Clear all in-memory rate limit buckets to avoid 429 cascade across tests."""
+    from core import http_runtime
+    http_runtime._user_global_counts.clear()
+    http_runtime._ip_global_counts.clear()
+    http_runtime._user_embed_counts.clear()
+    http_runtime._search_counts.clear()
+    http_runtime._dedup_cache.clear()
+    http_runtime._LOCAL_ABUSE_BANS.clear()
+    http_runtime._LOCAL_ABUSE_COUNTERS.clear()
+
+
 def test_share_requires_analysis_ownership(client, db_session):
+    _clear_rate_limit_state()
     _user(db_session, "test-user-123", "testuser@example.com", plan_type="pro")
     other = _user(db_session, "other-user", "other@example.com", plan_type="pro")
     foreign_analysis = _analysis(db_session, other)
@@ -44,6 +57,7 @@ def test_share_requires_analysis_ownership(client, db_session):
 
 
 def test_public_share_rejects_mismatched_share_owner(client, db_session):
+    _clear_rate_limit_state()
     owner = _user(db_session, "owner-user", "owner@example.com", plan_type="pro")
     other = _user(db_session, "other-user", "other@example.com", plan_type="pro")
     foreign_analysis = _analysis(db_session, other)
@@ -62,6 +76,7 @@ def test_public_share_rejects_mismatched_share_owner(client, db_session):
 
 
 def test_notes_require_analysis_ownership(client, db_session):
+    _clear_rate_limit_state()
     _user(db_session, "test-user-123", "testuser@example.com", plan_type="pro")
     other = _user(db_session, "other-user", "other@example.com", plan_type="pro")
     foreign_analysis = _analysis(db_session, other)
@@ -79,6 +94,7 @@ def test_notes_require_analysis_ownership(client, db_session):
 
 
 def test_favorites_require_analysis_ownership(client, db_session):
+    _clear_rate_limit_state()
     _user(db_session, "test-user-123", "testuser@example.com", plan_type="pro")
     other = _user(db_session, "other-user", "other@example.com", plan_type="pro")
     foreign_analysis = _analysis(db_session, other)
