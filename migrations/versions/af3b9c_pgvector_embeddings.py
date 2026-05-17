@@ -1,7 +1,7 @@
 """add pgvector embeddings
 
 Revision ID: af3b9c_pgvector_embeddings
-Revises: add_billing_status_to_organizations
+Revises: add_billing_status_orgs
 Create Date: 2026-03-04 12:00:00
 
 """
@@ -10,7 +10,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "af3b9c_pgvector_embeddings"
-down_revision = "add_billing_status_to_organizations"
+down_revision = "add_billing_status_orgs"
 branch_labels = None
 depends_on = None
 
