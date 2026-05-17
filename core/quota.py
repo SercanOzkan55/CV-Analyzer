@@ -12,6 +12,7 @@ import time
 from datetime import datetime, timedelta
 
 from fastapi import HTTPException
+from sqlalchemy.exc import SQLAlchemyError
 
 from core.metrics import _metric_quota_hit, _metric_error
 from core.ops_runtime import (
@@ -495,6 +496,9 @@ def _record_usage_daily(db, user_id: int):
         else:
             row = UsageDaily(user_id=user_id, date=today, count=1)
             db.add(row)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.warning("Usage daily tracking skipped: %s", exc)
     except Exception:
         pass
 
