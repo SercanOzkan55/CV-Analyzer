@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/LanguageContext'
 import { useToast } from '../components/Toast'
 import Navbar from '../components/Navbar'
+import { deleteCvVersion, getCvVersion, listCvVersions, saveCvVersion } from '../api'
 
 const VAULT_KEY = 'cv_analyzer_vault'
 
@@ -23,7 +24,7 @@ function setVault(userId, items) {
 }
 
 export default function MyCVsPage() {
-  const { user } = useAuth()
+  const { user, token } = useAuth()
   const { t } = useLanguage()
   const { addToast } = useToast()
   const userId = user?.id || user?.email || 'anon'
@@ -32,40 +33,100 @@ export default function MyCVsPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [newName, setNewName] = useState('')
   const [newContent, setNewContent] = useState('')
+  const [loadingRemote, setLoadingRemote] = useState(false)
 
   useEffect(() => {
-    setCvs(getVault(userId))
-  }, [userId])
+    let cancelled = false
+    const localItems = getVault(userId)
+    setCvs(localItems)
+    if (!token) return () => { cancelled = true }
+
+    setLoadingRemote(true)
+    listCvVersions(token, 50)
+      .then(async (res) => {
+        const items = Array.isArray(res?.items) ? res.items : []
+        const detailed = await Promise.all(
+          items.map((item) => getCvVersion(token, item.id).catch(() => item)),
+        )
+        if (cancelled) return
+        const remoteItems = detailed.map((row) => ({
+          id: `remote-${row.id}`,
+          remoteId: row.id,
+          name: row.version_label || row.source || `CV ${row.id}`,
+          content: row.optimized_cv_text || row.cv_text || '',
+          source: row.source || 'remote',
+          score: row.match_score,
+          createdAt: row.created_at || new Date().toISOString(),
+          updatedAt: row.created_at || new Date().toISOString(),
+        }))
+        const localOnly = localItems.filter((item) => !item.remoteId)
+        setCvs([...remoteItems, ...localOnly])
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingRemote(false) })
+
+    return () => { cancelled = true }
+  }, [userId, token])
 
   useEffect(() => {
     document.title = `${t('vault.title')} — CV Analyzer`
   }, [t])
 
-  function handleSave() {
+  async function handleSave() {
     const name = newName.trim() || `CV ${cvs.length + 1}`
     const content = newContent.trim()
     if (!content) return
-    const item = {
+    let item = {
       id: Date.now().toString(36),
       name,
       content,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
+    if (token) {
+      try {
+        const saved = await saveCvVersion(token, {
+          cv_text: content,
+          version_label: name,
+          source: 'vault',
+          lang: 'en',
+        })
+        item = {
+          ...item,
+          id: `remote-${saved.id}`,
+          remoteId: saved.id,
+          source: saved.source || 'vault',
+          score: saved.match_score,
+          createdAt: saved.created_at || item.createdAt,
+          updatedAt: saved.created_at || item.updatedAt,
+        }
+      } catch (err) {
+        addToast(err?.message || 'Remote save failed; saved locally', 'warning')
+      }
+    }
     const updated = [item, ...cvs]
     setCvs(updated)
-    setVault(userId, updated)
+    setVault(userId, updated.filter((cv) => !cv.remoteId))
     setShowAdd(false)
     setNewName('')
     setNewContent('')
     addToast(t('vault.saved'), 'success')
   }
 
-  function handleDelete(id) {
+  async function handleDelete(id) {
     if (!window.confirm(t('vault.delete_confirm'))) return
+    const current = cvs.find((c) => c.id === id)
+    if (token && current?.remoteId) {
+      try {
+        await deleteCvVersion(token, current.remoteId)
+      } catch (err) {
+        addToast(err?.message || 'Remote delete failed', 'error')
+        return
+      }
+    }
     const updated = cvs.filter((c) => c.id !== id)
     setCvs(updated)
-    setVault(userId, updated)
+    setVault(userId, updated.filter((cv) => !cv.remoteId))
     addToast(t('vault.deleted'), 'success')
   }
 
@@ -144,6 +205,8 @@ export default function MyCVsPage() {
         </AnimatePresence>
 
         {/* CV list */}
+        {loadingRemote && <p className="text-muted text-sm" style={{ marginBottom: '1rem' }}>Syncing saved CV versions...</p>}
+
         {cvs.length === 0 ? (
           <div className="db-empty-state" style={{ marginTop: '2rem' }}>
             <motion.span className="db-empty-icon" animate={{ y: [0, -8, 0] }} transition={{ duration: 3.5, repeat: Infinity }}>

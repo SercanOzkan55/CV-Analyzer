@@ -511,6 +511,36 @@ export async function fetchAnalysisNote(token, analysisId) {
   return res.json()
 }
 
+export async function downloadAnalysisReport(token, analysisId) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/export/analysis/${analysisId}`, { headers })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Report export failed: ${res.status}`)
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `analysis_${analysisId}_report.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+export async function fetchAnalysisTrends(token, days = 90) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/analysis-trends?days=${days}`, { headers })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Analysis trends failed: ${res.status}`)
+  }
+  return res.json()
+}
+
 export async function deleteAnalysisNote(token, analysisId) {
   const headers = {}
   const auth = authHeaderFrom(token)
@@ -1110,6 +1140,111 @@ export async function diffCvText(token, originalText, optimizedText) {
     throw new Error(err.detail || `CV diff failed: ${res.status}`)
   }
   return res.json()
+}
+
+export async function buildSkillRoadmap(token, payload = {}) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/job/skill-roadmap`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Skill roadmap failed: ${res.status}`)
+  }
+  notifyBillableUsage()
+  return res.json()
+}
+
+export async function saveCvVersion(token, payload = {}) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/cv/versions`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `CV version save failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function listCvVersions(token, limit = 100) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/cv/versions?limit=${limit}`, { headers })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `CV versions failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function getCvVersion(token, versionId) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/cv/versions/${versionId}`, { headers })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `CV version fetch failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function deleteCvVersion(token, versionId) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/cv/versions/${versionId}`, {
+    method: 'DELETE',
+    headers,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `CV version delete failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+async function _jobApplicationJson(token, path, method = 'GET', payload = null) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const opts = { method, headers }
+  if (payload) opts.body = JSON.stringify(payload)
+  const res = await fetch(`${BASE}${path}`, opts)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    const detail = Array.isArray(err.detail)
+      ? err.detail.map(e => e.msg || e.message || JSON.stringify(e)).join('; ')
+      : err.detail
+    throw new Error(detail || `Job application request failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export function listJobApplications(token) {
+  return _jobApplicationJson(token, '/api/v1/job-applications')
+}
+
+export function createJobApplication(token, payload) {
+  return _jobApplicationJson(token, '/api/v1/job-applications', 'POST', payload)
+}
+
+export function updateJobApplication(token, applicationId, payload) {
+  return _jobApplicationJson(token, `/api/v1/job-applications/${applicationId}`, 'PUT', payload)
+}
+
+export function deleteJobApplication(token, applicationId) {
+  return _jobApplicationJson(token, `/api/v1/job-applications/${applicationId}`, 'DELETE')
 }
 
 

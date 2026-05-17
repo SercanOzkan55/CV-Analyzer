@@ -30,6 +30,36 @@ class UserReminderUpdateRequest(BaseModel):
     is_active: bool | None = None
 
 
+class JobApplicationCreateRequest(BaseModel):
+    company: str
+    role: str
+    status: str = "wishlist"
+    location: str | None = ""
+    url: str | None = ""
+    salary: str | None = ""
+    priority: str = "medium"
+    notes: str | None = ""
+    applied_date: datetime | None = None
+    reminder_id: int | None = None
+    board_order: int = 0
+    source: str = "manual"
+
+
+class JobApplicationUpdateRequest(BaseModel):
+    company: str | None = None
+    role: str | None = None
+    status: str | None = None
+    location: str | None = None
+    url: str | None = None
+    salary: str | None = None
+    priority: str | None = None
+    notes: str | None = None
+    applied_date: datetime | None = None
+    reminder_id: int | None = None
+    board_order: int | None = None
+    source: str | None = None
+
+
 def _get_current_db_user(user, db) -> User:
     _ensure_not_expired(user)
     if _main_module().MOCK_SERVICES_ON:
@@ -41,6 +71,184 @@ def _get_current_db_user(user, db) -> User:
             mock_email or "dev@example.com",
         )
     return get_or_create_user(db, user.get("user_id"), user.get("email"))
+
+
+_APPLICATION_STATUSES = {"wishlist", "applied", "interview", "offer", "rejected"}
+_APPLICATION_PRIORITIES = {"high", "medium", "low"}
+
+
+def _normalize_application_status(value: str | None) -> str:
+    status = str(value or "wishlist").strip().lower()
+    return status if status in _APPLICATION_STATUSES else "wishlist"
+
+
+def _normalize_application_priority(value: str | None) -> str:
+    priority = str(value or "medium").strip().lower()
+    return priority if priority in _APPLICATION_PRIORITIES else "medium"
+
+
+def _clean_optional_text(value: str | None, limit: int) -> str | None:
+    text_value = str(value or "").strip()
+    return text_value[:limit] if text_value else None
+
+
+def _serialize_job_application(row: JobApplication) -> dict:
+    return {
+        "id": row.id,
+        "company": row.company,
+        "role": row.role,
+        "status": row.status,
+        "location": row.location,
+        "url": row.url,
+        "salary": row.salary,
+        "priority": row.priority,
+        "notes": row.notes,
+        "applied_date": row.applied_date.isoformat() + "Z" if row.applied_date else None,
+        "reminder_id": row.reminder_id,
+        "board_order": row.board_order or 0,
+        "source": row.source,
+        "created_at": row.created_at.isoformat() + "Z" if row.created_at else None,
+        "updated_at": row.updated_at.isoformat() + "Z" if row.updated_at else None,
+    }
+
+
+def _owned_job_application_or_404(db, db_user: User, application_id: int) -> JobApplication:
+    row = (
+        db.query(JobApplication)
+        .filter(JobApplication.id == application_id, JobApplication.user_id == db_user.id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Job application not found")
+    return row
+
+
+def _validate_owned_reminder_id(db, db_user: User, reminder_id: int | None) -> int | None:
+    if reminder_id is None:
+        return None
+    row = (
+        db.query(Reminder)
+        .filter(Reminder.id == reminder_id, Reminder.created_by == db_user.id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=400, detail="Reminder does not belong to the current user")
+    return int(reminder_id)
+
+
+@router.get("/api/v1/job-applications")
+def list_job_applications(
+    status: str | None = Query(None),
+    limit: int = Query(200, ge=1, le=500),
+    user=Depends(verify_supabase_jwt),
+    db=Depends(get_db),
+):
+    db_user = _get_current_db_user(user, db)
+    query = db.query(JobApplication).filter(JobApplication.user_id == db_user.id)
+    if status:
+        query = query.filter(JobApplication.status == _normalize_application_status(status))
+    rows = (
+        query.order_by(JobApplication.board_order.asc(), JobApplication.updated_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return {"items": [_serialize_job_application(row) for row in rows], "total": len(rows)}
+
+
+@router.post("/api/v1/job-applications")
+def create_job_application(
+    body: JobApplicationCreateRequest,
+    user=Depends(verify_supabase_jwt),
+    db=Depends(get_db),
+):
+    db_user = _get_current_db_user(user, db)
+    company = str(body.company or "").strip()
+    role = str(body.role or "").strip()
+    if not company or not role:
+        raise HTTPException(status_code=400, detail="company and role are required")
+
+    reminder_id = _validate_owned_reminder_id(db, db_user, body.reminder_id)
+    row = JobApplication(
+        user_id=db_user.id,
+        organization_id=getattr(db_user, "organization_id", None),
+        company=company[:200],
+        role=role[:200],
+        status=_normalize_application_status(body.status),
+        location=_clean_optional_text(body.location, 200),
+        url=_clean_optional_text(body.url, 1000),
+        salary=_clean_optional_text(body.salary, 120),
+        priority=_normalize_application_priority(body.priority),
+        notes=_clean_optional_text(body.notes, 5000),
+        applied_date=body.applied_date,
+        reminder_id=reminder_id,
+        board_order=int(body.board_order or 0),
+        source=_clean_optional_text(body.source, 80) or "manual",
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _serialize_job_application(row)
+
+
+@router.put("/api/v1/job-applications/{application_id}")
+def update_job_application(
+    application_id: int,
+    body: JobApplicationUpdateRequest,
+    user=Depends(verify_supabase_jwt),
+    db=Depends(get_db),
+):
+    db_user = _get_current_db_user(user, db)
+    row = _owned_job_application_or_404(db, db_user, application_id)
+    fields = getattr(body, "model_fields_set", set())
+
+    if "company" in fields:
+        company = str(body.company or "").strip()
+        if not company:
+            raise HTTPException(status_code=400, detail="company cannot be empty")
+        row.company = company[:200]
+    if "role" in fields:
+        role = str(body.role or "").strip()
+        if not role:
+            raise HTTPException(status_code=400, detail="role cannot be empty")
+        row.role = role[:200]
+    if "status" in fields:
+        row.status = _normalize_application_status(body.status)
+    if "location" in fields:
+        row.location = _clean_optional_text(body.location, 200)
+    if "url" in fields:
+        row.url = _clean_optional_text(body.url, 1000)
+    if "salary" in fields:
+        row.salary = _clean_optional_text(body.salary, 120)
+    if "priority" in fields:
+        row.priority = _normalize_application_priority(body.priority)
+    if "notes" in fields:
+        row.notes = _clean_optional_text(body.notes, 5000)
+    if "applied_date" in fields:
+        row.applied_date = body.applied_date
+    if "reminder_id" in fields:
+        row.reminder_id = _validate_owned_reminder_id(db, db_user, body.reminder_id)
+    if "board_order" in fields:
+        row.board_order = int(body.board_order or 0)
+    if "source" in fields:
+        row.source = _clean_optional_text(body.source, 80) or "manual"
+
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _serialize_job_application(row)
+
+
+@router.delete("/api/v1/job-applications/{application_id}")
+def delete_job_application(
+    application_id: int,
+    user=Depends(verify_supabase_jwt),
+    db=Depends(get_db),
+):
+    db_user = _get_current_db_user(user, db)
+    row = _owned_job_application_or_404(db, db_user, application_id)
+    db.delete(row)
+    db.commit()
+    return {"deleted": True, "id": application_id}
 
 
 def _storage_key_fingerprint(key: str | None) -> str | None:

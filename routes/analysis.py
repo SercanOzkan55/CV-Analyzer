@@ -12,6 +12,69 @@ from core.route_dependencies import *  # noqa: F403
 
 router = APIRouter(tags=["analysis"])
 
+
+_SUPPORTED_CV_UPLOAD_TYPES = {
+    "application/pdf": "pdf",
+    "text/plain": "txt",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+}
+
+
+def _upload_extension(filename: str | None) -> str:
+    _, ext = os.path.splitext(str(filename or "").lower())
+    return ext.lstrip(".")
+
+
+def _extract_uploaded_cv_text(contents: bytes, file: UploadFile) -> tuple[str, bool, str]:
+    """Validate and extract CV text from PDF, TXT, or DOCX uploads."""
+    if not contents:
+        raise HTTPException(status_code=400, detail="Empty file")
+    if len(contents) > _main_module().MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=400, detail="File too large")
+
+    ext = _upload_extension(file.filename)
+    content_type = (file.content_type or "").lower()
+    if content_type in _SUPPORTED_CV_UPLOAD_TYPES:
+        file_type = _SUPPORTED_CV_UPLOAD_TYPES[content_type]
+    elif ext in {"pdf", "txt", "docx"}:
+        file_type = ext
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported CV file type. Use PDF, TXT, or DOCX.")
+
+    try:
+        _scan_upload_for_viruses(contents)
+    except HTTPException:
+        raise
+    except Exception:
+        if os.getenv("CLAMAV_ENABLED", "0").lower() in ("1", "true", "yes"):
+            raise HTTPException(status_code=500, detail="Virus scanner error")
+
+    if file_type == "pdf":
+        _validate_pdf_upload(contents, "application/pdf")
+        text, truncated = _main_module()._extract_pdf_text(contents)
+    elif file_type == "txt":
+        text = contents.decode("utf-8", errors="ignore")
+        truncated = len(text) > _MAX_PDF_EXTRACTED_CHARS
+        text = text[:_MAX_PDF_EXTRACTED_CHARS]
+    elif file_type == "docx":
+        if not contents.startswith(b"PK"):
+            raise HTTPException(status_code=400, detail="Invalid DOCX file")
+        from utils.cv_processor import extract_docx_text_fast
+
+        text = extract_docx_text_fast(contents)
+        truncated = len(text) > _MAX_PDF_EXTRACTED_CHARS
+        text = text[:_MAX_PDF_EXTRACTED_CHARS]
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported CV file type. Use PDF, TXT, or DOCX.")
+
+    from renderers.blocks import fix_decomposed_diacritics
+
+    text = fix_decomposed_diacritics(str(text or "").strip())
+    if not text:
+        raise HTTPException(status_code=400, detail="Could not extract text from uploaded CV")
+    return text, bool(truncated), file_type
+
+
 @router.post("/api/v1/analyze")
 @rate_limit(f"{RATE_LIMIT_IP_ANALYZE_PER_MIN}/minute")
 def analyze(
@@ -583,13 +646,7 @@ async def analyze_pdf(
                     )
 
         contents = await _read_upload_or_400(file)
-        _validate_pdf_upload(contents, file.content_type)
-        try:
-            text, _pdf_truncated = _main_module()._extract_pdf_text(contents)
-        except HTTPException:
-            raise
-        except Exception:
-            raise HTTPException(status_code=400, detail="Invalid PDF file")
+        text, _pdf_truncated, _cv_file_type = _extract_uploaded_cv_text(contents, file)
 
         # ── CV detection: reject non-CV documents early ──
         from security.validators import is_probably_cv
@@ -603,6 +660,7 @@ async def analyze_pdf(
         # explicit action; running it here rewrites fields before scoring.
         result = _main_module().run_pipeline(text, job_description, lang)
         result["cv_text"] = text
+        result["cv_file_type"] = _cv_file_type
         if _pdf_truncated:
             result["truncated"] = True
             result["truncation_warning"] = (
@@ -744,7 +802,13 @@ async def analyze_pdf(
 
     # Only after quota check and increment, read and parse file
     contents = await _read_upload_or_400(file)
-    _validate_pdf_upload(contents, file.content_type)
+    text, _pdf_truncated, _cv_file_type = _extract_uploaded_cv_text(contents, file)
+    from security.validators import is_probably_cv
+    if not is_probably_cv(text):
+        raise HTTPException(
+            status_code=400,
+            detail="The uploaded file does not appear to be a CV/resume. Please upload a valid CV.",
+        )
 
     # Disable Zero Data Retention: Upload CV to storage
     from services.storage_service import upload_original_cv
@@ -759,22 +823,7 @@ async def analyze_pdf(
         )
     except Exception as e:
         logger.warning(f"Failed to upload CV to S3 in analyze-pdf: {e}")
-    try:
-        import PyPDF2
-
-        pdf_reader = PyPDF2.PdfReader(io.BytesIO(contents))
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid PDF file")
-    text = ""
-    for page in pdf_reader.pages:
-        extracted = page.extract_text()
-        if extracted:
-            text += extracted
-    from renderers.blocks import fix_decomposed_diacritics
-    _pdf_truncated = len(text) > _MAX_PDF_EXTRACTED_CHARS
-    if _pdf_truncated:
-        text = text[:_MAX_PDF_EXTRACTED_CHARS]
-    text = fix_decomposed_diacritics(text)
+    # Text was already extracted by _extract_uploaded_cv_text above.
 
     # Force extract → normalize pipeline before analysis task enqueue.
     # Queue the analysis job (or run synchronously in LocalTask fallback)
@@ -789,6 +838,7 @@ async def analyze_pdf(
         if getattr(task, "status", None) == "SUCCESS" and hasattr(task, "result"):
             result = dict(task.result) if task.result else {}
             result["cv_text"] = text
+            result["cv_file_type"] = _cv_file_type
             # Save Analysis + Candidate records and compute benchmark
             try:
                 analysis_record = Analysis(
@@ -1053,6 +1103,47 @@ def get_analytics(
 # ── Export and Reporting ───────────────────────────────────────
 
 
+@router.get("/api/v1/analysis-trends")
+def get_analysis_trends(
+    user=Depends(verify_supabase_jwt),
+    db=Depends(get_db),
+    days: int = Query(90, ge=7, le=365),
+):
+    """Return daily score trend data for the authenticated user."""
+    from sqlalchemy import func
+    from datetime import timedelta
+
+    supabase_id = user.get("user_id")
+    email = user.get("email")
+    db_user = get_or_create_user(db, supabase_id, email)
+
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    rows = (
+        db.query(
+            func.date(Analysis.created_at).label("day"),
+            func.count(Analysis.id).label("count"),
+            func.avg(Analysis.similarity_score).label("average_score"),
+            func.max(Analysis.similarity_score).label("best_score"),
+        )
+        .filter(Analysis.user_id == db_user.id, Analysis.created_at >= cutoff)
+        .group_by(func.date(Analysis.created_at))
+        .order_by(func.date(Analysis.created_at).asc())
+        .all()
+    )
+
+    return {
+        "days": [
+            {
+                "date": str(day),
+                "count": int(count or 0),
+                "average_score": round(float(average_score or 0), 2),
+                "best_score": round(float(best_score or 0), 2),
+            }
+            for day, count, average_score, best_score in rows
+        ]
+    }
+
+
 @router.get("/api/v1/export/analysis/{analysis_id}")
 def export_analysis_pdf(
     analysis_id: int,
@@ -1090,6 +1181,8 @@ def export_analysis_pdf(
         pdf.multi_cell(0, 10, txt=f"Details: {str(analysis.result)}")
 
     pdf_output = pdf.output(dest='S')
+    if isinstance(pdf_output, str):
+        pdf_output = pdf_output.encode("latin-1", errors="replace")
     return StreamingResponse(
         iter([pdf_output]),
         media_type='application/pdf',

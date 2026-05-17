@@ -11,7 +11,7 @@ import ScoreCircle from '../components/ScoreCircle'
 import ScoreBars from '../components/ScoreBars'
 import SkillTags from '../components/SkillTags'
 import { getHistory, removeHistoryItem, clearHistory } from '../utils/historyStorage'
-import { toggleFavorite, fetchFavoriteIds, exportHistoryCSV, createShareLink, saveAnalysisNote, fetchAnalysisNote } from '../api'
+import { toggleFavorite, fetchFavoriteIds, exportHistoryCSV, createShareLink, saveAnalysisNote, fetchAnalysisNote, downloadAnalysisReport } from '../api'
 import UpgradePrompt from '../components/UpgradePrompt'
 
 export default function HistoryPage() {
@@ -116,6 +116,7 @@ export default function HistoryPage() {
   const [noteText, setNoteText] = useState('')
   const [noteLoading, setNoteLoading] = useState(false)
   const [noteSaved, setNoteSaved] = useState(false)
+  const [reportLoading, setReportLoading] = useState(false)
 
   useEffect(() => {
     if (!selected?.analysis_id || !token) { setNoteText(''); return }
@@ -134,6 +135,22 @@ export default function HistoryPage() {
       setTimeout(() => setNoteSaved(false), 2000)
     } catch { /* ignore */ }
     finally { setNoteLoading(false) }
+  }
+
+  async function handleDownloadReport(item) {
+    if (!item?.analysis_id || !token) {
+      addToast('Bu analiz rapor olarak indirilemez', 'warning')
+      return
+    }
+    setReportLoading(true)
+    try {
+      await downloadAnalysisReport(token, item.analysis_id)
+      addToast('PDF rapor indirildi', 'success')
+    } catch (err) {
+      addToast(err?.message || 'Rapor indirilemedi', 'error')
+    } finally {
+      setReportLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -305,6 +322,14 @@ export default function HistoryPage() {
                       title="Paylaşım linki oluştur"
                     >
                       <Share2 size={14} /> Paylaş
+                    </button>
+                    <button
+                      className="btn-outline btn-sm"
+                      onClick={() => handleDownloadReport(selected)}
+                      disabled={reportLoading}
+                      title="PDF rapor indir"
+                    >
+                      <Download size={14} /> {reportLoading ? '...' : 'PDF Rapor'}
                     </button>
                     {shareUrl && (
                       <div className="share-url-row">

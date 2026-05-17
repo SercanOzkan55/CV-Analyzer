@@ -402,7 +402,12 @@ def _generate(prompt: str, max_tokens: int = 512) -> str:
 
 
 def ai_rewrite_available() -> bool:
-    return _select_provider() != "mock"
+    provider = _select_provider()
+    if provider == "mock":
+        return False
+    if provider in {"openai", "openai-compatible"}:
+        return bool(str(os.getenv("OPENAI_API_KEY", "")).strip())
+    return False
 
 
 def ai_rewrite_cv(

@@ -10,7 +10,16 @@ import Navbar from '../components/Navbar'
 import { useLanguage } from '../i18n/LanguageContext'
 import { useToast } from '../components/Toast'
 import { useAuth } from '../context/AuthContext'
-import { createReminder, updateReminder, deleteReminder, sendReminderTest } from '../api'
+import {
+  createJobApplication,
+  createReminder,
+  deleteJobApplication,
+  deleteReminder,
+  listJobApplications,
+  sendReminderTest,
+  updateJobApplication,
+  updateReminder,
+} from '../api'
 
 const STORAGE_KEY = 'cv_analyzer_job_tracker'
 
@@ -65,6 +74,42 @@ function loadJobs() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {} } catch { return {} }
 }
 function saveJobs(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) }
+
+function jobFromServer(row) {
+  return {
+    id: `srv-${row.id}`,
+    serverId: row.id,
+    company: row.company || '',
+    role: row.role || '',
+    status: row.status || 'wishlist',
+    location: row.location || '',
+    url: row.url || '',
+    salary: row.salary || '',
+    priority: row.priority || 'medium',
+    notes: row.notes || '',
+    appliedDate: row.applied_date ? row.applied_date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+    reminderId: row.reminder_id || null,
+    order: row.board_order || 0,
+    createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+  }
+}
+
+function jobToServer(job) {
+  return {
+    company: job.company,
+    role: job.role,
+    status: job.status,
+    location: job.location || '',
+    url: job.url || '',
+    salary: job.salary || '',
+    priority: job.priority || 'medium',
+    notes: job.notes || '',
+    applied_date: job.appliedDate ? new Date(job.appliedDate).toISOString() : null,
+    reminder_id: job.reminderId || null,
+    board_order: job.order || 0,
+    source: 'job_tracker',
+  }
+}
 
 const containerVariants = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } }
 const itemVariants = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.35 } } }
@@ -282,9 +327,29 @@ export default function JobTrackerPage() {
   const [addToColumn, setAddToColumn] = useState('wishlist')
   const [draggedJob, setDraggedJob] = useState(null)
   const [dragOverCol, setDragOverCol] = useState(null)
+  const [syncingJobs, setSyncingJobs] = useState(false)
 
   useEffect(() => { document.title = `${t('jt.title')} — CV Analyzer` }, [t])
   useEffect(() => { saveJobs(jobs) }, [jobs])
+
+  useEffect(() => {
+    if (!token) return undefined
+    let cancelled = false
+    setSyncingJobs(true)
+    listJobApplications(token)
+      .then((res) => {
+        if (cancelled) return
+        const remote = {}
+        ;(res.items || []).forEach((row) => {
+          const job = jobFromServer(row)
+          remote[job.id] = job
+        })
+        setJobs((prev) => ({ ...prev, ...remote }))
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setSyncingJobs(false) })
+    return () => { cancelled = true }
+  }, [token])
 
   // ── Helpers ──
   const allJobs = Object.values(jobs)
@@ -359,7 +424,15 @@ export default function JobTrackerPage() {
       newJob = { ...newJob, reminderSyncError: err.message || 'Reminder sync failed' }
       addToast(copy(lang, 'Başvuru kaydedildi ama mail hatırlatma kurulamadı.', 'Job saved, but email reminder could not be scheduled.'), 'warning')
     }
-    setJobs(prev => ({ ...prev, [id]: newJob }))
+    if (token) {
+      try {
+        const saved = await createJobApplication(token, jobToServer(newJob))
+        newJob = { ...newJob, id: `srv-${saved.id}`, serverId: saved.id }
+      } catch (err) {
+        addToast(err.message || copy(lang, 'BaÅŸvuru cihazda kaydedildi, sunucuya senkronize edilemedi.', 'Job saved locally, but server sync failed.'), 'warning')
+      }
+    }
+    setJobs(prev => ({ ...prev, [newJob.id || id]: newJob }))
     setModalOpen(false)
     addToast(newJob.reminderId ? copy(lang, 'Başvuru ve mail hatırlatma kaydedildi', 'Job and email reminder saved') : t('jt.job_added'), 'success')
   }
@@ -372,7 +445,22 @@ export default function JobTrackerPage() {
       updatedJob = { ...updatedJob, reminderSyncError: err.message || 'Reminder sync failed' }
       addToast(copy(lang, 'Başvuru güncellendi ama mail hatırlatma senkronize edilemedi.', 'Job updated, but email reminder could not be synced.'), 'warning')
     }
-    setJobs(prev => ({ ...prev, [editingJob.id]: updatedJob }))
+    if (token) {
+      try {
+        const saved = updatedJob.serverId
+          ? await updateJobApplication(token, updatedJob.serverId, jobToServer(updatedJob))
+          : await createJobApplication(token, jobToServer(updatedJob))
+        updatedJob = { ...updatedJob, id: `srv-${saved.id}`, serverId: saved.id }
+      } catch (err) {
+        addToast(err.message || copy(lang, 'BaÅŸvuru gÃ¼ncellendi ama sunucuya senkronize edilemedi.', 'Job updated locally, but server sync failed.'), 'warning')
+      }
+    }
+    setJobs(prev => {
+      const next = { ...prev }
+      if (updatedJob.id !== editingJob.id) delete next[editingJob.id]
+      next[updatedJob.id] = updatedJob
+      return next
+    })
     setEditingJob(null)
     setModalOpen(false)
     addToast(t('jt.job_updated'), 'success')
@@ -380,6 +468,7 @@ export default function JobTrackerPage() {
   function handleDeleteJob(id) {
     const job = jobs[id]
     if (token && job?.reminderId) deleteReminder(token, job.reminderId).catch(() => null)
+    if (token && job?.serverId) deleteJobApplication(token, job.serverId).catch(() => null)
     setJobs(prev => { const copy = { ...prev }; delete copy[id]; return copy })
     addToast(t('jt.job_deleted'), 'success')
   }
@@ -421,6 +510,11 @@ export default function JobTrackerPage() {
       ...prev,
       [draggedJob.id]: updatedJob
     }))
+    if (token && updatedJob.serverId) {
+      updateJobApplication(token, updatedJob.serverId, jobToServer(updatedJob)).catch(() => {
+        addToast(copy(lang, 'Durum cihazda gÃ¼ncellendi ama sunucu senkronu baÅŸarÄ±sÄ±z.', 'Status changed locally, but server sync failed.'), 'warning')
+      })
+    }
     // Toast for status change
     if (colId === 'offer') addToast(`🎉 ${t('jt.congrats_offer')}`, 'success')
     else if (colId === 'interview') addToast(`📞 ${t('jt.moved_interview')}`, 'success')
@@ -464,6 +558,7 @@ export default function JobTrackerPage() {
             <div>
               <h1 className="jt-title">{t('jt.title')}</h1>
               <p className="jt-subtitle">{t('jt.subtitle')}</p>
+              {syncingJobs && <p className="text-muted text-xs">Syncing applications...</p>}
             </div>
           </motion.div>
 
