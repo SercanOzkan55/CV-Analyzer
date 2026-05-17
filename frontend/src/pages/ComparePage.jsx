@@ -3,9 +3,11 @@ import { motion } from 'framer-motion'
 import { GitCompare, ArrowRight, ArrowUp, ArrowDown, Minus } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/LanguageContext'
+import { useToast } from '../components/Toast'
 import Navbar from '../components/Navbar'
 import ScoreCircle from '../components/ScoreCircle'
 import { getHistory } from '../utils/historyStorage'
+import { diffCvText } from '../api'
 
 function RadarChart({ dimensions, labelA, labelB }) {
   const n = dimensions.length
@@ -90,11 +92,16 @@ function RadarChart({ dimensions, labelA, labelB }) {
 }
 
 export default function ComparePage() {
-  const { user } = useAuth()
+  const { user, token } = useAuth()
   const { t } = useLanguage()
+  const { addToast } = useToast()
   const history = getHistory(user)
   const [idxA, setIdxA] = useState(0)
   const [idxB, setIdxB] = useState(Math.min(1, history.length - 1))
+  const [originalText, setOriginalText] = useState('')
+  const [optimizedText, setOptimizedText] = useState('')
+  const [diffSummary, setDiffSummary] = useState(null)
+  const [diffLoading, setDiffLoading] = useState(false)
 
   const a = history[idxA] || null
   const b = history[idxB] || null
@@ -135,11 +142,100 @@ export default function ComparePage() {
     return dims
   }, [a, b])
 
+  async function handleTextDiff() {
+    if (!originalText.trim() || !optimizedText.trim()) {
+      addToast('Paste both CV versions first', 'warning')
+      return
+    }
+    setDiffLoading(true)
+    try {
+      const res = await diffCvText(token, originalText, optimizedText)
+      setDiffSummary(res.change_summary || res)
+    } catch (err) {
+      addToast(err?.message || 'CV diff failed', 'error')
+    } finally {
+      setDiffLoading(false)
+    }
+  }
+
+  const textDiffCard = (
+    <motion.div
+      className="card"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      style={{ marginBottom: '1.25rem' }}
+    >
+      <h3 style={{ marginBottom: '0.75rem' }}>Original vs Optimized CV Diff</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
+        <textarea
+          className="job-desc-input"
+          rows={8}
+          value={originalText}
+          onChange={(e) => setOriginalText(e.target.value)}
+          placeholder="Paste original CV text"
+        />
+        <textarea
+          className="job-desc-input"
+          rows={8}
+          value={optimizedText}
+          onChange={(e) => setOptimizedText(e.target.value)}
+          placeholder="Paste optimized CV text"
+        />
+      </div>
+      <button className="btn-primary btn-sm" onClick={handleTextDiff} disabled={diffLoading} style={{ marginTop: '0.9rem' }}>
+        <GitCompare size={14} /> {diffLoading ? 'Comparing...' : 'Compare Text'}
+      </button>
+      {diffSummary && (
+        <div className="compare-table" style={{ marginTop: '1rem' }}>
+          <div className="compare-table-row">
+            <span>Lines</span>
+            <span>{diffSummary.original_lines || 0}</span>
+            <span>{diffSummary.optimized_lines || 0}</span>
+            <span>{(diffSummary.added_line_count || 0) - (diffSummary.removed_line_count || 0)}</span>
+          </div>
+          {(diffSummary.summary || []).map((item, index) => (
+            <div className="compare-table-row" key={index}>
+              <span>{item}</span>
+              <span />
+              <span />
+              <span />
+            </div>
+          ))}
+          {(diffSummary.added_examples || []).slice(0, 4).map((item, index) => (
+            <div className="compare-table-row" key={`add-${index}`}>
+              <span className="positive">+ {item}</span>
+              <span />
+              <span />
+              <span />
+            </div>
+          ))}
+          {(diffSummary.removed_examples || []).slice(0, 4).map((item, index) => (
+            <div className="compare-table-row" key={`remove-${index}`}>
+              <span className="negative">- {item}</span>
+              <span />
+              <span />
+              <span />
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  )
+
   if (history.length < 2) {
     return (
       <div className="app-layout">
         <Navbar />
         <main className="main-content" id="main-content">
+          <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+            <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <GitCompare size={24} style={{ color: 'var(--color-accent)' }} />
+              {t('compare.title')}
+            </h1>
+            <p className="text-muted" style={{ marginBottom: '1.5rem' }}>{t('compare.subtitle')}</p>
+          </motion.div>
+          {textDiffCard}
           <div className="db-empty-state" style={{ marginTop: '3rem' }}>
             <motion.span className="db-empty-icon" animate={{ y: [0, -8, 0] }} transition={{ duration: 3.5, repeat: Infinity }}>
               📊
@@ -173,6 +269,8 @@ export default function ComparePage() {
           </h1>
           <p className="text-muted" style={{ marginBottom: '1.5rem' }}>{t('compare.subtitle')}</p>
         </motion.div>
+
+        {textDiffCard}
 
         {/* Selectors */}
         <div className="compare-selectors">

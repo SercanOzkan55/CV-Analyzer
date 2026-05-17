@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -11,7 +11,7 @@ import { useLanguage } from '../i18n/LanguageContext'
 import Navbar from '../components/Navbar'
 import ScoreCircle from '../components/ScoreCircle'
 import { useToast } from '../components/Toast'
-import { createBillingPortalSession } from '../api'
+import { createBillingPortalSession, fetchAnalysisTrends } from '../api'
 import { getHistory } from '../utils/historyStorage'
 import useAnimatedCounter from '../hooks/useAnimatedCounter'
 import { getScoreColor } from '../utils/scoreColors'
@@ -232,6 +232,8 @@ export default function DashboardPage() {
   const { t } = useLanguage()
   const { addToast } = useToast()
   const history = getHistory(user)
+  const [remoteTrends, setRemoteTrends] = useState([])
+  const [trendLoading, setTrendLoading] = useState(false)
   const name = user?.email?.split('@')[0] || ''
   const usagePercent = dailyLimit === Infinity ? 0 : (usageToday / dailyLimit) * 100
   const showUsageSource = import.meta.env.DEV || import.meta.env.VITE_SHOW_USAGE_SOURCE === '1'
@@ -244,6 +246,39 @@ export default function DashboardPage() {
   useEffect(() => {
     document.title = `${t('nav.dashboard')} — CV Analyzer`
   }, [t])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!token) {
+      setRemoteTrends([])
+      return undefined
+    }
+
+    setTrendLoading(true)
+    fetchAnalysisTrends(token, 90)
+      .then((data) => {
+        if (cancelled) return
+        const rows = Array.isArray(data?.days) ? data.days : []
+        setRemoteTrends(rows.map((row) => ({
+          date: row.date,
+          score: Number(row.average_score || 0),
+          bestScore: Number(row.best_score || 0),
+          count: Number(row.count || 0),
+        })))
+      })
+      .catch(() => {
+        if (!cancelled) setRemoteTrends([])
+      })
+      .finally(() => {
+        if (!cancelled) setTrendLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [token])
+
+  const trendHistory = remoteTrends.length >= 2 ? remoteTrends : history
 
   async function onManageBilling() {
     if (!token) return
@@ -454,7 +489,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Score Trend Chart ──────────────────────── */}
-        {history.length >= 2 && (
+        {trendHistory.length >= 2 && (
           <motion.div
             className="card db-trend-card"
             initial={{ opacity: 0, y: 20 }}
@@ -467,8 +502,13 @@ export default function DashboardPage() {
                 <TrendingUp size={15} style={{ color: 'var(--color-accent)' }} />
                 {t('dashboard.score_trend')}
               </div>
+              {remoteTrends.length >= 2 && (
+                <span className="text-muted text-xs">
+                  {trendLoading ? 'Syncing...' : 'Database trend'}
+                </span>
+              )}
             </div>
-            <ScoreTrendChart history={history} />
+            <ScoreTrendChart history={trendHistory} />
           </motion.div>
         )}
 

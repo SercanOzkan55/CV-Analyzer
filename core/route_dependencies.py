@@ -42,7 +42,7 @@ from auth import verify_supabase_jwt
 from core.request_utils import _read_upload_or_400
 from core.runtime_bridge import is_mock_services_on, main_module
 from database import SessionLocal, get_db
-from models import Analysis, CVVersion, Candidate, Job, Organization, RecruiterJob, Reminder, User
+from models import Analysis, CVVersion, Candidate, Job, JobApplication, Organization, RecruiterJob, Reminder, User
 from services import rewrite_service
 from services.ai_feature_service import ensure_ai_rewrite_allowed as _ensure_ai_rewrite_allowed
 from services.billing_service import is_feature_enabled

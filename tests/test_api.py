@@ -92,6 +92,20 @@ def test_analyze_pdf_large_file(client, sample_texts):
     assert "File too large" in resp.text or resp.json().get("detail")
 
 
+def test_analyze_txt_upload_supported(client, sample_texts):
+    cv, job = sample_texts
+    files = {"file": ("resume.txt", cv.encode("utf-8"), "text/plain")}
+    resp = client.post(
+        "/api/v1/analyze-pdf",
+        files=files,
+        data={"job_description": job, "lang": "en"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["cv_file_type"] == "txt"
+    assert "cv_text" in data
+
+
 def test_history_auth(monkeypatch, client):
     # JWT auth is mocked in conftest for testing
     # /api/v1/history uses JWT (not API_KEY) authentication
@@ -325,6 +339,19 @@ def test_job_keyword_gap_endpoint_returns_v2_fields(client):
     assert "keyword_coverage_pct" in data
 
 
+def test_skill_roadmap_endpoint_returns_actions(client):
+    payload = {
+        "cv_text": "Python backend development",
+        "job_description": "Need Python, Docker, AWS and PostgreSQL",
+        "lang": "en",
+    }
+    resp = client.post("/api/v1/job/skill-roadmap", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "roadmap" in data
+    assert isinstance(data["roadmap"], list)
+
+
 def test_job_match_score_endpoint_includes_v2_match_fields(client, sample_texts):
     cv, job = sample_texts
     resp = client.post(
@@ -383,6 +410,38 @@ def test_cv_versions_save_list_get_flow(client):
     row = get_resp.json()
     assert row["id"] == version_id
     assert row["source"] == "auto_fix"
+
+
+def test_job_applications_crud_flow(client):
+    create_resp = client.post(
+        "/api/v1/job-applications",
+        json={
+            "company": "Acme",
+            "role": "Backend Engineer",
+            "status": "applied",
+            "location": "Remote",
+            "priority": "high",
+        },
+    )
+    assert create_resp.status_code == 200
+    created = create_resp.json()
+    assert created["company"] == "Acme"
+    assert created["status"] == "applied"
+
+    update_resp = client.put(
+        f"/api/v1/job-applications/{created['id']}",
+        json={"status": "interview", "board_order": 2},
+    )
+    assert update_resp.status_code == 200
+    assert update_resp.json()["status"] == "interview"
+
+    list_resp = client.get("/api/v1/job-applications")
+    assert list_resp.status_code == 200
+    assert any(item["id"] == created["id"] for item in list_resp.json()["items"])
+
+    delete_resp = client.delete(f"/api/v1/job-applications/{created['id']}")
+    assert delete_resp.status_code == 200
+    assert delete_resp.json()["deleted"] is True
 
 
 def test_billing_admin_set_user_plan_updates_user_by_email(client, db_session, monkeypatch):

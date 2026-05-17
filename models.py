@@ -294,6 +294,34 @@ class Reminder(Base):
 # ── Global ATS Benchmark Models ─────────────────────────────────
 
 
+class JobApplication(Base):
+    """User-owned job application tracker entries."""
+
+    __tablename__ = "job_applications"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(
+        Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    organization_id = Column(
+        Integer, ForeignKey("organizations.id"), nullable=True, index=True
+    )
+    company = Column(String(200), nullable=False)
+    role = Column(String(200), nullable=False)
+    status = Column(String(40), nullable=False, default="wishlist", index=True)
+    location = Column(String(200), nullable=True)
+    url = Column(Text, nullable=True)
+    salary = Column(String(120), nullable=True)
+    priority = Column(String(20), nullable=False, default="medium")
+    notes = Column(Text, nullable=True)
+    applied_date = Column(DateTime, nullable=True, index=True)
+    reminder_id = Column(Integer, ForeignKey("reminders.id", ondelete="SET NULL"), nullable=True)
+    board_order = Column(Integer, nullable=False, default=0)
+    source = Column(String(80), nullable=False, default="manual")
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class ATSBenchmarkGlobal(Base):
     """Single-row aggregate: global ATS statistics across all CVs."""
 

@@ -6,11 +6,23 @@ export default function DragDropUpload({ onFileSelect, file, onRemove }) {
   const inputRef = useRef(null)
   const [dragOver, setDragOver] = useState(false)
 
+  function isSupported(fileValue) {
+    const ext = String(fileValue?.name || '').split('.').pop()?.toLowerCase()
+    return (
+      ['pdf', 'txt', 'docx'].includes(ext) ||
+      [
+        'application/pdf',
+        'text/plain',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      ].includes(fileValue?.type)
+    )
+  }
+
   function handleDrop(e) {
     e.preventDefault()
     setDragOver(false)
     const dropped = e.dataTransfer.files[0]
-    if (dropped?.type === 'application/pdf') {
+    if (dropped && isSupported(dropped)) {
       onFileSelect(dropped)
     }
   }
@@ -44,7 +56,7 @@ export default function DragDropUpload({ onFileSelect, file, onRemove }) {
       <input
         ref={inputRef}
         type="file"
-        accept="application/pdf"
+        accept=".pdf,.txt,.docx,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         onChange={handleInputChange}
         hidden
       />

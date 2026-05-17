@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/LanguageContext'
 import { useToast } from '../components/Toast'
-import { analyzePdf, autoFixCv, exportAutoFixedCV, fetchScoreBreakdown } from '../api'
+import { analyzePdf, autoFixCv, buildSkillRoadmap, exportAutoFixedCV, fetchScoreBreakdown } from '../api'
 import { addHistoryItem } from '../utils/historyStorage'
 import Navbar from '../components/Navbar'
 import DragDropUpload from '../components/DragDropUpload'
@@ -48,6 +48,18 @@ const STATUS_BORDER = {
   danger: 'var(--status-danger-border)',
   info: 'var(--status-info-border)',
   accent: 'var(--status-accent-border)',
+}
+
+const SUPPORTED_CV_TYPES = new Set([
+  'application/pdf',
+  'text/plain',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+])
+
+function isSupportedCvFile(file) {
+  if (!file) return false
+  const ext = String(file.name || '').split('.').pop()?.toLowerCase()
+  return SUPPORTED_CV_TYPES.has(file.type) || ['pdf', 'txt', 'docx'].includes(ext)
 }
 
 function scoreStatus(score, mid = 50, high = 70) {
@@ -650,6 +662,9 @@ export default function AnalyzePage() {
   const [scoreBreakdown, setScoreBreakdown] = useState(null)
   const [breakdownLoading, setBreakdownLoading] = useState(false)
   const [cvPreviewUrl, setCvPreviewUrl] = useState('')
+  const [skillRoadmap, setSkillRoadmap] = useState(null)
+  const [skillRoadmapLoading, setSkillRoadmapLoading] = useState(false)
+  const [skillRoadmapError, setSkillRoadmapError] = useState(null)
 
   useEffect(() => {
     if (!file) {
@@ -698,9 +713,11 @@ export default function AnalyzePage() {
     setError(null)
     setResult(null)
     setSaved(false)
+    setSkillRoadmap(null)
+    setSkillRoadmapError(null)
 
     if (!file) return setError(t('analyze.no_file'))
-    if (file.type !== 'application/pdf') return setError(t('analyze.invalid_file'))
+    if (!isSupportedCvFile(file)) return setError(uiCopy(lang, 'Lütfen PDF, DOCX veya TXT CV dosyası seçin', 'Please select a PDF, DOCX, or TXT CV file'))
     if (file.size > 10 * 1024 * 1024) return setError(t('analyze.file_too_large'))
     // Job description is optional for ATS-focused checks
 
@@ -726,6 +743,8 @@ export default function AnalyzePage() {
       setAutoFixResult(null)
       setAutoFixError(null)
       setEditedText('')
+      setSkillRoadmap(null)
+      setSkillRoadmapError(null)
       recordAnalysis()
       saveToHistory(data, file.name, jobDesc, user)
       addToast(t('toast.analysis_complete'), 'success')
@@ -768,6 +787,28 @@ export default function AnalyzePage() {
       setAutoFixError(msg)
     } finally {
       setAutoFixLoading(false)
+    }
+  }
+
+  async function handleBuildSkillRoadmap() {
+    if (!result || !jobDesc.trim()) {
+      setSkillRoadmapError(uiCopy(lang, 'Roadmap icin is tanimi ve analiz sonucu gerekli.', 'A job description and analysis result are required for a roadmap.'))
+      return
+    }
+
+    try {
+      setSkillRoadmapLoading(true)
+      setSkillRoadmapError(null)
+      const data = await buildSkillRoadmap(token, {
+        cv_text: result.cv_text || '',
+        job_description: jobDesc,
+        lang,
+      })
+      setSkillRoadmap(data)
+    } catch (err) {
+      setSkillRoadmapError(err.message || t('toast.error_generic'))
+    } finally {
+      setSkillRoadmapLoading(false)
     }
   }
 
@@ -814,6 +855,8 @@ export default function AnalyzePage() {
     setAutoFixError(null)
     setExportLoading(null)
     setEditedText('')
+    setSkillRoadmap(null)
+    setSkillRoadmapError(null)
   }
 
   function getInterpretation(text) {
@@ -1365,6 +1408,52 @@ export default function AnalyzePage() {
                   )}
 
                   {/* Score Suggestions — actionable improvement tips */}
+                  {jobDesc?.trim() && result.missing_skills?.length > 0 && (
+                    <div className="card" style={{ borderLeft: '3px solid var(--status-info)' }}>
+                      <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.75rem' }}>
+                        <div>
+                          <h3 style={{ marginTop: 0 }}>{uiCopy(lang, 'Beceri yol haritasi', 'Skill gap roadmap')}</h3>
+                          <p className="text-muted" style={{ margin: 0, fontSize: '0.84rem' }}>
+                            {uiCopy(lang, 'Eksik becerileri kanitlanabilir CV aksiyonlarina donustur.', 'Turn missing skills into provable CV actions.')}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-outline btn-sm"
+                          onClick={handleBuildSkillRoadmap}
+                          disabled={skillRoadmapLoading}
+                        >
+                          {skillRoadmapLoading ? uiCopy(lang, 'Hazirlaniyor...', 'Building...') : uiCopy(lang, 'Roadmap uret', 'Build roadmap')}
+                        </button>
+                      </div>
+                      {skillRoadmapError && <p className="error" style={{ marginTop: 0 }}>{skillRoadmapError}</p>}
+                      {skillRoadmap?.roadmap?.length > 0 && (
+                        <div style={{ display: 'grid', gap: '0.65rem' }}>
+                          {skillRoadmap.roadmap.map((item, idx) => (
+                            <div key={`${item.skill}-${idx}`} style={{
+                              padding: '0.75rem',
+                              border: '1px solid var(--color-border)',
+                              borderRadius: '0.75rem',
+                              background: 'var(--bg-card-hover)',
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.4rem' }}>
+                                <strong>{item.skill}</strong>
+                                <span className={`status-pill ${item.priority === 'high' ? 'status-pill-danger' : 'status-pill-warning'}`}>
+                                  {item.priority}
+                                </span>
+                              </div>
+                              <ul style={{ margin: 0, paddingLeft: '1.1rem', color: 'var(--color-text-secondary)', fontSize: '0.84rem' }}>
+                                <li>{item.cv_action}</li>
+                                <li>{item.proof}</li>
+                                <li>{item.practice}</li>
+                              </ul>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {jobDesc?.trim() && result.score_suggestions?.length > 0 && (
                     <div className="card" style={{ borderLeft: '3px solid var(--status-accent)' }}>
                       <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0, color: 'var(--status-accent)' }}>

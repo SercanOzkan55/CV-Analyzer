@@ -445,6 +445,12 @@ class KeywordGapRequest(BaseModel):
     job_description: str
 
 
+class SkillRoadmapRequest(BaseModel):
+    cv_text: str
+    job_description: str
+    lang: str = "en"
+
+
 class CVRewriteRequest(BaseModel):
     cv_text: str
     job_description: str = ""
@@ -1164,6 +1170,72 @@ def keyword_gap_detector_endpoint(
     }
 
 
+def _skill_roadmap_for_gap(missing: list[str], weak: list[str], lang: str) -> list[dict]:
+    names = [str(item).strip() for item in (missing or []) + (weak or []) if str(item).strip()]
+    unique = []
+    seen = set()
+    for name in names:
+        key = name.lower()
+        if key not in seen:
+            seen.add(key)
+            unique.append(name)
+    if not unique:
+        return []
+
+    is_tr = str(lang or "en").lower().startswith("tr")
+    roadmap = []
+    for index, skill in enumerate(unique[:8], start=1):
+        roadmap.append(
+            {
+                "skill": skill,
+                "priority": "high" if index <= 3 else "medium",
+                "proof": (
+                    f"{skill} icin bir proje/deneyim maddesi ekle"
+                    if is_tr
+                    else f"Add one project or experience bullet that proves {skill}"
+                ),
+                "practice": (
+                    f"{skill} ile kucuk bir uygulama veya vaka calismasi hazirla"
+                    if is_tr
+                    else f"Build a small project or case study using {skill}"
+                ),
+                "cv_action": (
+                    f"{skill} bilgisini becerilerde listele ve deneyim/proje icinde baglamla kullan"
+                    if is_tr
+                    else f"List {skill} in skills and use it with context in experience or projects"
+                ),
+            }
+        )
+    return roadmap
+
+
+@router.post("/api/v1/job/skill-roadmap")
+@rate_limit(f"{RATE_LIMIT_IP_MATCH_PER_MIN}/minute")
+def skill_roadmap_endpoint(
+    body: SkillRoadmapRequest,
+    response: Response,
+    user=Depends(verify_supabase_jwt),
+    db=Depends(get_db),
+):
+    _ensure_not_expired(user)
+    supabase_id = user.get("user_id")
+    email = user.get("email")
+    db_user = get_or_create_user(db, supabase_id, email)
+    _consume_billable_usage(db, db_user, "skill-roadmap", response=response)
+
+    result = compare(body.cv_text, body.job_description)
+    missing = result.get("missing_keywords", []) or []
+    weak = result.get("weak_keywords", []) or []
+    roadmap = _skill_roadmap_for_gap(missing, weak, body.lang)
+    return {
+        "keyword_coverage_pct": result.get("keyword_coverage_pct", 0.0),
+        "missing_keywords": missing,
+        "weak_keywords": weak,
+        "roadmap": roadmap,
+        "message": "Roadmap generated from job-description gaps",
+    }
+
+
 @router.post("/api/v1/cv/versions")
 def save_cv_version(
     body: SaveCVVersionRequest,
@@ -1225,6 +1297,29 @@ def save_cv_version(
         "match_score": row.match_score,
         "created_at": row.created_at.isoformat() if row.created_at else None,
     }
+
+
+@router.delete("/api/v1/cv/versions/{version_id}")
+def delete_cv_version(
+    version_id: int,
+    user=Depends(verify_supabase_jwt),
+    db=Depends(get_db),
+):
+    _ensure_not_expired(user)
+    supabase_id = user.get("user_id")
+    email = user.get("email")
+    db_user = get_or_create_user(db, supabase_id, email)
+
+    row = (
+        db.query(CVVersion)
+        .filter(CVVersion.id == version_id, CVVersion.user_id == db_user.id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="CV version not found")
+    db.delete(row)
+    db.commit()
+    return {"deleted": True, "id": version_id}
 
 
 @router.get("/api/v1/cv/versions")
