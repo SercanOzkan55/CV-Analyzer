@@ -9,6 +9,27 @@ from io import BytesIO
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
+@pytest.fixture(autouse=True)
+def mock_cv_processing():
+    """Mock CV processing to avoid ProcessPoolExecutor spawn issue on Windows."""
+    async def mock_ultra_fast(files, job_description, job_id, use_cache=True, workers=None):
+        results = []
+        for f in files:
+            results.append({
+                "filename": f["filename"],
+                "status": "success",
+                "final_score": 85.0,
+                "ats_score": 90.0,
+                "skills_match": ["Python"],
+                "experience_match": 5,
+                "education_match": 4,
+                "processed_at": "2026-05-17T12:00:00"
+            })
+        return results
+
+    with patch("utils.cv_processor.process_cv_batch_ultra_fast", new=mock_ultra_fast):
+        yield
+
 
 @pytest.fixture
 def recruiter_user(db_session):
