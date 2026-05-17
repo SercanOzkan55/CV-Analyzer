@@ -19,6 +19,26 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     op.create_table(
+        "reminders",
+        sa.Column("id", sa.Integer(), primary_key=True),
+        sa.Column("organization_id", sa.Integer(), sa.ForeignKey("organizations.id"), nullable=False),
+        sa.Column("created_by", sa.Integer(), sa.ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("title", sa.String(), nullable=False),
+        sa.Column("description", sa.Text(), nullable=True),
+        sa.Column("reminder_type", sa.String(), nullable=False, server_default="interview"),
+        sa.Column("target_email", sa.String(), nullable=False),
+        sa.Column("event_date", sa.DateTime(), nullable=False),
+        sa.Column("is_active", sa.Boolean(), nullable=True, server_default="true"),
+        sa.Column("notified_3d_at", sa.DateTime(), nullable=True),
+        sa.Column("notified_1d_at", sa.DateTime(), nullable=True),
+        sa.Column("created_at", sa.DateTime(), nullable=True, server_default=sa.func.now()),
+        sa.Column("updated_at", sa.DateTime(), nullable=True, server_default=sa.func.now()),
+    )
+    op.create_index("ix_reminders_organization_id", "reminders", ["organization_id"])
+    op.create_index("ix_reminders_created_by", "reminders", ["created_by"])
+    op.create_index("ix_reminders_event_date", "reminders", ["event_date"])
+
+    op.create_table(
         "job_applications",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("user_id", sa.Integer(), sa.ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False),
@@ -52,3 +72,8 @@ def downgrade() -> None:
     op.drop_index("ix_job_applications_organization_id", table_name="job_applications")
     op.drop_index("ix_job_applications_user_id", table_name="job_applications")
     op.drop_table("job_applications")
+
+    op.drop_index("ix_reminders_event_date", table_name="reminders")
+    op.drop_index("ix_reminders_created_by", table_name="reminders")
+    op.drop_index("ix_reminders_organization_id", table_name="reminders")
+    op.drop_table("reminders")
