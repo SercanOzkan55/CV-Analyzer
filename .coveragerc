@@ -6,6 +6,18 @@ omit =
     */venv/*
     */env/*
     */.env/*
+    */migrations/*
+    */scripts/*
+    train_model.py
+    add_recruiter.py
+    check_env.py
+    make_token.py
+    manual_history_test.py
+    remove_dupes.py
+    reset_plans.py
+    setup_db.py
+    validate_saas.py
+    locustfile.py
 
 [report]
 show_missing = True
