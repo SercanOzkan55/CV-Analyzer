@@ -8,7 +8,7 @@ from openai import OpenAI
 from services.embedding_service import get_embedding
 from utils.centroid import update_centroid
 
-load_dotenv()
+load_dotenv(encoding="utf-8-sig")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 

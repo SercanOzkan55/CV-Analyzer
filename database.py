@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-load_dotenv()
+load_dotenv(encoding="utf-8-sig")
 
 
 def _read_secret_file(path: str | None) -> str | None:

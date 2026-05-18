@@ -9,7 +9,7 @@ from .embedding_service import get_embedding
 from .naming_service import generate_primary_name, generate_specialization_name
 from utils.centroid import update_centroid
 
-load_dotenv()
+load_dotenv(encoding="utf-8-sig")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 

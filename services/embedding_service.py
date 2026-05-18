@@ -21,7 +21,7 @@ try:
 except Exception:
     redis = None
 
-load_dotenv()
+load_dotenv(encoding="utf-8-sig")
 
 # Redis connection (adjust host/port/db as needed). Use REDIS_URL when
 # available to stay consistent with the rest of the app.

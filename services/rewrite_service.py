@@ -6,7 +6,7 @@ from typing import List, Optional
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(encoding="utf-8-sig")
 
 
 MAX_INPUT_CHARS = int(os.getenv("REWRITE_MAX_INPUT_CHARS", "24000") or "24000")
