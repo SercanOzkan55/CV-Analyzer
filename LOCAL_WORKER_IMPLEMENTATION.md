@@ -102,6 +102,18 @@ Revoked keys, revoked sessions, expired sessions, expired claims, completed clai
 
 ## Python Worker
 
+Employers can download a ready-to-run ZIP from the Settings > Local Worker panel. The
+download is served by `GET /api/worker/download-package` and contains:
+
+- `worker.py`
+- `requirements.txt`
+- `README.md`
+- `.env.example`
+- `run-worker.ps1`
+
+The ZIP never includes an API key. The employer must paste the one-time key shown
+after creating a worker key in the web app.
+
 Install:
 
 ```bash
@@ -117,6 +129,10 @@ python worker.py jobs --api-key sk_worker_live_xxx
 python worker.py run --api-key sk_worker_live_xxx --job-id 123 --batch-size 20
 python worker.py status --api-key sk_worker_live_xxx
 ```
+
+For local development, the worker defaults to `http://127.0.0.1:8001/api/worker`,
+matching the FastAPI dev server documented in the project README. For staging or
+production, set `CV_ANALYZER_API_URL` explicitly.
 
 The worker supports:
 

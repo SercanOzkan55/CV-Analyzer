@@ -12,7 +12,7 @@ from pathlib import Path
 import requests
 
 
-API_BASE_URL = os.environ.get("CV_ANALYZER_API_URL", "http://localhost:8000/api/worker")
+API_BASE_URL = os.environ.get("CV_ANALYZER_API_URL", "http://127.0.0.1:8001/api/worker")
 WORKER_VERSION = "1.2.0"
 ENGINE_VERSION = "rule_based_mvp_v1"
 PROGRESS_LOG = Path(os.environ.get("CV_WORKER_PROGRESS_LOG", "worker_progress.jsonl"))
