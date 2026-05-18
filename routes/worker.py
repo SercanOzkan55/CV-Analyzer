@@ -26,7 +26,19 @@ security = HTTPBearer()
 def hash_key(api_key: str) -> str:
     return hashlib.sha256(api_key.encode("utf-8")).hexdigest()
 
-_DOWNLOAD_TOKEN_TTL_SECONDS = 600
+
+def _download_token_ttl_seconds() -> int:
+    raw = os.getenv("WORKER_DOWNLOAD_URL_TTL_SECONDS", "600")
+    try:
+        ttl = int(raw)
+    except ValueError as exc:
+        raise RuntimeError("WORKER_DOWNLOAD_URL_TTL_SECONDS must be an integer") from exc
+    if ttl < 60 or ttl > 3600:
+        raise RuntimeError("WORKER_DOWNLOAD_URL_TTL_SECONDS must be between 60 and 3600 seconds")
+    return ttl
+
+
+_DOWNLOAD_TOKEN_TTL_SECONDS = _download_token_ttl_seconds()
 _KNOWN_SKILLS = [
     "python", "javascript", "typescript", "react", "node", "fastapi", "django",
     "flask", "sql", "postgresql", "mysql", "mongodb", "redis", "docker",
