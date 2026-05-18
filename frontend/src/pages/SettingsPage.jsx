@@ -5,6 +5,7 @@ import { useTheme } from '../context/ThemeContext'
 import { useToast } from '../components/Toast'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
+import LocalWorkerPanel from '../components/LocalWorkerPanel'
 
 export default function SettingsPage() {
   const { user, plan, planLoading, updatePassword, deleteUser } = useAuth()
@@ -184,6 +185,11 @@ export default function SettingsPage() {
           </div>
 
         </div>
+        {user && (
+          <section className="settings-worker-panel">
+            <LocalWorkerPanel organizationId={user?.organization_id || user?.organizationId} />
+          </section>
+        )}
       </main>
     </div>
   )

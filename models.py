@@ -255,6 +255,9 @@ class CandidateAction(Base):
     candidate_name = Column(String, nullable=False)
     candidate_email = Column(String, nullable=True)
     cv_text = Column(Text, nullable=True)
+    cv_file_key = Column(String, nullable=True)
+    cv_file_name = Column(String, nullable=True)
+    cv_file_type = Column(String, nullable=True)
     final_score = Column(Float, nullable=True)
     ats_score = Column(Float, nullable=True)
     action = Column(String, nullable=False)  # accepted | rejected | pending
@@ -452,3 +455,97 @@ class AnalysisNote(Base):
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ── Local Worker Models ─────────────────────────────────────────
+
+class WorkerKey(Base):
+    __tablename__ = "worker_keys"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    job_id = Column(Integer, ForeignKey("recruiter_jobs.id", ondelete="CASCADE"), nullable=True, index=True)
+    key_prefix = Column(String, nullable=False)
+    key_hash = Column(String, nullable=False, unique=True, index=True)
+    quota_limit = Column(Integer, nullable=False, default=0)
+    quota_used = Column(Integer, nullable=False, default=0)
+    quota_reserved = Column(Integer, nullable=False, default=0)
+    expires_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+    created_by_user_id = Column(Integer, ForeignKey("app_users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_used_at = Column(DateTime, nullable=True)
+    permissions = Column(JSON, nullable=True)
+
+
+class WorkerSession(Base):
+    __tablename__ = "worker_sessions"
+
+    id = Column(Integer, primary_key=True)
+    worker_key_id = Column(Integer, ForeignKey("worker_keys.id", ondelete="CASCADE"), nullable=False, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    device_name = Column(String, nullable=True)
+    worker_version = Column(String, nullable=True)
+    access_token_hash = Column(String, nullable=False, unique=True, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    last_seen_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    revoked_at = Column(DateTime, nullable=True)
+
+
+class WorkerClaim(Base):
+    __tablename__ = "worker_claims"
+
+    id = Column(Integer, primary_key=True)
+    worker_key_id = Column(Integer, ForeignKey("worker_keys.id", ondelete="CASCADE"), nullable=False, index=True)
+    worker_session_id = Column(Integer, ForeignKey("worker_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    job_id = Column(Integer, ForeignKey("recruiter_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
+    cv_id = Column(Integer, nullable=True)
+    candidate_id = Column(Integer, ForeignKey("candidates.id", ondelete="CASCADE"), nullable=False, index=True)
+    candidate_action_id = Column(Integer, ForeignKey("candidate_actions.id", ondelete="SET NULL"), nullable=True, index=True)
+    status = Column(String, nullable=False, default="claimed") # claimed | completed | failed | expired
+    claim_expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+    error_message = Column(Text, nullable=True)
+
+
+class WorkerAnalysisResult(Base):
+    __tablename__ = "worker_analysis_results"
+
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    job_id = Column(Integer, ForeignKey("recruiter_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
+    candidate_id = Column(Integer, ForeignKey("candidates.id", ondelete="CASCADE"), nullable=False, index=True)
+    candidate_action_id = Column(Integer, ForeignKey("candidate_actions.id", ondelete="SET NULL"), nullable=True, index=True)
+    cv_id = Column(Integer, nullable=True)
+    score = Column(Float, nullable=True)
+    decision = Column(String, nullable=True)
+    confidence = Column(String, nullable=True)
+    summary = Column(Text, nullable=True)
+    matched_skills = Column(JSON, nullable=True)
+    missing_skills = Column(JSON, nullable=True)
+    risk_flags = Column(JSON, nullable=True)
+    explanation = Column(Text, nullable=True)
+    source = Column(String, nullable=False, default="local_worker")
+    worker_key_id = Column(Integer, ForeignKey("worker_keys.id", ondelete="SET NULL"), nullable=True, index=True)
+    worker_version = Column(String, nullable=True)
+    engine_version = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class QuotaEvent(Base):
+    __tablename__ = "quota_events"
+
+    id = Column(Integer, primary_key=True)
+    worker_key_id = Column(Integer, ForeignKey("worker_keys.id", ondelete="CASCADE"), nullable=False, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    job_id = Column(Integer, nullable=True)
+    cv_id = Column(Integer, nullable=True)
+    event_type = Column(String, nullable=False) # reserved | completed | refunded | expired
+    amount = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    metadata_ = Column("metadata", JSON, nullable=True)

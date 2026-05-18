@@ -45,6 +45,9 @@ def persist_batch_results(
                 name = item.get("candidate_name") or item.get("filename") or "Unknown"
                 email = item.get("candidate_email")
                 cv_text = item.get("cv_text") or item.get("snippet") or None
+                cv_file_key = item.get("cv_file_key") or item.get("file_key")
+                cv_file_name = item.get("cv_file_name") or item.get("filename")
+                cv_file_type = item.get("cv_file_type") or item.get("file_type")
                 final_score = item.get("final_score")
                 ats_score = item.get("ats_score") or item.get("ats") and item.get("ats").get("score")
                 analysis_snapshot = item.get("details") or item.get("analysis") or item
@@ -61,6 +64,9 @@ def persist_batch_results(
                     ats_score=ats_score,
                     action="pending",
                     analysis_snapshot=analysis_snapshot,
+                    cv_file_key=cv_file_key,
+                    cv_file_name=cv_file_name,
+                    cv_file_type=cv_file_type,
                 )
                 written += 1
             except Exception as e:

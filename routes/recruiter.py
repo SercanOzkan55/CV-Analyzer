@@ -965,8 +965,23 @@ async def recruiter_batch_upload(
                 detail="File contains insufficient text or is unreadable: {}".format(file.filename)
             )
 
+        cv_file_key = None
+        try:
+            from services.storage_service import upload_original_cv
+            cv_file_key = upload_original_cv(
+                contents,
+                str(recruiter.id),
+                content_type=file.content_type or "application/octet-stream",
+                filename=file.filename,
+            )
+        except Exception as e:
+            logger.info("batch_upload: original file storage skipped for %s error=%s", file.filename, e)
+
         cv_list.append({
             "filename": file.filename,
+            "cv_file_name": file.filename,
+            "cv_file_type": filename_lower.rsplit(".", 1)[-1] if "." in filename_lower else "txt",
+            "cv_file_key": cv_file_key,
             "text": text[:100_000]  # Cap at 100k chars
         })
 

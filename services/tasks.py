@@ -169,7 +169,10 @@ try:
                         final_score=analysis.get("final_score"),
                         ats_score=analysis.get("ats_score"),
                         action="pending",
-                        analysis_snapshot=analysis
+                        analysis_snapshot=analysis,
+                        cv_file_key=cv_data.get("cv_file_key") or cv_data.get("file_key"),
+                        cv_file_name=cv_data.get("cv_file_name") or filename,
+                        cv_file_type=cv_data.get("cv_file_type") or cv_data.get("file_type"),
                     )
                     results.append({"id": action.id, "name": candidate_name, "status": "success"})
             finally:
@@ -239,7 +242,10 @@ except Exception:
                     db, org_id, job_id, recruiter_id, name,
                     analysis.get("candidate_email"), cv_text, 
                     analysis.get("final_score"), analysis.get("ats_score"), "pending",
-                    analysis
+                    analysis,
+                    cv_file_key=cv_data.get("cv_file_key") or cv_data.get("file_key"),
+                    cv_file_name=cv_data.get("cv_file_name") or filename,
+                    cv_file_type=cv_data.get("cv_file_type") or cv_data.get("file_type"),
                 )
                 results.append({"id": action.id, "name": name, "status": "success"})
         finally:

@@ -1844,6 +1844,34 @@ button:focus-visible, a:focus-visible {
 .plan-features-list li { padding: 8px 0; color: var(--color-text-secondary); font-size: 0.95rem; display: flex; gap: 10px; align-items: center; }
 .plan-features-list li::before { content: '✓'; color: var(--color-text); font-weight: 700; font-size: 0.8rem; }
 
+.settings-worker-panel { margin-top: 24px; }
+.worker-panel { margin-top: 0; }
+.worker-panel-header { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.worker-panel-grid { display: grid; grid-template-columns: minmax(260px, 0.85fr) minmax(0, 2fr); gap: 24px; align-items: start; }
+.worker-form { padding: 18px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--bg-secondary); }
+.worker-form h3,
+.worker-list h3 { margin: 0 0 16px; font-size: 0.98rem; }
+.worker-form select { width: 100%; padding: 12px 16px; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--bg-input); color: var(--color-text); font-size: 1rem; outline: none; }
+.worker-form select:focus { border-color: var(--color-accent); box-shadow: var(--focus-ring); }
+.worker-secret-box { display: grid; gap: 10px; margin-bottom: 20px; padding: 16px; border: 1px solid var(--status-success-border); border-radius: var(--radius-md); background: var(--status-success-bg); color: var(--color-text); }
+.worker-secret-box h3 { margin: 0; font-size: 1rem; }
+.worker-secret-box p { margin: 0; color: var(--color-text-secondary); }
+.worker-secret-value { display: block; padding: 12px; border-radius: var(--radius-sm); background: var(--bg-card-solid); border: 1px solid var(--color-border); color: var(--color-text); word-break: break-all; user-select: all; }
+.worker-key-prefix { display: block; margin-top: 4px; color: var(--color-text-muted); font-size: 0.76rem; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.worker-table .is-muted { opacity: 0.58; }
+.worker-usage { display: grid; gap: 6px; min-width: 120px; }
+.worker-usage span { color: var(--color-text-secondary); font-size: 0.82rem; }
+.worker-usage-bar { height: 6px; overflow: hidden; border-radius: 999px; background: var(--color-border); }
+.worker-usage-bar span { display: block; height: 100%; background: var(--color-accent); transition: width var(--motion-base) var(--transition-smooth); }
+.worker-progress-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 22px; }
+.worker-progress-card { padding: 16px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--bg-secondary); }
+.worker-progress-card > div { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.worker-progress-card > div span { color: var(--color-text-muted); font-size: 0.78rem; }
+.worker-progress-card dl { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; margin: 0; font-size: 0.84rem; }
+.worker-progress-card dt { color: var(--color-text-secondary); }
+.worker-progress-card dd { margin: 0; color: var(--color-text); font-weight: 700; }
+.empty-state.compact { padding: 28px 18px; border: 1px dashed var(--color-border); background: var(--bg-secondary); }
+
 /* ---------- Modal ---------- */
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(2, 6, 23, 0.68); backdrop-filter: blur(10px);
@@ -2049,6 +2077,7 @@ button:focus-visible, a:focus-visible {
   .autofix-changes-panel { position: relative; top: auto; }
   .history-grid { grid-template-columns: 1fr; }
   .settings-grid { grid-template-columns: 1fr; }
+  .worker-panel-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 768px) {
