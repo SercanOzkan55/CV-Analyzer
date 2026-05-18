@@ -20,6 +20,7 @@ Core properties:
 Recommended production settings:
 
 - `WORKER_DOWNLOAD_SIGNING_SECRET`: high-entropy secret used for backend-signed TXT fallback URLs. Set this explicitly in production.
+- `WORKER_DOWNLOAD_URL_TTL_SECONDS`: signed download URL TTL. Defaults to 600 and must be between 60 and 3600 seconds.
 - `SECRET_KEY`: application secret fallback. Do not rely on the development fallback value.
 - `CV_ANALYZER_API_URL`: local worker API base URL, for example `https://app.example.com/api/worker`.
 - `CV_WORKER_API_KEY`: optional local worker API key environment variable on the employer machine.
