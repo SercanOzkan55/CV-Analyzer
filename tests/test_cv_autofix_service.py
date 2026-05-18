@@ -10,7 +10,8 @@ from services.cv_autofix_service import (
     _polish_text,
     guess_name_from_lines,
     _canonical_section,
-    _noise_section
+    _noise_section,
+    _enforce_protected_section_floor,
 )
 
 def test_clean_lines():
@@ -77,6 +78,48 @@ Python, SQL
     assert len(sections["experience"]) >= 1
     assert len(sections["skills"]) >= 1
 
+
+def test_protected_sections_are_not_shrunk():
+    cv_text = """John Doe
+john@example.com
+
+PROJECTS
+Project One
+Project Two
+Project Three
+Project Four
+
+CERTIFICATIONS
+AWS Cloud Practitioner
+Google Data Analytics
+"""
+    optimized_text = """John Doe
+john@example.com
+
+PROJECTS
+Project One
+Project Two
+
+CERTIFICATIONS
+AWS Cloud Practitioner
+"""
+    text, sections, _, warnings = _enforce_protected_section_floor(
+        cv_text,
+        optimized_text,
+        {"projects": ["Project One", "Project Two"], "certifications": ["AWS Cloud Practitioner"]},
+        ["projects", "certifications"],
+        "John Doe",
+        [],
+        ["john@example.com"],
+    )
+
+    assert "Project Four" in text
+    assert "Google Data Analytics" in text
+    assert len(sections["projects"]) == 4
+    assert len(sections["certifications"]) == 2
+    assert warnings
+
+
 @patch("services.cv_autofix_service.analyze_cv")
 def test_auto_fix_cv_text(mock_analyze):
     # Mock the ATS analyzer to avoid full service run
@@ -100,3 +143,31 @@ Dev at Corp
     assert "builder_payload" in result
     assert result["score_delta"] == 0.0 # 80 - 80
     assert result["builder_payload"]["full_name"] == "John Doe"
+
+
+@patch("services.cv_autofix_service.analyze_cv")
+def test_auto_fix_never_returns_negative_score_delta(mock_analyze):
+    cv_text = """John Doe
+john@example.com
+
+SUMMARY
+Developer
+
+EXPERIENCE
+Dev at Corp
+
+PROJECTS
+Project One
+Project Two
+    """
+    guarded_cv_text = cv_text.strip()
+
+    def score_for_text(text, *args, **kwargs):
+        return {"overall_score": 90 if text == guarded_cv_text else 80}
+
+    mock_analyze.side_effect = score_for_text
+    result = auto_fix_cv_text(cv_text, "Looking for Developer", use_ai=False)
+
+    assert result["score_delta"] == 0.0
+    assert result["optimized_cv_text"] == guarded_cv_text
+    assert any("original CV text was preserved" in warning for warning in result["warnings"])

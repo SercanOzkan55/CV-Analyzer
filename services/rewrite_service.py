@@ -9,8 +9,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-MAX_INPUT_CHARS = int(os.getenv("REWRITE_MAX_INPUT_CHARS", "8000") or "8000")
-MAX_OUTPUT_CHARS = int(os.getenv("REWRITE_MAX_OUTPUT_CHARS", "4000") or "4000")
+MAX_INPUT_CHARS = int(os.getenv("REWRITE_MAX_INPUT_CHARS", "24000") or "24000")
+MAX_OUTPUT_CHARS = int(os.getenv("REWRITE_MAX_OUTPUT_CHARS", "8000") or "8000")
 COVER_LETTER_CACHE_LIMIT = int(os.getenv("COVER_LETTER_CACHE_LIMIT", "100") or "100")
 _COVER_LETTER_CACHE: dict[str, str] = {}
 LINKEDIN_ALLOWED_MODES = {"junior", "senior", "manager", "tech", "academic"}

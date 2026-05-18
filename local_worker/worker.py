@@ -23,6 +23,7 @@ STOPWORDS = {
     "your", "will", "have", "has", "must", "should", "role", "team", "work", "job",
     "experience", "years", "looking", "candidate", "ability", "skills",
 }
+MOJIBAKE_MARKERS = ("Ã", "Ä", "Å", "â€™", "â€œ", "â€", "Â")
 
 
 class LocalWorkerError(RuntimeError):
@@ -61,6 +62,94 @@ def _derive_keywords(job_description: str, max_items: int = 12) -> list[str]:
     return keywords
 
 
+def _mojibake_score(text: str) -> int:
+    return sum((text or "").count(marker) for marker in MOJIBAKE_MARKERS)
+
+
+def _fix_common_mojibake(text: str) -> str:
+    if not text or _mojibake_score(text) == 0:
+        return text
+    try:
+        repaired = text.encode("cp1252").decode("utf-8")
+    except UnicodeError:
+        return text
+    return repaired if _mojibake_score(repaired) < _mojibake_score(text) else text
+
+
+def _words_to_lines(words: list[dict]) -> list[str]:
+    if not words:
+        return []
+    ordered = sorted(words, key=lambda w: (float(w.get("top", 0)), float(w.get("x0", 0))))
+    lines: list[str] = []
+    current: list[dict] = []
+    current_top = float(ordered[0].get("top", 0))
+    for word in ordered:
+        top = float(word.get("top", 0))
+        if current and abs(top - current_top) > 4.5:
+            lines.append(" ".join(str(w.get("text", "")) for w in sorted(current, key=lambda w: float(w.get("x0", 0)))))
+            current = [word]
+            current_top = top
+        else:
+            current.append(word)
+            current_top = (current_top + top) / 2.0
+    if current:
+        lines.append(" ".join(str(w.get("text", "")) for w in sorted(current, key=lambda w: float(w.get("x0", 0)))))
+    return [line.strip() for line in lines if line.strip()]
+
+
+def _detect_columns(words: list[dict], page_width: float) -> list[tuple[float, float]]:
+    if len(words) < 35 or page_width <= 0:
+        return []
+    centers = sorted((float(w.get("x0", 0)) + float(w.get("x1", 0))) / 2.0 for w in words)
+    gap_threshold = max(36.0, page_width * 0.06)
+    clusters: list[list[float]] = []
+    for center in centers:
+        if not clusters or center - clusters[-1][-1] > gap_threshold:
+            clusters.append([center])
+        else:
+            clusters[-1].append(center)
+    min_words = max(8, int(len(words) * 0.08))
+    ranges: list[tuple[float, float, int]] = []
+    for cluster in clusters:
+        if len(cluster) >= min_words and max(cluster) - min(cluster) >= page_width * 0.04:
+            ranges.append((max(0.0, min(cluster) - 12.0), min(page_width, max(cluster) + 12.0), len(cluster)))
+    ranges.sort(key=lambda item: item[0])
+    if len(ranges) < 2 or sum(item[2] for item in ranges) < len(words) * 0.45:
+        return []
+    return [(left, right) for left, right, _ in ranges[:3]]
+
+
+def _extract_pdf_with_pdfplumber(file_bytes: bytes) -> str:
+    import pdfplumber
+
+    pages: list[str] = []
+    with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+        for page in pdf.pages:
+            words = page.extract_words(use_text_flow=False) or []
+            columns = _detect_columns(words, float(page.width))
+            if len(columns) < 2:
+                page_lines = _words_to_lines(words)
+            else:
+                buckets: list[list[dict]] = [[] for _ in columns]
+                for word in words:
+                    center = (float(word.get("x0", 0)) + float(word.get("x1", 0))) / 2.0
+                    chosen = min(
+                        range(len(columns)),
+                        key=lambda idx: 0
+                        if columns[idx][0] <= center <= columns[idx][1]
+                        else min(abs(center - columns[idx][0]), abs(center - columns[idx][1])),
+                    )
+                    buckets[chosen].append(word)
+                page_lines = []
+                for bucket in buckets:
+                    if page_lines:
+                        page_lines.append("")
+                    page_lines.extend(_words_to_lines(bucket))
+            if page_lines:
+                pages.append("\n".join(page_lines))
+    return _fix_common_mojibake("\n\n".join(pages).strip())
+
+
 def extract_text(file_bytes: bytes, file_type: str, file_name: str = "") -> str:
     kind = (file_type or Path(file_name).suffix.lstrip(".") or "txt").lower()
     if kind in {"txt", "text", "plain"}:
@@ -73,12 +162,18 @@ def extract_text(file_bytes: bytes, file_type: str, file_name: str = "") -> str:
 
     if kind == "pdf":
         try:
+            text = _extract_pdf_with_pdfplumber(file_bytes)
+            if text.strip():
+                return text
+        except Exception:
+            pass
+        try:
             try:
                 from pypdf import PdfReader
             except ImportError:
                 from PyPDF2 import PdfReader
             reader = PdfReader(BytesIO(file_bytes))
-            return "\n".join((page.extract_text() or "") for page in reader.pages)
+            return _fix_common_mojibake("\n".join((page.extract_text() or "") for page in reader.pages))
         except Exception as exc:
             raise LocalWorkerError(f"PDF extraction failed: {exc}") from exc
 
