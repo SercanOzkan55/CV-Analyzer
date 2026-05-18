@@ -2,9 +2,12 @@ import secrets
 import hashlib
 import hmac
 import base64
+import io
 import os
 import re
+import zipfile
 from datetime import datetime, timedelta
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
@@ -22,6 +25,9 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 router = APIRouter()
 security = HTTPBearer()
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_LOCAL_WORKER_DIR = _PROJECT_ROOT / "local_worker"
 
 def hash_key(api_key: str) -> str:
     return hashlib.sha256(api_key.encode("utf-8")).hexdigest()
@@ -180,6 +186,80 @@ def _worker_key_payload(wk: WorkerKey) -> dict:
         "permissions": wk.permissions or {},
     }
 
+
+def _worker_package_readme(api_base_url: str) -> str:
+    return f"""# CV Analyzer Local Worker
+
+This package lets an employer process claimed CVs locally and submit results back to CV Analyzer.
+
+## 1. Install
+
+Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.\\.venv\\Scripts\\python.exe -m pip install -r requirements.txt
+```
+
+macOS/Linux:
+
+```bash
+python3 -m venv .venv
+./.venv/bin/python -m pip install -r requirements.txt
+```
+
+## 2. Configure
+
+Set the backend URL and your one-time worker API key:
+
+```powershell
+$env:CV_ANALYZER_API_URL="{api_base_url}"
+$env:CV_WORKER_API_KEY="sk_worker_live_xxx"
+```
+
+The API key is only shown once in the web app when it is created. It is not stored in this package.
+
+## 3. Run
+
+```powershell
+.\\.venv\\Scripts\\python.exe worker.py login
+.\\.venv\\Scripts\\python.exe worker.py jobs
+.\\.venv\\Scripts\\python.exe worker.py run --job-id YOUR_JOB_ID --batch-size 1
+```
+
+The worker writes local progress events to `worker_progress.jsonl`.
+"""
+
+
+def _worker_run_script(api_base_url: str) -> str:
+    return f"""param(
+  [Parameter(Mandatory=$true)][string]$ApiKey,
+  [Parameter(Mandatory=$true)][int]$JobId,
+  [int]$BatchSize = 1
+)
+
+$ErrorActionPreference = "Stop"
+$env:CV_ANALYZER_API_URL = "{api_base_url}"
+$env:CV_WORKER_API_KEY = $ApiKey
+
+if (!(Test-Path ".venv")) {{
+  python -m venv .venv
+}}
+
+.\\.venv\\Scripts\\python.exe -m pip install -r requirements.txt
+.\\.venv\\Scripts\\python.exe worker.py login
+.\\.venv\\Scripts\\python.exe worker.py jobs
+.\\.venv\\Scripts\\python.exe worker.py run --job-id $JobId --batch-size $BatchSize
+"""
+
+
+def _worker_env_example(api_base_url: str) -> str:
+    return f"""CV_ANALYZER_API_URL={api_base_url}
+CV_WORKER_API_KEY=sk_worker_live_xxx
+CV_WORKER_MAX_FILE_BYTES=26214400
+CV_WORKER_PROGRESS_LOG=worker_progress.jsonl
+"""
+
 def _release_expired_claims(db: Session, organization_id: int, now: datetime | None = None) -> int:
     now = now or datetime.utcnow()
     expired_claims = db.query(WorkerClaim).filter(
@@ -269,6 +349,48 @@ def list_worker_keys(
 ):
     keys = db.query(WorkerKey).filter(WorkerKey.organization_id == recruiter.organization_id).all()
     return [_worker_key_payload(k) for k in keys]
+
+
+@router.get("/worker/download-package")
+@limiter.limit("10/minute")
+def download_worker_package(
+    request: Request,
+    recruiter = Depends(recruiter_required),
+):
+    """Return a self-contained Local Worker ZIP for employers.
+
+    The package intentionally does not include API keys or bearer tokens. Users
+    must paste the one-time worker key created in Settings.
+    """
+    worker_py = _LOCAL_WORKER_DIR / "worker.py"
+    requirements = _LOCAL_WORKER_DIR / "requirements.txt"
+    if not worker_py.exists() or not requirements.exists():
+        raise HTTPException(status_code=500, detail="Local worker package files are missing")
+
+    api_base_url = str(request.base_url).rstrip("/") + "/api/worker"
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.write(worker_py, arcname="worker.py")
+        archive.write(requirements, arcname="requirements.txt")
+        archive.writestr("README.md", _worker_package_readme(api_base_url))
+        archive.writestr("run-worker.ps1", _worker_run_script(api_base_url))
+        archive.writestr(".env.example", _worker_env_example(api_base_url))
+
+    audit_log(
+        "worker_package_downloaded",
+        organization_id=recruiter.organization_id,
+        user_id=recruiter.id,
+    )
+    buffer.seek(0)
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": 'attachment; filename="cv-analyzer-local-worker.zip"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 @router.post("/worker-keys/{key_id}/revoke")
 def revoke_worker_key(

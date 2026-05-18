@@ -1271,6 +1271,18 @@ export function createWorkerKey(token, payload) {
   return _workerJson(token, '/api/worker-keys', 'POST', payload)
 }
 
+export async function downloadWorkerPackage(token) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/worker/download-package`, { headers })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Worker package download failed: ${res.status}`)
+  }
+  return res.blob()
+}
+
 export function revokeWorkerKey(token, keyId) {
   return _workerJson(token, `/api/worker-keys/${keyId}/revoke`, 'POST', {})
 }

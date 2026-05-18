@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta
+import io
+import zipfile
 
 from models import (
     CandidateAction,
@@ -93,6 +95,24 @@ def test_worker_key_create_returns_plaintext_once(client, db_session, recruiter_
     row = db_session.query(WorkerKey).filter_by(id=created["id"]).one()
     assert row.key_hash != created["api_key"]
     assert row.key_prefix == created["api_key"][:20]
+
+
+def test_worker_package_download_contains_cli_without_plaintext_key(client, recruiter_user):
+    response = client.get("/api/worker/download-package")
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"] == "application/zip"
+
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        names = set(archive.namelist())
+        assert {"worker.py", "requirements.txt", "README.md", "run-worker.ps1", ".env.example"} <= names
+        readme = archive.read("README.md").decode("utf-8")
+        env_example = archive.read(".env.example").decode("utf-8")
+        worker_py = archive.read("worker.py").decode("utf-8")
+
+    assert "sk_worker_live_xxx" in readme
+    assert "sk_worker_live_xxx" in env_example
+    assert "sk_worker_live_" not in worker_py
+    assert "http://testserver/api/worker" in readme
 
 
 def test_worker_auth_success_fail_revoked_and_expired(client, db_session, recruiter_user, test_job):
