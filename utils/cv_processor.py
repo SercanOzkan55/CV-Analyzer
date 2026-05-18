@@ -47,8 +47,17 @@ def extract_text_fast(file_content: bytes, filename: str) -> str:
 
 def extract_pdf_text_fast(file_content: bytes) -> str:
     """
-    Fast PDF text extraction - only first 5 pages, no formatting.
+    Fast PDF text extraction with layout-aware reconstruction.
     """
+    try:
+        from services.pdf_text_extractor import extract_pdf_text
+
+        text, _ = extract_pdf_text(file_content, max_pages=50, max_chars=50000)
+        if text.strip():
+            return text[:50000].strip()
+    except Exception as e:
+        logger.warning(f"Layout-aware PDF extraction failed, falling back: {str(e)}")
+
     try:
         import pdfplumber
 

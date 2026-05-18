@@ -69,6 +69,7 @@ storage_data/
 # Logs
 *.log
 *.err.log
+.runtime-logs/
 
 # Dev scratch files
 _dev_scratch/

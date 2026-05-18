@@ -23,12 +23,13 @@ def _get_pipeline_agents():
     return extract_structured, normalize, get_section_order
 
 
-MAX_INPUT_CHARS = 20000
+MAX_INPUT_CHARS = int(os.getenv("CV_AUTOFIX_MAX_INPUT_CHARS", "60000") or "60000")
 SUMMARY_MAX_CHARS = 500
 MAX_HEADER_CONTACTS = 6
 STRUCTURED_SCORE_TOLERANCE = 5.0
 USE_PIPELINE = True
 _MAX_PROJECT_ENTRIES = 200      # max project entries from parser loop
+PROTECTED_SECTION_KEYS = {"education", "skills", "projects", "certifications", "languages"}
 
 SECTION_ALIASES = {
     "summary": {
@@ -528,6 +529,13 @@ _TR_TO_EN = str.maketrans({
     "Ü": "U", "ü": "u",
 })
 _TR_KEEP_LOWER = {"istanbul", "özkan", "kuşcu", "üsküdar", "kadıköy", "beşiktaş", "şişli"}
+_COMMON_TECH_SPELLING_FIXES = (
+    (re.compile(r"\bJAVASCRIPT\b", re.I), "JavaScript"),
+    (re.compile(r"\bTYPESCRIPT\b", re.I), "TypeScript"),
+    (re.compile(r"\bTYPECRIPT\b", re.I), "TypeScript"),
+    (re.compile(r"\bNEXT\s+JS\b", re.I), "Next.js"),
+    (re.compile(r"\bNODE\s+JS\b", re.I), "Node.js"),
+)
 
 
 def _polish_text(text: str, lang: str = "en") -> str:
@@ -570,6 +578,8 @@ def _polish_text(text: str, lang: str = "en") -> str:
         stripped = re.sub(r",(?=[A-Za-z])", ", ", stripped)
         # PDF line wraps often leave "hands- on" / "real- world" artifacts.
         stripped = re.sub(r"\b([A-Za-z]{3,})-\s+(on|world|time|stack|end|based|level)\b", r"\1-\2", stripped, flags=re.I)
+        for pattern, replacement in _COMMON_TECH_SPELLING_FIXES:
+            stripped = pattern.sub(replacement, stripped)
         # Normalize bullet chars: ▪ ◦ ◆ ▸ ► → •
         stripped = re.sub(r"^[\u25AA\u25E6\u25C6\u25B8\u25BA]\s*", "• ", stripped)
         # Ensure bullet lines start with uppercase
@@ -2750,6 +2760,58 @@ def _restore_lost_sections(
     return rebuilt_text, structured_sections, section_order, restoration_warnings
 
 
+def _non_empty_section_lines(sections: Dict[str, List[str]], key: str) -> List[str]:
+    return [line for line in (sections.get(key) or []) if (line or "").strip()]
+
+
+def _enforce_protected_section_floor(
+    cv_text: str,
+    optimized_text: str,
+    structured_sections: Dict[str, List[str]],
+    section_order: List[str],
+    orig_name: str | None,
+    orig_title_lines: List[str],
+    orig_contacts: List[str],
+) -> tuple[str, Dict[str, List[str]], List[str], List[str]]:
+    """Never let normalization shrink evidence-heavy sections.
+
+    Parser/AI rewrites may legitimately improve wording, but they must not
+    reduce projects, certifications, skills, education, or languages. If the
+    optimized output has fewer non-empty lines than the source for one of
+    those sections, restore the original section lines.
+    """
+    _, source_sections, _ = _parse_sections(cv_text)
+    _, current_sections, _ = _parse_sections(optimized_text)
+    restored: List[str] = []
+    rebuilt_sections: Dict[str, List[str]] = {
+        key: list(values or []) for key, values in structured_sections.items()
+    }
+
+    for key in PROTECTED_SECTION_KEYS:
+        source_lines = _non_empty_section_lines(source_sections, key)
+        current_lines = _non_empty_section_lines(current_sections, key)
+        if source_lines and len(current_lines) < len(source_lines):
+            rebuilt_sections[key] = source_lines
+            if key not in section_order:
+                section_order.append(key)
+            title = SECTION_TITLES.get(key, key.upper())
+            restored.append(
+                f"{title} section had fewer items after optimization and was restored from the original CV."
+            )
+
+    if not restored:
+        return optimized_text, structured_sections, section_order, []
+
+    rebuilt_text = _render_structured_sections(
+        orig_name,
+        orig_title_lines,
+        orig_contacts,
+        rebuilt_sections,
+        section_order,
+    )
+    return rebuilt_text, rebuilt_sections, section_order, restored
+
+
 def auto_fix_cv_text(
     cv_text: str,
     job_description: str = "",
@@ -2923,29 +2985,34 @@ def auto_fix_cv_text(
 
     # ═══ TEXT POLISHING (typos, punctuation, Turkish chars in English CVs) ═══
     optimized_text = _polish_text(optimized_text, lang=lang)
+    optimized_text, structured_sections, section_order, _floor_warns = (
+        _enforce_protected_section_floor(
+            cv_text,
+            optimized_text,
+            structured_sections,
+            section_order,
+            orig_name=orig_name,
+            orig_title_lines=[orig_title] if orig_title else [],
+            orig_contacts=orig_contacts,
+        )
+    )
+    warnings.extend(_floor_warns)
+    if _floor_warns:
+        optimized_text = _polish_text(optimized_text, lang=lang)
 
     # ═══ FINAL SCORING ═══
     after_ats = analyze_cv(optimized_text, job_description, lang=lang)
 
-    # Fallback: section-aware score regression guard
-    # Only fall back to minimal rewrite when the structured output BOTH
-    # loses sections AND drops the score significantly (>3 points).
-    # Small score drops are acceptable when section integrity is preserved,
-    # because the structured output has better formatting and ATS compliance.
+    # Auto-fix must not ship a lower-scoring rewrite. Prefer a conservative
+    # heading-only fallback, and if that still regresses, preserve the source CV.
     after_score = float(after_ats.get("overall_score", 0) or 0)
     before_score = float(before_ats.get("overall_score", 0) or 0)
     score_regression = before_score - after_score
 
     # Check if sections were lost in the structured output
     lost_in_structured = _verify_section_preservation(cv_text, structured_sections)
-    sections_preserved = len(lost_in_structured) == 0
 
-    # Tolerate small score drops (≤3) when all sections are preserved
-    SECTION_SAFE_TOLERANCE = 3.0
-    use_fallback = (
-        score_regression > 0
-        and (score_regression > SECTION_SAFE_TOLERANCE or not sections_preserved)
-    )
+    use_fallback = score_regression > 0
 
     if use_fallback:
         fallback_text = _minimal_heading_rewrite(cv_text)
@@ -2955,8 +3022,9 @@ def auto_fix_cv_text(
             fallback_title_lines=[orig_title] if orig_title else [],
             fallback_contacts=orig_contacts,
         )
+        fallback_text = _polish_text(fallback_text, lang=lang)
         fallback_ats = analyze_cv(fallback_text, job_description, lang=lang)
-        if float(fallback_ats.get("overall_score", 0) or 0) >= after_score:
+        if float(fallback_ats.get("overall_score", 0) or 0) >= before_score:
             optimized_text = fallback_text
             after_ats = fallback_ats
             if lost_in_structured:
@@ -2971,15 +3039,21 @@ def auto_fix_cv_text(
                     f"(score drop: {round(score_regression, 1)}), "
                     f"so the safer non-regression output was used."
                 )
-    elif score_regression > 0 and sections_preserved:
-        # Structured output preserved all sections but score dropped slightly
-        # — this is acceptable, log it as info
+    # ═══ APPLIED CHANGES ═══
+    if float(after_ats.get("overall_score", 0) or 0) < before_score:
+        optimized_text = cv_text
+        after_ats = before_ats
+        _, original_sections, _ = _parse_sections(cv_text)
+        structured_sections = {
+            key: _non_empty_section_lines(original_sections, key)
+            for key in SECTION_ORDER
+            if _non_empty_section_lines(original_sections, key)
+        }
+        section_order = _extract_section_order_from_text(cv_text)
         warnings.append(
-            f"Structured rewrite has a minor score change ({round(-score_regression, 1)} points) "
-            f"but all {len(structured_sections)} sections are preserved. Using the structured output."
+            "No safe auto-fix variant improved the ATS score, so the original CV text was preserved."
         )
 
-    # ═══ APPLIED CHANGES ═══
     score_delta = round(
         float(after_ats.get("overall_score", 0)) - float(before_ats.get("overall_score", 0)),
         2,

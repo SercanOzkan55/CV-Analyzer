@@ -160,6 +160,8 @@ def _check_date_integrity(extracted: dict) -> List[str]:
 
     # Check experience dates
     for i, exp in enumerate(extracted.get("experiences", [])):
+        if not isinstance(exp, dict):
+            continue
         start = str(exp.get("start_date", "")).strip()
         end = str(exp.get("end_date", "")).strip()
         if start and end:
@@ -171,6 +173,8 @@ def _check_date_integrity(extracted: dict) -> List[str]:
 
     # Check education dates
     for i, edu in enumerate(extracted.get("education", [])):
+        if not isinstance(edu, dict):
+            continue
         start = str(edu.get("start_date", "")).strip()
         end = str(edu.get("end_date", "")).strip()
         if start and end:

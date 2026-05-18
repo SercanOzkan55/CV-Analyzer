@@ -18,6 +18,23 @@ _SECTION_HEADING_RE = re.compile(
     re.I,
 )
 
+_MOJIBAKE_MARKERS = ("Ã", "Ä", "Å", "â€™", "â€œ", "â€", "Â")
+
+
+def _mojibake_score(text: str) -> int:
+    return sum((text or "").count(marker) for marker in _MOJIBAKE_MARKERS)
+
+
+def _fix_common_mojibake(text: str) -> str:
+    """Repair common UTF-8-as-Windows-1252 extraction artifacts when obvious."""
+    if not text or _mojibake_score(text) == 0:
+        return text
+    try:
+        repaired = text.encode("cp1252").decode("utf-8")
+    except UnicodeError:
+        return text
+    return repaired if _mojibake_score(repaired) < _mojibake_score(text) else text
+
 
 def _word_center(word: dict) -> float:
     return (float(word["x0"]) + float(word["x1"])) / 2.0
@@ -339,7 +356,7 @@ def extract_pdf_text(
             truncated = len(raw) > max_chars
             if truncated:
                 raw = raw[:max_chars]
-            return fix_decomposed_diacritics(raw), truncated
+            return fix_decomposed_diacritics(_fix_common_mojibake(raw)), truncated
     except HTTPException:
         raise
     except Exception:
@@ -369,4 +386,4 @@ def extract_pdf_text(
             "pdf_text_truncated: %d > %d", len(raw), max_chars
         )
         raw = raw[:max_chars]
-    return fix_decomposed_diacritics(raw), truncated
+    return fix_decomposed_diacritics(_fix_common_mojibake(raw)), truncated
