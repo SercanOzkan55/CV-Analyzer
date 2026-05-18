@@ -324,6 +324,9 @@ def save_candidate_action(
     ats_score: float | None,
     action: str,
     analysis_snapshot: dict | None = None,
+    cv_file_key: str | None = None,
+    cv_file_name: str | None = None,
+    cv_file_type: str | None = None,
 ) -> CandidateAction:
     record = CandidateAction(
         organization_id=org_id,
@@ -332,6 +335,9 @@ def save_candidate_action(
         candidate_name=candidate_name,
         candidate_email=candidate_email,
         cv_text=cv_text,
+        cv_file_key=cv_file_key,
+        cv_file_name=cv_file_name,
+        cv_file_type=cv_file_type,
         final_score=final_score,
         ats_score=ats_score,
         action=action,

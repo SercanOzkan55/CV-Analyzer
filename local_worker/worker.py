@@ -1,0 +1,404 @@
+import argparse
+import glob
+import json
+import os
+import re
+import sys
+import time
+from datetime import datetime
+from io import BytesIO
+from pathlib import Path
+
+import requests
+
+
+API_BASE_URL = os.environ.get("CV_ANALYZER_API_URL", "http://localhost:8000/api/worker")
+WORKER_VERSION = "1.2.0"
+ENGINE_VERSION = "rule_based_mvp_v1"
+PROGRESS_LOG = Path(os.environ.get("CV_WORKER_PROGRESS_LOG", "worker_progress.jsonl"))
+MAX_FILE_BYTES = int(os.environ.get("CV_WORKER_MAX_FILE_BYTES", str(25 * 1024 * 1024)))
+
+STOPWORDS = {
+    "and", "or", "the", "with", "for", "from", "that", "this", "are", "you", "our",
+    "your", "will", "have", "has", "must", "should", "role", "team", "work", "job",
+    "experience", "years", "looking", "candidate", "ability", "skills",
+}
+
+
+class LocalWorkerError(RuntimeError):
+    pass
+
+
+def _log_progress(event: str, **fields):
+    payload = {"event": event, "timestamp": datetime.utcnow().isoformat() + "Z", **fields}
+    with PROGRESS_LOG.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+
+def _normalize(text: str) -> str:
+    return re.sub(r"[^a-z0-9+#./-]+", " ", (text or "").lower()).strip()
+
+
+def _contains_term(text_norm: str, term: str) -> bool:
+    term_norm = _normalize(term)
+    if not term_norm:
+        return False
+    return f" {term_norm} " in f" {text_norm} "
+
+
+def _derive_keywords(job_description: str, max_items: int = 12) -> list[str]:
+    words = re.findall(r"[A-Za-z][A-Za-z0-9+#./-]{2,}", job_description or "")
+    seen = set()
+    keywords = []
+    for word in words:
+        key = word.lower()
+        if key in STOPWORDS or key in seen:
+            continue
+        seen.add(key)
+        keywords.append(word)
+        if len(keywords) >= max_items:
+            break
+    return keywords
+
+
+def extract_text(file_bytes: bytes, file_type: str, file_name: str = "") -> str:
+    kind = (file_type or Path(file_name).suffix.lstrip(".") or "txt").lower()
+    if kind in {"txt", "text", "plain"}:
+        for encoding in ("utf-8", "utf-16", "latin-1"):
+            try:
+                return file_bytes.decode(encoding)
+            except UnicodeDecodeError:
+                continue
+        return file_bytes.decode("utf-8", errors="replace")
+
+    if kind == "pdf":
+        try:
+            try:
+                from pypdf import PdfReader
+            except ImportError:
+                from PyPDF2 import PdfReader
+            reader = PdfReader(BytesIO(file_bytes))
+            return "\n".join((page.extract_text() or "") for page in reader.pages)
+        except Exception as exc:
+            raise LocalWorkerError(f"PDF extraction failed: {exc}") from exc
+
+    if kind == "docx":
+        try:
+            from docx import Document
+            doc = Document(BytesIO(file_bytes))
+            return "\n".join(p.text for p in doc.paragraphs if p.text)
+        except Exception as exc:
+            raise LocalWorkerError(f"DOCX extraction failed: {exc}") from exc
+
+    raise LocalWorkerError(f"Unsupported file type: {kind}")
+
+
+def score_cv(cv_text: str, config: dict) -> dict:
+    text_norm = _normalize(cv_text)
+    required = list(config.get("required_skills") or [])
+    nice = list(config.get("nice_to_have_skills") or [])
+    hard_reject = list(config.get("hard_reject_criteria") or [])
+    if not required:
+        required = _derive_keywords(config.get("description", ""))
+
+    matched_required = [skill for skill in required if _contains_term(text_norm, skill)]
+    missing_required = [skill for skill in required if skill not in matched_required]
+    matched_nice = [skill for skill in nice if _contains_term(text_norm, skill)]
+    risk_flags = [criterion for criterion in hard_reject if _contains_term(text_norm, criterion)]
+
+    required_score = 70.0 if not required else 70.0 * (len(matched_required) / len(required))
+    nice_score = 20.0 if not nice else 20.0 * (len(matched_nice) / len(nice))
+    content_score = min(10.0, max(0.0, len(cv_text or "") / 300.0))
+    penalty = 25.0 if risk_flags else 0.0
+    score = max(0.0, min(100.0, required_score + nice_score + content_score - penalty))
+
+    accept_threshold = int(config.get("accept_threshold") or 75)
+    review_threshold = int(config.get("review_threshold") or 50)
+    if risk_flags:
+        decision = "recommended_reject"
+    elif score >= accept_threshold:
+        decision = "recommended_accept"
+    elif score >= review_threshold:
+        decision = "recommended_review"
+    else:
+        decision = "recommended_reject"
+
+    if len(cv_text or "") < 250 or not required:
+        confidence = "low"
+    elif score >= accept_threshold or score < review_threshold:
+        confidence = "high"
+    else:
+        confidence = "medium"
+
+    matched_skills = matched_required + matched_nice
+    summary = (
+        f"Matched {len(matched_required)}/{len(required)} required skills"
+        + (f" and {len(matched_nice)}/{len(nice)} nice-to-have skills." if nice else ".")
+    )
+    explanation = summary
+    if missing_required:
+        explanation += " Missing required skills: " + ", ".join(missing_required[:8]) + "."
+    if risk_flags:
+        explanation += " Hard reject criteria detected: " + ", ".join(risk_flags[:5]) + "."
+
+    return {
+        "score": round(score, 2),
+        "decision": decision,
+        "confidence": confidence,
+        "summary": summary,
+        "matched_skills": matched_skills,
+        "missing_skills": missing_required,
+        "risk_flags": risk_flags,
+        "explanation": explanation,
+    }
+
+
+class LocalWorker:
+    def __init__(self, api_key: str, processing_mode: str, ai_mode: str, device_name: str):
+        self.api_key = api_key
+        self.processing_mode = processing_mode
+        self.ai_mode = ai_mode
+        self.device_name = device_name
+        self.access_token = None
+        self.company_id = None
+        self.allowed_jobs = []
+        self.quota_remaining = 0
+        self.session = requests.Session()
+
+    def _request(self, method: str, path_or_url: str, *, absolute: bool = False, allow_reauth: bool = True, **kwargs):
+        url = path_or_url if absolute else f"{API_BASE_URL}{path_or_url}"
+        last_error = None
+        timeout = kwargs.pop("timeout", 30)
+        for attempt in range(4):
+            try:
+                resp = self.session.request(method, url, timeout=timeout, **kwargs)
+                if (
+                    resp.status_code == 401
+                    and allow_reauth
+                    and not absolute
+                    and path_or_url != "/auth"
+                    and self.api_key
+                ):
+                    self.login()
+                    resp = self.session.request(method, url, timeout=timeout, **kwargs)
+                if resp.status_code in {429, 500, 502, 503, 504} and attempt < 3:
+                    time.sleep(2 ** attempt)
+                    continue
+                return resp
+            except requests.RequestException as exc:
+                last_error = exc
+                if attempt < 3:
+                    time.sleep(2 ** attempt)
+                    continue
+        raise LocalWorkerError(f"Request failed: {last_error}")
+
+    def login(self):
+        if not self.api_key:
+            raise LocalWorkerError("Missing API key. Pass --api-key or set CV_WORKER_API_KEY.")
+        resp = self._request("POST", "/auth", allow_reauth=False, json={
+            "api_key": self.api_key,
+            "device_name": self.device_name,
+            "worker_version": WORKER_VERSION,
+        })
+        if resp.status_code != 200:
+            raise LocalWorkerError(f"Login failed: {resp.text}")
+
+        data = resp.json()
+        self.access_token = data["access_token"]
+        self.company_id = data["company_id"]
+        self.allowed_jobs = data["allowed_jobs"]
+        self.quota_remaining = data["quota_remaining"]
+        self.session.headers.update({"Authorization": f"Bearer {self.access_token}"})
+        _log_progress("login", company_id=self.company_id, quota_remaining=self.quota_remaining)
+        print(f"Login successful. Company={self.company_id} Quota remaining={self.quota_remaining}")
+
+    def list_jobs(self):
+        resp = self._request("GET", "/jobs")
+        if resp.status_code != 200:
+            raise LocalWorkerError(f"Failed to list jobs: {resp.text}")
+        jobs = resp.json().get("jobs", [])
+        print(json.dumps({"jobs": jobs}, indent=2))
+
+    def run(self, job_id: int, batch_size: int = 10, local_folder: str | None = None, max_empty_polls: int = 1):
+        if self.processing_mode == "local_folder":
+            self._run_local_folder(job_id, local_folder)
+            return
+
+        config_resp = self._request("GET", f"/jobs/{job_id}/config")
+        if config_resp.status_code != 200:
+            raise LocalWorkerError(f"Failed to get job config: {config_resp.text}")
+        config = config_resp.json()
+        print(f"Loaded job config: {config.get('title')}")
+
+        empty_polls = 0
+        while empty_polls < max_empty_polls:
+            processed = self._process_server_batch(job_id, config, batch_size)
+            if processed == 0:
+                empty_polls += 1
+                if empty_polls < max_empty_polls:
+                    time.sleep(15)
+            else:
+                empty_polls = 0
+            self._heartbeat()
+        print("No more pending claims for now.")
+
+    def _process_server_batch(self, job_id: int, config: dict, batch_size: int) -> int:
+        claim_resp = self._request("POST", f"/jobs/{job_id}/claim", json={"limit": batch_size})
+        if claim_resp.status_code == 402:
+            print("Quota exhausted.")
+            return 0
+        if claim_resp.status_code != 200:
+            raise LocalWorkerError(f"Failed to claim CVs: {claim_resp.text}")
+
+        items = claim_resp.json().get("items", [])
+        if not items:
+            return 0
+
+        print(f"Claimed {len(items)} CV(s).")
+        processed = 0
+        for item in items:
+            try:
+                self.process_item(job_id, config, item)
+                processed += 1
+            except Exception as exc:
+                print(f"Failed item candidate={item.get('candidate_id')}: {exc}")
+                _log_progress("item_failed", job_id=job_id, candidate_id=item.get("candidate_id"), error=str(exc))
+        return processed
+
+    def _download_item(self, item: dict) -> bytes:
+        resp = self._request("GET", item["download_url"], absolute=True, timeout=60)
+        if resp.status_code != 200:
+            raise LocalWorkerError(f"Download failed for candidate {item.get('candidate_id')}: {resp.text}")
+        if len(resp.content) > MAX_FILE_BYTES:
+            raise LocalWorkerError(
+                f"Downloaded file is too large for candidate {item.get('candidate_id')}: "
+                f"{len(resp.content)} bytes > {MAX_FILE_BYTES} bytes"
+            )
+        return resp.content
+
+    def process_item(self, job_id: int, config: dict, item: dict):
+        cv_id = item.get("cv_id")
+        candidate_id = item.get("candidate_id")
+        print(f"Processing candidate={candidate_id} file={item.get('file_name')}")
+        try:
+            file_bytes = self._download_item(item)
+            cv_text = extract_text(file_bytes, item.get("file_type", "txt"), item.get("file_name", "cv.txt"))
+            if cv_text.strip():
+                score = score_cv(cv_text, config)
+            else:
+                score = self._failed_score(
+                    "No readable text could be extracted from this CV.",
+                    risk_flag="empty_text",
+                    config=config,
+                )
+        except Exception as exc:
+            score = self._failed_score(
+                f"Local worker could not process this CV safely: {exc}",
+                risk_flag="extraction_failed",
+                config=config,
+            )
+        payload = {
+            "cv_id": cv_id,
+            "candidate_id": candidate_id,
+            "worker_version": WORKER_VERSION,
+            "engine_version": ENGINE_VERSION,
+            **score,
+        }
+        resp = self._request("POST", f"/jobs/{job_id}/results", json=payload)
+        if resp.status_code not in {200, 201}:
+            raise LocalWorkerError(f"Result submit failed: {resp.text}")
+        _log_progress(
+            "result_submitted",
+            job_id=job_id,
+            candidate_id=candidate_id,
+            cv_id=cv_id,
+            score=score["score"],
+            decision=score["decision"],
+        )
+        print(f"Submitted candidate={candidate_id} score={score['score']} decision={score['decision']}")
+
+    def _failed_score(self, message: str, *, risk_flag: str, config: dict) -> dict:
+        required = list(config.get("required_skills") or [])
+        return {
+            "score": 0,
+            "decision": "recommended_reject",
+            "confidence": "low",
+            "summary": message,
+            "matched_skills": [],
+            "missing_skills": required[:20],
+            "risk_flags": [risk_flag],
+            "explanation": message,
+        }
+
+    def _run_local_folder(self, job_id: int, folder_path: str | None):
+        if not folder_path:
+            raise LocalWorkerError("--local-folder is required with local_folder mode")
+        files = []
+        for pattern in ("*.pdf", "*.docx", "*.txt"):
+            files.extend(glob.glob(os.path.join(folder_path, pattern)))
+        print(f"Found {len(files)} local file(s). Local-folder result sync is planned for the next phase.")
+        for file_path in files:
+            data = Path(file_path).read_bytes()
+            text = extract_text(data, Path(file_path).suffix.lstrip("."), Path(file_path).name)
+            print(json.dumps({"file": file_path, "chars": len(text)}, ensure_ascii=False))
+
+    def _heartbeat(self):
+        try:
+            self._request("POST", "/heartbeat", json={})
+        except Exception:
+            pass
+
+
+def _add_common_args(parser):
+    parser.add_argument("--api-key", default=None, help="Worker API key. Defaults to CV_WORKER_API_KEY.")
+    parser.add_argument("--device-name", default=os.environ.get("COMPUTERNAME") or os.environ.get("HOSTNAME") or "Local Worker")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="CV Analyzer Local Worker MVP")
+    parser.add_argument("--processing-mode", choices=["server_files", "local_folder"], default="server_files")
+    parser.add_argument("--ai-mode", choices=["none", "customer_openai_key", "platform_openai_proxy"], default="none")
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    login_parser = subparsers.add_parser("login")
+    _add_common_args(login_parser)
+    jobs_parser = subparsers.add_parser("jobs")
+    _add_common_args(jobs_parser)
+    run_parser = subparsers.add_parser("run")
+    _add_common_args(run_parser)
+    run_parser.add_argument("--job-id", type=int, required=True)
+    run_parser.add_argument("--batch-size", type=int, default=10)
+    run_parser.add_argument("--local-folder", type=str)
+    run_parser.add_argument("--max-empty-polls", type=int, default=1)
+    status_parser = subparsers.add_parser("status")
+    _add_common_args(status_parser)
+
+    args = parser.parse_args()
+    api_key = args.api_key or os.environ.get("CV_WORKER_API_KEY")
+    worker = LocalWorker(api_key, args.processing_mode, args.ai_mode, args.device_name)
+
+    try:
+        if args.command == "login":
+            worker.login()
+        elif args.command == "jobs":
+            worker.login()
+            worker.list_jobs()
+        elif args.command == "run":
+            worker.login()
+            worker.run(args.job_id, args.batch_size, args.local_folder, args.max_empty_polls)
+        elif args.command == "status":
+            worker.login()
+            print(json.dumps({
+                "company_id": worker.company_id,
+                "allowed_jobs": worker.allowed_jobs,
+                "quota_remaining": worker.quota_remaining,
+                "processing_mode": worker.processing_mode,
+                "ai_mode": worker.ai_mode,
+            }, indent=2))
+    except LocalWorkerError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

@@ -515,6 +515,7 @@ from services.ai_feature_service import ensure_ai_rewrite_allowed as _ensure_ai_
 from routes.ai_tools import router as ai_tools_router  # noqa: E402
 from routes.billing import router as billing_router  # noqa: E402
 from routes.cv_storage import router as cv_storage_router  # noqa: E402
+from routes.worker import router as worker_router  # noqa: E402
 
 app.include_router(system_router)
 app.include_router(cv_builder_router)
@@ -524,3 +525,4 @@ app.include_router(user_data_router)
 app.include_router(ai_tools_router)
 app.include_router(billing_router)
 app.include_router(cv_storage_router)
+app.include_router(worker_router, prefix="/api")

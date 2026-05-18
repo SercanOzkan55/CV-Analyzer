@@ -1247,6 +1247,38 @@ export function deleteJobApplication(token, applicationId) {
   return _jobApplicationJson(token, `/api/v1/job-applications/${applicationId}`, 'DELETE')
 }
 
+async function _workerJson(token, path, method = 'GET', payload) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers,
+    body: payload === undefined ? undefined : JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Worker request failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export function listWorkerKeys(token) {
+  return _workerJson(token, '/api/worker-keys')
+}
+
+export function createWorkerKey(token, payload) {
+  return _workerJson(token, '/api/worker-keys', 'POST', payload)
+}
+
+export function revokeWorkerKey(token, keyId) {
+  return _workerJson(token, `/api/worker-keys/${keyId}/revoke`, 'POST', {})
+}
+
+export function fetchWorkerProgress(token, jobId) {
+  return _workerJson(token, `/api/worker/dashboard-progress/${encodeURIComponent(jobId)}`)
+}
+
 
 // ¦¦ Recruiter SaaS Batch Hub ¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦
 
