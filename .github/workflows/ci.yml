@@ -220,9 +220,57 @@ jobs:
         if: always()
 
   # ── Docker Build ──
+  local-worker:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile local worker package
+        run: |
+          python -m py_compile \
+            local_worker/worker.py \
+            local_worker/gui.py \
+            local_worker/workspace.py \
+            local_worker/credentials.py
+
+      - name: Verify downloadable package contents
+        run: |
+          python - <<'PY'
+          import io
+          import zipfile
+          from pathlib import Path
+
+          files = [
+              "worker.py",
+              "gui.py",
+              "workspace.py",
+              "credentials.py",
+              "requirements.txt",
+              "install_windows.cmd",
+              "run_gui.cmd",
+              "build_windows_exe.cmd",
+              "VERSION",
+          ]
+          root = Path("local_worker")
+          buffer = io.BytesIO()
+          with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+              for name in files:
+                  path = root / name
+                  assert path.exists(), f"Missing package file: {path}"
+                  archive.write(path, arcname=name)
+          with zipfile.ZipFile(io.BytesIO(buffer.getvalue())) as archive:
+              assert archive.namelist() == files
+          print("local worker package ok")
+          PY
+
   docker:
     runs-on: ubuntu-latest
-    needs: [test, frontend, benchmark]
+    needs: [test, frontend, benchmark, local-worker]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     permissions:
       contents: read
