@@ -202,6 +202,8 @@ This package has two modes:
 3. Double-click `run_gui.cmd`.
 4. In the app, paste or type the job description, choose a CV folder, and click **Analyze local folder**.
 
+The installer also creates a desktop shortcut named **CV Analyzer Local Worker**.
+
 The local app writes:
 
 - `local_worker_results.csv`
@@ -245,6 +247,16 @@ Run server-side claim processing:
 ```
 
 The worker writes local progress events to `worker_progress.jsonl`.
+
+## Optional executable build
+
+For an `.exe` build on a Windows machine, double-click:
+
+```text
+build_windows_exe.cmd
+```
+
+The generated executable is written under `dist/`. This build step installs PyInstaller into the worker-local `.venv`; it does not add PyInstaller to the CV Analyzer server application.
 """
 
 
@@ -386,6 +398,8 @@ def download_worker_package(
         ("requirements.txt", _LOCAL_WORKER_DIR / "requirements.txt"),
         ("install_windows.cmd", _LOCAL_WORKER_DIR / "install_windows.cmd"),
         ("run_gui.cmd", _LOCAL_WORKER_DIR / "run_gui.cmd"),
+        ("build_windows_exe.cmd", _LOCAL_WORKER_DIR / "build_windows_exe.cmd"),
+        ("VERSION", _LOCAL_WORKER_DIR / "VERSION"),
     ]
     missing = [name for name, path in package_files if not path.exists()]
     if missing:
