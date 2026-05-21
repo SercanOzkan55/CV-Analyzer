@@ -75,6 +75,23 @@ def _extract_uploaded_cv_text(contents: bytes, file: UploadFile) -> tuple[str, b
     return text, bool(truncated), file_type
 
 
+def _analysis_candidate_embedding_enabled() -> bool:
+    return os.getenv("ANALYSIS_SAVE_CANDIDATE_EMBEDDINGS", "0").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+
+
+def _maybe_get_analysis_candidate_embedding(text: str):
+    if not _analysis_candidate_embedding_enabled():
+        return None
+    try:
+        return get_embedding(text)
+    except Exception:
+        return None
+
+
 @router.post("/api/v1/analyze")
 @rate_limit(f"{RATE_LIMIT_IP_ANALYZE_PER_MIN}/minute")
 def analyze(
@@ -361,10 +378,7 @@ def analyze(
 
     # --- Auto-save candidate and its embedding for later semantic retrieval ---
     try:
-        try:
-            cv_embedding = get_embedding(body.cv_text)
-        except Exception:
-            cv_embedding = None
+        cv_embedding = _maybe_get_analysis_candidate_embedding(body.cv_text)
         cand = Candidate(
             organization_id=db_user.organization_id,
             cv_text=body.cv_text,
@@ -870,10 +884,7 @@ async def analyze_pdf(
                 db.commit()
                 db.refresh(analysis_record)
 
-                try:
-                    cv_embedding = get_embedding(text)
-                except Exception:
-                    cv_embedding = None
+                cv_embedding = _maybe_get_analysis_candidate_embedding(text)
                 cand = Candidate(
                     organization_id=db_user.organization_id,
                     cv_text=text,

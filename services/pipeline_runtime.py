@@ -34,6 +34,21 @@ def _get_embedding(text: str):
     # Tests monkeypatch main.get_embedding; keep that hook centralized here.
     return main_value("get_embedding", _default_get_embedding)(text)
 
+
+def _fallback_domain_data() -> dict:
+    return {"domain_id": 1, "domain_name": "Other"}
+
+
+def _fallback_industry_data(domain_id: int = 1) -> dict:
+    return {
+        "domain_id": domain_id,
+        "industry_id": 1,
+        "industry_name": "Other",
+        "specialization_id": 1,
+        "specialization_name": "General",
+    }
+
+
 def interpret_score(score):
     if score > 75:
         return "High Match"
@@ -427,8 +442,12 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
                 # Ignore cache decode errors and continue with fresh pipeline
                 pass
 
-    cv_embedding = _get_embedding(cv_text)
-    job_embedding = _get_embedding(job_description)
+    _has_jd = bool(job_description and job_description.strip())
+    cv_embedding = None
+    job_embedding = None
+    if _has_jd:
+        cv_embedding = _get_embedding(cv_text)
+        job_embedding = _get_embedding(job_description)
 
     # If embeddings fail, fall back to conservative defaults and mark
     warnings: list[str] = []
@@ -476,13 +495,17 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
 
     exp_score = experience_score(cv_text, job_description)
 
-    # DOMAIN CREATE / FETCH
-    domain_data = detect_or_create_domain(job_description, job_embedding)
-
-    domain_similarity = get_domain_similarity(domain_data["domain_id"], job_embedding)
-
-    # INDUSTRY + SPECIALIZATION
-    industry_data = detect_industry_and_specialization(job_description, job_embedding)
+    # DOMAIN / INDUSTRY: only run embedding-backed classification when a real JD
+    # and a job embedding are available. This avoids extra OpenAI retries when
+    # embeddings are disabled, rate-limited, or unnecessary for CV-only scoring.
+    if _has_jd and job_embedding:
+        domain_data = detect_or_create_domain(job_description, job_embedding)
+        domain_similarity = get_domain_similarity(domain_data["domain_id"], job_embedding)
+        industry_data = detect_industry_and_specialization(job_description, job_embedding)
+    else:
+        domain_data = _fallback_domain_data()
+        domain_similarity = 0.0
+        industry_data = _fallback_industry_data(domain_data["domain_id"])
 
     # ATS DETAILS (detailed breakdown)
     ats_details = analyze_cv(cv_text, job_description, lang=detected_lang)
@@ -556,7 +579,6 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
     # since keyword/skill/semantic scores are meaningless without a JD target.
     from services.ats_service import compute_final_score
     breakdown = None
-    _has_jd = bool(job_description and job_description.strip())
     if not _has_jd:
         final_score = round(float(ats_score), 2)
     else:
