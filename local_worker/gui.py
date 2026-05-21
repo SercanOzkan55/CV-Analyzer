@@ -60,9 +60,11 @@ class LocalWorkerApp:
 
         self.store = WorkspaceStore()
         self.local_jobs: list[dict] = []
+        self.local_runs: list[dict] = []
         self.theme_name = StringVar(value="dark")
         self.job_name_var = StringVar(value="New local job")
         self.saved_job_var = StringVar()
+        self.saved_run_var = StringVar()
         self.folder_var = StringVar()
         self.output_var = StringVar(value=str(Path.cwd() / "local_results"))
         self.required_var = StringVar()
@@ -117,6 +119,13 @@ class LocalWorkerApp:
         self.saved_jobs_combo.pack(side="left", fill="x", expand=True, padx=(0, 8))
         self.saved_jobs_combo.bind("<<ComboboxSelected>>", lambda _event: self._load_selected_job())
         Button(saved_row, text="Load", command=self._load_selected_job).pack(side="left")
+
+        run_row = Frame(shell)
+        run_row.pack(fill="x", pady=4)
+        Label(run_row, text="Run history", width=18, anchor="w").pack(side="left")
+        self.saved_runs_combo = ttk.Combobox(run_row, textvariable=self.saved_run_var, state="readonly")
+        self.saved_runs_combo.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        Button(run_row, text="Open run", command=self._load_selected_run).pack(side="left")
 
         file_row = Frame(shell)
         file_row.pack(fill="x", pady=4)
@@ -261,6 +270,14 @@ class LocalWorkerApp:
     def _refresh_jobs(self):
         self.local_jobs = self.store.list_jobs()
         self.saved_jobs_combo["values"] = [job["name"] for job in self.local_jobs]
+        self._refresh_runs()
+
+    def _refresh_runs(self, job_id: int | None = None):
+        self.local_runs = self.store.list_runs(job_id=job_id)
+        self.saved_runs_combo["values"] = [
+            f"#{run['id']} | {run['job_name']} | {run['total_files']} files | {run['created_at']}"
+            for run in self.local_runs
+        ]
 
     def _save_current_job(self):
         try:
@@ -278,6 +295,7 @@ class LocalWorkerApp:
         if not job:
             return
         config = job["config"]
+        self._refresh_runs(job["id"])
         self.job_name_var.set(job["name"])
         self.jd_text.delete("1.0", END)
         self.jd_text.insert("1.0", config.get("description", ""))
@@ -287,6 +305,25 @@ class LocalWorkerApp:
         self.accept_var.set(str(config.get("accept_threshold") or 75))
         self.review_var.set(str(config.get("review_threshold") or 50))
         self.status_var.set(f"Loaded {job['name']}.")
+
+    def _load_selected_run(self):
+        selected = self.saved_run_var.get()
+        if not selected:
+            return
+        run_id_text = selected.split("|", 1)[0].strip().lstrip("#")
+        try:
+            run_id = int(run_id_text)
+        except ValueError:
+            return
+        rows = self.store.get_run_results(run_id)
+        self.results = []
+        self.result_by_iid = {}
+        self.table.delete(*self.table.get_children())
+        for row in rows:
+            self.work_queue.put(("row", row))
+        self.progress.configure(value=len(rows), maximum=max(1, len(rows)))
+        self.summary_var.set(f"Loaded historical run #{run_id} with {len(rows)} result(s).")
+        self.status_var.set("Historical run loaded.")
 
     def _config(self) -> dict:
         try:
@@ -419,6 +456,7 @@ class LocalWorkerApp:
                     "risk_flags": ", ".join(row.get("risk_flags") or []),
                 })
         self.work_queue.put(("done", f"Done. Results saved to {output}"))
+        self.work_queue.put(("runs_refresh", job_id))
 
     def _summary_text(self, processed: int, total: int, counts: dict) -> str:
         return (
@@ -480,6 +518,8 @@ class LocalWorkerApp:
                     self.progress.configure(maximum=payload, value=0)
                 elif kind == "progress":
                     self.progress.configure(value=payload)
+                elif kind == "runs_refresh":
+                    self._refresh_runs(payload)
                 elif kind == "done":
                     self.status_var.set(payload)
                     self.is_running = False
