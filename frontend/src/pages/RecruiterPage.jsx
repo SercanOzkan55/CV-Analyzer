@@ -28,12 +28,16 @@ import {
   recruiterPreviewTemplate, recruiterSendEmail,
   recruiterUpdateActionStage,
   recruiterScanCV,
+  recruiterSendEmailBulk,
+  recruiterExportRankings,
+  recruiterExportCandidates,
 } from '../api'
 import {
   exportBatchToCSV, exportBatchToHTML, exportBatchToJSON,
   exportDecisionsToCSV, exportUsageStatsToCSV
 } from '../utils/exportUtils'
 import CameraScanModal from '../components/CameraScanModal'
+import BatchUploadModal from '../components/BatchUploadModal'
 
 function SortIcon({ sortKey, sortConfig }) {
   if (sortConfig.key !== sortKey) return <ArrowUpDown size={13} className="sort-icon" />
@@ -175,6 +179,7 @@ export default function RecruiterPage() {
   const [sortConfig,    setSortConfig]    = useState({ key: 'score', direction: 'desc' })
   const [activeFilter,  setActiveFilter]  = useState('all')
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const [dbExportOpen, setDbExportOpen] = useState(false)
 
   // ── Dashboard state ──────────────────────────────────────────────────────────
   const [activeSection, setActiveSection] = useState('overview') // overview | decisions | templates
@@ -200,6 +205,7 @@ export default function RecruiterPage() {
 
   // camera scan
   const [scanModal, setScanModal]         = useState(false)
+  const [batchUploadOpen, setBatchUploadOpen] = useState(false)
 
   // decision feedback modal
   const [actionModal, setActionModal]     = useState({ open: false, candidate: null, action: null, message: '' })
@@ -481,6 +487,45 @@ export default function RecruiterPage() {
     } else {
       toast.error(result.message)
     }
+  }
+
+  const triggerDownload = (blob, filename) => {
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', filename)
+    document.body.appendChild(link)
+    link.click()
+    link.parentNode.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  }
+
+  async function handleDbExportRankings(format) {
+    if (!selectedJob?.id) {
+      toast.error('Select a job first')
+      return
+    }
+    try {
+      toast.info(`Exporting database rankings as ${format.toUpperCase()}...`)
+      const blob = await recruiterExportRankings(token, selectedJob.id, format)
+      triggerDownload(blob, `stored_rankings_job_${selectedJob.id}.${format}`)
+      toast.success('Export completed successfully')
+    } catch (err) {
+      toast.error(err.message || 'Export failed')
+    }
+    setDbExportOpen(false)
+  }
+
+  async function handleDbExportCandidates(format) {
+    try {
+      toast.info(`Exporting database candidates as ${format.toUpperCase()}...`)
+      const blob = await recruiterExportCandidates(token, format)
+      triggerDownload(blob, `stored_candidates.${format}`)
+      toast.success('Export completed successfully')
+    } catch (err) {
+      toast.error(err.message || 'Export failed')
+    }
+    setDbExportOpen(false)
   }
 
   async function openCandidateDetail(candidate) {
@@ -796,39 +841,60 @@ export default function RecruiterPage() {
     setBulkEmailModal(true)
   }
 
-  // ── Bulk email: send one by one ─────────────────────────────────────────────
   async function handleBulkSendEmail() {
     if (!bulkEmailTplId) { toast.error('Select a template'); return }
     const selected = getSelectedCandidates()
     if (!selected.length) return
     setBulkSending(true)
 
-    for (let i = 0; i < selected.length; i++) {
-      const c = selected[i]
-      const email = c.email || c.candidate_email || ''
-      if (!email) {
-        setBulkProgress(prev => prev.map((p, j) => j === i ? { ...p, status: 'error', error: 'No email' } : p))
-        continue
+    setBulkProgress(prev => prev.map(p => ({ ...p, status: 'sending' })))
+
+    try {
+      const emails = selected.map(c => c.email || c.candidate_email || '').filter(Boolean)
+      if (!emails.length) {
+        toast.error('None of the selected candidates have a valid email address')
+        setBulkSending(false)
+        return
       }
-      setBulkProgress(prev => prev.map((p, j) => j === i ? { ...p, status: 'sending' } : p))
-      try {
-        await recruiterSendEmail(token, {
-          candidate_name: c.candidate_name || c.name || '',
-          candidate_email: email,
-          cv_text: c.cv_text || '',
-          job_description: jdText,
-          template_id: Number(bulkEmailTplId),
-          job_id: selectedJob?.id || null,
-          sender_email: bulkSenderEmail.trim(),
+
+      const res = await recruiterSendEmailBulk(token, {
+        template_id: Number(bulkEmailTplId),
+        candidate_emails: emails,
+        job_id: selectedJob?.id || null,
+        sender_email: bulkSenderEmail.trim() || null
+      })
+
+      const resultsMap = {}
+      if (res.results && Array.isArray(res.results)) {
+        res.results.forEach(r => {
+          resultsMap[r.email] = r
         })
-        setBulkProgress(prev => prev.map((p, j) => j === i ? { ...p, status: 'sent' } : p))
-      } catch (err) {
-        setBulkProgress(prev => prev.map((p, j) => j === i ? { ...p, status: 'error', error: err.message || 'Failed' } : p))
       }
+
+      setBulkProgress(prev => prev.map(p => {
+        const match = resultsMap[p.email]
+        if (match) {
+          return {
+            ...p,
+            status: match.status === 'success' ? 'sent' : 'error',
+            error: match.error || null
+          }
+        }
+        return { ...p, status: 'error', error: 'No response from server' }
+      }))
+
+      if (res.failed > 0) {
+        toast.warning(`Bulk email complete: ${res.successful} sent, ${res.failed} failed`)
+      } else {
+        toast.success(`Bulk email sent successfully to ${res.successful} candidates`)
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to send bulk email')
+      setBulkProgress(prev => prev.map(p => ({ ...p, status: 'error', error: err.message || 'Failed' })))
+    } finally {
+      setBulkSending(false)
+      setBulkSelected(new Set())
     }
-    setBulkSending(false)
-    toast.success('Bulk email finished')
-    setBulkSelected(new Set())
   }
 
   const fadeUp = {
@@ -991,12 +1057,26 @@ export default function RecruiterPage() {
           animate="visible"
           custom={1}
         >
-          <div className="admin-card-header">
-            <Upload size={18} className="admin-card-icon" />
-            <h2>{t('recruiter.batch_title')}</h2>
-            <span className="recruiter-cv-count">
-              <Upload size={13} /> {cvFiles.length} / 5000
-            </span>
+          <div className="admin-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Upload size={18} className="admin-card-icon" />
+              <h2>{t('recruiter.batch_title')}</h2>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
+              <motion.button
+                type="button"
+                className="btn-outline btn-sm"
+                onClick={() => setBatchUploadOpen(true)}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', padding: '6px 12px' }}
+              >
+                <Sparkles size={13} /> SaaS Cloud Upload
+              </motion.button>
+              <span className="recruiter-cv-count">
+                <Upload size={13} /> {cvFiles.length} / 5000
+              </span>
+            </div>
           </div>
           <form onSubmit={handleBatchRank} className="recruiter-batch-form">
             <div className="recruiter-form-group">
@@ -1672,9 +1752,134 @@ export default function RecruiterPage() {
         {activeSection === 'decisions' && (
           <motion.div key="decisions" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.3 }}>
             <motion.div className="admin-card" variants={fadeUp} initial="hidden" animate="visible" custom={2}>
-              <div className="admin-card-header">
-                <FileText size={18} className="admin-card-icon" />
-                <h2>Candidate Decisions {selectedJob ? `— ${selectedJob.title}` : ''}</h2>
+              <div className="admin-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <FileText size={18} className="admin-card-icon" />
+                  <h2>Candidate Decisions {selectedJob ? `— ${selectedJob.title}` : ''}</h2>
+                </div>
+                {selectedJob && (
+                  <div style={{ position: 'relative', marginLeft: 'auto' }}>
+                    <motion.button
+                      className="btn-outline btn-sm"
+                      onClick={() => setDbExportOpen(!dbExportOpen)}
+                      whileHover={{ scale: 1.04 }}
+                      whileTap={{ scale: 0.96 }}
+                      title="Export stored database data"
+                    >
+                      <Download size={14} /> Database Export
+                    </motion.button>
+                    <AnimatePresence>
+                      {dbExportOpen && (
+                        <motion.div
+                          className="export-menu"
+                          initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            right: 0,
+                            marginTop: 6,
+                            background: 'var(--color-surface)',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: 8,
+                            zIndex: 1000,
+                            minWidth: 220,
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                          }}
+                        >
+                          <div style={{ padding: '6px 14px 2px 14px', fontSize: '0.75rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>Rankings</div>
+                          <button
+                            onClick={() => handleDbExportRankings('csv')}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              width: '100%',
+                              padding: '8px 14px',
+                              border: 'none',
+                              background: 'transparent',
+                              color: 'var(--color-text)',
+                              cursor: 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: 500,
+                              textAlign: 'left'
+                            }}
+                            onMouseEnter={e => e.target.style.background = 'var(--color-accent)08'}
+                            onMouseLeave={e => e.target.style.background = 'transparent'}
+                          >
+                            <FileSpreadsheet size={14} /> Export Job Rankings (CSV)
+                          </button>
+                          <button
+                            onClick={() => handleDbExportRankings('json')}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              width: '100%',
+                              padding: '8px 14px',
+                              border: 'none',
+                              background: 'transparent',
+                              color: 'var(--color-text)',
+                              cursor: 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: 500,
+                              borderBottom: '1px solid var(--color-border)',
+                              textAlign: 'left'
+                            }}
+                            onMouseEnter={e => e.target.style.background = 'var(--color-accent)08'}
+                            onMouseLeave={e => e.target.style.background = 'transparent'}
+                          >
+                            <FileJson size={14} /> Export Job Rankings (JSON)
+                          </button>
+                          <div style={{ padding: '6px 14px 2px 14px', fontSize: '0.75rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>Candidates</div>
+                          <button
+                            onClick={() => handleDbExportCandidates('csv')}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              width: '100%',
+                              padding: '8px 14px',
+                              border: 'none',
+                              background: 'transparent',
+                              color: 'var(--color-text)',
+                              cursor: 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: 500,
+                              textAlign: 'left'
+                            }}
+                            onMouseEnter={e => e.target.style.background = 'var(--color-accent)08'}
+                            onMouseLeave={e => e.target.style.background = 'transparent'}
+                          >
+                            <FileSpreadsheet size={14} /> Export All Candidates (CSV)
+                          </button>
+                          <button
+                            onClick={() => handleDbExportCandidates('json')}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              width: '100%',
+                              padding: '8px 14px',
+                              border: 'none',
+                              background: 'transparent',
+                              color: 'var(--color-text)',
+                              cursor: 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: 500,
+                              textAlign: 'left'
+                            }}
+                            onMouseEnter={e => e.target.style.background = 'var(--color-accent)08'}
+                            onMouseLeave={e => e.target.style.background = 'transparent'}
+                          >
+                            <FileJson size={14} /> Export All Candidates (JSON)
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
               </div>
               {!selectedJob ? (
                 <div className="empty-state" style={{ padding: '32px 0' }}>
@@ -2106,8 +2311,15 @@ export default function RecruiterPage() {
           </div>
         </Modal>
 
-        {/* Camera Scan Modal */}
-        <CameraScanModal open={scanModal} onClose={() => setScanModal(false)} />
+         <CameraScanModal open={scanModal} onClose={() => setScanModal(false)} />
+        <BatchUploadModal
+          isOpen={batchUploadOpen}
+          onClose={() => setBatchUploadOpen(false)}
+          onSuccess={() => {
+            toast.success('Bulk upload and processing started successfully')
+          }}
+          jobs={jobs}
+        />
       </main>
     </div>
   )

@@ -2,10 +2,18 @@ import csv
 import hashlib
 import json
 import queue
+import sys
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
-from tkinter import BOTH, DISABLED, END, NORMAL, Button, Entry, Frame, Label, StringVar, Text, Tk, filedialog, messagebox, ttk
+
+try:
+    from tkinter import BOTH, DISABLED, END, NORMAL, Button, Entry, Frame, Label, StringVar, Text, Tk, filedialog, messagebox, ttk
+except ImportError:
+    print("\n[ERROR] The 'tkinter' package is required for the Graphical User Interface but is not installed or available on your system.")
+    print("Please install tkinter (e.g., 'sudo apt-get install python3-tk' on Debian/Ubuntu, or ensure Python is installed with Tk support on your OS).")
+    print("You can also run the CLI-based worker instead.\n")
+    sys.exit(1)
 
 from worker import MAX_FILE_BYTES, extract_text, maybe_apply_ai_review, score_cv
 from workspace import WorkspaceStore
