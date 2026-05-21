@@ -12,6 +12,8 @@ from pathlib import Path
 
 import requests
 
+from credentials import load_worker_api_key, save_worker_api_key
+
 
 API_BASE_URL = os.environ.get("CV_ANALYZER_API_URL", "http://127.0.0.1:8001/api/worker")
 WORKER_VERSION = "1.2.0"
@@ -570,6 +572,7 @@ class LocalWorker:
 
 def _add_common_args(parser):
     parser.add_argument("--api-key", default=None, help="Worker API key. Defaults to CV_WORKER_API_KEY.")
+    parser.add_argument("--save-api-key", action="store_true", help="Save the provided API key to the OS credential store.")
     parser.add_argument("--device-name", default=os.environ.get("COMPUTERNAME") or os.environ.get("HOSTNAME") or "Local Worker")
 
 
@@ -593,7 +596,10 @@ def main():
     _add_common_args(status_parser)
 
     args = parser.parse_args()
-    api_key = args.api_key or os.environ.get("CV_WORKER_API_KEY")
+    api_key = args.api_key or os.environ.get("CV_WORKER_API_KEY") or load_worker_api_key()
+    if args.api_key and args.save_api_key:
+        saved = save_worker_api_key(args.api_key)
+        print("API key saved to OS credential store." if saved else "API key could not be saved to OS credential store.")
     worker = LocalWorker(api_key, args.processing_mode, args.ai_mode, args.device_name)
 
     try:
