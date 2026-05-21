@@ -209,6 +209,7 @@ The local app writes:
 - `local_worker_results.csv`
 - `local_worker_results.json`
 - `failed_files.txt` when one or more files could not be processed
+- `sync_manifest.json` for future optional site sync/import
 - `local_worker_workspace.sqlite3` for saved local jobs and local analysis history
 
 These files stay on your device.
