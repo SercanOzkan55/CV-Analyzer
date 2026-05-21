@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from tkinter import BOTH, DISABLED, END, NORMAL, Button, Entry, Frame, Label, StringVar, Text, Tk, filedialog, messagebox, ttk
 
-from worker import extract_text, score_cv
+from worker import extract_text, maybe_apply_ai_review, score_cv
 from workspace import WorkspaceStore
 
 
@@ -72,6 +72,7 @@ class LocalWorkerApp:
         self.hard_reject_var = StringVar()
         self.accept_var = StringVar(value="75")
         self.review_var = StringVar(value="50")
+        self.ai_mode_var = StringVar(value="none")
         self.status_var = StringVar(value="Ready")
         self.summary_var = StringVar(value="No run yet")
         self.work_queue: queue.Queue = queue.Queue()
@@ -166,6 +167,10 @@ class LocalWorkerApp:
         self.review_label = Label(thresholds, text="Review threshold")
         self.review_label.pack(side="left")
         Entry(thresholds, textvariable=self.review_var, width=8).pack(side="left", padx=(6, 18))
+        Label(thresholds, text="AI review").pack(side="left")
+        self.ai_combo = ttk.Combobox(thresholds, textvariable=self.ai_mode_var, state="readonly", width=20)
+        self.ai_combo["values"] = ["none", "customer_openai_key"]
+        self.ai_combo.pack(side="left", padx=(6, 0))
 
         actions = Frame(shell)
         actions.pack(fill="x", pady=(12, 8))
@@ -304,6 +309,7 @@ class LocalWorkerApp:
         self.hard_reject_var.set(", ".join(config.get("hard_reject_criteria") or []))
         self.accept_var.set(str(config.get("accept_threshold") or 75))
         self.review_var.set(str(config.get("review_threshold") or 50))
+        self.ai_mode_var.set(config.get("ai_mode") or "none")
         self.status_var.set(f"Loaded {job['name']}.")
 
     def _load_selected_run(self):
@@ -340,6 +346,7 @@ class LocalWorkerApp:
             "accept_threshold": accept,
             "review_threshold": review,
             "reject_threshold": 30,
+            "ai_mode": self.ai_mode_var.get(),
         }
 
     def _start_analysis(self):
@@ -392,7 +399,7 @@ class LocalWorkerApp:
                 else:
                     seen_hashes[file_hash] = str(path)
                 text = extract_text(data, path.suffix.lstrip("."), path.name)
-                result = score_cv(text, config)
+                result = maybe_apply_ai_review(text, config, score_cv(text, config), config.get("ai_mode") or "none")
                 row = {
                     "file": str(path),
                     "file_hash": file_hash,
@@ -483,6 +490,7 @@ class LocalWorkerApp:
             f"Score: {row.get('score')} | Decision: {_decision_label(row.get('decision'))} | Confidence: {row.get('confidence')}",
             f"Duplicate: {'yes' if row.get('is_duplicate') else 'no'}",
             f"Breakdown: {json.dumps(row.get('score_breakdown') or {}, ensure_ascii=False)}",
+            f"AI review: {row.get('ai_review_status') or 'not_used'}",
             f"Matched: {', '.join(row.get('matched_skills') or [])}",
             f"Missing: {', '.join(row.get('missing_skills') or [])}",
             f"Risks: {', '.join(row.get('risk_flags') or [])}",
