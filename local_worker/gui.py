@@ -477,6 +477,7 @@ class LocalWorkerApp:
         json_path = output / "local_worker_results.json"
         csv_path = output / "local_worker_results.csv"
         failed_path = output / "failed_files.txt"
+        sync_path = output / "sync_manifest.json"
         ranked_rows = sorted(rows, key=lambda item: float(item.get("score") or 0), reverse=True)
         for rank, row in enumerate(ranked_rows, start=1):
             row["rank"] = rank
@@ -495,6 +496,31 @@ class LocalWorkerApp:
             failed_path.write_text("\n".join(self.failed_files), encoding="utf-8")
         elif failed_path.exists():
             failed_path.unlink()
+        sync_path.write_text(
+            json.dumps(
+                {
+                    "schema": "cv_analyzer.local_worker.sync_manifest.v1",
+                    "job": {
+                        "id": job_id,
+                        "name": job_name,
+                        "config": config,
+                    },
+                    "run": {
+                        "cv_folder": str(folder),
+                        "output_folder": str(output),
+                        "total_files": len(files),
+                        "created_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+                    },
+                    "results_file": str(json_path),
+                    "csv_file": str(csv_path),
+                    "failed_files": list(self.failed_files),
+                    "sync_status": "offline_ready",
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
         self.work_queue.put(("done", f"Done. Results saved to {output}"))
         self.work_queue.put(("runs_refresh", job_id))
 
