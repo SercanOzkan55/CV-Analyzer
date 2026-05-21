@@ -128,3 +128,42 @@ class WorkspaceStore:
                     _now(),
                 ),
             )
+
+    def list_runs(self, job_id: int | None = None, limit: int = 25) -> list[dict]:
+        sql = """
+            SELECT id, job_id, job_name, cv_folder, output_folder, total_files, created_at
+            FROM analysis_runs
+        """
+        params: tuple = ()
+        if job_id:
+            sql += " WHERE job_id = ?"
+            params = (job_id,)
+        sql += " ORDER BY created_at DESC LIMIT ?"
+        params = (*params, limit)
+        with self._connect() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        return [
+            {
+                "id": row[0],
+                "job_id": row[1],
+                "job_name": row[2],
+                "cv_folder": row[3],
+                "output_folder": row[4],
+                "total_files": row[5],
+                "created_at": row[6],
+            }
+            for row in rows
+        ]
+
+    def get_run_results(self, run_id: int) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT result_json
+                FROM analysis_results
+                WHERE run_id = ?
+                ORDER BY score DESC, id ASC
+                """,
+                (run_id,),
+            ).fetchall()
+        return [json.loads(row[0]) for row in rows]
