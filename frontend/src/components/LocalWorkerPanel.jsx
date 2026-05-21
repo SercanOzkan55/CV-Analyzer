@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { createWorkerKey, downloadWorkerPackage, fetchWorkerProgress, listWorkerKeys, recruiterListJobs, revokeWorkerKey } from '../api'
+import { createWorkerKey, downloadWorkerPackage, fetchWorkerProgress, fetchWorkerSessions, listWorkerKeys, recruiterListJobs, revokeWorkerKey } from '../api'
 import { useAuth } from '../context/AuthContext'
 
 export default function LocalWorkerPanel({ organizationId }) {
@@ -7,6 +7,7 @@ export default function LocalWorkerPanel({ organizationId }) {
   const [keys, setKeys] = useState([])
   const [jobs, setJobs] = useState([])
   const [progressByJob, setProgressByJob] = useState({})
+  const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
   const [newKeyJobId, setNewKeyJobId] = useState('')
@@ -17,6 +18,7 @@ export default function LocalWorkerPanel({ organizationId }) {
     if (!token) return
     fetchKeys()
     fetchJobs()
+    fetchSessions()
   }, [token])
 
   async function fetchKeys() {
@@ -28,6 +30,16 @@ export default function LocalWorkerPanel({ organizationId }) {
       console.error('Error fetching worker keys:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function fetchSessions() {
+    try {
+      const data = await fetchWorkerSessions(token)
+      setSessions(data.sessions || [])
+    } catch (error) {
+      console.warn('Worker sessions unavailable', error)
+      setSessions([])
     }
   }
 
@@ -82,6 +94,7 @@ export default function LocalWorkerPanel({ organizationId }) {
       setLoading(true)
       await revokeWorkerKey(token, id)
       await fetchKeys()
+      await fetchSessions()
     } catch (error) {
       console.error('Error revoking worker key:', error)
       window.alert(error.message || 'Failed to revoke worker key')
@@ -248,6 +261,42 @@ export default function LocalWorkerPanel({ organizationId }) {
           })}
         </div>
       )}
+
+      <div className="worker-list worker-session-list">
+        <h3>Connected Devices</h3>
+        {sessions.length === 0 ? (
+          <p className="text-muted">No worker sessions have connected yet.</p>
+        ) : (
+          <div className="table-wrapper">
+            <table className="data-table worker-table">
+              <thead>
+                <tr>
+                  <th>Device</th>
+                  <th>Version</th>
+                  <th>Key</th>
+                  <th>Last seen</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sessions.map((session) => (
+                  <tr key={session.id} className={session.revoked_at ? 'is-muted' : ''}>
+                    <td>{session.device_name || 'Unknown device'}</td>
+                    <td>{session.worker_version || '-'}</td>
+                    <td>{session.key_name || `Key #${session.worker_key_id}`}</td>
+                    <td>{session.last_seen_at ? new Date(session.last_seen_at).toLocaleString() : '-'}</td>
+                    <td>
+                      <span className={`status-pill ${session.revoked_at || session.is_expired ? 'status-pill-danger' : 'status-pill-success'}`}>
+                        {session.revoked_at ? 'Revoked' : session.is_expired ? 'Expired' : 'Active'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
