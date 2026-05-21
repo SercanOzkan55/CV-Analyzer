@@ -463,6 +463,39 @@ def revoke_worker_key(
     audit_log("worker_key_revoked", worker_key_id=key_id, organization_id=recruiter.organization_id)
     return {"message": "Revoked"}
 
+
+@router.get("/worker/sessions")
+def list_worker_sessions(
+    db: Session = Depends(get_db),
+    recruiter=Depends(recruiter_required),
+):
+    now = datetime.utcnow()
+    rows = (
+        db.query(WorkerSession, WorkerKey)
+        .join(WorkerKey, WorkerSession.worker_key_id == WorkerKey.id)
+        .filter(WorkerSession.organization_id == recruiter.organization_id)
+        .order_by(WorkerSession.last_seen_at.desc().nullslast(), WorkerSession.created_at.desc())
+        .limit(100)
+        .all()
+    )
+    return {
+        "sessions": [
+            {
+                "id": session.id,
+                "worker_key_id": session.worker_key_id,
+                "key_name": key.name,
+                "device_name": session.device_name,
+                "worker_version": session.worker_version,
+                "created_at": session.created_at,
+                "last_seen_at": session.last_seen_at,
+                "expires_at": session.expires_at,
+                "revoked_at": session.revoked_at or key.revoked_at,
+                "is_expired": bool(session.expires_at and session.expires_at < now),
+            }
+            for session, key in rows
+        ]
+    }
+
 @router.post("/worker/auth", response_model=WorkerAuthResponse)
 @limiter.limit("10/minute")
 def worker_auth(request: Request, req: WorkerAuthRequest, db: Session = Depends(get_db)):

@@ -1307,6 +1307,10 @@ export function fetchWorkerProgress(token, jobId) {
   return _workerJson(token, `/api/worker/dashboard-progress/${encodeURIComponent(jobId)}`)
 }
 
+export function fetchWorkerSessions(token) {
+  return _workerJson(token, '/api/worker/sessions')
+}
+
 
 // ¦¦ Recruiter SaaS Batch Hub ¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦
 
