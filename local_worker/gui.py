@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from tkinter import BOTH, DISABLED, END, NORMAL, Button, Entry, Frame, Label, StringVar, Text, Tk, filedialog, messagebox, ttk
 
-from worker import extract_text, maybe_apply_ai_review, score_cv
+from worker import MAX_FILE_BYTES, extract_text, maybe_apply_ai_review, score_cv
 from workspace import WorkspaceStore
 
 
@@ -78,6 +78,7 @@ class LocalWorkerApp:
         self.work_queue: queue.Queue = queue.Queue()
         self.results: list[dict] = []
         self.result_by_iid: dict[str, dict] = {}
+        self.failed_files: list[str] = []
         self.is_running = False
 
         self._build()
@@ -176,6 +177,8 @@ class LocalWorkerApp:
         actions.pack(fill="x", pady=(12, 8))
         self.run_button = Button(actions, text="Analyze local folder", command=self._start_analysis)
         self.run_button.pack(side="left")
+        self.retry_button = Button(actions, text="Retry failed files", command=self._retry_failed_files)
+        self.retry_button.pack(side="left", padx=(8, 0))
         Button(actions, text="Open output folder", command=self._open_output).pack(side="left", padx=8)
         self.status_label = Label(actions, textvariable=self.status_var)
         self.status_label.pack(side="left", padx=12)
@@ -324,6 +327,7 @@ class LocalWorkerApp:
         rows = self.store.get_run_results(run_id)
         self.results = []
         self.result_by_iid = {}
+        self.failed_files = []
         self.table.delete(*self.table.get_children())
         for row in rows:
             self.work_queue.put(("row", row))
@@ -379,10 +383,31 @@ class LocalWorkerApp:
         self.is_running = True
         self.run_button.configure(state=DISABLED)
         self.status_var.set("Analyzing...")
-        threading.Thread(target=self._analyze_folder, args=(folder, output, config, job_id, job_name), daemon=True).start()
+        threading.Thread(target=self._analyze_folder, args=(folder, output, config, job_id, job_name, None), daemon=True).start()
 
-    def _analyze_folder(self, folder: Path, output: Path, config: dict, job_id: int | None, job_name: str):
-        files = [path for path in folder.rglob("*") if path.suffix.lower() in SUPPORTED_EXTENSIONS and path.is_file()]
+    def _retry_failed_files(self):
+        if self.is_running or not self.failed_files:
+            return
+        try:
+            config = self._config()
+        except ValueError as exc:
+            messagebox.showerror("Invalid settings", str(exc))
+            return
+        output = Path(self.output_var.get()).expanduser()
+        job_name = self.job_name_var.get().strip() or "Untitled local job"
+        job_id = self.store.save_job(job_name, config)
+        retry_paths = [Path(path) for path in self.failed_files if Path(path).exists()]
+        if not retry_paths:
+            messagebox.showinfo("No failed files", "There are no existing failed files to retry.")
+            return
+        self.is_running = True
+        self.run_button.configure(state=DISABLED)
+        self.status_var.set("Retrying failed files...")
+        self.failed_files = []
+        threading.Thread(target=self._analyze_folder, args=(Path("."), output, config, job_id, job_name, retry_paths), daemon=True).start()
+
+    def _analyze_folder(self, folder: Path, output: Path, config: dict, job_id: int | None, job_name: str, explicit_files: list[Path] | None):
+        files = explicit_files or [path for path in folder.rglob("*") if path.suffix.lower() in SUPPORTED_EXTENSIONS and path.is_file()]
         run_id = self.store.create_run(job_id, job_name, str(folder), str(output), len(files))
         rows: list[dict] = []
         seen_hashes: dict[str, str] = {}
@@ -391,6 +416,8 @@ class LocalWorkerApp:
         self.work_queue.put(("status", f"Found {len(files)} CV file(s)."))
         for index, path in enumerate(files, start=1):
             try:
+                if path.stat().st_size > MAX_FILE_BYTES:
+                    raise ValueError(f"File is larger than {MAX_FILE_BYTES} bytes.")
                 data = path.read_bytes()
                 file_hash = hashlib.sha256(data).hexdigest()
                 duplicate_of = seen_hashes.get(file_hash)
@@ -417,6 +444,7 @@ class LocalWorkerApp:
                 }
             except Exception as exc:
                 counts["failed"] += 1
+                self.failed_files.append(str(path))
                 row = {
                     "file": str(path),
                     "file_hash": "",
@@ -448,6 +476,7 @@ class LocalWorkerApp:
         output.mkdir(parents=True, exist_ok=True)
         json_path = output / "local_worker_results.json"
         csv_path = output / "local_worker_results.csv"
+        failed_path = output / "failed_files.txt"
         ranked_rows = sorted(rows, key=lambda item: float(item.get("score") or 0), reverse=True)
         for rank, row in enumerate(ranked_rows, start=1):
             row["rank"] = rank
@@ -462,6 +491,10 @@ class LocalWorkerApp:
                     "missing_skills": ", ".join(row.get("missing_skills") or []),
                     "risk_flags": ", ".join(row.get("risk_flags") or []),
                 })
+        if self.failed_files:
+            failed_path.write_text("\n".join(self.failed_files), encoding="utf-8")
+        elif failed_path.exists():
+            failed_path.unlink()
         self.work_queue.put(("done", f"Done. Results saved to {output}"))
         self.work_queue.put(("runs_refresh", job_id))
 
