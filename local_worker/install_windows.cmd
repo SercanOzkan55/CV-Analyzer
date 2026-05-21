@@ -27,7 +27,10 @@ echo Installing worker dependencies...
 ".venv\Scripts\python.exe" -m pip install --upgrade pip
 ".venv\Scripts\python.exe" -m pip install -r requirements.txt
 
+echo Creating desktop shortcut...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop') + '\CV Analyzer Local Worker.lnk'); $s.TargetPath='%CD%\run_gui.cmd'; $s.WorkingDirectory='%CD%'; $s.IconLocation='%SystemRoot%\System32\SHELL32.dll,220'; $s.Save()"
+
 echo.
 echo Setup complete.
-echo Run run_gui.cmd to open the Local Worker app.
+echo Run run_gui.cmd or use the desktop shortcut to open the Local Worker app.
 pause
