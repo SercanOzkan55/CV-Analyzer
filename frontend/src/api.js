@@ -1257,8 +1257,17 @@ async function _workerJson(token, path, method = 'GET', payload) {
     body: payload === undefined ? undefined : JSON.stringify(payload),
   })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.detail || `Worker request failed: ${res.status}`)
+    const text = await res.text().catch(() => '')
+    let detail = ''
+    try {
+      const parsed = text ? JSON.parse(text) : {}
+      detail = Array.isArray(parsed.detail)
+        ? parsed.detail.map((item) => item.msg || JSON.stringify(item)).join('; ')
+        : parsed.detail || parsed.message || ''
+    } catch {
+      detail = text
+    }
+    throw new Error(detail || `Worker request failed: ${res.status}`)
   }
   return res.json()
 }
@@ -1277,8 +1286,15 @@ export async function downloadWorkerPackage(token) {
   if (auth) headers['Authorization'] = auth
   const res = await fetch(`${BASE}/api/worker/download-package`, { headers })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.detail || `Worker package download failed: ${res.status}`)
+    const text = await res.text().catch(() => '')
+    let detail = ''
+    try {
+      const parsed = text ? JSON.parse(text) : {}
+      detail = parsed.detail || parsed.message || ''
+    } catch {
+      detail = text
+    }
+    throw new Error(detail || `Worker package download failed: ${res.status}`)
   }
   return res.blob()
 }

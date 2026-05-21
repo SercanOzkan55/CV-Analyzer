@@ -1,11 +1,19 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
+import {
+  ChevronDown,
+  FileSearch,
+  LogOut,
+  Moon,
+  Settings,
+  Sun,
+  UserRound,
+} from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/LanguageContext'
 import { useTheme } from '../context/ThemeContext'
 import NotificationCenter from './NotificationCenter'
-import { ChevronDown } from 'lucide-react'
 
 const langLabels = { en: 'EN', tr: 'TR' }
 
@@ -32,7 +40,6 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  // Close mobile menu on route change
   useEffect(() => {
     setMobileOpen(false)
   }, [location.pathname])
@@ -49,15 +56,16 @@ export default function Navbar() {
       transition={{ duration: 0.35 }}
     >
       <div className="navbar-inner">
-        <Link to="/" className="navbar-logo">
+        <Link to="/" className="navbar-logo" aria-label="CV Analyzer home">
           <motion.span
             className="logo-icon"
-            animate={{ rotate: [0, 8, -4, 0] }}
-            transition={{ duration: 3, repeat: Infinity, repeatDelay: 6, ease: 'easeInOut' }}
+            animate={{ opacity: [0.82, 1, 0.82] }}
+            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+            aria-hidden="true"
           >
-            ◆
+            <FileSearch size={20} strokeWidth={1.8} />
           </motion.span>
-          CV Analyzer
+          <span className="logo-wordmark">CV Analyzer</span>
         </Link>
 
         <button
@@ -83,7 +91,7 @@ export default function Navbar() {
             <>
               <NavLink to="/dashboard" active={location.pathname === '/dashboard'}>{t('nav.dashboard')}</NavLink>
               <NavLink to="/analyze" active={location.pathname === '/analyze'}>{t('nav.analyze')}</NavLink>
-              
+
               <div className="nav-dropdown">
                 <button
                   type="button"
@@ -131,7 +139,6 @@ export default function Navbar() {
         </div>
 
         <div className="navbar-actions">
-          {/* Language Switcher */}
           <div className="lang-switcher">
             {availableLanguages.map((l) => (
               <button
@@ -144,24 +151,23 @@ export default function Navbar() {
             ))}
           </div>
 
-          {/* Theme Toggle */}
           <motion.button
             className="theme-toggle"
             onClick={toggleTheme}
             aria-label="Toggle theme"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9, rotate: 20 }}
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.96, rotate: 12 }}
           >
             <AnimatePresence mode="wait" initial={false}>
               <motion.span
                 key={theme}
-                initial={{ opacity: 0, rotate: -30, scale: 0.7 }}
+                initial={{ opacity: 0, rotate: -20, scale: 0.8 }}
                 animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                exit={{ opacity: 0, rotate: 30, scale: 0.7 }}
-                transition={{ duration: 0.2 }}
-                style={{ display: 'inline-block' }}
+                exit={{ opacity: 0, rotate: 20, scale: 0.8 }}
+                transition={{ duration: 0.18 }}
+                className="theme-toggle-icon"
               >
-                {theme === 'dark' ? '☀️' : '🌙'}
+                {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
               </motion.span>
             </AnimatePresence>
           </motion.button>
@@ -169,22 +175,27 @@ export default function Navbar() {
           {isLanding ? (
             <>
               <Link to="/login" className="nav-link">{t('nav.login')}</Link>
-              <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                 <Link to="/register" className="btn-primary btn-sm">{t('nav.register')}</Link>
               </motion.div>
             </>
           ) : (
             <>
               <NotificationCenter />
-              <Link to="/profile" className="nav-link nav-icon" title={t('profile.title')}>👤</Link>
-              <Link to="/settings" className="nav-link nav-icon" title={t('nav.settings')}>⚙</Link>
+              <Link to="/profile" className="nav-link nav-icon" title={t('profile.title')} aria-label={t('profile.title')}>
+                <UserRound size={16} />
+              </Link>
+              <Link to="/settings" className="nav-link nav-icon" title={t('nav.settings')} aria-label={t('nav.settings')}>
+                <Settings size={16} />
+              </Link>
               <span className="user-email">{user?.email?.split('@')[0]}</span>
               <motion.button
                 className="btn-outline btn-sm"
                 onClick={handleLogout}
                 whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.97 }}
+                whileTap={{ scale: 0.98 }}
               >
+                <LogOut size={14} />
                 {t('nav.logout')}
               </motion.button>
             </>

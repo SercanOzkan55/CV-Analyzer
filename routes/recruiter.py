@@ -1341,7 +1341,7 @@ def recruiter_pipeline(job_id: int, db=Depends(get_db), recruiter=Depends(recrui
 
 
 @router.get("/report/{job_id}")
-def recruiter_batch_report(job_id: int, format: str = Query("xlsx", regex="^(xlsx|csv)$"), db=Depends(get_db), recruiter=Depends(recruiter_required)):
+def recruiter_batch_report(job_id: int, format: str = Query("xlsx", pattern="^(xlsx|csv)$"), db=Depends(get_db), recruiter=Depends(recruiter_required)):
     org_id = recruiter.organization_id
     if not org_id:
         raise HTTPException(status_code=400, detail="Recruiter has no organization")

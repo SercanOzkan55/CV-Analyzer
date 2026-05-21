@@ -1,0 +1,130 @@
+import json
+import sqlite3
+from datetime import UTC, datetime
+from pathlib import Path
+
+
+WORKSPACE_DB = Path("local_worker_workspace.sqlite3")
+
+
+def _now() -> str:
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+class WorkspaceStore:
+    def __init__(self, db_path: Path | str = WORKSPACE_DB):
+        self.db_path = Path(db_path)
+        self._ensure()
+
+    def _connect(self):
+        return sqlite3.connect(self.db_path)
+
+    def _ensure(self):
+        with self._connect() as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS local_jobs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    config_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS analysis_runs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    job_id INTEGER,
+                    job_name TEXT NOT NULL,
+                    cv_folder TEXT NOT NULL,
+                    output_folder TEXT NOT NULL,
+                    total_files INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS analysis_results (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id INTEGER NOT NULL,
+                    file_path TEXT NOT NULL,
+                    file_hash TEXT,
+                    duplicate_of TEXT,
+                    score REAL NOT NULL,
+                    decision TEXT NOT NULL,
+                    confidence TEXT NOT NULL,
+                    result_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            self._ensure_column(conn, "analysis_results", "file_hash", "file_hash TEXT")
+            self._ensure_column(conn, "analysis_results", "duplicate_of", "duplicate_of TEXT")
+
+    def _ensure_column(self, conn, table_name: str, column_name: str, column_sql: str):
+        columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()}
+        if column_name not in columns:
+            conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_sql}")
+
+    def list_jobs(self) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT id, name, config_json, updated_at FROM local_jobs ORDER BY updated_at DESC, name ASC"
+            ).fetchall()
+        return [
+            {"id": row[0], "name": row[1], "config": json.loads(row[2]), "updated_at": row[3]}
+            for row in rows
+        ]
+
+    def save_job(self, name: str, config: dict) -> int:
+        clean_name = (name or "").strip() or "Untitled local job"
+        payload = json.dumps(config, ensure_ascii=False)
+        timestamp = _now()
+        with self._connect() as conn:
+            existing = conn.execute("SELECT id FROM local_jobs WHERE name = ?", (clean_name,)).fetchone()
+            if existing:
+                conn.execute(
+                    "UPDATE local_jobs SET config_json = ?, updated_at = ? WHERE id = ?",
+                    (payload, timestamp, existing[0]),
+                )
+                return int(existing[0])
+            cursor = conn.execute(
+                "INSERT INTO local_jobs (name, config_json, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                (clean_name, payload, timestamp, timestamp),
+            )
+            return int(cursor.lastrowid)
+
+    def create_run(self, job_id: int | None, job_name: str, cv_folder: str, output_folder: str, total_files: int) -> int:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO analysis_runs (job_id, job_name, cv_folder, output_folder, total_files, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (job_id, job_name, cv_folder, output_folder, total_files, _now()),
+            )
+            return int(cursor.lastrowid)
+
+    def add_result(self, run_id: int, row: dict):
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO analysis_results
+                    (run_id, file_path, file_hash, duplicate_of, score, decision, confidence, result_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    row.get("file", ""),
+                    row.get("file_hash", ""),
+                    row.get("duplicate_of", ""),
+                    float(row.get("score") or 0),
+                    row.get("decision", ""),
+                    row.get("confidence", ""),
+                    json.dumps(row, ensure_ascii=False),
+                    _now(),
+                ),
+            )

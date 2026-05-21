@@ -190,25 +190,42 @@ def _worker_key_payload(wk: WorkerKey) -> dict:
 def _worker_package_readme(api_base_url: str) -> str:
     return f"""# CV Analyzer Local Worker
 
-This package lets an employer process claimed CVs locally and submit results back to CV Analyzer.
+This package has two modes:
 
-## 1. Install
+1. **Local app mode**: one-click Windows setup, visual UI, local job description, local CV folder, local CSV/JSON output. This mode does not require site-side jobs.
+2. **Server worker mode**: authenticate with a worker API key, claim site-side CVs, process them locally, and submit results back to CV Analyzer.
 
-Windows PowerShell:
+## Recommended Windows setup
+
+1. Extract the ZIP.
+2. Double-click `install_windows.cmd`.
+3. Double-click `run_gui.cmd`.
+4. In the app, paste or type the job description, choose a CV folder, and click **Analyze local folder**.
+
+The local app writes:
+
+- `local_worker_results.csv`
+- `local_worker_results.json`
+- `local_worker_workspace.sqlite3` for saved local jobs and local analysis history
+
+These files stay on your device.
+
+## Manual install
 
 ```powershell
 python -m venv .venv
 .\\.venv\\Scripts\\python.exe -m pip install -r requirements.txt
 ```
 
-macOS/Linux:
+Then open the local visual app:
 
-```bash
-python3 -m venv .venv
-./.venv/bin/python -m pip install -r requirements.txt
+```powershell
+.\\.venv\\Scripts\\python.exe gui.py
 ```
 
-## 2. Configure
+## Optional server worker mode
+
+Use this only when you want the local worker to claim CVs from the CV Analyzer website and sync results back.
 
 Set the backend URL and your one-time worker API key:
 
@@ -219,7 +236,7 @@ $env:CV_WORKER_API_KEY="sk_worker_live_xxx"
 
 The API key is only shown once in the web app when it is created. It is not stored in this package.
 
-## 3. Run
+Run server-side claim processing:
 
 ```powershell
 .\\.venv\\Scripts\\python.exe worker.py login
@@ -362,16 +379,23 @@ def download_worker_package(
     The package intentionally does not include API keys or bearer tokens. Users
     must paste the one-time worker key created in Settings.
     """
-    worker_py = _LOCAL_WORKER_DIR / "worker.py"
-    requirements = _LOCAL_WORKER_DIR / "requirements.txt"
-    if not worker_py.exists() or not requirements.exists():
+    package_files = [
+        ("worker.py", _LOCAL_WORKER_DIR / "worker.py"),
+        ("gui.py", _LOCAL_WORKER_DIR / "gui.py"),
+        ("workspace.py", _LOCAL_WORKER_DIR / "workspace.py"),
+        ("requirements.txt", _LOCAL_WORKER_DIR / "requirements.txt"),
+        ("install_windows.cmd", _LOCAL_WORKER_DIR / "install_windows.cmd"),
+        ("run_gui.cmd", _LOCAL_WORKER_DIR / "run_gui.cmd"),
+    ]
+    missing = [name for name, path in package_files if not path.exists()]
+    if missing:
         raise HTTPException(status_code=500, detail="Local worker package files are missing")
 
     api_base_url = str(request.base_url).rstrip("/") + "/api/worker"
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        archive.write(worker_py, arcname="worker.py")
-        archive.write(requirements, arcname="requirements.txt")
+        for arcname, path in package_files:
+            archive.write(path, arcname=arcname)
         archive.writestr("README.md", _worker_package_readme(api_base_url))
         archive.writestr("run-worker.ps1", _worker_run_script(api_base_url))
         archive.writestr(".env.example", _worker_env_example(api_base_url))
