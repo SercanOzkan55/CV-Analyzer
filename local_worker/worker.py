@@ -1,4 +1,5 @@
 import argparse
+import difflib
 import glob
 import json
 import os
@@ -17,6 +18,21 @@ WORKER_VERSION = "1.2.0"
 ENGINE_VERSION = "rule_based_mvp_v1"
 PROGRESS_LOG = Path(os.environ.get("CV_WORKER_PROGRESS_LOG", "worker_progress.jsonl"))
 MAX_FILE_BYTES = int(os.environ.get("CV_WORKER_MAX_FILE_BYTES", str(25 * 1024 * 1024)))
+SKILL_SYNONYMS = {
+    "javascript": ["js", "ecmascript"],
+    "typescript": ["ts"],
+    "react": ["reactjs", "react.js"],
+    "node": ["nodejs", "node.js"],
+    "postgresql": ["postgres", "psql"],
+    "machine learning": ["ml"],
+    "artificial intelligence": ["ai"],
+    "continuous integration": ["ci"],
+    "continuous deployment": ["cd"],
+    "amazon web services": ["aws"],
+    "google cloud": ["gcp"],
+    "microsoft azure": ["azure"],
+    "object oriented programming": ["oop"],
+}
 
 STOPWORDS = {
     "and", "or", "the", "with", "for", "from", "that", "this", "are", "you", "our",
@@ -45,6 +61,38 @@ def _contains_term(text_norm: str, term: str) -> bool:
     if not term_norm:
         return False
     return f" {term_norm} " in f" {text_norm} "
+
+
+def _term_variants(term: str) -> list[str]:
+    base = _normalize(term)
+    variants = [base] if base else []
+    variants.extend(_normalize(value) for value in SKILL_SYNONYMS.get(base, []))
+    for canonical, aliases in SKILL_SYNONYMS.items():
+        alias_values = [_normalize(alias) for alias in aliases]
+        if base in alias_values:
+            variants.append(canonical)
+            variants.extend(alias_values)
+    return list(dict.fromkeys(value for value in variants if value))
+
+
+def _token_set(text_norm: str) -> set[str]:
+    return set(re.findall(r"[a-z0-9+#./-]{2,}", text_norm or ""))
+
+
+def _matches_term(text_norm: str, text_tokens: set[str], term: str) -> bool:
+    for variant in _term_variants(term):
+        if f" {variant} " in f" {text_norm} ":
+            return True
+        variant_tokens = variant.split()
+        if len(variant_tokens) == 1:
+            token = variant_tokens[0]
+            if token in text_tokens:
+                return True
+            if len(token) >= 5 and difflib.get_close_matches(token, text_tokens, n=1, cutoff=0.86):
+                return True
+        elif all(token in text_tokens for token in variant_tokens):
+            return True
+    return False
 
 
 def _derive_keywords(job_description: str, max_items: int = 12) -> list[str]:
@@ -190,16 +238,17 @@ def extract_text(file_bytes: bytes, file_type: str, file_name: str = "") -> str:
 
 def score_cv(cv_text: str, config: dict) -> dict:
     text_norm = _normalize(cv_text)
+    text_tokens = _token_set(text_norm)
     required = list(config.get("required_skills") or [])
     nice = list(config.get("nice_to_have_skills") or [])
     hard_reject = list(config.get("hard_reject_criteria") or [])
     if not required:
         required = _derive_keywords(config.get("description", ""))
 
-    matched_required = [skill for skill in required if _contains_term(text_norm, skill)]
+    matched_required = [skill for skill in required if _matches_term(text_norm, text_tokens, skill)]
     missing_required = [skill for skill in required if skill not in matched_required]
-    matched_nice = [skill for skill in nice if _contains_term(text_norm, skill)]
-    risk_flags = [criterion for criterion in hard_reject if _contains_term(text_norm, criterion)]
+    matched_nice = [skill for skill in nice if _matches_term(text_norm, text_tokens, skill)]
+    risk_flags = [criterion for criterion in hard_reject if _matches_term(text_norm, text_tokens, criterion)]
 
     required_score = 70.0 if not required else 70.0 * (len(matched_required) / len(required))
     nice_score = 20.0 if not nice else 20.0 * (len(matched_nice) / len(nice))
@@ -245,6 +294,12 @@ def score_cv(cv_text: str, config: dict) -> dict:
         "missing_skills": missing_required,
         "risk_flags": risk_flags,
         "explanation": explanation,
+        "score_breakdown": {
+            "required_skills": round(required_score, 2),
+            "nice_to_have": round(nice_score, 2),
+            "content_quality": round(content_score, 2),
+            "risk_penalty": round(penalty, 2),
+        },
     }
 
 

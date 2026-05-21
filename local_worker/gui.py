@@ -482,6 +482,7 @@ class LocalWorkerApp:
             f"File: {row.get('file')}",
             f"Score: {row.get('score')} | Decision: {_decision_label(row.get('decision'))} | Confidence: {row.get('confidence')}",
             f"Duplicate: {'yes' if row.get('is_duplicate') else 'no'}",
+            f"Breakdown: {json.dumps(row.get('score_breakdown') or {}, ensure_ascii=False)}",
             f"Matched: {', '.join(row.get('matched_skills') or [])}",
             f"Missing: {', '.join(row.get('missing_skills') or [])}",
             f"Risks: {', '.join(row.get('risk_flags') or [])}",
