@@ -245,6 +245,12 @@ $env:CV_WORKER_API_KEY="sk_worker_live_xxx"
 
 The API key is only shown once in the web app when it is created. It is not stored in this package.
 
+To store the worker key in the OS credential store instead of an environment variable:
+
+```powershell
+.\\.venv\\Scripts\\python.exe worker.py login --api-key sk_worker_live_xxx --save-api-key
+```
+
 Run server-side claim processing:
 
 ```powershell
@@ -404,6 +410,7 @@ def download_worker_package(
         ("worker.py", _LOCAL_WORKER_DIR / "worker.py"),
         ("gui.py", _LOCAL_WORKER_DIR / "gui.py"),
         ("workspace.py", _LOCAL_WORKER_DIR / "workspace.py"),
+        ("credentials.py", _LOCAL_WORKER_DIR / "credentials.py"),
         ("requirements.txt", _LOCAL_WORKER_DIR / "requirements.txt"),
         ("install_windows.cmd", _LOCAL_WORKER_DIR / "install_windows.cmd"),
         ("run_gui.cmd", _LOCAL_WORKER_DIR / "run_gui.cmd"),
