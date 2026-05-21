@@ -212,6 +212,12 @@ The local app writes:
 
 These files stay on your device.
 
+Optional AI review can be enabled inside the app by selecting `customer_openai_key`. It only runs for uncertain or low-confidence results and uses a key stored in your local environment:
+
+```powershell
+$env:CV_WORKER_OPENAI_API_KEY="sk-..."
+```
+
 ## Manual install
 
 ```powershell
@@ -287,6 +293,8 @@ def _worker_env_example(api_base_url: str) -> str:
 CV_WORKER_API_KEY=sk_worker_live_xxx
 CV_WORKER_MAX_FILE_BYTES=26214400
 CV_WORKER_PROGRESS_LOG=worker_progress.jsonl
+CV_WORKER_OPENAI_API_KEY=
+CV_WORKER_OPENAI_MODEL=gpt-5.2
 """
 
 def _release_expired_claims(db: Session, organization_id: int, now: datetime | None = None) -> int:

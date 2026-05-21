@@ -18,6 +18,7 @@ WORKER_VERSION = "1.2.0"
 ENGINE_VERSION = "rule_based_mvp_v1"
 PROGRESS_LOG = Path(os.environ.get("CV_WORKER_PROGRESS_LOG", "worker_progress.jsonl"))
 MAX_FILE_BYTES = int(os.environ.get("CV_WORKER_MAX_FILE_BYTES", str(25 * 1024 * 1024)))
+OPENAI_MODEL = os.environ.get("CV_WORKER_OPENAI_MODEL", "gpt-5.2")
 SKILL_SYNONYMS = {
     "javascript": ["js", "ecmascript"],
     "typescript": ["ts"],
@@ -303,6 +304,74 @@ def score_cv(cv_text: str, config: dict) -> dict:
     }
 
 
+def _is_uncertain_score(score: dict, config: dict) -> bool:
+    value = float(score.get("score") or 0)
+    accept = float(config.get("accept_threshold") or 75)
+    review = float(config.get("review_threshold") or 50)
+    return abs(value - accept) <= 8 or abs(value - review) <= 8 or score.get("confidence") == "low"
+
+
+def _extract_response_text(payload: dict) -> str:
+    if isinstance(payload.get("output_text"), str):
+        return payload["output_text"]
+    parts = []
+    for item in payload.get("output") or []:
+        for content in item.get("content") or []:
+            if content.get("type") in {"output_text", "text"} and content.get("text"):
+                parts.append(content["text"])
+    return "\n".join(parts).strip()
+
+
+def maybe_apply_ai_review(cv_text: str, config: dict, score: dict, ai_mode: str) -> dict:
+    if ai_mode != "customer_openai_key" or not _is_uncertain_score(score, config):
+        return score
+    api_key = os.environ.get("CV_WORKER_OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        return {**score, "ai_review_status": "skipped_missing_customer_key"}
+
+    trimmed_cv = (cv_text or "")[:6000]
+    prompt = {
+        "job": {
+            "title": config.get("title"),
+            "description": (config.get("description") or "")[:3000],
+            "required_skills": config.get("required_skills") or [],
+            "nice_to_have_skills": config.get("nice_to_have_skills") or [],
+            "hard_reject_criteria": config.get("hard_reject_criteria") or [],
+        },
+        "rule_based_score": score,
+        "cv_text_excerpt": trimmed_cv,
+    }
+    try:
+        resp = requests.post(
+            "https://api.openai.com/v1/responses",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": OPENAI_MODEL,
+                "instructions": (
+                    "You are reviewing a local CV screening result. Do not invent facts. "
+                    "Return concise JSON with keys: decision, confidence, explanation, risk_flags."
+                ),
+                "input": json.dumps(prompt, ensure_ascii=False),
+                "store": False,
+            },
+            timeout=45,
+        )
+        if resp.status_code >= 400:
+            return {**score, "ai_review_status": f"failed_{resp.status_code}"}
+        text = _extract_response_text(resp.json())
+        return {
+            **score,
+            "ai_review_status": "completed",
+            "ai_review_model": OPENAI_MODEL,
+            "ai_review": text[:2500],
+        }
+    except Exception as exc:
+        return {**score, "ai_review_status": f"failed_{type(exc).__name__}"}
+
+
 class LocalWorker:
     def __init__(self, api_key: str, processing_mode: str, ai_mode: str, device_name: str):
         self.api_key = api_key
@@ -434,7 +503,7 @@ class LocalWorker:
             file_bytes = self._download_item(item)
             cv_text = extract_text(file_bytes, item.get("file_type", "txt"), item.get("file_name", "cv.txt"))
             if cv_text.strip():
-                score = score_cv(cv_text, config)
+                score = maybe_apply_ai_review(cv_text, config, score_cv(cv_text, config), self.ai_mode)
             else:
                 score = self._failed_score(
                     "No readable text could be extracted from this CV.",
