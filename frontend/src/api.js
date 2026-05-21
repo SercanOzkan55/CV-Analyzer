@@ -1,4 +1,4 @@
-﻿const DEFAULT_BASE = (() => {
+const DEFAULT_BASE = (() => {
   if (typeof window === 'undefined') return 'http://127.0.0.1:8001'
   return ''
 })()
@@ -1478,4 +1478,29 @@ export const recruiterSendEmail = async (token, payload) => {
     body: JSON.stringify(payload)
   });
   return res.json();
+}
+
+export const recruiterSendEmailBulk = async (token, payload) => {
+  const res = await fetch(`${BASE}/api/v1/recruiter/send-email-bulk`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+export const recruiterExportRankings = async (token, jobId, format = 'csv') => {
+  const res = await fetch(`${BASE}/api/v1/recruiter/export/rankings?job_id=${jobId}&format=${format}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error(`Export failed: ${res.statusText}`);
+  return res.blob();
+}
+
+export const recruiterExportCandidates = async (token, format = 'csv') => {
+  const res = await fetch(`${BASE}/api/v1/recruiter/export/candidates?format=${format}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error(`Export failed: ${res.statusText}`);
+  return res.blob();
 }

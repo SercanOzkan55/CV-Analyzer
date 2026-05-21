@@ -56,6 +56,7 @@ def test_extract_pdf_text_fast_success(mock_pdf_open):
     mock_pdf = MagicMock()
     mock_page = MagicMock()
     mock_page.extract_text.return_value = "Page content"
+    mock_page.extract_words.return_value = []
     mock_pdf.pages = [mock_page, mock_page, mock_page]
     mock_pdf_open.return_value.__enter__.return_value = mock_pdf
     
@@ -64,24 +65,32 @@ def test_extract_pdf_text_fast_success(mock_pdf_open):
 
 @patch("pdfplumber.open")
 @patch("main._extract_pdf_text")
-def test_extract_pdf_text_fast_many_pages(mock_main_extract, mock_pdf_open):
+@patch("services.pdf_text_extractor.extract_pdf_text")
+def test_extract_pdf_text_fast_many_pages(mock_layout_extract, mock_main_extract, mock_pdf_open):
     # Mock pdfplumber with 10 pages
     mock_pdf = MagicMock()
     mock_pdf.pages = [MagicMock()] * 10
     mock_pdf_open.return_value.__enter__.return_value = mock_pdf
     
+    mock_layout_extract.return_value = ("", False)
     mock_main_extract.return_value = ("Robust full text", None)
     
     text = extract_pdf_text_fast(b"dummy pdf")
     assert text == "Robust full text"
 
-@patch("pdfplumber.open", side_effect=ImportError("No pdfplumber"))
-def test_extract_pdf_text_fast_fallback_cv_text(mock_pdf_open):
+@patch("pdfplumber.open")
+@patch("services.pdf_text_extractor.extract_pdf_text")
+def test_extract_pdf_text_fast_fallback_cv_text(mock_layout_extract, mock_pdf_open):
+    mock_pdf_open.side_effect = ImportError("No pdfplumber")
+    mock_layout_extract.side_effect = ImportError("No pdfplumber")
     text = extract_pdf_text_fast(b"dummy pdf")
     assert text == ""
 
-@patch("pdfplumber.open", side_effect=Exception("Crash"))
-def test_extract_pdf_text_fast_exception(mock_pdf_open):
+@patch("pdfplumber.open")
+@patch("services.pdf_text_extractor.extract_pdf_text")
+def test_extract_pdf_text_fast_exception(mock_layout_extract, mock_pdf_open):
+    mock_pdf_open.side_effect = Exception("Crash")
+    mock_layout_extract.side_effect = Exception("Crash")
     assert extract_pdf_text_fast(b"dummy pdf") == ""
 
 def test_extract_docx_text_fast_success():

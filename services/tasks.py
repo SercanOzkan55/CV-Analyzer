@@ -117,6 +117,12 @@ try:
             task_soft_time_limit=45,                # soft limit → SoftTimeLimitExceeded
             task_time_limit=60,                     # hard kill after 60s
             worker_hijack_root_logger=False,        # keep app logging config
+            beat_schedule={
+                "cleanup-expired-worker-claims": {
+                    "task": "cleanup_expired_claims",
+                    "schedule": 300.0,
+                }
+            }
         )
 
         @celery_app.task(bind=True, name="analyze_pdf_task", queue="pdf_processing")
@@ -178,6 +184,46 @@ try:
             finally:
                 db.close()
             return results
+
+        @celery_app.task(name="cleanup_expired_claims")
+        def cleanup_expired_claims():
+            """Automatically clean up expired claims and restore worker quotas."""
+            from database import SessionLocal
+            from models import WorkerClaim, WorkerKey, QuotaEvent
+            from datetime import datetime
+
+            db = SessionLocal()
+            try:
+                now = datetime.utcnow()
+                expired_claims = db.query(WorkerClaim).filter(
+                    WorkerClaim.status == "claimed",
+                    WorkerClaim.claim_expires_at < now
+                ).with_for_update(skip_locked=True).all()
+
+                released = 0
+                for claim in expired_claims:
+                    wk = db.query(WorkerKey).filter(WorkerKey.id == claim.worker_key_id).with_for_update().first()
+                    if wk:
+                        wk.quota_reserved = max(0, int(wk.quota_reserved or 0) - 1)
+                        db.add(QuotaEvent(
+                            worker_key_id=wk.id,
+                            organization_id=claim.organization_id,
+                            job_id=claim.job_id,
+                            cv_id=claim.cv_id,
+                            event_type="expired",
+                            amount=1,
+                            metadata_={"claim_id": claim.id},
+                        ))
+                    claim.status = "expired"
+                    released += 1
+                if released > 0:
+                    db.commit()
+                    _task_logger.info(f"Released {released} expired worker claims.")
+            except Exception as e:
+                db.rollback()
+                _task_logger.error(f"Failed to cleanup expired worker claims: {str(e)}")
+            finally:
+                db.close()
 
     else:
         raise RuntimeError("Redis unavailable; fallback to LocalTask")
@@ -253,3 +299,41 @@ except Exception:
         return results
 
     batch_recruiter_task = LocalTask(_batch_recruiter)
+
+    def _cleanup_expired_claims():
+        from database import SessionLocal
+        from models import WorkerClaim, WorkerKey, QuotaEvent
+        from datetime import datetime
+
+        db = SessionLocal()
+        try:
+            now = datetime.utcnow()
+            expired_claims = db.query(WorkerClaim).filter(
+                WorkerClaim.status == "claimed",
+                WorkerClaim.claim_expires_at < now
+            ).all()
+
+            released = 0
+            for claim in expired_claims:
+                wk = db.query(WorkerKey).filter(WorkerKey.id == claim.worker_key_id).first()
+                if wk:
+                    wk.quota_reserved = max(0, int(wk.quota_reserved or 0) - 1)
+                    db.add(QuotaEvent(
+                        worker_key_id=wk.id,
+                        organization_id=claim.organization_id,
+                        job_id=claim.job_id,
+                        cv_id=claim.cv_id,
+                        event_type="expired",
+                        amount=1,
+                        metadata_={"claim_id": claim.id},
+                    ))
+                claim.status = "expired"
+                released += 1
+            if released > 0:
+                db.commit()
+        except Exception:
+            db.rollback()
+        finally:
+            db.close()
+
+    cleanup_expired_claims = LocalTask(_cleanup_expired_claims)

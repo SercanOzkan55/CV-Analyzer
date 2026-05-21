@@ -16,6 +16,7 @@ from credentials import load_worker_api_key, save_worker_api_key
 
 
 API_BASE_URL = os.environ.get("CV_ANALYZER_API_URL", "http://127.0.0.1:8001/api/worker")
+VERIFY_SSL = os.environ.get("VERIFY_SSL", "True").lower() not in ("false", "0", "no")
 WORKER_VERSION = "1.2.0"
 ENGINE_VERSION = "rule_based_mvp_v1"
 PROGRESS_LOG = Path(os.environ.get("CV_WORKER_PROGRESS_LOG", "worker_progress.jsonl"))
@@ -360,6 +361,7 @@ def maybe_apply_ai_review(cv_text: str, config: dict, score: dict, ai_mode: str)
                 "store": False,
             },
             timeout=45,
+            verify=VERIFY_SSL,
         )
         if resp.status_code >= 400:
             return {**score, "ai_review_status": f"failed_{resp.status_code}"}
@@ -375,16 +377,18 @@ def maybe_apply_ai_review(cv_text: str, config: dict, score: dict, ai_mode: str)
 
 
 class LocalWorker:
-    def __init__(self, api_key: str, processing_mode: str, ai_mode: str, device_name: str):
+    def __init__(self, api_key: str, processing_mode: str, ai_mode: str, device_name: str, verify_ssl: bool = True):
         self.api_key = api_key
         self.processing_mode = processing_mode
         self.ai_mode = ai_mode
         self.device_name = device_name
+        self.verify_ssl = verify_ssl
         self.access_token = None
         self.company_id = None
         self.allowed_jobs = []
         self.quota_remaining = 0
         self.session = requests.Session()
+        self.session.verify = self.verify_ssl
 
     def _request(self, method: str, path_or_url: str, *, absolute: bool = False, allow_reauth: bool = True, **kwargs):
         url = path_or_url if absolute else f"{API_BASE_URL}{path_or_url}"
@@ -574,6 +578,7 @@ def _add_common_args(parser):
     parser.add_argument("--api-key", default=None, help="Worker API key. Defaults to CV_WORKER_API_KEY.")
     parser.add_argument("--save-api-key", action="store_true", help="Save the provided API key to the OS credential store.")
     parser.add_argument("--device-name", default=os.environ.get("COMPUTERNAME") or os.environ.get("HOSTNAME") or "Local Worker")
+    parser.add_argument("--no-verify-ssl", action="store_true", help="Bypass SSL verification for SaaS backend request calls.")
 
 
 def main():
@@ -600,7 +605,8 @@ def main():
     if args.api_key and args.save_api_key:
         saved = save_worker_api_key(args.api_key)
         print("API key saved to OS credential store." if saved else "API key could not be saved to OS credential store.")
-    worker = LocalWorker(api_key, args.processing_mode, args.ai_mode, args.device_name)
+    verify_ssl = VERIFY_SSL and not getattr(args, "no_verify_ssl", False)
+    worker = LocalWorker(api_key, args.processing_mode, args.ai_mode, args.device_name, verify_ssl=verify_ssl)
 
     try:
         if args.command == "login":
