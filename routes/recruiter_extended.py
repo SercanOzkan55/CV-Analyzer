@@ -210,7 +210,7 @@ def recruiter_send_email_bulk(
 @router.get("/export/rankings")
 def recruiter_export_rankings(
     job_id: int,
-    format: str = Query("csv", regex="^(csv|json)$"),
+    format: str = Query("csv", pattern="^(csv|json)$"),
     db=Depends(get_db),
     recruiter=Depends(recruiter_required),
     request: Request = None,
@@ -287,7 +287,7 @@ def recruiter_export_rankings(
 @_get_limiter().limit("60/minute")
 @router.get("/export/candidates")
 def recruiter_export_candidates(
-    format: str = Query("csv", regex="^(csv|json)$"),
+    format: str = Query("csv", pattern="^(csv|json)$"),
     db=Depends(get_db),
     recruiter=Depends(recruiter_required),
     request: Request = None,

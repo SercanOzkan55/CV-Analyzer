@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom'
 import { motion, useInView } from 'framer-motion'
 import {
   Brain, FileCheck, Target, Globe2, LayoutGrid, Users,
-  Upload, FileText, CheckCircle2, ArrowRight, Sparkles,
-  Star, Zap, Shield, Clock,
+  Upload, FileText, CheckCircle2, ArrowRight,
+  Star, Shield, Clock,
 } from 'lucide-react'
 import { useLanguage } from '../i18n/LanguageContext'
 import Navbar from '../components/Navbar'
@@ -29,7 +29,7 @@ const scaleIn = {
 }
 
 // ─── Feature accent colors ───────────────────────────────────────
-const FEATURE_COLORS = ['#c084fc', '#a78bfa', '#34d399', '#f59e0b', '#f472b6', '#38bdf8']
+const FEATURE_COLORS = ['#20c7b2', '#d9b15f', '#35c779', '#68b7ff', '#ff7a90', '#8ee7d8']
 const FEATURE_ICONS  = [Brain, FileCheck, Target, Globe2, LayoutGrid, Users]
 const STEP_ICONS     = [Upload, FileText, CheckCircle2]
 const STEP_TIMES     = ['< 1 min', '2 min', 'Instant']
@@ -63,16 +63,16 @@ function DemoCard({ t }) {
         animate={{ y: [0, -6, 0] }}
         transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
       >
-        <Sparkles size={12} style={{ color: 'var(--color-accent)' }} />
-        AI Analysis
+        <FileCheck size={12} style={{ color: 'var(--color-accent)' }} />
+        Evidence Scan
       </motion.div>
       <motion.div
         className="lp-float-badge lp-float-badge-bottom"
         animate={{ y: [0, 6, 0] }}
         transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut', delay: 0.8 }}
       >
-        <Shield size={12} style={{ color: '#34d399' }} />
-        ATS Optimized
+        <Shield size={12} style={{ color: 'var(--color-success)' }} />
+        ATS Ready
       </motion.div>
 
       {/* Main demo card */}
@@ -195,7 +195,7 @@ export default function LandingPage() {
             variants={stagger}
           >
             <motion.div className="hero-badge" variants={fadeUp}>
-              <Sparkles size={14} /> AI-Powered Resume Analysis
+              <FileCheck size={14} /> Resume intelligence workspace
             </motion.div>
 
             <motion.h1 variants={fadeUp}>{t('landing.hero_title')}</motion.h1>
@@ -207,7 +207,7 @@ export default function LandingPage() {
             <motion.div className="hero-actions" variants={fadeUp}>
               <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
                 <Link to="/register" className="btn-primary btn-lg">
-                  <Zap size={16} />
+                  <ArrowRight size={16} />
                   {t('landing.try_now')}
                 </Link>
               </motion.div>
@@ -443,7 +443,7 @@ export default function LandingPage() {
             viewport={{ once: true }}
             transition={{ duration: 0.4, type: 'spring', stiffness: 260 }}
           >
-            <Sparkles size={13} /> {t('landing.try_now')}
+            <FileCheck size={13} /> {t('landing.try_now')}
           </motion.div>
           <motion.h2
             initial={{ opacity: 0, y: 20 }}
@@ -470,7 +470,7 @@ export default function LandingPage() {
           >
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
               <Link to="/register" className="btn-primary btn-lg">
-                <Zap size={16} /> {t('landing.try_now')} <ArrowRight size={16} />
+                <ArrowRight size={16} /> {t('landing.try_now')}
               </Link>
             </motion.div>
             <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
@@ -480,7 +480,7 @@ export default function LandingPage() {
             </motion.div>
           </motion.div>
           <p className="lp-cta-note">
-            ✓ Free to start &nbsp;·&nbsp; ✓ No credit card &nbsp;·&nbsp; ✓ Instant results
+            Free to start | No credit card | Instant results
           </p>
         </div>
       </section>

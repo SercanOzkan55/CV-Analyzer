@@ -40,6 +40,22 @@ from services.cv_builder_service import (
 from services.email_service import _start_reminder_worker
 
 
+def _ensure_sqlite_column(connection, table_name: str, column_name: str, column_sql: str):
+    columns = {
+        row[1]
+        for row in connection.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
+    }
+    if column_name not in columns:
+        connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_sql}"))
+
+
+def _ensure_mock_sqlite_schema_columns():
+    with engine.begin() as connection:
+        _ensure_sqlite_column(connection, "candidate_actions", "cv_file_key", "cv_file_key VARCHAR")
+        _ensure_sqlite_column(connection, "candidate_actions", "cv_file_name", "cv_file_name VARCHAR")
+        _ensure_sqlite_column(connection, "candidate_actions", "cv_file_type", "cv_file_type VARCHAR")
+
+
 def _configure_logging():
     try:
         from logging_config import setup_logging
@@ -57,6 +73,7 @@ def _ensure_new_tables():
 
         if main_value("MOCK_SERVICES_ON", False) and str(_DATABASE_URL or "").startswith("sqlite"):
             _Base.metadata.create_all(engine)
+            _ensure_mock_sqlite_schema_columns()
             logging.getLogger("app.startup").info("Mock sqlite schema ensured for all models")
             return
 

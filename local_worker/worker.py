@@ -5,7 +5,7 @@ import os
 import re
 import sys
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
 
@@ -31,7 +31,7 @@ class LocalWorkerError(RuntimeError):
 
 
 def _log_progress(event: str, **fields):
-    payload = {"event": event, "timestamp": datetime.utcnow().isoformat() + "Z", **fields}
+    payload = {"event": event, "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"), **fields}
     with PROGRESS_LOG.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
