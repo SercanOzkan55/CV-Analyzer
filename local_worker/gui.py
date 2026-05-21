@@ -13,6 +13,31 @@ from workspace import WorkspaceStore
 
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt"}
 
+THEMES = {
+    "dark": {
+        "bg": "#0d1110",
+        "panel": "#121918",
+        "panel_2": "#18211f",
+        "text": "#e8efec",
+        "muted": "#98a8a2",
+        "accent": "#39c6a3",
+        "accent_2": "#d7b85b",
+        "border": "#263330",
+        "field": "#0f1514",
+    },
+    "light": {
+        "bg": "#f4f7f5",
+        "panel": "#ffffff",
+        "panel_2": "#eef4f1",
+        "text": "#17211e",
+        "muted": "#5d6b66",
+        "accent": "#12846f",
+        "accent_2": "#a37920",
+        "border": "#d9e4df",
+        "field": "#ffffff",
+    },
+}
+
 
 def _split_terms(value: str) -> list[str]:
     return [item.strip() for item in (value or "").replace("\n", ",").split(",") if item.strip()]
@@ -35,6 +60,7 @@ class LocalWorkerApp:
 
         self.store = WorkspaceStore()
         self.local_jobs: list[dict] = []
+        self.theme_name = StringVar(value="dark")
         self.job_name_var = StringVar(value="New local job")
         self.saved_job_var = StringVar()
         self.folder_var = StringVar()
@@ -52,19 +78,31 @@ class LocalWorkerApp:
         self.is_running = False
 
         self._build()
+        self._apply_theme()
         self._refresh_jobs()
         self.root.after(150, self._drain_queue)
 
     def _build(self):
         shell = Frame(self.root, padx=18, pady=18)
         shell.pack(fill=BOTH, expand=True)
+        self.shell = shell
 
-        Label(shell, text="CV Analyzer Local Worker", font=("Segoe UI", 18, "bold")).pack(anchor="w")
-        Label(
-            shell,
-            text="Analyze a local CV folder without creating site-side jobs. Results stay on this device unless you export them.",
+        header = Frame(shell)
+        header.pack(fill="x", pady=(0, 14))
+        self.header = header
+        title_box = Frame(header)
+        title_box.pack(side="left", fill="x", expand=True)
+        self.title_box = title_box
+        self.title_label = Label(title_box, text="CV Analyzer Local Worker", font=("Segoe UI", 20, "bold"))
+        self.title_label.pack(anchor="w")
+        self.subtitle_label = Label(
+            title_box,
+            text="Offline-first CV ranking workspace for local employer folders.",
             font=("Segoe UI", 10),
-        ).pack(anchor="w", pady=(2, 14))
+        )
+        self.subtitle_label.pack(anchor="w", pady=(2, 0))
+        self.theme_button = Button(header, text="Light theme", command=self._toggle_theme)
+        self.theme_button.pack(side="right")
 
         job_row = Frame(shell)
         job_row.pack(fill="x", pady=4)
@@ -82,17 +120,20 @@ class LocalWorkerApp:
 
         file_row = Frame(shell)
         file_row.pack(fill="x", pady=4)
-        Label(file_row, text="CV folder", width=18, anchor="w").pack(side="left")
+        self.file_label = Label(file_row, text="CV folder", width=18, anchor="w")
+        self.file_label.pack(side="left")
         Entry(file_row, textvariable=self.folder_var).pack(side="left", fill="x", expand=True, padx=(0, 8))
         Button(file_row, text="Choose folder", command=self._choose_folder).pack(side="left")
 
         output_row = Frame(shell)
         output_row.pack(fill="x", pady=4)
-        Label(output_row, text="Output folder", width=18, anchor="w").pack(side="left")
+        self.output_label = Label(output_row, text="Output folder", width=18, anchor="w")
+        self.output_label.pack(side="left")
         Entry(output_row, textvariable=self.output_var).pack(side="left", fill="x", expand=True, padx=(0, 8))
         Button(output_row, text="Choose output", command=self._choose_output).pack(side="left")
 
-        Label(shell, text="Job description", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(14, 4))
+        self.jd_label = Label(shell, text="Job description", font=("Segoe UI", 10, "bold"))
+        self.jd_label.pack(anchor="w", pady=(14, 4))
         self.jd_text = Text(shell, height=7, wrap="word")
         self.jd_text.pack(fill="x")
 
@@ -110,9 +151,11 @@ class LocalWorkerApp:
 
         thresholds = Frame(shell)
         thresholds.pack(fill="x", pady=4)
-        Label(thresholds, text="Accept threshold").pack(side="left")
+        self.accept_label = Label(thresholds, text="Accept threshold")
+        self.accept_label.pack(side="left")
         Entry(thresholds, textvariable=self.accept_var, width=8).pack(side="left", padx=(6, 18))
-        Label(thresholds, text="Review threshold").pack(side="left")
+        self.review_label = Label(thresholds, text="Review threshold")
+        self.review_label.pack(side="left")
         Entry(thresholds, textvariable=self.review_var, width=8).pack(side="left", padx=(6, 18))
 
         actions = Frame(shell)
@@ -120,11 +163,13 @@ class LocalWorkerApp:
         self.run_button = Button(actions, text="Analyze local folder", command=self._start_analysis)
         self.run_button.pack(side="left")
         Button(actions, text="Open output folder", command=self._open_output).pack(side="left", padx=8)
-        Label(actions, textvariable=self.status_var).pack(side="left", padx=12)
+        self.status_label = Label(actions, textvariable=self.status_var)
+        self.status_label.pack(side="left", padx=12)
 
         self.progress = ttk.Progressbar(shell, mode="determinate")
         self.progress.pack(fill="x", pady=(0, 6))
-        Label(shell, textvariable=self.summary_var, anchor="w").pack(fill="x", pady=(0, 6))
+        self.summary_label = Label(shell, textvariable=self.summary_var, anchor="w")
+        self.summary_label.pack(fill="x", pady=(0, 6))
 
         columns = ("file", "score", "decision", "confidence", "duplicate", "matched", "missing")
         self.table = ttk.Treeview(shell, columns=columns, show="headings", height=12)
@@ -134,9 +179,62 @@ class LocalWorkerApp:
         self.table.pack(fill=BOTH, expand=True, pady=(4, 8))
         self.table.bind("<<TreeviewSelect>>", self._show_selected_result)
 
-        Label(shell, text="Selected result detail", font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        self.detail_label = Label(shell, text="Selected result detail", font=("Segoe UI", 10, "bold"))
+        self.detail_label.pack(anchor="w")
         self.detail_text = Text(shell, height=6, wrap="word", state=DISABLED)
         self.detail_text.pack(fill="x")
+
+    def _all_frames(self):
+        frames = [self.root, self.shell, self.header, self.title_box]
+        for child in self.shell.winfo_children():
+            if isinstance(child, Frame):
+                frames.append(child)
+                frames.extend([nested for nested in child.winfo_children() if isinstance(nested, Frame)])
+        return frames
+
+    def _all_labels(self):
+        labels = [
+            self.title_label,
+            self.subtitle_label,
+            self.file_label,
+            self.output_label,
+            self.jd_label,
+            self.accept_label,
+            self.review_label,
+            self.status_label,
+            self.summary_label,
+            self.detail_label,
+        ]
+        for child in self.shell.winfo_children():
+            if isinstance(child, Frame):
+                labels.extend([nested for nested in child.winfo_children() if isinstance(nested, Label)])
+        return list(dict.fromkeys(labels))
+
+    def _apply_theme(self):
+        colors = THEMES[self.theme_name.get()]
+        style = ttk.Style(self.root)
+        try:
+            style.theme_use("clam")
+        except Exception:
+            pass
+        style.configure("Treeview", background=colors["panel"], fieldbackground=colors["panel"], foreground=colors["text"], rowheight=28, bordercolor=colors["border"])
+        style.configure("Treeview.Heading", background=colors["panel_2"], foreground=colors["text"], font=("Segoe UI", 9, "bold"))
+        style.configure("TCombobox", fieldbackground=colors["field"], background=colors["panel"], foreground=colors["text"])
+        style.configure("Horizontal.TProgressbar", troughcolor=colors["panel_2"], background=colors["accent"])
+        for frame in self._all_frames():
+            frame.configure(bg=colors["bg"] if frame in {self.root, self.shell} else colors["panel"])
+        for label in self._all_labels():
+            label.configure(bg=label.master.cget("bg"), fg=colors["text"])
+        self.subtitle_label.configure(fg=colors["muted"])
+        self.status_label.configure(fg=colors["accent"])
+        self.summary_label.configure(fg=colors["accent_2"])
+        self.jd_text.configure(bg=colors["field"], fg=colors["text"], insertbackground=colors["text"], relief="flat", highlightthickness=1, highlightbackground=colors["border"])
+        self.detail_text.configure(bg=colors["field"], fg=colors["text"], insertbackground=colors["text"], relief="flat", highlightthickness=1, highlightbackground=colors["border"])
+        self.theme_button.configure(text="Light theme" if self.theme_name.get() == "dark" else "Dark theme")
+
+    def _toggle_theme(self):
+        self.theme_name.set("light" if self.theme_name.get() == "dark" else "dark")
+        self._apply_theme()
 
     def run(self):
         self.root.mainloop()
