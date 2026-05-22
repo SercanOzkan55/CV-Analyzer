@@ -3,23 +3,22 @@ import logging
 import os
 import re
 import unicodedata
-from typing import Dict, List
 
 logger = logging.getLogger("app.cv_autofix")
 
 from schemas.cv_model import CVModel
-from schemas.cv_schema import CVSchema
-from .ats_service import analyze_cv
-from .skill_service import extract_skills
-from . import rewrite_service
-from .section_classifier import detect_sections as _block_detect_sections, classify_block
 from services.schema_builder import build_schema
+
+from . import rewrite_service
+from .ats_service import analyze_cv
+from .section_classifier import detect_sections as _block_detect_sections
+from .skill_service import extract_skills
 
 
 def _get_pipeline_agents():
     """Lazy import to avoid circular dependency with agents module."""
     from agents.extract_agent import extract_structured
-    from agents.normalize_agent import normalize, get_section_order
+    from agents.normalize_agent import get_section_order, normalize
     return extract_structured, normalize, get_section_order
 
 
@@ -31,279 +30,7 @@ USE_PIPELINE = True
 _MAX_PROJECT_ENTRIES = 200      # max project entries from parser loop
 PROTECTED_SECTION_KEYS = {"education", "skills", "projects", "certifications", "languages"}
 
-SECTION_ALIASES = {
-    "summary": {
-        "summary",
-        "professional summary",
-        "personal information",
-        "profile",
-        "about",
-        "objective",
-        "career summary",
-        # TR
-        "özet", "profil", "kişisel bilgiler", "kariyer özeti",
-        # FR
-        "résumé professionnel", "profil professionnel",
-        # DE
-        "zusammenfassung", "über mich", "kurzprofil",
-        # ES
-        "resumen profesional", "perfil profesional", "resumen", "perfil",
-        # PT
-        "resumo profissional", "resumo",
-        # IT
-        "profilo professionale", "riepilogo", "sommario",
-        # NL
-        "samenvatting", "profiel", "persoonlijk profiel",
-        # RU
-        "резюме", "профиль", "о себе",
-        # PL
-        "podsumowanie", "podsumowanie zawodowe", "profil zawodowy",
-        # SV/NO/DA/FI
-        "sammanfattning", "sammendrag", "yhteenveto", "profiili",
-        # CS/HU/RO
-        "shrnutí", "összefoglaló", "rezumat",
-        # AR/ZH/JA/KO/HI
-        "ملخص", "الملف الشخصي", "个人简介", "摘要", "概要",
-        "プロフィール", "요약", "프로필", "सारांश",
-        # ID/VI/TH
-        "ringkasan", "tóm tắt", "สรุป", "โปรไฟล์",
-    },
-    "experience": {
-        "experience",
-        "work experience",
-        "professional experience",
-        "employment",
-        "employment history",
-        "work history",
-        # TR
-        "deneyim", "iş deneyimi", "mesleki deneyim",
-        # FR
-        "expérience", "expérience professionnelle",
-        # DE
-        "erfahrung", "berufserfahrung",
-        # ES
-        "experiencia", "experiencia laboral", "experiencia profesional",
-        # PT
-        "experiência", "experiência profissional",
-        # IT
-        "esperienza", "esperienza lavorativa",
-        # NL
-        "ervaring", "werkervaring",
-        # RU
-        "опыт", "опыт работы",
-        # PL
-        "doświadczenie", "doświadczenie zawodowe",
-        # SV/NO/DA/FI
-        "erfarenhet", "erfaring", "kokemus", "työkokemus",
-        # CS/HU/RO
-        "zkušenosti", "tapasztalat", "experiență",
-        # AR/ZH/JA/KO/HI
-        "الخبرة", "الخبرة المهنية", "工作经验", "工作经历",
-        "職歴", "경력", "경험", "अनुभव",
-        # ID/VI/TH
-        "pengalaman", "pengalaman kerja", "kinh nghiệm",
-        "ประสบการณ์",
-    },
-    "education": {
-        "education", "academic background", "qualifications",
-        # TR
-        "eğitim", "akademik geçmiş",
-        # FR
-        "formation", "études",
-        # DE
-        "ausbildung", "bildung", "studium",
-        # ES
-        "educación", "formación",
-        # PT
-        "educação", "formação acadêmica",
-        # IT
-        "istruzione", "formazione",
-        # NL
-        "opleiding", "onderwijs",
-        # RU
-        "образование",
-        # PL
-        "wykształcenie", "edukacja",
-        # SV/NO/DA/FI
-        "utbildning", "utdanning", "uddannelse", "koulutus",
-        # CS/HU/RO
-        "vzdělání", "végzettség", "educație", "studii",
-        # AR/ZH/JA/KO/HI
-        "التعليم", "教育", "学历", "学歴", "학력", "शिक्षा",
-        # ID/VI/TH
-        "pendidikan", "học vấn", "การศึกษา",
-    },
-    "skills": {
-        "skills",
-        "technical skills",
-        "core competencies",
-        "competencies",
-        "technologies",
-        # TR
-        "beceriler", "yetenekler", "teknik beceriler", "yetkinlikler",
-        # FR
-        "compétences", "compétences techniques",
-        # DE
-        "fähigkeiten", "kenntnisse", "kompetenzen",
-        # ES
-        "habilidades", "competencias",
-        # PT
-        "competências",
-        # IT
-        "competenze", "abilità",
-        # NL
-        "vaardigheden", "competenties",
-        # RU
-        "навыки", "умения", "компетенции",
-        # PL
-        "umiejętności", "kompetencje",
-        # SV/NO/DA/FI
-        "färdigheter", "ferdigheter", "færdigheder", "taidot", "osaaminen",
-        # CS/HU/RO
-        "dovednosti", "készségek", "competențe",
-        # AR/ZH/JA/KO/HI
-        "المهارات", "技能", "スキル", "기술", "कौशल",
-        # ID/VI/TH
-        "keahlian", "keterampilan", "kỹ năng", "ทักษะ",
-    },
-    "projects": {
-        "project", "projects", "project experience", "personal projects",
-        # TR
-        "projeler",
-        # FR
-        "projets",
-        # DE
-        "projekte",
-        # ES
-        "proyectos",
-        # PT/IT/NL
-        "projetos", "progetti", "projecten",
-        # RU
-        "проекты",
-        # PL/CS/HU
-        "projekty", "projektek",
-        # SV/DA/NO/FI/RO
-        "projekter", "prosjekter", "projektit", "proiecte",
-        # AR/ZH/JA/KO/HI
-        "المشاريع", "项目", "プロジェクト", "프로젝트", "परियोजनाएं",
-        # ID/VI/TH
-        "proyek", "dự án", "โครงการ",
-    },
-    "certifications": {
-        "certifications", "certificates", "licenses",
-        # TR
-        "sertifikalar", "belgeler",
-        # FR
-        "diplômes",
-        # DE
-        "zertifizierungen", "zertifikate",
-        # ES
-        "certificaciones",
-        # PT
-        "certificações",
-        # IT/NL
-        "certificazioni", "certificeringen",
-        # RU
-        "сертификаты",
-        # PL/CS/HU
-        "certyfikaty", "certifikáty", "tanúsítványok",
-        # SV/NO/DA/FI/RO
-        "certifieringar", "sertifiseringer", "sertifikaatit", "certificări",
-        # AR/ZH/JA/KO/HI
-        "الشهادات", "证书", "資格", "자격증", "प्रमाणपत्र",
-        # ID/VI/TH
-        "sertifikasi", "chứng chỉ", "ใบรับรอง",
-    },
-    "languages": {
-        "languages", "language skills",
-        # TR
-        "diller", "yabancı diller",
-        # FR
-        "langues",
-        # DE
-        "sprachen",
-        # ES/PT
-        "idiomas",
-        # IT
-        "lingue",
-        # NL
-        "talen",
-        # RU
-        "языки",
-        # PL
-        "języki",
-        # SV/NO
-        "språk",
-        # DA
-        "sprog",
-        # FI
-        "kielet",
-        # CS/HU
-        "jazyky", "nyelvek",
-        # RO
-        "limbi",
-        # AR/ZH/JA/KO/HI
-        "اللغات", "语言", "言語", "언어", "भाषाएं",
-        # ID/VI/TH
-        "bahasa", "ngôn ngữ", "ภาษา",
-    },
-    "contact": {
-        "contact", "contact information", "communication",
-        # TR
-        "iletişim",
-        # FR
-        "coordonnées",
-        # DE
-        "kontakt", "kontaktdaten",
-        # ES
-        "contacto",
-        # PT/IT
-        "contato", "contatto",
-        # NL
-        "contactgegevens",
-        # RU
-        "контакты",
-        # PL
-        "dane kontaktowe",
-        # FI
-        "yhteystiedot",
-        # HU
-        "kapcsolat", "elérhetőség",
-        # AR/ZH/JA/KO/HI
-        "الاتصال", "联系方式", "連絡先", "연락처", "संपर्क",
-        # ID/VI/TH
-        "kontak", "liên hệ", "ติดต่อ",
-    },
-    "interests": {
-        "interests", "hobbies", "personal interests",
-        # TR
-        "ilgi alanları", "hobiler",
-        # FR
-        "centres d'intérêt", "loisirs",
-        # DE
-        "interessen", "hobbys",
-        # ES
-        "intereses", "aficiones",
-        # PT/IT
-        "interesses", "interessi",
-        # NL
-        "hobby's",
-        # RU
-        "интересы", "хобби",
-        # PL
-        "zainteresowania",
-        # SV/NO/DA
-        "intressen", "interesser",
-        # FI
-        "kiinnostukset", "harrastukset",
-        # CS/HU/RO
-        "zájmy", "érdeklődés", "interese",
-        # AR/ZH/JA/KO/HI
-        "الاهتمامات", "兴趣", "趣味", "취미", "रुचियां",
-        # ID/VI/TH
-        "minat", "sở thích", "ความสนใจ",
-    },
-}
+from .language_service import SECTION_ALIASES, clean_lower
 
 # ── Pre-indexed alias lookup for fuzzy matching (Task 8) ──────────────
 _AUTOFIX_FLAT_ALIASES: dict[str, str] = {}
@@ -466,7 +193,7 @@ def _guard_text(value: str, field_name: str) -> str:
 
 
 def _normalize_heading(line: str) -> str:
-    normalized = re.sub(r"[^\w\s]|[\d_]", " ", line, flags=re.UNICODE).lower()
+    normalized = clean_lower(re.sub(r"[^\w\s]|[\d_]", " ", line, flags=re.UNICODE))
     return re.sub(r"\s+", " ", normalized).strip()
 
 
@@ -497,7 +224,7 @@ def _noise_section(line: str) -> str | None:
     return None
 
 
-def _clean_lines(text: str) -> List[str]:
+def _clean_lines(text: str) -> list[str]:
     lines = []
     for line in text.split("\n"):
         clean = unicodedata.normalize("NFC", line)
@@ -506,7 +233,7 @@ def _clean_lines(text: str) -> List[str]:
         clean = re.sub(r"([a-z0-9])\-\s+([a-z0-9])", r"\1\2", clean)
         clean = re.sub(r"([A-Za-z])\(", r"\1 (", clean)
         lines.append(clean)
-    compact: List[str] = []
+    compact: list[str] = []
     previous_blank = False
     for line in lines:
         if not line:
@@ -535,6 +262,61 @@ _COMMON_TECH_SPELLING_FIXES = (
     (re.compile(r"\bTYPECRIPT\b", re.I), "TypeScript"),
     (re.compile(r"\bNEXT\s+JS\b", re.I), "Next.js"),
     (re.compile(r"\bNODE\s+JS\b", re.I), "Node.js"),
+    (re.compile(r"\bGITHUB\b", re.I), "GitHub"),
+    (re.compile(r"\bLINKEDIN\b", re.I), "LinkedIn"),
+    (re.compile(r"\bPOWERPOINT\b", re.I), "PowerPoint"),
+    (re.compile(r"\bPOSTGRESQL\b", re.I), "PostgreSQL"),
+    (re.compile(r"\bMONGODB\b", re.I), "MongoDB"),
+    (re.compile(r"\bKUBERNETES\b", re.I), "Kubernetes"),
+    (re.compile(r"\bDOCKER\b", re.I), "Docker"),
+)
+
+_COMMON_TR_SPELLING_FIXES = (
+    (re.compile(r"\boluturma\b", re.I), "oluşturma"),
+    (re.compile(r"\bolusturma\b", re.I), "oluşturma"),
+    (re.compile(r"\bveritaban\b", re.I), "veritabanı"),
+    (re.compile(r"\byazilim\b", re.I), "yazılım"),
+    (re.compile(r"\bgelistirici\b", re.I), "geliştirici"),
+    (re.compile(r"\bmuhendisligi\b", re.I), "mühendisliği"),
+    (re.compile(r"\bmuhendisi\b", re.I), "mühendisi"),
+    (re.compile(r"\bendustri\b", re.I), "endüstri"),
+    (re.compile(r"\biletisim\b", re.I), "iletişim"),
+    (re.compile(r"\begitim\b", re.I), "eğitim"),
+    (re.compile(r"\bdeneyim\b", re.I), "deneyim"),
+    (re.compile(r"\bprojeler\b", re.I), "projeler"),
+    (re.compile(r"\byetenekler\b", re.I), "yetenekler"),
+    (re.compile(r"\bsertifikalar\b", re.I), "sertifikalar"),
+    (re.compile(r"\bdiller\b", re.I), "diller"),
+    (re.compile(r"\bihmal\b", re.I), "ihmal"),
+    (re.compile(r"\bturkce\b", re.I), "Türkçe"),
+    (re.compile(r"\bingilizce\b", re.I), "İngilizce"),
+    (re.compile(r"\balmanca\b", re.I), "Almanca"),
+    (re.compile(r"\bfransizca\b", re.I), "Fransızca"),
+    (re.compile(r"\bcalismalari\b", re.I), "çalışmaları"),
+    (re.compile(r"\bcalismalar\b", re.I), "çalışmalar"),
+    (re.compile(r"\bgelistirme\b", re.I), "geliştirme"),
+    (re.compile(r"\byonetimi\b", re.I), "yönetimi"),
+    (re.compile(r"\byonetici\b", re.I), "yönetici"),
+    (re.compile(r"\btasarimi\b", re.I), "tasarımı"),
+    (re.compile(r"\bcozumleri\b", re.I), "çözümleri"),
+    (re.compile(r"\bstajer\b", re.I), "stajyer"),
+    (re.compile(r"\biletisimi\b", re.I), "iletişimi"),
+    (re.compile(r"\buniversitesi\b", re.I), "üniversitesi"),
+    (re.compile(r"\bbolumu\b", re.I), "bölümü"),
+    (re.compile(r"\bisletme\b", re.I), "işletme"),
+    (re.compile(r"\bsurec\b", re.I), "süreç"),
+    (re.compile(r"\bsurecleri\b", re.I), "süreçleri"),
+    (re.compile(r"\bveritabani\b", re.I), "veritabanı"),
+    (re.compile(r"\bcozum\b", re.I), "çözüm"),
+    (re.compile(r"\bisbirligi\b", re.I), "işbirliği"),
+    (re.compile(r"\byonelik\b", re.I), "yönelik"),
+    (re.compile(r"\bmusteri\b", re.I), "müşteri"),
+    (re.compile(r"\buretim\b", re.I), "üretim"),
+    (re.compile(r"\bdökümantasyon\b", re.I), "dokümantasyon"),
+    (re.compile(r"\byayinlama\b", re.I), "yayınlama"),
+    (re.compile(r"\byayinlanan\b", re.I), "yayınlanan"),
+    (re.compile(r"\bbaslangic\b", re.I), "başlangıç"),
+    (re.compile(r"\bmuhendis\b", re.I), "mühendis"),
 )
 
 
@@ -576,10 +358,26 @@ def _polish_text(text: str, lang: str = "en") -> str:
         stripped = re.sub(r"(?<=[a-zA-Z)])\.(?=[A-Z])", ". ", stripped)
         # Missing space after comma (but not in numbers like 1,000)
         stripped = re.sub(r",(?=[A-Za-z])", ", ", stripped)
-        # PDF line wraps often leave "hands- on" / "real- world" artifacts.
-        stripped = re.sub(r"\b([A-Za-z]{3,})-\s+(on|world|time|stack|end|based|level)\b", r"\1-\2", stripped, flags=re.I)
+
+        # ── hece- bölünmesi / hyphen-space merging ──
+        # PDF line wraps often leave hece- bölünmesi or "hands- on" artifacts.
+        # If the second part is a known compound word suffix, keep the hyphen. Otherwise, merge completely.
+        def merge_hyphenated_space(match):
+            part1 = match.group(1)
+            part2 = match.group(2)
+            if part2.lower() in {"on", "world", "time", "stack", "end", "based", "level"}:
+                return f"{part1}-{part2}"
+            return f"{part1}{part2}"
+
+        stripped = re.sub(r"\b([A-Za-z0-9]+)-\s+([A-Za-z0-9]+)\b", merge_hyphenated_space, stripped)
+
         for pattern, replacement in _COMMON_TECH_SPELLING_FIXES:
             stripped = pattern.sub(replacement, stripped)
+
+        if lang == "tr":
+            for pattern, replacement in _COMMON_TR_SPELLING_FIXES:
+                stripped = pattern.sub(replacement, stripped)
+
         # Normalize bullet chars: ▪ ◦ ◆ ▸ ► → •
         stripped = re.sub(r"^[\u25AA\u25E6\u25C6\u25B8\u25BA]\s*", "• ", stripped)
         # Ensure bullet lines start with uppercase
@@ -590,10 +388,10 @@ def _polish_text(text: str, lang: str = "en") -> str:
     return "\n".join(out)
 
 
-def _parse_sections(cv_text: str) -> tuple[list[str], Dict[str, List[str]], List[str]]:
-    header_lines: List[str] = []
-    sections: Dict[str, List[str]] = {key: [] for key in SECTION_ALIASES}
-    dropped_sections: List[str] = []
+def _parse_sections(cv_text: str) -> tuple[list[str], dict[str, list[str]], list[str]]:
+    header_lines: list[str] = []
+    sections: dict[str, list[str]] = {key: [] for key in SECTION_ALIASES}
+    dropped_sections: list[str] = []
     current: str | None = None
     dropping = False
 
@@ -652,7 +450,7 @@ def _parse_sections(cv_text: str) -> tuple[list[str], Dict[str, List[str]], List
             "languages": "languages",
             "contact": "contact",
         }
-        new_header: List[str] = []
+        new_header: list[str] = []
         for block_label, block_lines in block_sections.items():
             alias_key = _BLOCK_TO_ALIAS.get(block_label)
             if alias_key and alias_key in sections:
@@ -780,14 +578,14 @@ def _header_has_contact(lines: list[str]) -> bool:
 
 
 def _extract_contact_block(
-    header_lines: List[str],
-    explicit_lines: List[str],
-) -> tuple[str | None, List[str], List[str], List[str]]:
+    header_lines: list[str],
+    explicit_lines: list[str],
+) -> tuple[str | None, list[str], list[str], list[str]]:
     lines = [line for line in header_lines + explicit_lines if line]
     name = None
-    title_lines: List[str] = []
-    contacts: List[str] = []
-    leftovers: List[str] = []
+    title_lines: list[str] = []
+    contacts: list[str] = []
+    leftovers: list[str] = []
     title_hint_words = (
         "engineer", "developer", "student", "manager", "analyst", "specialist", "consultant",
         "architect", "designer", "intern", "lead", "director", "officer", "professor",
@@ -850,10 +648,10 @@ def _extract_contact_block(
                 if email:
                     contacts.append(email)
                     continue
-                elif phone:
+                if phone:
                     contacts.append(phone)
                     continue
-                elif url:
+                if url:
                     contacts.append(url)
                     continue
                 # Address label → strip prefix and put value in leftovers
@@ -867,7 +665,7 @@ def _extract_contact_block(
             tokenized = [line]
 
         consumed_any = False
-        unconsumed_tokens: List[str] = []
+        unconsumed_tokens: list[str] = []
         for token in tokenized:
             email = _extract_email(token)
             if email:
@@ -903,7 +701,7 @@ def _extract_contact_block(
             else:
                 leftovers.append(line)
 
-    deduped_contacts: List[str] = []
+    deduped_contacts: list[str] = []
     seen = set()
     for value in contacts:
         key = value.strip().lower()
@@ -912,7 +710,7 @@ def _extract_contact_block(
         seen.add(key)
         deduped_contacts.append(value.strip())
 
-    deduped_titles: List[str] = []
+    deduped_titles: list[str] = []
     title_seen = set()
     for value in title_lines:
         key = value.strip().lower()
@@ -944,14 +742,14 @@ def _extract_contact_block(
     return name, deduped_titles, deduped_contacts, leftovers
 
 
-def _extract_skill_names(skill_result: dict) -> List[str]:
+def _extract_skill_names(skill_result: dict) -> list[str]:
     if not isinstance(skill_result, dict):
         return []
     if "found" in skill_result:
         found = skill_result.get("found") or []
         return sorted(str(item).strip() for item in found if str(item).strip())
 
-    values: List[str] = []
+    values: list[str] = []
     for key in ("all_skills", "technical_skills", "soft_skills"):
         raw = skill_result.get(key) or []
         values.extend(str(item).strip() for item in raw if str(item).strip())
@@ -966,7 +764,7 @@ def _extract_skill_names(skill_result: dict) -> List[str]:
     return deduped
 
 
-def _sentences_from_line(line: str) -> List[str]:
+def _sentences_from_line(line: str) -> list[str]:
     if re.match(r"^\s*[-*•]\s*", line):
         return [re.sub(r"^\s*[-*•]\s*", "", line).strip()]
     if len(line) < 90:
@@ -975,8 +773,8 @@ def _sentences_from_line(line: str) -> List[str]:
     return [part.strip(" -") for part in parts if part.strip(" -")]
 
 
-def _normalize_experience(lines: List[str]) -> List[str]:
-    result: List[str] = []
+def _normalize_experience(lines: list[str]) -> list[str]:
+    result: list[str] = []
     for line in lines:
         if not line:
             continue
@@ -996,8 +794,8 @@ def _normalize_experience(lines: List[str]) -> List[str]:
     return result
 
 
-def _normalize_list_section(lines: List[str]) -> List[str]:
-    items: List[str] = []
+def _normalize_list_section(lines: list[str]) -> list[str]:
+    items: list[str] = []
     for line in lines:
         if not line:
             continue
@@ -1008,7 +806,7 @@ def _normalize_list_section(lines: List[str]) -> List[str]:
             cleaned = part.strip(" -*•")
             if cleaned:
                 items.append(cleaned)
-    deduped: List[str] = []
+    deduped: list[str] = []
     seen = set()
     for item in items:
         lowered = item.lower()
@@ -1056,7 +854,7 @@ _ORPHAN_LEVEL_RE = re.compile(
 from utils.section_scorer import KNOWN_LANGUAGES as _KNOWN_LANGS
 
 
-def _normalize_language_lines(lines: List[str]) -> List[str]:
+def _normalize_language_lines(lines: list[str]) -> list[str]:
     """Normalize language section lines, preserving CEFR details.
     Handles:
       - Sub-skills: English Writing C2 Listening C1
@@ -1070,7 +868,7 @@ def _normalize_language_lines(lines: List[str]) -> List[str]:
         parts = re.split(r"\s*[|;/]\s*", line)
         if len(parts) == 1:
             parts = re.split(r"\s{2,}", line)
-        
+
         # Split by comma as well, to catch lists like "English, German"
         sub_items = []
         for part in parts:
@@ -1081,7 +879,7 @@ def _normalize_language_lines(lines: List[str]) -> List[str]:
         items.extend(sub_items)
 
     # Merge orphaned items (e.g. "English" followed by "C1" or "Writing C1")
-    merged: List[str] = []
+    merged: list[str] = []
     for item in items:
         if _ORPHAN_SUBSKILL_RE.match(item) or _ORPHAN_LEVEL_RE.match(item):
             if merged:
@@ -1089,13 +887,13 @@ def _normalize_language_lines(lines: List[str]) -> List[str]:
         else:
             merged.append(item)
 
-    result: List[str] = []
+    result: list[str] = []
     _prefix_re = re.compile(r"^(?:foreign\s+languages?|languages?(?:\s+known)?)\s*:\s*", re.I)
     for entry in merged:
         entry = _prefix_re.sub("", entry).strip()
         if not entry:
             continue
-        
+
         # Case 1: Sub-skill format (e.g., "English Writing C2 Speaking B2")
         pairs = _SUBSKILL_CEFR_RE.findall(entry)
         if pairs and len(pairs) >= 2:
@@ -1110,7 +908,7 @@ def _normalize_language_lines(lines: List[str]) -> List[str]:
                 parts_str = [f"{skill.capitalize()}: {level.upper() if len(level) <= 2 else level.capitalize()}" for skill, level in pairs]
                 result.append(f"{lang_name.capitalize()} ({', '.join(parts_str)})")
                 continue
-                
+
         # Case 2: Simple Language Level (e.g., "English C1", "Almanca: B2", "English (Native)")
         match = re.search(r"^([A-Za-z\u00C0-\u024F\u0400-\u04FF\u011E\u011F\u0130\u0131\u015E\u015F\u00C7\u00E7\u00D6\u00F6\u00DC\u00FC\s]+?)\s*[:\-–—,\s]?\s*\(?\s*" + _LEVELS_PATTERN + r"\s*\)?$", entry, re.I | re.UNICODE)
         if match:
@@ -1120,13 +918,13 @@ def _normalize_language_lines(lines: List[str]) -> List[str]:
                 formatted_level = level.upper() if len(level) <= 2 else level.capitalize()
                 result.append(f"{lang.capitalize()} ({formatted_level})")
                 continue
-                
+
         # Case 3: Fallback (keep as is)
         result.append(entry)
 
     # Deduplicate
     seen: set = set()
-    deduped: List[str] = []
+    deduped: list[str] = []
     for item in result:
         key = item.strip().lower()
         if key and key not in seen:
@@ -1135,8 +933,8 @@ def _normalize_language_lines(lines: List[str]) -> List[str]:
     return deduped
 
 
-def _normalize_skill_lines(lines: List[str]) -> List[str]:
-    items: List[str] = []
+def _normalize_skill_lines(lines: list[str]) -> list[str]:
+    items: list[str] = []
     for line in lines:
         if not line:
             continue
@@ -1147,7 +945,7 @@ def _normalize_skill_lines(lines: List[str]) -> List[str]:
                 if cleaned:
                     items.append(cleaned)
 
-    merged: List[str] = []
+    merged: list[str] = []
     index = 0
     while index < len(items):
         current = items[index]
@@ -1158,7 +956,7 @@ def _normalize_skill_lines(lines: List[str]) -> List[str]:
         merged.append(current)
         index += 1
 
-    deduped: List[str] = []
+    deduped: list[str] = []
     seen = set()
     for item in merged:
         lowered = item.lower()
@@ -1169,7 +967,7 @@ def _normalize_skill_lines(lines: List[str]) -> List[str]:
     return deduped
 
 
-def _normalize_summary(summary_lines: List[str], fallback_lines: List[str], preferred_skills: List[str]) -> str:
+def _normalize_summary(summary_lines: list[str], fallback_lines: list[str], preferred_skills: list[str]) -> str:
     summary = " ".join(line for line in summary_lines if line).strip()
     if not summary:
         summary = " ".join(line for line in fallback_lines[:2] if line).strip()
@@ -1181,7 +979,7 @@ def _normalize_summary(summary_lines: List[str], fallback_lines: List[str], pref
     return summary
 
 
-def _ordered_skills(cv_text: str, explicit_skill_lines: List[str], job_description: str) -> List[str]:
+def _ordered_skills(cv_text: str, explicit_skill_lines: list[str], job_description: str) -> list[str]:
     explicit = _normalize_skill_lines(explicit_skill_lines)
     cv_skills = _extract_skill_names(extract_skills(cv_text))
     job_skills = set(skill.lower() for skill in _extract_skill_names(extract_skills(job_description)))
@@ -1192,8 +990,8 @@ def _ordered_skills(cv_text: str, explicit_skill_lines: List[str], job_descripti
     return matched + rest
 
 
-def _extract_section_order_from_text(cv_text: str) -> List[str]:
-    order: List[str] = []
+def _extract_section_order_from_text(cv_text: str) -> list[str]:
+    order: list[str] = []
     seen = set()
     for raw_line in _clean_lines(cv_text):
         canonical = _canonical_section(raw_line)
@@ -1211,7 +1009,7 @@ def _section_score(text: str) -> int:
         return 0
 
     # Pass 1: alias-based header matching (fast, exact)
-    lowered = text.lower()
+    lowered = clean_lower(text)
     found = set()
     for canonical, aliases in SECTION_ALIASES.items():
         if canonical == "contact":
@@ -1261,7 +1059,7 @@ def _detect_fix_mode(cv_text: str, requested_mode: str = "auto") -> tuple[str, i
 def _inject_skills_section_if_missing(
     text: str,
     job_description: str = "",
-) -> tuple[str, Dict[str, List[str]], bool]:
+) -> tuple[str, dict[str, list[str]], bool]:
     header_lines, sections, _ = _parse_sections(text)
     has_existing_skills = any((line or "").strip() for line in (sections.get("skills") or []))
     if has_existing_skills:
@@ -1271,13 +1069,13 @@ def _inject_skills_section_if_missing(
     if not inferred_skills:
         return text, sections, False
 
-    output_lines: List[str] = []
+    output_lines: list[str] = []
     output_lines.extend(header_lines)
     if output_lines:
         output_lines.append("")
 
     ordered_keys = _extract_section_order_from_text(text)
-    rebuilt_sections: Dict[str, List[str]] = {k: list(v or []) for k, v in sections.items()}
+    rebuilt_sections: dict[str, list[str]] = {k: list(v or []) for k, v in sections.items()}
     rebuilt_sections["skills"] = [", ".join(inferred_skills[:20])]
 
     for key in ordered_keys:
@@ -1294,7 +1092,7 @@ def _inject_skills_section_if_missing(
 
 
 def _minimal_heading_rewrite(cv_text: str) -> str:
-    rewritten: List[str] = []
+    rewritten: list[str] = []
     for line in _clean_lines(cv_text):
         canonical = _canonical_section(line)
         if canonical in SECTION_TITLES:
@@ -1308,7 +1106,7 @@ def _build_structured_cv(
     cv_text: str,
     job_description: str = "",
     mode: str = "balanced",
-) -> tuple[str, Dict[str, List[str]], List[str], List[str]]:
+) -> tuple[str, dict[str, list[str]], list[str], list[str]]:
     if USE_PIPELINE:
         extract_structured, normalize, _get_order = _get_pipeline_agents()
         structured = extract_structured(cv_text)
@@ -1344,7 +1142,7 @@ def _build_structured_cv(
     skills = _ordered_skills(cv_text, sections.get("skills", []), job_description)
     summary = _normalize_summary(sections.get("summary", []), leftover_header, skills)
 
-    output_lines: List[str] = []
+    output_lines: list[str] = []
     if name:
         output_lines.append(name)
     for title_line in title_lines:
@@ -1352,7 +1150,7 @@ def _build_structured_cv(
     if contacts:
         output_lines.append(" | ".join(contacts[:MAX_HEADER_CONTACTS]))
 
-    structured_sections: Dict[str, List[str]] = {}
+    structured_sections: dict[str, list[str]] = {}
     if summary:
         structured_sections["summary"] = [summary]
     if experience_lines:
@@ -1392,10 +1190,10 @@ def _build_structured_cv(
 
 
 def _pipeline_to_structured_text(
-    normalized: Dict,
+    normalized: dict,
     job_description: str = "",
     mode: str = "balanced",
-) -> tuple[str, Dict[str, List[str]], List[str], List[str]]:
+) -> tuple[str, dict[str, list[str]], list[str], list[str]]:
     """Convert pipeline-normalized JSON into structured text and sections.
 
     Same return interface as _build_structured_cv() so downstream callers
@@ -1406,7 +1204,7 @@ def _pipeline_to_structured_text(
     name = normalized.get("full_name", "")
     title = normalized.get("title", "")
 
-    contacts: List[str] = []
+    contacts: list[str] = []
     for field in ("email", "phone", "location", "linkedin"):
         val = (normalized.get(field) or "").strip()
         if val:
@@ -1442,7 +1240,7 @@ def _pipeline_to_structured_text(
                 summary = f"{subject} with project experience in {', '.join(project_names)}."
 
     # ── experience ──
-    experience_lines: List[str] = []
+    experience_lines: list[str] = []
     for exp in (normalized.get("experiences") or normalized.get("experience") or []):
         header_parts = [p for p in [
             exp.get("title", ""),
@@ -1463,7 +1261,7 @@ def _pipeline_to_structured_text(
                 )
 
     # ── education (GPA stays attached) ──
-    education_lines: List[str] = []
+    education_lines: list[str] = []
     for edu in (normalized.get("education") or []):
         parts = [p for p in [
             edu.get("degree", ""),
@@ -1492,7 +1290,7 @@ def _pipeline_to_structured_text(
         rest = [s for s in skills_flat if s.lower() not in job_skills]
         skills_flat = matched + rest
 
-    skill_lines: List[str] = []
+    skill_lines: list[str] = []
     if skills_cat and mode != "strict":
         for cat, items in skills_cat.items():
             if isinstance(items, list) and items:
@@ -1503,7 +1301,7 @@ def _pipeline_to_structured_text(
         skill_lines = [", ".join(skills_flat[:20])]
 
     # ── projects ──
-    project_lines: List[str] = []
+    project_lines: list[str] = []
     for proj in (normalized.get("projects") or normalized.get("project") or []):
         proj_name = proj.get("name") or proj.get("title") or ""
         if proj_name:
@@ -1528,7 +1326,7 @@ def _pipeline_to_structured_text(
                     )
 
     # ── certifications ──
-    cert_lines: List[str] = []
+    cert_lines: list[str] = []
     for cert in (normalized.get("certifications") or normalized.get("certification") or []):
         if isinstance(cert, dict):
             cname = cert.get("name", "")
@@ -1545,7 +1343,7 @@ def _pipeline_to_structured_text(
     ]
 
     # ── assemble sections ──
-    structured_sections: Dict[str, List[str]] = {}
+    structured_sections: dict[str, list[str]] = {}
     if summary:
         structured_sections["summary"] = [summary]
     if experience_lines:
@@ -1573,12 +1371,12 @@ def _pipeline_to_structured_text(
 
 def _render_structured_sections(
     name: str | None,
-    title_lines: List[str],
-    contacts: List[str],
-    structured_sections: Dict[str, List[str]],
-    section_order: List[str] | None = None,
+    title_lines: list[str],
+    contacts: list[str],
+    structured_sections: dict[str, list[str]],
+    section_order: list[str] | None = None,
 ) -> str:
-    output_lines: List[str] = []
+    output_lines: list[str] = []
     if name:
         output_lines.append(name)
     for title_line in title_lines:
@@ -1604,8 +1402,8 @@ def _render_structured_sections(
 def _ensure_identity_header(
     text: str,
     fallback_name: str | None,
-    fallback_title_lines: List[str],
-    fallback_contacts: List[str],
+    fallback_title_lines: list[str],
+    fallback_contacts: list[str],
 ) -> str:
     header_lines, sections, _ = _parse_sections(text)
     name, title_lines, contacts, _ = _extract_contact_block(header_lines, sections.get("contact", []))
@@ -1618,7 +1416,7 @@ def _ensure_identity_header(
         return text
 
     lines = _clean_lines(text)
-    rebuilt: List[str] = []
+    rebuilt: list[str] = []
     if final_name:
         rebuilt.append(final_name)
     for title_line in final_title_lines:
@@ -1707,10 +1505,10 @@ def _ensure_bullet_format(line: str) -> str:
 
 def _boost_keywords(
     structured_text: str,
-    structured_sections: Dict[str, List[str]],
+    structured_sections: dict[str, list[str]],
     job_description: str,
     mode: str = "balanced",
-    section_order: List[str] | None = None,
+    section_order: list[str] | None = None,
 ) -> str:
     header_lines, parsed_sections, _ = _parse_sections(structured_text)
     name, title_lines, contacts, _ = _extract_contact_block(header_lines, parsed_sections.get("contact", []))
@@ -1747,7 +1545,7 @@ def _boost_keywords(
     if mode == "strict":
         experience_lines = list(boosted_sections.get("experience", []))
         used_verbs: set = set()
-        new_experience: List[str] = []
+        new_experience: list[str] = []
         for line in experience_lines:
             normalized_line = _ensure_bullet_format(line)
             if not normalized_line or not re.match(r"^\s*[-•*]\s+", normalized_line):
@@ -1760,7 +1558,7 @@ def _boost_keywords(
         boosted_sections["experience"] = new_experience
 
         project_lines = list(boosted_sections.get("projects", []))
-        new_projects: List[str] = []
+        new_projects: list[str] = []
         for line in project_lines:
             normalized_line = _ensure_bullet_format(line)
             if not normalized_line or not re.match(r"^\s*[-•*]\s+", normalized_line):
@@ -1788,7 +1586,7 @@ def _boost_keywords(
     return _render_structured_sections(name, title_lines, contacts, boosted_sections, section_order=section_order)
 
 
-def _split_concatenated_bullets(lines: List[str]) -> List[str]:
+def _split_concatenated_bullets(lines: list[str]) -> list[str]:
     """Pre-process experience lines: split bullets joined on the same line.
 
     PDF extractors often merge bullet points, e.g.:
@@ -1797,7 +1595,7 @@ def _split_concatenated_bullets(lines: List[str]) -> List[str]:
       '– First point – Second point'
     Split these into separate lines so downstream can treat each as a bullet.
     """
-    result: List[str] = []
+    result: list[str] = []
     for raw in lines:
         line = (raw or "").strip()
         if not line:
@@ -1823,11 +1621,11 @@ def _split_concatenated_bullets(lines: List[str]) -> List[str]:
     return result
 
 
-def _parse_experience_entries(lines: List[str]) -> List[Dict]:
+def _parse_experience_entries(lines: list[str]) -> list[dict]:
     # Pre-process: split concatenated bullets from PDF extraction
     lines = _split_concatenated_bullets(lines)
-    entries: List[Dict] = []
-    current: Dict | None = None
+    entries: list[dict] = []
+    current: dict | None = None
 
     _date_token = (
         r"(?:\d{1,2}[/.]\s*)?(?:19|20)\d{2}"
@@ -1868,7 +1666,7 @@ def _parse_experience_entries(lines: List[str]) -> List[Dict]:
         cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
         return cleaned, start, end
 
-    def _new_entry(title: str) -> Dict:
+    def _new_entry(title: str) -> dict:
         title, start_date, end_date = _extract_date_range(title)
         entry = {
             "title": title,
@@ -1944,7 +1742,7 @@ def _parse_experience_entries(lines: List[str]) -> List[Dict]:
         words = set(re.split(r"[\s/,.-]+", text.lower()))
         return bool(words & _ROLE_KEYWORDS)
 
-    def _try_split_pipe_header(line: str) -> Dict | None:
+    def _try_split_pipe_header(line: str) -> dict | None:
         """Try to parse pipe-delimited experience header.
 
         Handles both formats:
@@ -1959,7 +1757,7 @@ def _parse_experience_entries(lines: List[str]) -> List[Dict]:
             return None
 
         # Separate date parts from non-date parts
-        non_date_parts: List[str] = []
+        non_date_parts: list[str] = []
         start_date, end_date = "", ""
         for part in parts:
             if _is_date_like(part):
@@ -2175,7 +1973,7 @@ def _extract_paren_dates(text: str) -> tuple:
     return text, "", ""
 
 
-def _new_edu_entry() -> Dict:
+def _new_edu_entry() -> dict:
     return {
         "degree": "",
         "school": "",
@@ -2200,9 +1998,9 @@ def _parse_date_range(line: str) -> tuple:
     return s, e
 
 
-def _parse_education_entries(lines: List[str]) -> List[Dict]:
-    entries: List[Dict] = []
-    current: Dict | None = None
+def _parse_education_entries(lines: list[str]) -> list[dict]:
+    entries: list[dict] = []
+    current: dict | None = None
     university_keywords = (
         "university", "universit",
         "institute", "enstit",
@@ -2333,7 +2131,7 @@ def _parse_education_entries(lines: List[str]) -> List[Dict]:
         entries.append(current)
 
     # ── Post-process: split merged transferred lines (PDF extraction fallback) ──
-    expanded: List[Dict] = []
+    expanded: list[dict] = []
     for entry in entries:
         degree = (entry.get("degree") or "").strip()
         transfer_match = re.match(
@@ -2362,9 +2160,9 @@ def _parse_education_entries(lines: List[str]) -> List[Dict]:
     return expanded
 
 
-def _extract_categorized_skills(lines: List[str]) -> tuple[Dict[str, List[str]], List[str]]:
-    categories: Dict[str, List[str]] = {}
-    uncategorized: List[str] = []
+def _extract_categorized_skills(lines: list[str]) -> tuple[dict[str, list[str]], list[str]]:
+    categories: dict[str, list[str]] = {}
+    uncategorized: list[str] = []
 
     for raw in lines or []:
         line = str(raw or "").strip()
@@ -2388,7 +2186,7 @@ def _extract_categorized_skills(lines: List[str]) -> tuple[Dict[str, List[str]],
             )
 
     if uncategorized:
-        dedup_uncat: List[str] = []
+        dedup_uncat: list[str] = []
         seen = set()
         for item in uncategorized:
             lowered = item.lower()
@@ -2399,7 +2197,7 @@ def _extract_categorized_skills(lines: List[str]) -> tuple[Dict[str, List[str]],
         if not categories:
             categories.setdefault("Technical Skills", dedup_uncat)
 
-    flattened: List[str] = []
+    flattened: list[str] = []
     seen_flat = set()
     for values in categories.values():
         for value in values:
@@ -2447,7 +2245,7 @@ def _looks_like_tech_list(line: str) -> bool:
     return all(len(t.split()) <= 4 for t in tokens)
 
 
-def _parse_project_entries(lines: List[str]) -> List[Dict]:
+def _parse_project_entries(lines: list[str]) -> list[dict]:
     _TECH_HDR = re.compile(
         r"^\s*(?:used\s+technologies|tech(?:nology|nologies)?\s*(?:stack|used)?"
         r"|tools(?:\s+(?:used|&|and)\s+\w+)?"
@@ -2479,8 +2277,8 @@ def _parse_project_entries(lines: List[str]) -> List[Dict]:
             return True
         return bool(_PROJECT_CONTINUATION_RE.match(text))
 
-    entries: List[Dict] = []
-    current: Dict | None = None
+    entries: list[dict] = []
+    current: dict | None = None
 
     for raw in lines:
         line = (raw or "").strip()
@@ -2620,7 +2418,7 @@ def structured_text_to_builder_payload(
     return model
 
 
-def _diff_preview(before_text: str, after_text: str) -> List[str]:
+def _diff_preview(before_text: str, after_text: str) -> list[str]:
     diff = difflib.unified_diff(
         before_text.splitlines(),
         after_text.splitlines(),
@@ -2632,13 +2430,13 @@ def _diff_preview(before_text: str, after_text: str) -> List[str]:
 
 
 def _collect_applied_changes(
-    before_ats: Dict,
-    after_ats: Dict,
-    dropped_sections: List[str],
-    structured_sections: Dict[str, List[str]],
+    before_ats: dict,
+    after_ats: dict,
+    dropped_sections: list[str],
+    structured_sections: dict[str, list[str]],
     used_ai: bool,
-) -> List[str]:
-    changes: List[str] = []
+) -> list[str]:
+    changes: list[str] = []
 
     before_content = before_ats.get("content", {}) if isinstance(before_ats, dict) else {}
     after_content = after_ats.get("content", {}) if isinstance(after_ats, dict) else {}
@@ -2695,7 +2493,7 @@ def _collect_applied_changes(
 
 def _verify_section_preservation(
     cv_text: str,
-    structured_sections: Dict[str, List[str]],
+    structured_sections: dict[str, list[str]],
 ) -> set:
     """Detect sections present in the original CV but missing from pipeline output.
 
@@ -2714,12 +2512,12 @@ def _verify_section_preservation(
 
 def _restore_lost_sections(
     cv_text: str,
-    structured_sections: Dict[str, List[str]],
-    section_order: List[str],
+    structured_sections: dict[str, list[str]],
+    section_order: list[str],
     orig_name: str | None,
-    orig_title_lines: List[str],
-    orig_contacts: List[str],
-) -> tuple[str, Dict[str, List[str]], List[str], List[str]]:
+    orig_title_lines: list[str],
+    orig_contacts: list[str],
+) -> tuple[str, dict[str, list[str]], list[str], list[str]]:
     """Restore sections that were lost during pipeline processing.
 
     Parses the original CV text to recover content for any sections that exist
@@ -2739,7 +2537,7 @@ def _restore_lost_sections(
         )
 
     _, orig_sections, _ = _parse_sections(cv_text)
-    restoration_warnings: List[str] = []
+    restoration_warnings: list[str] = []
 
     for lost_key in lost:
         orig_lines = [line for line in orig_sections.get(lost_key, []) if (line or "").strip()]
@@ -2760,19 +2558,19 @@ def _restore_lost_sections(
     return rebuilt_text, structured_sections, section_order, restoration_warnings
 
 
-def _non_empty_section_lines(sections: Dict[str, List[str]], key: str) -> List[str]:
+def _non_empty_section_lines(sections: dict[str, list[str]], key: str) -> list[str]:
     return [line for line in (sections.get(key) or []) if (line or "").strip()]
 
 
 def _enforce_protected_section_floor(
     cv_text: str,
     optimized_text: str,
-    structured_sections: Dict[str, List[str]],
-    section_order: List[str],
+    structured_sections: dict[str, list[str]],
+    section_order: list[str],
     orig_name: str | None,
-    orig_title_lines: List[str],
-    orig_contacts: List[str],
-) -> tuple[str, Dict[str, List[str]], List[str], List[str]]:
+    orig_title_lines: list[str],
+    orig_contacts: list[str],
+) -> tuple[str, dict[str, list[str]], list[str], list[str]]:
     """Never let normalization shrink evidence-heavy sections.
 
     Parser/AI rewrites may legitimately improve wording, but they must not
@@ -2782,8 +2580,8 @@ def _enforce_protected_section_floor(
     """
     _, source_sections, _ = _parse_sections(cv_text)
     _, current_sections, _ = _parse_sections(optimized_text)
-    restored: List[str] = []
-    rebuilt_sections: Dict[str, List[str]] = {
+    restored: list[str] = []
+    rebuilt_sections: dict[str, list[str]] = {
         key: list(values or []) for key, values in structured_sections.items()
     }
 
@@ -2818,7 +2616,7 @@ def auto_fix_cv_text(
     lang: str = "en",
     use_ai: bool = False,
     mode: str = "safe",
-) -> Dict:
+) -> dict:
     cv_text = _guard_text(cv_text, "cv_text")
     job_description = (job_description or "").strip()
 
@@ -2866,15 +2664,15 @@ def auto_fix_cv_text(
         detected_mode = "rebuild"
 
     # ═══ GENERATE STRUCTURED TEXT FROM PIPELINE JSON ═══
-    dropped_sections: List[str] = list(raw_dropped_sections)
+    dropped_sections: list[str] = list(raw_dropped_sections)
     skills_inferred = False
-    _restore_warns: List[str] = []
+    _restore_warns: list[str] = []
 
     if detected_mode == "preserve":
         # Minimal rewrite: just standardize headings on original text
         optimized_text = _minimal_heading_rewrite(cv_text)
         _, parsed_secs, _ = _parse_sections(optimized_text)
-        structured_sections: Dict[str, List[str]] = {
+        structured_sections: dict[str, list[str]] = {
             key: [line for line in values if line]
             for key, values in parsed_secs.items()
             if key in SECTION_ORDER and any((line or "").strip() for line in values)
@@ -2933,7 +2731,7 @@ def auto_fix_cv_text(
 
     # ═══ AI REWRITE (optional) ═══
     used_ai = False
-    warnings: List[str] = list(_restore_warns) if detected_mode != "preserve" else []
+    warnings: list[str] = list(_restore_warns) if detected_mode != "preserve" else []
     best_score = float(before_ats.get("overall_score", 0) or 0)
     current_ats = analyze_cv(optimized_text, job_description, lang=lang)
     current_score = float(current_ats.get("overall_score", 0) or 0)
@@ -2946,7 +2744,7 @@ def auto_fix_cv_text(
         warnings.append("LLM Fallback triggered by Quality Validator due to catastrophic parsing failure.")
     elif use_ai and rewrite_service.ai_rewrite_available():
         should_run_ai = True
-        
+
     if should_run_ai:
         try:
             ai_input_text = cv_text if needs_llm_fallback else optimized_text

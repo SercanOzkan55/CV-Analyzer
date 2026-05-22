@@ -24,6 +24,15 @@ class TestFindSections:
     def test_empty_text(self):
         assert _find_sections("") == []
 
+    def test_detects_turkish_sections(self):
+        text = "İLETİŞİM\neda@example.com\nÖZET\nBackend geliştirici\nDENEYİM\nPython\nEĞİTİM\nÜniversite\nYETENEKLER\nSQL"
+        sections = _find_sections(text)
+        assert "contact" in sections
+        assert "summary" in sections
+        assert "experience" in sections
+        assert "education" in sections
+        assert "skills" in sections
+
 
 class TestContactScore:
     def test_full_contact(self):
@@ -58,6 +67,11 @@ class TestActionVerbScore:
         text = "Company XYZ\n2020-2023"
         score = _action_verb_score(text)
         assert score < 30
+
+    def test_turkish_action_verbs(self):
+        text = "Projeleri yönetti, API servisleri geliştirdi ve veritabanı süreçlerini optimize etti."
+        score = _action_verb_score(text, lang="tr")
+        assert score >= 30
 
 
 class TestLengthScore:
