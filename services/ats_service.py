@@ -12,6 +12,7 @@ import re
 from typing import Dict, List
 
 from .keyword_service import keyword_match_score
+from .language_service import SECTION_ALIASES, clean_lower
 
 # ── Section detection ────────────────────────────────────────────────
 
@@ -58,7 +59,7 @@ MIN_REQUIRED_SECTIONS = [
 
 def _has_project_based_experience(cv_text: str) -> bool:
     """Treat substantial project sections as experience for student/entry CVs."""
-    text_lower = cv_text.lower()
+    text_lower = clean_lower(cv_text)
     has_projects = bool(re.search(r"\b(?:projects?|key projects|projeler)\b", text_lower))
     if not has_projects:
         return False
@@ -184,6 +185,13 @@ ACTION_VERBS = [
 # Multilingual action verbs — keyed by language code
 ACTION_VERBS_I18N: dict[str, list[str]] = {
     "tr": [
+        "yönetti", "liderlik etti", "koordine etti", "geliştirdi", "oluşturdu",
+        "tasarladı", "uyguladı", "başlattı", "iyileştirdi", "optimize etti",
+        "analiz etti", "değerlendirdi", "araştırdı", "teslim etti", "çözdü",
+        "artırdı", "azalttı", "eğitti", "sundu", "otomatize etti",
+        "entegre etti", "yeniden yapılandırdı", "denetledi", "planladı",
+        "kurdu", "geliştirdim", "tasarladım", "uyguladım", "yönettim",
+        "optimize ettim", "analiz ettim", "iyileştirdim", "oluşturdum",
         "yönetti", "liderlik etti", "koordine etti", "geliştirdi", "oluşturdu",
         "tasarladı", "uyguladı", "başlattı", "iyileştirdi", "optimize etti",
         "analiz etti", "değerlendirdi", "araştırdı", "teslim etti", "çözdü",
@@ -354,11 +362,13 @@ QUANTIFICATION_PATTERNS = [
 
 
 def _find_sections(cv_text: str) -> List[str]:
-    text = cv_text.lower()
+    text = clean_lower(cv_text)
     found = []
-    for s in COMMON_SECTIONS:
-        if re.search(r"\b" + re.escape(s) + r"\b", text):
-            found.append(s)
+    for canon, aliases in SECTION_ALIASES.items():
+        for alias in aliases:
+            if re.search(r"\b" + re.escape(clean_lower(alias)) + r"\b", text):
+                found.append(canon)
+                break
     return found
 
 
@@ -366,9 +376,9 @@ def _contact_score(cv_text: str) -> float:
     text = cv_text
     email = re.search(r"[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,}", text)
     phone = re.search(r"(\+?\d[\d\s\-()]{6,}\d)", text)
-    linkedin = re.search(r"linkedin\.com/[A-Za-z0-9_-]+", text.lower())
-    github = re.search(r"github\.com/[A-Za-z0-9_-]+", text.lower())
-    portfolio = re.search(r"(?:portfolio|website|blog)\s*[:.]?\s*(?:https?://)?[\w\.-]+\.\w{2,}", text.lower())
+    linkedin = re.search(r"linkedin\.com/[A-Za-z0-9_-]+", clean_lower(text))
+    github = re.search(r"github\.com/[A-Za-z0-9_-]+", clean_lower(text))
+    portfolio = re.search(r"(?:portfolio|website|blog)\s*[:.]?\s*(?:https?://)?[\w\.-]+\.\w{2,}", clean_lower(text))
 
     score = 0
     if email:
@@ -419,8 +429,8 @@ def _keyword_density_penalty(cv_text: str, job_text: str) -> float:
     if not job_text:
         return 0.0
 
-    job_words = set(re.findall(r"\b\w+\b", job_text.lower()))
-    cv_words = re.findall(r"\b\w+\b", cv_text.lower())
+    job_words = set(re.findall(r"\b\w+\b", clean_lower(job_text)))
+    cv_words = re.findall(r"\b\w+\b", clean_lower(cv_text))
 
     if not cv_words:
         return 0.0
@@ -436,13 +446,20 @@ def _keyword_density_penalty(cv_text: str, job_text: str) -> float:
     return 0.0
 
 
-def _action_verb_score(cv_text: str) -> float:
-    text = cv_text.lower()
+def _action_verb_score(cv_text: str, lang: str = "en") -> float:
+    text = clean_lower(cv_text)
     found_verbs = set()
     total_hits = 0
 
-    for v in ACTION_VERBS:
-        hits = len(re.findall(r"\b" + re.escape(v) + r"(?:s|ed|ing|d)?\b", text))
+    verbs = get_action_verbs(lang)
+    for v in verbs:
+        is_en_verb = v in ACTION_VERBS
+        if is_en_verb:
+            hits = len(re.findall(r"\b" + re.escape(clean_lower(v)) + r"(?:s|ed|ing|d)?\b", text))
+        elif lang == "tr":
+            hits = len(re.findall(r"\b" + re.escape(clean_lower(v)) + r"(?:[mk])?\b", text))
+        else:
+            hits = len(re.findall(r"\b" + re.escape(clean_lower(v)) + r"\b", text))
         if hits > 0:
             found_verbs.add(v)
             total_hits += hits
@@ -533,6 +550,8 @@ def _formatting_consistency_score(cv_text: str) -> float:
     standard_headings = [
         "PROFESSIONAL SUMMARY", "EXPERIENCE", "EDUCATION", "SKILLS",
         "PROJECTS", "CERTIFICATIONS", "LANGUAGES",
+        "ÖZET", "DENEYİM", "EĞİTİM", "YETENEKLER", "PROJELER", "SERTİFİKALAR", "DİLLER",
+        "İŞ DENEYİMİ", "MESLEKİ DENEYİM", "AKADEMİK GEÇMİŞ", "YETKİNLİKLER"
     ]
     std_count = sum(1 for h in standard_headings if h in cv_text)
     if std_count >= 4:
@@ -554,7 +573,7 @@ def _formatting_consistency_score(cv_text: str) -> float:
 
 def _summary_score(cv_text: str) -> float:
     """Score the professional summary / profile section."""
-    text_lower = cv_text.lower()
+    text_lower = clean_lower(cv_text)
     has_summary = bool(
         re.search(r"\b(?:summary|profile|objective|professional\s+summary|about\s+me|özet|profil)\b", text_lower)
     )
@@ -563,7 +582,7 @@ def _summary_score(cv_text: str) -> float:
 
     # Try to extract summary text (text between summary header and next section)
     summary_match = re.search(
-        r"(?:summary|profile|objective|professional\s+summary|about\s+me|özet|profil)\s*\n([\s\S]{10,500}?)(?:\n\s*(?:experience|education|skills|projects|work)\b|\Z)",
+        r"(?:summary|profile|objective|professional\s+summary|about\s+me|özet|profil)\s*\n([\s\S]{10,500}?)(?:\n\s*(?:experience|education|skills|projects|work|deneyim|eğitim|yetenekler|beceriler|projeler)\b|\Z)",
         text_lower,
     )
     if not summary_match:
@@ -595,7 +614,7 @@ def _summary_score(cv_text: str) -> float:
 
 def _skills_section_score(cv_text: str, job_text: str = "") -> float:
     """Score the skills section quality."""
-    text_lower = cv_text.lower()
+    text_lower = clean_lower(cv_text)
     has_skills = bool(
         re.search(r"\b(?:skills|technical\s+skills|core\s+competencies|competencies|beceriler|yetenekler)\b", text_lower)
     )
@@ -605,7 +624,7 @@ def _skills_section_score(cv_text: str, job_text: str = "") -> float:
     score = 50.0
 
     # Count skill-like items (comma/pipe separated or bullet listed)
-    skill_lines = re.findall(r"(?:skills|competencies|beceriler)[\s\S]{0,50}\n([\s\S]{10,1000}?)(?:\n\s*(?:experience|education|projects|certifications)\b|\Z)", text_lower)
+    skill_lines = re.findall(r"(?:skills|competencies|beceriler|yetenekler)[\s\S]{0,50}\n([\s\S]{10,1000}?)(?:\n\s*(?:experience|education|projects|certifications|deneyim|eğitim|projeler|sertifikalar)\b|\Z)", text_lower)
     skill_text = skill_lines[0] if skill_lines else ""
 
     if skill_text:
@@ -635,9 +654,9 @@ def _skills_section_score(cv_text: str, job_text: str = "") -> float:
     return min(100.0, score)
 
 
-def _work_experience_score(cv_text: str) -> float:
+def _work_experience_score(cv_text: str, lang: str = "en") -> float:
     """Score work experience section quality (structure, bullets, metrics)."""
-    text_lower = cv_text.lower()
+    text_lower = clean_lower(cv_text)
     has_exp = bool(
         re.search(r"\b(?:experience|work\s+experience|professional\s+experience|employment|deneyim|iş\s+deneyimi)\b", text_lower)
     )
@@ -653,11 +672,20 @@ def _work_experience_score(cv_text: str) -> float:
             score += 12.0
         elif bullets >= 3:
             score += 8.0
-        action_count = sum(
-            1
-            for v in ACTION_VERBS
-            if re.search(r"\b" + re.escape(v) + r"(?:s|ed|ing|d)?\b", text_lower)
-        )
+
+        verbs = get_action_verbs(lang)
+        action_count = 0
+        for v in verbs:
+            is_en_verb = v in ACTION_VERBS
+            if is_en_verb:
+                matched = bool(re.search(r"\b" + re.escape(clean_lower(v)) + r"(?:s|ed|ing|d)?\b", text_lower))
+            elif lang == "tr":
+                matched = bool(re.search(r"\b" + re.escape(clean_lower(v)) + r"(?:[mk])?\b", text_lower))
+            else:
+                matched = bool(re.search(r"\b" + re.escape(clean_lower(v)) + r"\b", text_lower))
+            if matched:
+                action_count += 1
+
         if action_count >= 5:
             score += 12.0
         elif action_count >= 2:
@@ -689,7 +717,19 @@ def _work_experience_score(cv_text: str) -> float:
         score += 5.0
 
     # Action verbs
-    action_count = sum(1 for v in ACTION_VERBS if re.search(r"\b" + re.escape(v) + r"(?:s|ed|ing|d)?\b", text_lower))
+    verbs = get_action_verbs(lang)
+    action_count = 0
+    for v in verbs:
+        is_en_verb = v in ACTION_VERBS
+        if is_en_verb:
+            matched = bool(re.search(r"\b" + re.escape(clean_lower(v)) + r"(?:s|ed|ing|d)?\b", text_lower))
+        elif lang == "tr":
+            matched = bool(re.search(r"\b" + re.escape(clean_lower(v)) + r"(?:[mk])?\b", text_lower))
+        else:
+            matched = bool(re.search(r"\b" + re.escape(clean_lower(v)) + r"\b", text_lower))
+        if matched:
+            action_count += 1
+
     if action_count >= 8:
         score += 15.0
     elif action_count >= 4:
@@ -713,7 +753,7 @@ def _work_experience_score(cv_text: str) -> float:
 
 def _education_score(cv_text: str) -> float:
     """Score education section presence and quality."""
-    text_lower = cv_text.lower()
+    text_lower = clean_lower(cv_text)
     has_edu = bool(
         re.search(r"\b(?:education|academic|eğitim|öğrenim|university|üniversite)\b", text_lower)
     )
@@ -1135,6 +1175,33 @@ def compute_final_score(
     return final
 
 
+def _find_section_position(canonical_sec: str, clean_cv_text: str) -> int:
+    """Returns the start position of the section header in the text, or -1 if not found."""
+    if canonical_sec == "contact":
+        best_pos = -1
+        aliases = SECTION_ALIASES.get("contact", set())
+        for alias in aliases:
+            m = re.search(r"\b" + re.escape(clean_lower(alias)) + r"\b", clean_cv_text)
+            if m:
+                if best_pos == -1 or m.start() < best_pos:
+                    best_pos = m.start()
+        if best_pos != -1:
+            return best_pos
+        # Fallback: email/phone presence
+        if re.search(r"[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,}", clean_cv_text) or re.search(r"(\+?\d[\d\s\-()]{6,}\d)", clean_cv_text):
+            return 0
+        return -1
+
+    aliases = SECTION_ALIASES.get(canonical_sec, set())
+    best_pos = -1
+    for alias in aliases:
+        m = re.search(r"\b" + re.escape(clean_lower(alias)) + r"\b", clean_cv_text)
+        if m:
+            if best_pos == -1 or m.start() < best_pos:
+                best_pos = m.start()
+    return best_pos
+
+
 def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
     """
     Returns a dictionary with detailed ATS compatibility scores and suggestions.
@@ -1156,7 +1223,7 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
     # Spam / density penalty (prevent copy-paste job descriptions)
     penalty = _keyword_density_penalty(cv_text, job_text)
 
-    action_score = _action_verb_score(cv_text)
+    action_score = _action_verb_score(cv_text, lang=lang)
 
     # Quantified achievements: percentages, dollar amounts, large numbers
     quant_hits = 0
@@ -1164,8 +1231,9 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
         quant_hits += len(re.findall(pattern, cv_text))
     quant_hits += len(
         re.findall(
-            r"\b\d+\s+(?:users|clients|customers|projects|team members|employees|servers|applications|features|releases|deployments|endpoints|repositories|databases|microservices)\b",
-            cv_text.lower(),
+            r"\b\d+\s+(?:users|clients|customers|projects|team\s+members|employees|servers|applications|features|releases|deployments|endpoints|repositories|databases|microservices|"
+            r"kullanıcı|müşteri|proje|ekip|çalışan|sunucu|uygulama|özellik|sürüm|dağıtım|veritabanı|servis)\b",
+            clean_lower(cv_text),
         )
     )
     achievement_score = float(min(100.0, quant_hits * 12))
@@ -1175,7 +1243,7 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
     required_found = [
         s
         for s in MIN_REQUIRED_SECTIONS
-        if re.search(r"\b" + re.escape(s) + r"\b", cv_text.lower())
+        if s in sections_found
     ]
     if "experience" not in required_found and _has_project_based_experience(cv_text):
         required_found.append("experience")
@@ -1200,14 +1268,15 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
     prev_pos = -1
     order_ok = True
     found_any = False
+    clean_text = clean_lower(cv_text)
     for sec in preferred_order:
-        m = re.search(r"\b" + re.escape(sec) + r"\b", cv_text.lower())
-        if m:
+        pos = _find_section_position(sec, clean_text)
+        if pos != -1:
             found_any = True
-            if m.start() <= prev_pos:
+            if pos <= prev_pos:
                 order_ok = False
                 break
-            prev_pos = m.start()
+            prev_pos = pos
     if order_ok and found_any:
         layout_score = min(100.0, layout_score + 5.0)
 
@@ -1229,7 +1298,7 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
     edu_score = _education_score(cv_text)
     summary_score = _summary_score(cv_text)
     skills_score = _skills_section_score(cv_text, job_text)
-    work_exp_score = _work_experience_score(cv_text)
+    work_exp_score = _work_experience_score(cv_text, lang=lang)
 
     # ATS compatibility composite
     ats_compat_score = round(

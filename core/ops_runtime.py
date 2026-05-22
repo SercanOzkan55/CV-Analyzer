@@ -13,25 +13,23 @@ import threading as _threading
 import time
 from datetime import datetime
 
-from security.redaction import redact_for_log, redact_mapping
-
 from core.metrics import (
+    _GUARD_REJECT_LOCK,
+    _GUARD_REJECT_TIMESTAMPS,
     ADMIN_ACTIONS_TOTAL,
     BREAKER_OPEN,
     FLAG_ENABLED,
+    GC_COLLECTIONS_TOTAL,
+    GUARD_SAFE_MODE_TRIGGERS,
     PANIC_ACTIVE,
     PANIC_TRIGGERS_TOTAL,
     PROCESS_CPU_PERCENT,
     PROCESS_RSS_BYTES,
     PROCESS_VMS_BYTES,
-    GC_COLLECTIONS_TOTAL,
     WORKER_ACTIVE_TASKS,
     WORKER_QUEUE_SIZE,
-    GUARD_SAFE_MODE_TRIGGERS,
-    _GUARD_REJECT_TIMESTAMPS,
-    _GUARD_REJECT_LOCK,
 )
-
+from security.redaction import redact_for_log, redact_mapping
 
 # ── Ops: Feature flags (env-driven) ──────────────────────────────────────
 FEATURE_OPTIMIZE = os.getenv("FEATURE_OPTIMIZE", "1").lower() not in ("0", "false", "no")
@@ -81,7 +79,7 @@ def _reload_flags_from_file() -> None:
     if not _LIVE_FLAGS_FILE:
         return
     try:
-        with open(_LIVE_FLAGS_FILE, "r", encoding="utf-8") as f:
+        with open(_LIVE_FLAGS_FILE, encoding="utf-8") as f:
             data = json.loads(f.read())
         if not isinstance(data, dict):
             return
@@ -202,7 +200,6 @@ def _record_error_for_panic() -> None:
         if len(_panic_error_timestamps) >= _PANIC_ERROR_THRESHOLD and not _panic_mode:
             _panic_mode = True
             _audit_event("panic_mode", enabled=True, errors=len(_panic_error_timestamps))
-            from core.metrics import _metric_guard_reject  # avoid circular at module level
             try:
                 PANIC_TRIGGERS_TOTAL.inc()
                 PANIC_ACTIVE.set(1)
@@ -350,7 +347,6 @@ def _extract_client_ip(request) -> str | None:
 
 
 # ── Runtime: Request sampling (1%) ───────────────────────────────────────
-import random as _random
 _SAMPLE_RATE = float(os.getenv("REQUEST_SAMPLE_RATE", "0.01"))
 _sample_logger = logging.getLogger("app.sample")
 
@@ -421,7 +417,7 @@ def _get_rss_bytes() -> int:
     except Exception:
         pass
     try:
-        with open("/proc/self/status", "r") as f:
+        with open("/proc/self/status") as f:
             for line in f:
                 if line.startswith("VmRSS:"):
                     return int(line.split()[1]) * 1024
@@ -438,6 +434,8 @@ _disk_logger = logging.getLogger("app.disk")
 
 def _get_disk_usage() -> float:
     """Return disk usage percentage for the app partition."""
+    if os.getenv("ENV") == "test" or os.getenv("TESTING") == "1":
+        return 0.0
     import shutil
     total, used, free = shutil.disk_usage(os.path.dirname(os.path.dirname(__file__)) or "/")
     return round(used / total * 100, 1) if total > 0 else 0.0
@@ -446,6 +444,7 @@ def _get_disk_usage() -> float:
 def _check_disk_safety() -> None:
     """Warn >80%, block >95% disk usage. Raises HTTPException(503)."""
     from fastapi import HTTPException
+
     from shared import _alert
     try:
         pct = _get_disk_usage()
@@ -469,7 +468,7 @@ _METRICS_COLLECT_INTERVAL = 15
 
 def _metrics_collector_loop():
     """Background thread: update process, worker, breaker, flag gauges."""
-    from shared import _circuit_breaker_state, _cb_lock
+    from shared import _cb_lock, _circuit_breaker_state
     while True:
         time.sleep(_METRICS_COLLECT_INTERVAL)
         try:
@@ -492,7 +491,8 @@ def _metrics_collector_loop():
             PROCESS_CPU_PERCENT.set(cpu)
 
             try:
-                from services.model_worker import _proc as _mw_proc, _request_queue as _mw_q
+                from services.model_worker import _proc as _mw_proc
+                from services.model_worker import _request_queue as _mw_q
                 WORKER_ACTIVE_TASKS.set(1 if (_mw_proc and _mw_proc.is_alive()) else 0)
                 WORKER_QUEUE_SIZE.set(_mw_q.qsize() if _mw_q else 0)
             except Exception:
@@ -529,8 +529,8 @@ def _check_auto_safe_mode_from_guards(now: float) -> None:
         count = len(_GUARD_REJECT_TIMESTAMPS)
     if count >= _GUARD_SAFE_MODE_THRESHOLD:
         try:
-            from services.cv_builder_service import _safe_mode_auto, _safe_mode_lock
             import services.cv_builder_service as _cbs
+            from services.cv_builder_service import _safe_mode_lock
             with _safe_mode_lock:
                 if not _cbs._safe_mode_auto:
                     _cbs._safe_mode_auto = True

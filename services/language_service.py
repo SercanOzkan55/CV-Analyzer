@@ -368,3 +368,294 @@ ATS_SUGGESTIONS = {
 def get_ats_suggestion(key: str, lang: str = "en") -> str:
     template = ATS_SUGGESTIONS.get(key, {})
     return template.get(lang, template.get("en", ""))
+
+
+def clean_lower(text: str) -> str:
+    """Global ve dil bağımsız küçük harfe dönüştürme fonksiyonu.
+    Türkçe'deki noktalı büyük İ harfinin (U+0130) bozulmasını ve regex eşleşmelerinin kaçırılmasını engeller.
+    """
+    if not text:
+        return ""
+    # Noktalı büyük İ harfini standart küçük 'i' ile değiştir
+    text = text.replace("\u0130", "i")
+    lowered = text.lower()
+    # Olası birleşen karakter bozulmalarını düzelt
+    lowered = lowered.replace("i\u0307", "i").replace("i̇", "i")
+    return lowered
+
+
+SECTION_ALIASES = {
+    "summary": {
+        "summary",
+        "professional summary",
+        "personal information",
+        "profile",
+        "about",
+        "objective",
+        "career summary",
+        # TR
+        "özet", "profil", "kişisel bilgiler", "kariyer özeti",
+        # FR
+        "résumé professionnel", "profil professionnel",
+        # DE
+        "zusammenfassung", "über mich", "kurzprofil",
+        # ES
+        "resumen profesional", "perfil profesional", "resumen", "perfil",
+        # PT
+        "resumo profissional", "resumo",
+        # IT
+        "profilo professionale", "riepilogo", "sommario",
+        # NL
+        "samenvatting", "profiel", "persoonlijk profiel",
+        # RU
+        "резюме", "профиль", "о себе",
+        # PL
+        "podsumowanie", "podsumowanie zawodowe", "profil zawodowy",
+        # SV/NO/DA/FI
+        "sammanfattning", "sammendrag", "yhteenveto", "profiili",
+        # CS/HU/RO
+        "shrnutí", "összefoglaló", "rezumat",
+        # AR/ZH/JA/KO/HI
+        "ملخص", "الملف الشخصي", "个人简介", "摘要", "概要",
+        "プロフィール", "요약", "프로필", "सारांश",
+        # ID/VI/TH
+        "ringkasan", "tóm tắt", "สรุป", "โปรไฟล์",
+    },
+    "experience": {
+        "experience",
+        "work experience",
+        "professional experience",
+        "employment",
+        "employment history",
+        "work history",
+        # TR
+        "deneyim", "iş deneyimi", "mesleki deneyim",
+        # FR
+        "expérience", "expérience professionnelle",
+        # DE
+        "erfahrung", "berufserfahrung",
+        # ES
+        "experiencia", "experiencia laboral", "experiencia profesional",
+        # PT
+        "experiência", "experiência profissional",
+        # IT
+        "esperienza", "esperienza lavorativa",
+        # NL
+        "ervaring", "werkervaring",
+        # RU
+        "опыт", "опыт работы",
+        # PL
+        "doświadczenie", "doświadczenie zawodowe",
+        # SV/NO/DA/FI
+        "erfarenhet", "erfaring", "kokemus", "työkokemus",
+        # CS/HU/RO
+        "zkušenosti", "tapasztalat", "experiență",
+        # AR/ZH/JA/KO/HI
+        "الخبرة", "الخبرة المهنية", "工作经验", "工作经历",
+        "職歴", "경력", "경험", "अनुभव",
+        # ID/VI/TH
+        "pengalaman", "pengalaman kerja", "kinh nghiệm",
+        "předchozí zaměstnání", "geçmiş işler", "professional history",
+        "pengalaman", "pengalaman kerja", "kinh nghiệm",
+        "ประสบการณ์",
+    },
+    "education": {
+        "education", "academic background", "qualifications",
+        # TR
+        "eğitim", "akademik geçmiş",
+        # FR
+        "formation", "études",
+        # DE
+        "ausbildung", "bildung", "studium",
+        # ES
+        "educación", "formación",
+        # PT
+        "educação", "formação acadêmica",
+        # IT
+        "istruzione", "formazione",
+        # NL
+        "opleiding", "onderwijs",
+        # RU
+        "образование",
+        # PL
+        "wykształcenie", "edukacja",
+        # SV/NO/DA/FI
+        "utbildning", "utdanning", "uddannelse", "koulutus",
+        # CS/HU/RO
+        "vzdělání", "végzettség", "educație", "studii",
+        # AR/ZH/JA/KO/HI
+        "التعليم", "教育", "学历", "学歴", "학력", "शिक्षा",
+        # ID/VI/TH
+        "pendidikan", "học vấn", "การศึกษา",
+    },
+    "skills": {
+        "skills",
+        "technical skills",
+        "core competencies",
+        "competencies",
+        "technologies",
+        # TR
+        "beceriler", "yetenekler", "teknik beceriler", "yetkinlikler",
+        # FR
+        "compétences", "compétences techniques",
+        # DE
+        "fähigkeiten", "kenntnisse", "kompetenzen",
+        # ES
+        "habilidades", "competencias",
+        # PT
+        "competências",
+        # IT
+        "competenze", "abilità",
+        # NL
+        "vaardigheden", "competenties",
+        # RU
+        "навыки", "умения", "компетенции",
+        # PL
+        "umiejętności", "kompetencje",
+        # SV/NO/DA/FI
+        "färdigheter", "ferdigheter", "færdigheder", "taidot", "osaaminen",
+        # CS/HU/RO
+        "dovednosti", "készségek", "competențe",
+        # AR/ZH/JA/KO/HI
+        "المهارات", "技能", "スキル", "기술", "कौशल",
+        # ID/VI/TH
+        "keahlian", "keterampilan", "kỹ năng", "ทักษะ",
+    },
+    "projects": {
+        "project", "projects", "project experience", "personal projects",
+        # TR
+        "projeler",
+        # FR
+        "projets",
+        # DE
+        "projekte",
+        # ES
+        "proyectos",
+        # PT/IT/NL
+        "projetos", "progetti", "projecten",
+        # RU
+        "проекты",
+        # PL/CS/HU
+        "projekty", "projektek",
+        # SV/DA/NO/FI/RO
+        "projekter", "prosjekter", "projektit", "proiecte",
+        # AR/ZH/JA/KO/HI
+        "المشاريع", "项目", "プロジェクト", "프로젝트", "परियोजनाएं",
+        # ID/VI/TH
+        "proyek", "dự án", "โครงการ",
+    },
+    "certifications": {
+        "certifications", "certificates", "licenses",
+        # TR
+        "sertifikalar", "belgeler",
+        # FR
+        "diplômes",
+        # DE
+        "zertifizierungen", "zertifikate",
+        # ES
+        "certificaciones",
+        # PT
+        "certificações",
+        # IT/NL
+        "certificazioni", "certificeringen",
+        # RU
+        "сертификаты",
+        # PL/CS/HU
+        "certyfikaty", "certifikáty", "tanúsítványok",
+        # SV/NO/DA/FI/RO
+        "certifieringar", "sertifiseringer", "sertifikaatit", "certificări",
+        # AR/ZH/JA/KO/HI
+        "الشهادات", "证书", "資格", "자격증", "प्रमाणपत्र",
+        # ID/VI/TH
+        "sertifikasi", "chứng chỉ", "ใบรับรอง",
+    },
+    "languages": {
+        "languages", "language skills",
+        # TR
+        "diller", "yabancı diller",
+        # FR
+        "langues",
+        # DE
+        "sprachen",
+        # ES/PT
+        "idiomas",
+        # IT
+        "lingue",
+        # NL
+        "talen",
+        # RU
+        "языки",
+        # PL
+        "języki",
+        # SV/NO
+        "språk",
+        # DA
+        "sprog",
+        # FI
+        "kielet",
+        # CS/HU
+        "jazyky", "nyelvek",
+        # RO
+        "limbi",
+        # AR/ZH/JA/KO/HI
+        "اللغات", "语言", "言語", "언어", "भाषाएं",
+        # ID/VI/TH
+        "bahasa", "ngôn ngữ", "ภาษา",
+    },
+    "contact": {
+        "contact", "contact information", "communication",
+        # TR
+        "iletişim",
+        # FR
+        "coordonnées",
+        # DE
+        "kontakt", "kontaktdaten",
+        # ES
+        "contacto",
+        # PT/IT
+        "contato", "contatto",
+        # NL
+        "contactgegevens",
+        # RU
+        "контакты",
+        # PL
+        "dane kontaktowe",
+        # FI
+        "yhteystiedot",
+        # HU
+        "kapcsolat", "elérhetőség",
+        # AR/ZH/JA/KO/HI
+        "الاتصال", "联系方式", "連絡先", "연락처", "संपर्क",
+        # ID/VI/TH
+        "kontak", "liên hệ", "ติดต่อ",
+    },
+    "interests": {
+        "interests", "hobbies", "personal interests",
+        # TR
+        "ilgi alanları", "hobiler",
+        # FR
+        "centres d'intérêt", "loisirs",
+        # DE
+        "interessen", "hobbys",
+        # ES
+        "intereses", "aficiones",
+        # PT/IT
+        "interesses", "interessi",
+        # NL
+        "hobby's",
+        # RU
+        "интересы", "хобби",
+        # PL
+        "zainteresowania",
+        # SV/NO/DA
+        "intressen", "interesser",
+        # FI
+        "kiinnostukset", "harrastukset",
+        # CS/HU/RO
+        "zájmy", "érdeklődés", "interese",
+        # AR/ZH/JA/KO/HI
+        "الاهتمامات", "兴趣", "趣味", "취미", "रुचियां",
+        # ID/VI/TH
+        "minat", "sở thích", "ความสนใจ",
+    },
+}
