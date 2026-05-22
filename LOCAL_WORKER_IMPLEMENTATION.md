@@ -26,6 +26,7 @@ Recommended production settings:
 - `CV_WORKER_API_KEY`: optional local worker API key environment variable on the employer machine.
 - `CV_WORKER_PROGRESS_LOG`: optional local worker JSONL progress log path.
 - `CV_WORKER_MAX_FILE_BYTES`: optional max downloaded CV size for the CLI worker. Defaults to 25 MB.
+- `CV_WORKER_AI_MAX_REVIEWS`: optional local AI review cap for `customer_openai_key` mode. Defaults to 25 reviews per local folder run.
 - Storage provider variables used by `services.storage_service`, such as S3/R2 endpoint, bucket, region, access key, and secret key.
 
 Production must not run with the implicit development download signing secret.
@@ -106,9 +107,17 @@ Employers can download a ready-to-run ZIP from the Settings > Local Worker panel
 download is served by `GET /api/worker/download-package` and contains:
 
 - `worker.py`
+- `gui.py`
+- `workspace.py`
+- `credentials.py`
+- `install_windows.cmd`
+- `run_gui.cmd`
+- `start_here.cmd`
+- `build_windows_exe.cmd`
 - `requirements.txt`
 - `README.md`
 - `.env.example`
+- `config.example.json`
 - `run-worker.ps1`
 
 The ZIP never includes an API key. The employer must paste the one-time key shown
@@ -121,6 +130,8 @@ cd local_worker
 python -m pip install -r requirements.txt
 ```
 
+Windows users can run `start_here.cmd` for a one-click setup that installs dependencies and opens the GUI. `install_windows.cmd` can also create a desktop shortcut. The package does not need Node.js.
+
 Use:
 
 ```bash
@@ -128,6 +139,12 @@ python worker.py login --api-key sk_worker_live_xxx
 python worker.py jobs --api-key sk_worker_live_xxx
 python worker.py run --api-key sk_worker_live_xxx --job-id 123 --batch-size 20
 python worker.py status --api-key sk_worker_live_xxx
+```
+
+Site-independent local analysis:
+
+```bash
+python worker.py --processing-mode local_folder run --job-id 1 --local-folder C:\Resumes --output-folder C:\Resumes\results --job-description "Backend engineer..." --required-skills "Python,FastAPI,SQL"
 ```
 
 For local development, the worker defaults to `http://127.0.0.1:8001/api/worker`,
@@ -148,8 +165,18 @@ The worker supports:
 - max file size guard through `CV_WORKER_MAX_FILE_BYTES`
 - low-confidence failed extraction result submit
 - local JSONL progress log
+- local SQLite workspace for saved jobs, run history, and sync status
+- local JSON and CSV exports
 
-`local_folder` mode is intentionally extraction-only in this MVP. It can read local PDF/DOCX/TXT files and report extracted character counts, but it does not sync results to the backend because local files do not yet have server-side candidate ids, claims, signed download scope, or quota ownership. The next phase should add local upload/virtual-claim design before enabling backend sync.
+`local_folder` mode is a site-independent local analysis workspace. It reads local PDF/DOCX/TXT files, applies the same local rule-based scoring engine, writes JSON/CSV outputs, stores the run in `local_worker_workspace.sqlite3`, and marks every local result as `pending` sync. It does not yet submit those local-only CVs to the SaaS backend because those files do not have server-side candidate ids, claims, signed download scope, or quota ownership. The next phase should add local upload or virtual-claim design before enabling backend sync.
+
+Local output files:
+
+- `local_worker_results.json`: full ranked result payloads.
+- `local_worker_results.csv`: recruiter-friendly ranked table.
+- `sync_manifest.json`: local job configuration, output paths, AI review count, and offline sync state.
+- `failed_files.txt`: files that could not be read safely, when any exist.
+- `local_worker_workspace.sqlite3`: saved local jobs, run history, results, and per-result `sync_status`.
 
 ## Security Checklist
 
@@ -180,6 +207,7 @@ The worker supports:
 ## Tests
 
 Worker MVP tests live in `tests/test_worker_mvp.py`.
+Local folder CLI tests live in `tests/test_local_worker_cli.py`.
 
 Covered scenarios:
 
@@ -205,12 +233,13 @@ Run:
 
 ```bash
 python -m pytest tests/test_worker_mvp.py -q
+python -m pytest tests/test_local_worker_cli.py -q
 ```
 
 ## Remaining MVP Risks
 
 - Recruiter batch upload now attempts to store original files and propagate file metadata into `candidate_actions`. If storage is not configured, the worker safely falls back to backend-signed TXT download from `cv_text`.
-- `local_folder` mode is extraction-only for now; result sync should be added after local uploads or virtual claims are designed.
+- `local_folder` results are locally ranked and exportable, but backend sync is intentionally pending until local uploads or virtual claims are designed.
 - Rate limiting uses the app limiter. A distributed rate-limit backend is recommended before multi-instance production.
 - The rule-based scoring engine is intentionally simple and should be calibrated with real employer feedback.
 - The fallback TXT endpoint necessarily returns CV text for a valid active claim. Keep token TTL short and audit access.
