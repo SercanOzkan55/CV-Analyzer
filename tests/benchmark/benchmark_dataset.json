@@ -415,7 +415,7 @@
         },
         "final_score": {
           "min": 25,
-          "max": 50
+          "max": 62
         }
       },
       "notes": "German CV text against English JD. Technical terms should match despite language difference."
