@@ -601,6 +601,8 @@ class LocalWorker:
         rows = []
         failed_files = []
         seen_hashes: dict[str, str] = {}
+        ai_reviews_used = 0
+        ai_review_limit = int(config.get("ai_max_reviews") or os.environ.get("CV_WORKER_AI_MAX_REVIEWS", "25") or "25")
         for file_path in files:
             path = Path(file_path)
             try:
@@ -612,7 +614,14 @@ class LocalWorker:
                 if not duplicate_of:
                     seen_hashes[file_hash] = str(path)
                 text = extract_text(data, path.suffix.lstrip("."), path.name)
-                result = maybe_apply_ai_review(text, config, score_cv(text, config), self.ai_mode)
+                base_score = score_cv(text, config)
+                ai_mode = self.ai_mode
+                if ai_mode == "customer_openai_key" and ai_reviews_used >= ai_review_limit:
+                    result = {**base_score, "ai_review_status": "skipped_ai_review_limit"}
+                else:
+                    result = maybe_apply_ai_review(text, config, base_score, ai_mode)
+                    if result.get("ai_review_status") == "completed":
+                        ai_reviews_used += 1
             except Exception as exc:
                 failed_files.append(str(path))
                 file_hash = ""
@@ -676,6 +685,8 @@ class LocalWorker:
                     "results_file": str(json_path),
                     "csv_file": str(csv_path),
                     "failed_files": failed_files,
+                    "ai_reviews_used": ai_reviews_used,
+                    "ai_review_limit": ai_review_limit,
                     "sync_status": "offline_ready",
                     "created_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 },
@@ -730,6 +741,7 @@ def _load_local_config(args) -> dict:
     config.setdefault("hard_reject_criteria", [])
     config["accept_threshold"] = args.accept_threshold
     config["review_threshold"] = args.review_threshold
+    config.setdefault("ai_max_reviews", int(os.environ.get("CV_WORKER_AI_MAX_REVIEWS", "25") or "25"))
     config.setdefault("reject_threshold", 30)
     config.setdefault("scoring_weights", {
         "required_skills": 70.0,
