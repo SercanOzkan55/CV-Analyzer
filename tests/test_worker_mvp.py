@@ -126,7 +126,9 @@ def test_worker_package_download_contains_cli_without_plaintext_key(client, recr
     assert "sk_worker_live_xxx" in readme
     assert "start_here.cmd" in readme
     assert "sk_worker_live_xxx" in env_example
+    assert "CV_WORKER_AI_MAX_REVIEWS=25" in env_example
     assert "paste-created-worker-key-at-runtime" in config_example
+    assert '"ai_max_reviews": 25' in config_example
     assert "sk_worker_live_" not in worker_py
     assert "http://testserver/api/worker" in readme
 

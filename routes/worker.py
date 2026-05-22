@@ -304,6 +304,7 @@ CV_WORKER_MAX_FILE_BYTES=26214400
 CV_WORKER_PROGRESS_LOG=worker_progress.jsonl
 CV_WORKER_OPENAI_API_KEY=
 CV_WORKER_OPENAI_MODEL=gpt-5.2
+CV_WORKER_AI_MAX_REVIEWS=25
 """
 
 
@@ -324,6 +325,7 @@ def _worker_config_example(api_base_url: str) -> str:
             },
             "limits": {
                 "max_file_bytes": 26214400,
+                "ai_max_reviews": 25,
             },
         },
         indent=2,
