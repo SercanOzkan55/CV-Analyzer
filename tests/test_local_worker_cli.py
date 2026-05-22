@@ -48,6 +48,7 @@ def test_local_folder_mode_writes_ranked_outputs(tmp_path):
     assert results[0]["rank"] == 1
     assert manifest["mode"] == "local_folder"
     assert manifest["sync_status"] == "offline_ready"
+    assert manifest["ai_review_limit"] == 25
 
     store = WorkspaceStore(output_dir / "local_worker_workspace.sqlite3")
     runs = store.list_runs()
