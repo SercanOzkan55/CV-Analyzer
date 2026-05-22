@@ -53,6 +53,8 @@ class WorkspaceStore:
                     file_path TEXT NOT NULL,
                     file_hash TEXT,
                     duplicate_of TEXT,
+                    sync_status TEXT NOT NULL DEFAULT 'pending',
+                    sync_error TEXT,
                     score REAL NOT NULL,
                     decision TEXT NOT NULL,
                     confidence TEXT NOT NULL,
@@ -63,6 +65,8 @@ class WorkspaceStore:
             )
             self._ensure_column(conn, "analysis_results", "file_hash", "file_hash TEXT")
             self._ensure_column(conn, "analysis_results", "duplicate_of", "duplicate_of TEXT")
+            self._ensure_column(conn, "analysis_results", "sync_status", "sync_status TEXT NOT NULL DEFAULT 'pending'")
+            self._ensure_column(conn, "analysis_results", "sync_error", "sync_error TEXT")
 
     def _ensure_column(self, conn, table_name: str, column_name: str, column_sql: str):
         columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()}
@@ -113,20 +117,29 @@ class WorkspaceStore:
             conn.execute(
                 """
                 INSERT INTO analysis_results
-                    (run_id, file_path, file_hash, duplicate_of, score, decision, confidence, result_json, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (run_id, file_path, file_hash, duplicate_of, sync_status, sync_error, score, decision, confidence, result_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     run_id,
                     row.get("file", ""),
                     row.get("file_hash", ""),
                     row.get("duplicate_of", ""),
+                    row.get("sync_status", "pending"),
+                    row.get("sync_error", ""),
                     float(row.get("score") or 0),
                     row.get("decision", ""),
                     row.get("confidence", ""),
                     json.dumps(row, ensure_ascii=False),
                     _now(),
                 ),
+            )
+
+    def update_result_sync_status(self, result_id: int, status: str, error: str = ""):
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE analysis_results SET sync_status = ?, sync_error = ? WHERE id = ?",
+                (status, error, result_id),
             )
 
     def list_runs(self, job_id: int | None = None, limit: int = 25) -> list[dict]:
@@ -167,3 +180,24 @@ class WorkspaceStore:
                 (run_id,),
             ).fetchall()
         return [json.loads(row[0]) for row in rows]
+
+    def list_pending_sync_results(self, limit: int = 100) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, result_json, sync_status, sync_error
+                FROM analysis_results
+                WHERE sync_status IN ('pending', 'failed')
+                ORDER BY id ASC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        results = []
+        for row in rows:
+            payload = json.loads(row[1])
+            payload["local_result_id"] = row[0]
+            payload["sync_status"] = row[2]
+            payload["sync_error"] = row[3]
+            results.append(payload)
+        return results

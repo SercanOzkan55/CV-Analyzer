@@ -635,6 +635,7 @@ class LocalWorker:
                 "worker_version": WORKER_VERSION,
                 "engine_version": ENGINE_VERSION,
                 "processed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+                "sync_status": "pending",
                 **result,
             }
             rows.append(row)
@@ -656,7 +657,7 @@ class LocalWorker:
                 fh,
                 fieldnames=[
                     "rank", "file", "score", "decision", "confidence", "is_duplicate",
-                    "duplicate_of", "file_hash", "worker_version", "engine_version",
+                    "duplicate_of", "file_hash", "worker_version", "engine_version", "sync_status",
                     "summary", "score_breakdown", "matched_skills", "missing_skills",
                     "risk_flags", "explanation", "processed_at",
                 ],
