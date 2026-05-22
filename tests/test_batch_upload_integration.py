@@ -283,13 +283,10 @@ def test_export_rankings_json(client, recruiter_user, test_job):
     assert isinstance(data, list)
 
 
-def test_rate_limiting_batch_upload(client, recruiter_user, test_job, sample_pdf_file):
+@pytest.mark.skip(reason="Rate limiting test requires rate limiter configuration")
+def test_rate_limiting_batch_upload():
     """Test rate limiting on batch upload endpoint."""
-    # Make rapid requests to hit the 60/minute limit
-    limiter_key = f"/api/v1/recruiter/dashboard/batch-upload"
-    
-    # This would need rate limiter configured - skip for now
-    pytest.skip("Rate limiting test requires rate limiter configuration")
+    # This would need rate limiter configured.
 
 
 def test_pagination_with_batch_upload(client, recruiter_user):

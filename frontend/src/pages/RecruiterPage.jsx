@@ -2319,6 +2319,7 @@ export default function RecruiterPage() {
             toast.success('Bulk upload and processing started successfully')
           }}
           jobs={jobs}
+          token={token}
         />
       </main>
     </div>

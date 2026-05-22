@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import api from '../api'
+import { recruiterSaaSBatchUpload } from '../api'
 import BatchUploadProgress from './BatchUploadProgress'
 import './BatchUploadModal.css'
 
@@ -12,7 +12,7 @@ import './BatchUploadModal.css'
  * @param {function} onSuccess - Callback when upload completes successfully
  * @param {array} jobs - Available recruiter jobs for selection
  */
-export const BatchUploadModal = ({ isOpen, onClose, onSuccess = null, jobs = [] }) => {
+export const BatchUploadModal = ({ isOpen, onClose, onSuccess = null, jobs = [], token = null }) => {
   const inputRef = useRef(null)
   const [files, setFiles] = useState([])
   const [selectedJobId, setSelectedJobId] = useState(null)
@@ -79,33 +79,18 @@ export const BatchUploadModal = ({ isOpen, onClose, onSuccess = null, jobs = [] 
     setUploading(true)
     setUploadError(null)
 
-    const formData = new FormData()
-    formData.append('job_id', selectedJobId)
-    files.forEach((file) => {
-      formData.append('files', file)
-    })
-
     try {
-      const response = await api.post(
-        '/recruiter/dashboard/batch-upload',
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        }
-      )
+      const response = await recruiterSaaSBatchUpload(token, selectedJobId, files)
 
-      if (response.data.task_id) {
-        setTaskId(response.data.task_id)
+      if (response.task_id) {
+        setTaskId(response.task_id)
       } else {
         throw new Error('No task ID received')
       }
     } catch (error) {
       console.error('Upload error:', error)
       setUploadError(
-        error.response?.data?.detail ||
-          error.message ||
+        error.message ||
           'Upload failed'
       )
       setUploading(false)
