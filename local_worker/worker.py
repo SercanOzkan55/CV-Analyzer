@@ -1,6 +1,8 @@
 import argparse
+import csv
 import difflib
 import glob
+import hashlib
 import json
 import os
 import re
@@ -444,9 +446,17 @@ class LocalWorker:
         jobs = resp.json().get("jobs", [])
         print(json.dumps({"jobs": jobs}, indent=2))
 
-    def run(self, job_id: int, batch_size: int = 10, local_folder: str | None = None, max_empty_polls: int = 1):
+    def run(
+        self,
+        job_id: int,
+        batch_size: int = 10,
+        local_folder: str | None = None,
+        max_empty_polls: int = 1,
+        local_config: dict | None = None,
+        output_folder: str | None = None,
+    ):
         if self.processing_mode == "local_folder":
-            self._run_local_folder(job_id, local_folder)
+            self._run_local_folder(job_id, local_folder, local_config, output_folder)
             return
 
         config_resp = self._request("GET", f"/jobs/{job_id}/config")
@@ -555,17 +565,118 @@ class LocalWorker:
             "explanation": message,
         }
 
-    def _run_local_folder(self, job_id: int, folder_path: str | None):
+    def _run_local_folder(self, job_id: int, folder_path: str | None, config: dict | None = None, output_folder: str | None = None):
         if not folder_path:
             raise LocalWorkerError("--local-folder is required with local_folder mode")
+        config = config or {
+            "title": f"Local job {job_id}",
+            "description": "",
+            "required_skills": [],
+            "nice_to_have_skills": [],
+            "hard_reject_criteria": [],
+            "accept_threshold": 75,
+            "review_threshold": 50,
+            "reject_threshold": 30,
+        }
+        if not config.get("description") and not config.get("required_skills"):
+            raise LocalWorkerError("Local folder mode requires --job-description, --required-skills, or --job-config.")
+
+        folder = Path(folder_path).expanduser()
+        output = Path(output_folder or (folder / "cv_analyzer_results")).expanduser()
+        output.mkdir(parents=True, exist_ok=True)
+
         files = []
         for pattern in ("*.pdf", "*.docx", "*.txt"):
-            files.extend(glob.glob(os.path.join(folder_path, pattern)))
-        print(f"Found {len(files)} local file(s). Local-folder result sync is planned for the next phase.")
+            files.extend(glob.glob(str(folder / "**" / pattern), recursive=True))
+        files = sorted({str(Path(path)) for path in files})
+        print(f"Found {len(files)} local file(s).")
+        rows = []
+        failed_files = []
+        seen_hashes: dict[str, str] = {}
         for file_path in files:
-            data = Path(file_path).read_bytes()
-            text = extract_text(data, Path(file_path).suffix.lstrip("."), Path(file_path).name)
-            print(json.dumps({"file": file_path, "chars": len(text)}, ensure_ascii=False))
+            path = Path(file_path)
+            try:
+                if path.stat().st_size > MAX_FILE_BYTES:
+                    raise LocalWorkerError(f"File exceeds max size: {MAX_FILE_BYTES} bytes")
+                data = path.read_bytes()
+                file_hash = hashlib.sha256(data).hexdigest()
+                duplicate_of = seen_hashes.get(file_hash)
+                if not duplicate_of:
+                    seen_hashes[file_hash] = str(path)
+                text = extract_text(data, path.suffix.lstrip("."), path.name)
+                result = maybe_apply_ai_review(text, config, score_cv(text, config), self.ai_mode)
+            except Exception as exc:
+                failed_files.append(str(path))
+                file_hash = ""
+                duplicate_of = ""
+                result = self._failed_score(str(exc), risk_flag="extraction_failed", config=config)
+            row = {
+                "file": str(path),
+                "file_hash": file_hash,
+                "is_duplicate": bool(duplicate_of),
+                "duplicate_of": duplicate_of or "",
+                "worker_version": WORKER_VERSION,
+                "engine_version": ENGINE_VERSION,
+                "processed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+                **result,
+            }
+            rows.append(row)
+            print(json.dumps({"file": str(path), "score": row["score"], "decision": row["decision"]}, ensure_ascii=False))
+
+        ranked_rows = sorted(rows, key=lambda item: float(item.get("score") or 0), reverse=True)
+        for rank, row in enumerate(ranked_rows, start=1):
+            row["rank"] = rank
+
+        json_path = output / "local_worker_results.json"
+        csv_path = output / "local_worker_results.csv"
+        sync_path = output / "sync_manifest.json"
+        failed_path = output / "failed_files.txt"
+
+        json_path.write_text(json.dumps(ranked_rows, ensure_ascii=False, indent=2), encoding="utf-8")
+        with csv_path.open("w", newline="", encoding="utf-8-sig") as fh:
+            writer = csv.DictWriter(
+                fh,
+                fieldnames=[
+                    "rank", "file", "score", "decision", "confidence", "is_duplicate",
+                    "duplicate_of", "file_hash", "worker_version", "engine_version",
+                    "summary", "score_breakdown", "matched_skills", "missing_skills",
+                    "risk_flags", "explanation", "processed_at",
+                ],
+            )
+            writer.writeheader()
+            for row in ranked_rows:
+                writer.writerow({
+                    **row,
+                    "matched_skills": ", ".join(row.get("matched_skills") or []),
+                    "missing_skills": ", ".join(row.get("missing_skills") or []),
+                    "risk_flags": ", ".join(row.get("risk_flags") or []),
+                    "score_breakdown": json.dumps(row.get("score_breakdown") or {}, ensure_ascii=False),
+                })
+        if failed_files:
+            failed_path.write_text("\n".join(failed_files), encoding="utf-8")
+        elif failed_path.exists():
+            failed_path.unlink()
+
+        sync_path.write_text(
+            json.dumps(
+                {
+                    "schema": "cv_analyzer.local_worker.sync_manifest.v1",
+                    "mode": "local_folder",
+                    "job_id": job_id,
+                    "job_config": config,
+                    "results_file": str(json_path),
+                    "csv_file": str(csv_path),
+                    "failed_files": failed_files,
+                    "sync_status": "offline_ready",
+                    "created_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        print(f"Results saved: {json_path}")
+        print(f"CSV saved: {csv_path}")
 
     def _heartbeat(self):
         try:
@@ -579,6 +690,33 @@ def _add_common_args(parser):
     parser.add_argument("--save-api-key", action="store_true", help="Save the provided API key to the OS credential store.")
     parser.add_argument("--device-name", default=os.environ.get("COMPUTERNAME") or os.environ.get("HOSTNAME") or "Local Worker")
     parser.add_argument("--no-verify-ssl", action="store_true", help="Bypass SSL verification for SaaS backend request calls.")
+
+
+def _split_cli_terms(value: str | None) -> list[str]:
+    return [item.strip() for item in (value or "").replace("\n", ",").split(",") if item.strip()]
+
+
+def _load_local_config(args) -> dict:
+    config = {}
+    if getattr(args, "job_config", None):
+        config = json.loads(Path(args.job_config).read_text(encoding="utf-8"))
+    config.setdefault("title", f"Local job {args.job_id}")
+    if args.job_description:
+        config["description"] = args.job_description
+    config.setdefault("description", "")
+    if args.required_skills:
+        config["required_skills"] = _split_cli_terms(args.required_skills)
+    config.setdefault("required_skills", [])
+    if args.nice_to_have_skills:
+        config["nice_to_have_skills"] = _split_cli_terms(args.nice_to_have_skills)
+    config.setdefault("nice_to_have_skills", [])
+    if args.hard_reject_criteria:
+        config["hard_reject_criteria"] = _split_cli_terms(args.hard_reject_criteria)
+    config.setdefault("hard_reject_criteria", [])
+    config["accept_threshold"] = args.accept_threshold
+    config["review_threshold"] = args.review_threshold
+    config.setdefault("reject_threshold", 30)
+    return config
 
 
 def main():
@@ -596,6 +734,14 @@ def main():
     run_parser.add_argument("--job-id", type=int, required=True)
     run_parser.add_argument("--batch-size", type=int, default=10)
     run_parser.add_argument("--local-folder", type=str)
+    run_parser.add_argument("--output-folder", type=str)
+    run_parser.add_argument("--job-config", type=str, help="JSON file with local job criteria for local_folder mode.")
+    run_parser.add_argument("--job-description", type=str, help="Local job description for local_folder mode.")
+    run_parser.add_argument("--required-skills", type=str, help="Comma-separated required skills for local_folder mode.")
+    run_parser.add_argument("--nice-to-have-skills", type=str, help="Comma-separated nice-to-have skills for local_folder mode.")
+    run_parser.add_argument("--hard-reject-criteria", type=str, help="Comma-separated rejection criteria for local_folder mode.")
+    run_parser.add_argument("--accept-threshold", type=int, default=75)
+    run_parser.add_argument("--review-threshold", type=int, default=50)
     run_parser.add_argument("--max-empty-polls", type=int, default=1)
     status_parser = subparsers.add_parser("status")
     _add_common_args(status_parser)
@@ -615,8 +761,18 @@ def main():
             worker.login()
             worker.list_jobs()
         elif args.command == "run":
-            worker.login()
-            worker.run(args.job_id, args.batch_size, args.local_folder, args.max_empty_polls)
+            if args.processing_mode == "local_folder":
+                worker.run(
+                    args.job_id,
+                    args.batch_size,
+                    args.local_folder,
+                    args.max_empty_polls,
+                    _load_local_config(args),
+                    args.output_folder,
+                )
+            else:
+                worker.login()
+                worker.run(args.job_id, args.batch_size, args.local_folder, args.max_empty_polls)
         elif args.command == "status":
             worker.login()
             print(json.dumps({
