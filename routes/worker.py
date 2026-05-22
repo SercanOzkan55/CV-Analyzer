@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import base64
 import io
+import json
 import os
 import re
 import zipfile
@@ -198,8 +199,8 @@ This package has two modes:
 ## Recommended Windows setup
 
 1. Extract the ZIP.
-2. Double-click `install_windows.cmd`.
-3. Double-click `run_gui.cmd`.
+2. Double-click `start_here.cmd`.
+3. The app opens after dependencies are installed.
 4. In the app, paste or type the job description, choose a CV folder, and click **Analyze local folder**.
 
 The installer also creates a desktop shortcut named **CV Analyzer Local Worker**.
@@ -304,6 +305,29 @@ CV_WORKER_PROGRESS_LOG=worker_progress.jsonl
 CV_WORKER_OPENAI_API_KEY=
 CV_WORKER_OPENAI_MODEL=gpt-5.2
 """
+
+
+def _worker_config_example(api_base_url: str) -> str:
+    return json.dumps(
+        {
+            "api_base_url": api_base_url,
+            "server_mode": {
+                "enabled": False,
+                "worker_api_key": "paste-created-worker-key-at-runtime",
+                "batch_size": 1,
+            },
+            "local_mode": {
+                "enabled": True,
+                "cv_folder": "C:/path/to/cv-folder",
+                "output_folder": "C:/path/to/local-results",
+                "ai_mode": "none",
+            },
+            "limits": {
+                "max_file_bytes": 26214400,
+            },
+        },
+        indent=2,
+    )
 
 def _release_expired_claims(db: Session, organization_id: int, now: datetime | None = None) -> int:
     now = now or datetime.utcnow()
@@ -413,6 +437,7 @@ def download_worker_package(
         ("workspace.py", _LOCAL_WORKER_DIR / "workspace.py"),
         ("credentials.py", _LOCAL_WORKER_DIR / "credentials.py"),
         ("requirements.txt", _LOCAL_WORKER_DIR / "requirements.txt"),
+        ("start_here.cmd", _LOCAL_WORKER_DIR / "start_here.cmd"),
         ("install_windows.cmd", _LOCAL_WORKER_DIR / "install_windows.cmd"),
         ("run_gui.cmd", _LOCAL_WORKER_DIR / "run_gui.cmd"),
         ("build_windows_exe.cmd", _LOCAL_WORKER_DIR / "build_windows_exe.cmd"),
@@ -430,6 +455,7 @@ def download_worker_package(
         archive.writestr("README.md", _worker_package_readme(api_base_url))
         archive.writestr("run-worker.ps1", _worker_run_script(api_base_url))
         archive.writestr(".env.example", _worker_env_example(api_base_url))
+        archive.writestr("config.example.json", _worker_config_example(api_base_url))
 
     audit_log(
         "worker_package_downloaded",

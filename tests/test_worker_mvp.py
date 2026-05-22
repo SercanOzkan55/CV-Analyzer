@@ -104,13 +104,29 @@ def test_worker_package_download_contains_cli_without_plaintext_key(client, recr
 
     with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
         names = set(archive.namelist())
-        assert {"worker.py", "requirements.txt", "README.md", "run-worker.ps1", ".env.example"} <= names
+        assert {
+            "worker.py",
+            "gui.py",
+            "workspace.py",
+            "credentials.py",
+            "requirements.txt",
+            "README.md",
+            "start_here.cmd",
+            "install_windows.cmd",
+            "run_gui.cmd",
+            "run-worker.ps1",
+            ".env.example",
+            "config.example.json",
+        } <= names
         readme = archive.read("README.md").decode("utf-8")
         env_example = archive.read(".env.example").decode("utf-8")
+        config_example = archive.read("config.example.json").decode("utf-8")
         worker_py = archive.read("worker.py").decode("utf-8")
 
     assert "sk_worker_live_xxx" in readme
+    assert "start_here.cmd" in readme
     assert "sk_worker_live_xxx" in env_example
+    assert "paste-created-worker-key-at-runtime" in config_example
     assert "sk_worker_live_" not in worker_py
     assert "http://testserver/api/worker" in readme
 
