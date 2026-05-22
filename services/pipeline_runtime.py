@@ -16,6 +16,7 @@ from services.experience_service import experience_score
 from services.industry_service import detect_industry_and_specialization
 from services.keyword_service import compare, compute_keyword_gap, keyword_match_score
 from services.language_service import (
+    clean_lower,
     detect_language,
     interpret_score_localized,
     localize_risk_level,
@@ -28,6 +29,86 @@ from services.skill_service import skill_coverage_score
 
 
 logger = logging.getLogger("app.pipeline")
+
+_WORD_RE = re.compile(r"[A-Za-z\u00C0-\u024F\u0400-\u04FF]{2,}", re.UNICODE)
+_WORD3_RE = re.compile(r"[A-Za-z\u00C0-\u024F\u0400-\u04FF]{3,}", re.UNICODE)
+
+_GLOBAL_STOPWORDS = {
+    # English
+    "the", "and", "for", "are", "but", "not", "you", "all", "can", "her",
+    "was", "one", "our", "out", "with", "that", "this", "have", "from",
+    "they", "will", "each", "make", "like", "been", "has", "its", "who",
+    "did", "get", "may", "him", "his", "how", "let", "say", "she", "too",
+    "use", "way", "about", "would", "there", "their", "what", "could",
+    "other", "than", "then", "them", "these", "some", "which", "into",
+    "over", "under", "between", "within", "without", "your", "role",
+    # Turkish
+    "ve", "veya", "ile", "için", "icin", "bir", "bu", "şu", "su", "da",
+    "de", "mi", "mı", "mu", "mü", "olan", "olarak", "gibi", "çok", "cok",
+    "daha", "en", "her", "tüm", "tum", "ise", "hem", "ya", "ki",
+    # German
+    "und", "oder", "mit", "für", "fur", "der", "die", "das", "ein", "eine",
+    "einen", "einem", "zu", "im", "in", "von", "den", "dem", "des", "als",
+    # French
+    "et", "ou", "avec", "pour", "les", "des", "une", "un", "du", "de",
+    "la", "le", "dans", "sur", "par", "aux", "au", "ce", "cette",
+    # Spanish
+    "y", "o", "con", "para", "los", "las", "una", "uno", "del", "de",
+    "el", "la", "en", "por", "como", "que", "este", "esta",
+    # Portuguese / Italian / Dutch
+    "e", "com", "para", "os", "as", "um", "uma", "do", "da", "no", "na",
+    "il", "lo", "gli", "le", "di", "per", "che", "een", "het", "van",
+    "voor", "met", "op", "aan", "als",
+}
+
+_SOFT_SKILL_TERMS = {
+    # English
+    "leadership", "teamwork", "communication", "collaboration", "problem solving",
+    "time management", "critical thinking", "adaptability", "creativity",
+    "mentoring", "negotiation", "presentation", "stakeholder", "cross functional",
+    "strategic", "initiative", "empathy", "conflict resolution",
+    # Turkish
+    "liderlik", "takım çalışması", "takim calismasi", "iletişim", "iletisim",
+    "iş birliği", "is birligi", "problem çözme", "problem cozme", "zaman yönetimi",
+    "zaman yonetimi", "eleştirel düşünme", "elestirel dusunme", "uyum sağlama",
+    "uyum saglama", "yaratıcılık", "yaraticilik", "mentorluk", "müzakere",
+    "muzakere", "sunum", "paydaş", "paydas", "stratejik", "inisiyatif", "empati",
+    "çatışma çözümü", "catisma cozumu",
+    # German
+    "führung", "fuhrung", "teamarbeit", "kommunikation", "zusammenarbeit",
+    "problemlösung", "problemlosung", "zeitmanagement", "kritisches denken",
+    "anpassungsfähigkeit", "kreativität", "mentoring", "verhandlung", "präsentation",
+    # French
+    "leadership", "travail d'équipe", "travail equipe", "communication",
+    "collaboration", "résolution de problèmes", "resolution de problemes",
+    "gestion du temps", "pensée critique", "adaptabilité", "créativité",
+    # Spanish
+    "liderazgo", "trabajo en equipo", "comunicación", "comunicacion",
+    "colaboración", "colaboracion", "resolución de problemas",
+    "resolucion de problemas", "gestión del tiempo", "gestion del tiempo",
+    "pensamiento crítico", "pensamiento critico", "adaptabilidad", "creatividad",
+}
+
+_EDUCATION_LEVEL_PATTERNS = (
+    (100.0, r"\b(ph\.?d|doctorate|doctoral|doctorado|doctorat|doktor|doktora|promotion)\b"),
+    (80.0, r"\b(master|msc|m\.sc|m\.a\.|mba|magistrale|maestr[ií]a|ma[îi]trise|yüksek\s*lisans|yuksek\s*lisans|mast[eè]re|magister)\b"),
+    (60.0, r"\b(bachelor|bsc|b\.sc|b\.a\.|licenciatura|licence|laurea|lisans|undergraduate|grado|studium)\b"),
+    (40.0, r"\b(associate|ön\s*lisans|on\s*lisans|diploma|berufsabschluss|technicien|t[eé]cnico)\b"),
+    (20.0, r"\b(high\s*school|lise|certificate|certificat|certificado|zertifikat|abitur|gymnasium|baccalaur[eé]at|bachillerato)\b"),
+)
+
+
+def _phrase_pattern(term: str) -> str:
+    return r"(?<!\w)" + re.escape(clean_lower(term)).replace(r"\ ", r"\s+") + r"(?!\w)"
+
+
+def _word_tokens(text: str, min_len: int = 2) -> list[str]:
+    pattern = _WORD3_RE if min_len >= 3 else _WORD_RE
+    return pattern.findall(clean_lower(text or ""))
+
+
+def _contains_soft_skill(text: str, term: str) -> bool:
+    return bool(re.search(_phrase_pattern(term), text))
 
 
 def _get_embedding(text: str):
@@ -114,26 +195,25 @@ def build_features(
         r"\bstakeholder\b", r"\bcross.functional\b", r"\bstrategic\b",
         r"\binitiative\b", r"\bempathy\b", r"\bconflict.resolution\b",
     ]
-    _cv_lower = (cv_text or "").lower()
-    _soft_hits = sum(1 for p in _SOFT_SKILL_PATTERNS if re.search(p, _cv_lower))
-    soft_skill_score = min(100.0, (_soft_hits / max(len(_SOFT_SKILL_PATTERNS), 1)) * 150)
+    _cv_lower = clean_lower(cv_text or "")
+    _soft_hits = sum(1 for term in _SOFT_SKILL_TERMS if _contains_soft_skill(_cv_lower, term))
+    soft_skill_score = min(100.0, (_soft_hits / max(len(_SOFT_SKILL_TERMS), 1)) * 300)
 
     # Readability: vocabulary richness (unique words / total words)
-    _words = re.findall(r"[a-zA-Z]{2,}", _cv_lower)
+    _words = _word_tokens(_cv_lower, min_len=2)
     _total_words = max(len(_words), 1)
     _unique_words = len(set(_words))
     readability_score = min(100.0, (_unique_words / _total_words) * 130)
 
     # Keyword density: how well matched keywords spread across the text
-    _jd_lower = (job_description or "").lower()
-    _jd_words = set(re.findall(r"[a-zA-Z]{3,}", _jd_lower))
+    _jd_words = set(_word_tokens(job_description, min_len=3))
     _stop = {"the", "and", "for", "are", "but", "not", "you", "all", "can", "her",
              "was", "one", "our", "out", "with", "that", "this", "have", "from",
              "they", "will", "each", "make", "like", "been", "has", "its", "who",
              "did", "get", "may", "him", "his", "how", "its", "let", "say", "she",
              "too", "use", "way", "about", "would", "there", "their", "what",
              "could", "other", "than", "then", "them", "these", "some", "which"}
-    _jd_kw = _jd_words - _stop
+    _jd_kw = _jd_words - _GLOBAL_STOPWORDS
     if _jd_kw and _total_words > 0:
         _kw_found = sum(1 for w in _words if w in _jd_kw)
         keyword_density = min(100.0, (_kw_found / _total_words) * 500)
@@ -152,6 +232,10 @@ def build_features(
         _edu_score = 40.0
     elif re.search(r"\b(high\s*school|lise|certificate)\b", _cv_lower):
         _edu_score = 20.0
+    for score, pattern in _EDUCATION_LEVEL_PATTERNS:
+        if re.search(pattern, _cv_lower):
+            _edu_score = max(_edu_score, score)
+            break
 
     features = [
         float(semantic),
@@ -251,13 +335,13 @@ def _title_match_score(cv_text: str, job_description: str) -> float:
 
 
 def _detect_seniority(text: str) -> str:
-    lowered = str(text or "").lower()
+    lowered = clean_lower(text or "")
     senior_patterns = {
-        "intern": ["intern", "stajyer"],
-        "junior": ["junior", "entry level", "associate"],
-        "mid": ["mid", "intermediate", "regular"],
-        "senior": ["senior", "lead", "principal", "staff"],
-        "manager": ["manager", "head", "director", "vp", "chief"],
+        "intern": ["intern", "internship", "trainee", "stajyer", "praktikant", "stagiaire", "pasante", "becario", "tirocinante", "practicante"],
+        "junior": ["junior", "entry level", "entry-level", "associate", "júnior", "juniorentwickler", "débutant", "debutant", "principiante"],
+        "mid": ["mid", "mid level", "mid-level", "intermediate", "regular", "mittelstufe", "confirmé", "confirme", "intermedio"],
+        "senior": ["senior", "lead", "principal", "staff", "experienced", "kıdemli", "kidemli", "leiter", "chef", "responsable", "principal", "avanzado"],
+        "manager": ["manager", "head", "director", "vp", "chief", "yönetici", "yonetici", "müdür", "mudur", "leiter", "geschäftsführer", "chef", "directeur", "gerente", "jefe", "diretor"],
     }
     for level, patterns in senior_patterns.items():
         for pattern in patterns:
