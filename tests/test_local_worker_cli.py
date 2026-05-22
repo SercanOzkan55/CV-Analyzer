@@ -9,6 +9,7 @@ if str(LOCAL_WORKER_DIR) not in sys.path:
     sys.path.insert(0, str(LOCAL_WORKER_DIR))
 
 from worker import LocalWorker  # noqa: E402
+from workspace import WorkspaceStore  # noqa: E402
 
 
 def test_local_folder_mode_writes_ranked_outputs(tmp_path):
@@ -41,8 +42,15 @@ def test_local_folder_mode_writes_ranked_outputs(tmp_path):
     manifest = json.loads((output_dir / "sync_manifest.json").read_text(encoding="utf-8"))
 
     assert (output_dir / "local_worker_results.csv").exists()
+    assert (output_dir / "local_worker_workspace.sqlite3").exists()
     assert len(results) == 2
     assert results[0]["score"] >= results[1]["score"]
     assert results[0]["rank"] == 1
     assert manifest["mode"] == "local_folder"
     assert manifest["sync_status"] == "offline_ready"
+
+    store = WorkspaceStore(output_dir / "local_worker_workspace.sqlite3")
+    runs = store.list_runs()
+    assert len(runs) == 1
+    saved_rows = store.get_run_results(runs[0]["id"])
+    assert len(saved_rows) == 2
