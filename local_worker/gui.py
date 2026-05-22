@@ -4,6 +4,7 @@ import json
 import queue
 import sys
 import threading
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -15,7 +16,9 @@ except ImportError:
     print("You can also run the CLI-based worker instead.\n")
     sys.exit(1)
 
-from worker import MAX_FILE_BYTES, extract_text, maybe_apply_ai_review, score_cv
+import worker as worker_module
+from credentials import save_worker_api_key
+from worker import API_BASE_URL, MAX_FILE_BYTES, LocalWorker, extract_text, maybe_apply_ai_review, score_cv
 from workspace import WorkspaceStore
 
 
@@ -81,7 +84,10 @@ class LocalWorkerApp:
         self.accept_var = StringVar(value="75")
         self.review_var = StringVar(value="50")
         self.ai_mode_var = StringVar(value="none")
+        self.api_url_var = StringVar(value=os.environ.get("CV_ANALYZER_API_URL", API_BASE_URL))
+        self.api_key_var = StringVar(value="")
         self.status_var = StringVar(value="Ready")
+        self.server_status_var = StringVar(value="Server mode not connected")
         self.summary_var = StringVar(value="No run yet")
         self.work_queue: queue.Queue = queue.Queue()
         self.results: list[dict] = []
@@ -115,6 +121,23 @@ class LocalWorkerApp:
         self.subtitle_label.pack(anchor="w", pady=(2, 0))
         self.theme_button = Button(header, text="Light theme", command=self._toggle_theme)
         self.theme_button.pack(side="right")
+
+        server_box = Frame(shell, padx=10, pady=10)
+        server_box.pack(fill="x", pady=(0, 12))
+        self.server_box = server_box
+        Label(server_box, text="Optional website connection", font=("Segoe UI", 10, "bold"), anchor="w").pack(fill="x")
+        server_url_row = Frame(server_box)
+        server_url_row.pack(fill="x", pady=(6, 3))
+        Label(server_url_row, text="API URL", width=18, anchor="w").pack(side="left")
+        Entry(server_url_row, textvariable=self.api_url_var).pack(side="left", fill="x", expand=True, padx=(0, 8))
+        Button(server_url_row, text="Test connection", command=self._test_server_connection).pack(side="left")
+        server_key_row = Frame(server_box)
+        server_key_row.pack(fill="x", pady=3)
+        Label(server_key_row, text="Worker key", width=18, anchor="w").pack(side="left")
+        Entry(server_key_row, textvariable=self.api_key_var, show="*").pack(side="left", fill="x", expand=True, padx=(0, 8))
+        Button(server_key_row, text="Save key locally", command=self._save_server_key).pack(side="left")
+        self.server_status_label = Label(server_box, textvariable=self.server_status_var, anchor="w")
+        self.server_status_label.pack(fill="x", pady=(5, 0))
 
         job_row = Frame(shell)
         job_row.pack(fill="x", pady=4)
@@ -210,7 +233,7 @@ class LocalWorkerApp:
         self.detail_text.pack(fill="x")
 
     def _all_frames(self):
-        frames = [self.root, self.shell, self.header, self.title_box]
+        frames = [self.root, self.shell, self.header, self.title_box, self.server_box]
         for child in self.shell.winfo_children():
             if isinstance(child, Frame):
                 frames.append(child)
@@ -227,6 +250,7 @@ class LocalWorkerApp:
             self.accept_label,
             self.review_label,
             self.status_label,
+            self.server_status_label,
             self.summary_label,
             self.detail_label,
         ]
@@ -252,6 +276,7 @@ class LocalWorkerApp:
             label.configure(bg=label.master.cget("bg"), fg=colors["text"])
         self.subtitle_label.configure(fg=colors["muted"])
         self.status_label.configure(fg=colors["accent"])
+        self.server_status_label.configure(fg=colors["muted"])
         self.summary_label.configure(fg=colors["accent_2"])
         self.jd_text.configure(bg=colors["field"], fg=colors["text"], insertbackground=colors["text"], relief="flat", highlightthickness=1, highlightbackground=colors["border"])
         self.detail_text.configure(bg=colors["field"], fg=colors["text"], insertbackground=colors["text"], relief="flat", highlightthickness=1, highlightbackground=colors["border"])
@@ -268,6 +293,45 @@ class LocalWorkerApp:
         folder = filedialog.askdirectory(title="Choose CV folder")
         if folder:
             self.folder_var.set(folder)
+
+    def _save_server_key(self):
+        api_key = self.api_key_var.get().strip()
+        if not api_key:
+            messagebox.showerror("Missing worker key", "Paste the worker key created in the website Settings page.")
+            return
+        saved = save_worker_api_key(api_key)
+        if saved:
+            self.api_key_var.set("")
+            self.server_status_var.set("Worker key saved to the operating system credential store.")
+        else:
+            messagebox.showwarning("Key not saved", "The operating system credential store rejected the key. You can still use environment variables or paste it for testing.")
+
+    def _test_server_connection(self):
+        api_url = self.api_url_var.get().strip()
+        api_key = self.api_key_var.get().strip()
+        if not api_url:
+            messagebox.showerror("Missing API URL", "Enter the website worker API URL.")
+            return
+        if not api_key:
+            messagebox.showerror("Missing worker key", "Paste a worker key to test the connection.")
+            return
+        self.server_status_var.set("Testing website connection...")
+        threading.Thread(target=self._test_server_connection_worker, args=(api_url, api_key), daemon=True).start()
+
+    def _test_server_connection_worker(self, api_url: str, api_key: str):
+        original_url = worker_module.API_BASE_URL
+        try:
+            worker_module.API_BASE_URL = api_url.rstrip("/")
+            worker = LocalWorker(api_key, "server_files", "none", "desktop-gui")
+            worker.login()
+            self.work_queue.put((
+                "server_status",
+                f"Connected. Company={worker.company_id} | Quota remaining={worker.quota_remaining}",
+            ))
+        except Exception as exc:
+            self.work_queue.put(("server_status", f"Connection failed: {exc}"))
+        finally:
+            worker_module.API_BASE_URL = original_url
 
     def _choose_output(self):
         folder = filedialog.askdirectory(title="Choose output folder")
@@ -588,6 +652,8 @@ class LocalWorkerApp:
                     self.result_by_iid[iid] = payload
                 elif kind == "status":
                     self.status_var.set(payload)
+                elif kind == "server_status":
+                    self.server_status_var.set(payload)
                 elif kind == "summary":
                     self.summary_var.set(payload)
                 elif kind == "progress_max":
