@@ -15,6 +15,7 @@ from pathlib import Path
 import requests
 
 from credentials import load_worker_api_key, save_worker_api_key
+from workspace import WorkspaceStore
 
 
 API_BASE_URL = os.environ.get("CV_ANALYZER_API_URL", "http://127.0.0.1:8001/api/worker")
@@ -631,6 +632,7 @@ class LocalWorker:
         csv_path = output / "local_worker_results.csv"
         sync_path = output / "sync_manifest.json"
         failed_path = output / "failed_files.txt"
+        workspace_path = output / "local_worker_workspace.sqlite3"
 
         json_path.write_text(json.dumps(ranked_rows, ensure_ascii=False, indent=2), encoding="utf-8")
         with csv_path.open("w", newline="", encoding="utf-8-sig") as fh:
@@ -675,8 +677,14 @@ class LocalWorker:
             ),
             encoding="utf-8",
         )
+        store = WorkspaceStore(workspace_path)
+        saved_job_id = store.save_job(config.get("title") or f"Local job {job_id}", config)
+        run_id = store.create_run(saved_job_id, config.get("title") or f"Local job {job_id}", str(folder), str(output), len(files))
+        for row in ranked_rows:
+            store.add_result(run_id, row)
         print(f"Results saved: {json_path}")
         print(f"CSV saved: {csv_path}")
+        print(f"Local workspace saved: {workspace_path}")
 
     def _heartbeat(self):
         try:
