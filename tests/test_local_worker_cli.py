@@ -115,3 +115,39 @@ def test_score_cv_honors_custom_scoring_weights():
 
     assert weighted_score["score"] > default_score["score"]
     assert weighted_score["score_breakdown"]["required_skills"] == 90
+
+
+def test_local_worker_unicode_and_i18n():
+    from worker import _normalize, _token_set, _derive_keywords, STOPWORDS
+    
+    # 1. Test clean lowercasing & Unicode normalization
+    assert _normalize("İSTANBUL") == "istanbul"
+    assert _normalize("ılık") == "ılık"
+    assert _normalize("geliştirici") == "geliştirici"
+    assert _normalize("entwickler") == "entwickler"
+    assert _normalize("c++ developer") == "c++ developer"
+    assert _normalize("c# backend") == "c# backend"
+    assert _normalize("ci/cd pipeline") == "ci/cd pipeline"
+    assert _normalize("node.js") == "node.js"
+    assert _normalize("python_django") == "python django"
+    
+    # 2. Test token extraction
+    tokens = _token_set("geliştirici c++ c# .net")
+    assert "geliştirici" in tokens
+    assert "c++" in tokens
+    assert "c#" in tokens
+    
+    # 3. Test multilingual stopwords filtering
+    assert "ve" in STOPWORDS
+    assert "und" in STOPWORDS
+    assert "para" in STOPWORDS
+    assert "avec" in STOPWORDS
+    
+    # 4. Test keyword derivation with Unicode letters
+    jd = "Aradığımız aday gelişmiş Python ve Django bilgisine sahip, tecrübeli bir geliştirici olmalıdır."
+    derived = _derive_keywords(jd)
+    assert "ve" not in derived
+    assert "bir" not in derived
+    derived_lower = [w.lower() for w in derived]
+    assert "geliştirici" in derived_lower
+    assert "python" in derived_lower

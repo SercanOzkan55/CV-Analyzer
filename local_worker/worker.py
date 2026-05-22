@@ -42,9 +42,33 @@ SKILL_SYNONYMS = {
 }
 
 STOPWORDS = {
-    "and", "or", "the", "with", "for", "from", "that", "this", "are", "you", "our",
-    "your", "will", "have", "has", "must", "should", "role", "team", "work", "job",
-    "experience", "years", "looking", "candidate", "ability", "skills",
+    # English
+    "the", "and", "for", "are", "but", "not", "you", "all", "can", "her",
+    "was", "one", "our", "out", "with", "that", "this", "have", "from",
+    "they", "will", "each", "make", "like", "been", "has", "its", "who",
+    "did", "get", "may", "him", "his", "how", "let", "say", "she", "too",
+    "use", "way", "about", "would", "there", "their", "what", "could",
+    "other", "than", "then", "them", "these", "some", "which", "into",
+    "over", "under", "between", "within", "without", "your", "role",
+    "team", "work", "job", "experience", "years", "looking", "candidate",
+    "ability", "skills", "must", "should",
+    # Turkish
+    "ve", "veya", "ile", "için", "icin", "bir", "bu", "şu", "su", "da",
+    "de", "mi", "mı", "mu", "mü", "olan", "olarak", "gibi", "çok", "cok",
+    "daha", "en", "her", "tüm", "tum", "ise", "hem", "ya", "ki",
+    # German
+    "und", "oder", "mit", "für", "fur", "der", "die", "das", "ein", "eine",
+    "einen", "einem", "zu", "im", "in", "von", "den", "dem", "des", "als",
+    # French
+    "et", "ou", "avec", "pour", "les", "des", "une", "un", "du", "de",
+    "la", "le", "dans", "sur", "par", "aux", "au", "ce", "cette",
+    # Spanish
+    "y", "o", "con", "para", "los", "las", "una", "uno", "del", "de",
+    "el", "la", "en", "por", "como", "que", "este", "esta",
+    # Portuguese / Italian / Dutch
+    "e", "com", "para", "os", "as", "um", "uma", "do", "da", "no", "na",
+    "il", "lo", "gli", "le", "di", "per", "che", "een", "het", "van",
+    "voor", "met", "op", "aan", "als",
 }
 MOJIBAKE_MARKERS = ("Ã", "Ä", "Å", "â€™", "â€œ", "â€", "Â")
 
@@ -59,8 +83,24 @@ def _log_progress(event: str, **fields):
         fh.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
 
+def _clean_lower(text: str) -> str:
+    """Global and language-independent lowercase conversion.
+    Prevents corruption of dotted uppercase İ (U+0130) in Turkish and missing regex matches.
+    """
+    if not text:
+        return ""
+    text = text.replace("\u0130", "i")
+    lowered = text.lower()
+    lowered = lowered.replace("i\u0307", "i").replace("i̇", "i")
+    return lowered
+
+
 def _normalize(text: str) -> str:
-    return re.sub(r"[^a-z0-9+#./-]+", " ", (text or "").lower()).strip()
+    # Use clean_lower and keep Unicode letters/digits plus +, #, ., /, -
+    # \w includes alphanumeric and underscore, so we replace underscore with space
+    cleaned = _clean_lower(text or "")
+    normalized = re.sub(r"[^\w+#./-]+", " ", cleaned)
+    return normalized.replace("_", " ").strip()
 
 
 def _contains_term(text_norm: str, term: str) -> bool:
@@ -83,7 +123,8 @@ def _term_variants(term: str) -> list[str]:
 
 
 def _token_set(text_norm: str) -> set[str]:
-    return set(re.findall(r"[a-z0-9+#./-]{2,}", text_norm or ""))
+    # Since text_norm is already normalized (and has no underscores), \w is perfect
+    return set(re.findall(r"[\w+#./-]{2,}", text_norm or ""))
 
 
 def _matches_term(text_norm: str, text_tokens: set[str], term: str) -> bool:
@@ -103,11 +144,12 @@ def _matches_term(text_norm: str, text_tokens: set[str], term: str) -> bool:
 
 
 def _derive_keywords(job_description: str, max_items: int = 12) -> list[str]:
-    words = re.findall(r"[A-Za-z][A-Za-z0-9+#./-]{2,}", job_description or "")
+    # Match words starting with any Unicode letter followed by Unicode alphanumeric/symbols
+    words = re.findall(r"[^\W\d_][\w+#./-]{2,}", job_description or "")
     seen = set()
     keywords = []
     for word in words:
-        key = word.lower()
+        key = _clean_lower(word)
         if key in STOPWORDS or key in seen:
             continue
         seen.add(key)
