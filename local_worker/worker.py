@@ -257,11 +257,18 @@ def score_cv(cv_text: str, config: dict) -> dict:
     matched_nice = [skill for skill in nice if _matches_term(text_norm, text_tokens, skill)]
     risk_flags = [criterion for criterion in hard_reject if _matches_term(text_norm, text_tokens, criterion)]
 
-    required_score = 70.0 if not required else 70.0 * (len(matched_required) / len(required))
-    nice_score = 20.0 if not nice else 20.0 * (len(matched_nice) / len(nice))
-    content_score = min(10.0, max(0.0, len(cv_text or "") / 300.0))
+    weights = dict(config.get("scoring_weights") or {})
+    required_weight = float(weights.get("required_skills", 70.0))
+    nice_weight = float(weights.get("nice_to_have_skills", 20.0))
+    content_weight = float(weights.get("content_quality", 10.0))
+    total_weight = max(1.0, required_weight + nice_weight + content_weight)
+    scale = 100.0 / total_weight
+
+    required_score = required_weight if not required else required_weight * (len(matched_required) / len(required))
+    nice_score = nice_weight if not nice else nice_weight * (len(matched_nice) / len(nice))
+    content_score = min(content_weight, max(0.0, len(cv_text or "") / 300.0 * (content_weight / 10.0)))
     penalty = 25.0 if risk_flags else 0.0
-    score = max(0.0, min(100.0, required_score + nice_score + content_score - penalty))
+    score = max(0.0, min(100.0, ((required_score + nice_score + content_score) * scale) - penalty))
 
     accept_threshold = int(config.get("accept_threshold") or 75)
     review_threshold = int(config.get("review_threshold") or 50)
@@ -724,6 +731,11 @@ def _load_local_config(args) -> dict:
     config["accept_threshold"] = args.accept_threshold
     config["review_threshold"] = args.review_threshold
     config.setdefault("reject_threshold", 30)
+    config.setdefault("scoring_weights", {
+        "required_skills": 70.0,
+        "nice_to_have_skills": 20.0,
+        "content_quality": 10.0,
+    })
     return config
 
 

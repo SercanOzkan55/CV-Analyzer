@@ -8,7 +8,7 @@ LOCAL_WORKER_DIR = PROJECT_ROOT / "local_worker"
 if str(LOCAL_WORKER_DIR) not in sys.path:
     sys.path.insert(0, str(LOCAL_WORKER_DIR))
 
-from worker import LocalWorker  # noqa: E402
+from worker import LocalWorker, score_cv  # noqa: E402
 from workspace import WorkspaceStore  # noqa: E402
 
 
@@ -84,3 +84,27 @@ def test_local_folder_mode_marks_duplicates_and_failed_files(tmp_path):
     assert any(row["is_duplicate"] for row in results)
     assert any("broken.pdf" in row["file"] and "extraction_failed" in row["risk_flags"] for row in results)
     assert "broken.pdf" in failed
+
+
+def test_score_cv_honors_custom_scoring_weights():
+    text = "Candidate with Python and SQL production experience."
+    default_score = score_cv(text, {
+        "required_skills": ["Python", "SQL"],
+        "nice_to_have_skills": ["React"],
+        "accept_threshold": 75,
+        "review_threshold": 50,
+    })
+    weighted_score = score_cv(text, {
+        "required_skills": ["Python", "SQL"],
+        "nice_to_have_skills": ["React"],
+        "accept_threshold": 75,
+        "review_threshold": 50,
+        "scoring_weights": {
+            "required_skills": 90,
+            "nice_to_have_skills": 5,
+            "content_quality": 5,
+        },
+    })
+
+    assert weighted_score["score"] > default_score["score"]
+    assert weighted_score["score_breakdown"]["required_skills"] == 90
