@@ -18,6 +18,9 @@ omit =
     setup_db.py
     validate_saas.py
     locustfile.py
+    # Downloadable client application; validated by dedicated local worker
+    # tests, but excluded from the backend service coverage gate.
+    local_worker/*
     # Non-unit runtime/deployment shims and generated scratch files.
     FEATURE_IMPLEMENTATIONS.py
     gunicorn_config.py
