@@ -55,6 +55,12 @@ def test_local_folder_mode_writes_ranked_outputs(tmp_path):
     assert len(runs) == 1
     saved_rows = store.get_run_results(runs[0]["id"])
     assert len(saved_rows) == 2
+    pending_rows = store.list_pending_sync_results()
+    assert len(pending_rows) == 2
+    assert all(row["sync_status"] == "pending" for row in pending_rows)
+    store.update_result_sync_status(pending_rows[0]["local_result_id"], "failed", "network unavailable")
+    pending_rows = store.list_pending_sync_results()
+    assert any(row["sync_error"] == "network unavailable" for row in pending_rows)
 
 
 def test_local_folder_mode_marks_duplicates_and_failed_files(tmp_path):
