@@ -22,6 +22,7 @@ import alembic.config
 
 # Ensure tests always have an API key for header-based tests
 os.environ.setdefault("API_KEY", "test-key")
+os.environ.setdefault("ENV", "test")
 # Ensure MOCK_SERVICES is disabled so quota/rate-limit logic runs in tests
 os.environ.setdefault("MOCK_SERVICES", "0")
 # Disable background model worker during tests to avoid concurrency issues
@@ -177,7 +178,7 @@ def _mock_verify_jwt(authorization: str = None):
 _TEST_DB_URL = os.getenv(
     "DATABASE_URL", "postgresql+psycopg2://testuser:testpass@localhost:5433/testdb"
 )
-_FALLBACK_SQLITE_URL = "sqlite:///./.pytest_test.db"
+_FALLBACK_SQLITE_URL = f"sqlite:///./.pytest_test_{os.getpid()}.db"
 _ACTIVE_TEST_DB_URL = _TEST_DB_URL
 
 
@@ -347,6 +348,8 @@ def client(db_session):
     app.dependency_overrides[verify_supabase_jwt] = _mock_verify_jwt
 
     with TestClient(app) as c:
+        if _is_sqlite_url(_ACTIVE_TEST_DB_URL):
+            Base.metadata.create_all(bind=db_session.get_bind())
         yield c
 
     app.dependency_overrides.clear()

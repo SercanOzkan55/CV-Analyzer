@@ -966,16 +966,17 @@ async def recruiter_batch_upload(
             )
 
         cv_file_key = None
-        try:
-            from services.storage_service import upload_original_cv
-            cv_file_key = upload_original_cv(
-                contents,
-                str(recruiter.id),
-                content_type=file.content_type or "application/octet-stream",
-                filename=file.filename,
-            )
-        except Exception as e:
-            logger.info("batch_upload: original file storage skipped for %s error=%s", file.filename, e)
+        if os.getenv("ENV") != "test":
+            try:
+                from services.storage_service import upload_original_cv
+                cv_file_key = upload_original_cv(
+                    contents,
+                    str(recruiter.id),
+                    content_type=file.content_type or "application/octet-stream",
+                    filename=file.filename,
+                )
+            except Exception as e:
+                logger.info("batch_upload: original file storage skipped for %s error=%s", file.filename, e)
 
         cv_list.append({
             "filename": file.filename,
