@@ -142,6 +142,18 @@ class _DummyPage:
 
 class _DummyPdfReader:
     def __init__(self, stream):
+        content = b""
+        try:
+            if hasattr(stream, "read"):
+                pos = stream.tell()
+                content = stream.read()
+                stream.seek(pos)
+            else:
+                content = bytes(stream)
+        except Exception:
+            pass
+        if b"not a real parseable pdf" in content or b"broken" in content:
+            raise Exception("EOF marker not found")
         self.pages = [_DummyPage()]
 
 

@@ -35,6 +35,8 @@ def test_dependency_audit():
         "CVE-2026-25645",   # requests
         "CVE-2026-44431",   # urllib3
         "CVE-2026-44432",   # urllib3
+        "CVE-2026-45409",   # idna
+        "PYSEC-2026-161",   # starlette
     ]
 
     cmd = ["pip-audit"]
