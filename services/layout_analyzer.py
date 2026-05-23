@@ -141,7 +141,7 @@ def _classify_layout(
         s = l.strip()
         words = s.split()
         if 1 <= len(words) <= 4 and len(s) <= 40:
-            alpha = re.sub(r"[^a-zA-ZçğıöşüÇĞİÖŞÜ]", "", s)
+            alpha = "".join(c for c in s if c.isalpha())
             if alpha and (alpha == alpha.upper() or all(w[0].isupper() for w in words if w[0].isalpha())):
                 header_count += 1
 
@@ -258,7 +258,7 @@ def _detect_header_style(lines: List[str]) -> Tuple[HeaderStyle, bool]:
 
         words = stripped.split()
         if 1 <= len(words) <= 5 and len(stripped) <= 40:
-            alpha_only = re.sub(r"[^a-zA-ZçğıöşüÇĞİÖŞÜ]", "", stripped)
+            alpha_only = "".join(c for c in stripped if c.isalpha())
             if alpha_only and alpha_only == alpha_only.upper() and len(alpha_only) >= 2:
                 allcaps_count += 1
             elif all(w[0].isupper() for w in words if w and w[0].isalpha()):

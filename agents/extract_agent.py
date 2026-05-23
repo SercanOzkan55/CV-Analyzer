@@ -250,24 +250,48 @@ _MERGE_CONTACT_SIGNAL_RE = re.compile(
     re.I,
 )
 _MERGE_BIRTH_RE = re.compile(
-    r"\b(?:birth|do\u011fum|dob|geboren|date\s+of\s+birth)\b",
+    r"\b(?:birth|do\u011fum|dob|geboren|date\s+of\s+birth|geburtsdatum|geburtstag|nacid[oa]|fecha\s+de\s+nacimiento|n\u00e9e?|date\s+de\s+naissance)\b",
     re.I,
 )
 _MERGE_EDUCATION_START_RE = re.compile(
-    r"\b(?:universit(?:y|e\w*)|[u\u00fc]niversite\w*|institute?\w*|enstit[u\u00fc]\w*"
-    r"|college|school|facult(?:y|e\w*)|fak[u\u00fc]lte\w*"
-    r"|academy|akademi\w*|polytechnic"
-    r"|m[u\u00fc]hendisli[gk\u011f]\w*|engineering|b\.?s\.?c?|m\.?s\.?c?"
-    r"|bachelor|master|diploma|degree|ph\.?d|m\.?b\.?a"
-    r"|lisans|y[u\u00fc]ksek\s*lisans|doktora|[o\u00f6]n\s*lisans)\b",
+    r"\b(?:universit(?:y|e\w*|ad\w*|ä\w*)|[u\u00fc]niversite\w*|institute?\w*|enstit[u\u00fc]\w*|instituto\w*"
+    r"|college|school|schule\w*|\u00e9cole\w*|escuela\w*|facult(?:y|e\w*|ad\w*)|fak[u\u00fc]lte\w*"
+    r"|academy|akademi\w*|academia\w*|polytechnic"
+    r"|m[u\u00fc]hendisli[gk\u011f]\w*|engineering|ing\u00e9nierie\w*|ingenier\u00eda\w*"
+    r"|bachelor|master|maestr\u00eda\w*|ma\u00eetrise\w*|licence\w*|licenciatura\w*"
+    r"|diploma\w*|dipl\u00f4me\w*|diplom\w*|degree|ph\.?d|m\.?b\.?a"
+    r"|lisans|y[u\u00fc]ksek\s*lisans|doktora|[o\u00f6]n\s*lisans|doctorat\w*|doctorado\w*"
+    r"|studium|studiengang|hochschule\w*|bachillerato\w*)\b",
     re.I,
 )
 
-# Capitalized full-name pattern — 2-4 Title Case words or ALL-CAPS name
-_MERGE_FULLNAME_RE = re.compile(
-    r"^[A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+){1,3}$"
-    r"|^[A-ZÇĞİÖŞÜ]{2,}(?:\s+[A-ZÇĞİÖŞÜ]{2,}){1,3}$",
-)
+def _is_fullname(line: str) -> bool:
+    words = line.strip().split()
+    if not (2 <= len(words) <= 4):
+        return False
+    if not all(w.isalpha() for w in words):
+        return False
+    # Case 1: All uppercase
+    if all(len(w) >= 2 and w.isupper() for w in words):
+        return True
+    # Case 2: Title Case
+    if all(len(w) >= 2 and w[0].isupper() and w[1:].islower() for w in words):
+        return True
+    return False
+
+def _is_colon_label(line: str) -> bool:
+    if ":" not in line:
+        return False
+    parts = line.split(":", 1)
+    left, right = parts[0], parts[1]
+    left_stripped = left.strip()
+    if not (2 <= len(left_stripped) <= 20):
+        return False
+    if not all(c.isalpha() or c.isspace() for c in left_stripped):
+        return False
+    if not right.strip():
+        return False
+    return True
 
 
 def _merge_wrapped_lines(text: str) -> str:
@@ -354,7 +378,7 @@ def _merge_wrapped_lines(text: str) -> str:
             continue
 
         # Capitalized full name (2-4 words) — never merge
-        if _MERGE_FULLNAME_RE.match(line) and len(line.split()) <= 4:
+        if _is_fullname(line):
             if buffer:
                 merged.append(buffer)
                 buffer = ""
@@ -362,7 +386,7 @@ def _merge_wrapped_lines(text: str) -> str:
             continue
 
         # Colon-prefixed label lines are standalone
-        if re.match(r"^[A-Za-zÇĞİÖŞÜçğıöşü ]{2,20}\s*:\s*\S", line):
+        if _is_colon_label(line):
             if buffer:
                 merged.append(buffer)
                 buffer = ""

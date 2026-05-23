@@ -587,8 +587,25 @@ def _extract_contact_block(
     contacts: list[str] = []
     leftovers: list[str] = []
     title_hint_words = (
+        # English
         "engineer", "developer", "student", "manager", "analyst", "specialist", "consultant",
         "architect", "designer", "intern", "lead", "director", "officer", "professor",
+        "assistant", "coordinator", "technician", "administrator", "backend", "frontend",
+        "fullstack", "full-stack", "software", "data", "devops", "qa", "tester",
+        # Turkish
+        "mühendis", "muhendis", "geliştirici", "gelistirici", "uzman", "stajyer", "analist",
+        "tasarımcı", "tasarimci", "yönetici", "yonetici", "öğretmen", "ogretmen", "hemşire",
+        "hemsire", "satış", "satis", "danışman", "danisman", "koordinatör", "koordinator",
+        # German
+        "entwickler", "ingenieur", "leiter", "spezialist", "berater", "architekt",
+        "assistent", "praktikant", "administrator",
+        # French
+        "développeur", "developpeur", "ingénieur", "ingenieur", "directeur",
+        "spécialiste", "specialiste", "consultant", "architecte", "assistant",
+        "stagiaire", "administrateur",
+        # Spanish
+        "desarrollador", "ingeniero", "director", "especialista", "consultor",
+        "arquitecto", "asistente", "becario", "administrador",
     )
 
     # Language-agnostic contact-label pattern: any short label followed by a colon
@@ -2036,9 +2053,12 @@ def _parse_education_entries(lines: list[str]) -> list[dict]:
         if "|" in line:
             parts = [p.strip() for p in line.split("|") if p.strip()]
             if len(parts) >= 2:
-                if current:
-                    entries.append(current)
-                current = _new_edu_entry()
+                if current and current.get("school") and not current.get("degree") and not current.get("start_date") and not current.get("end_date"):
+                    pass  # merge into current
+                else:
+                    if current:
+                        entries.append(current)
+                    current = _new_edu_entry()
                 for part in parts:
                     lp = part.lower()
                     if any(kw in lp for kw in university_keywords):
