@@ -426,6 +426,894 @@ def maybe_apply_ai_review(cv_text: str, config: dict, score: dict, ai_mode: str)
         }
     except Exception as exc:
         return {**score, "ai_review_status": f"failed_{type(exc).__name__}"}
+def _generate_html_report(ranked_rows: list[dict], config: dict, html_path: Path):
+    rows_json = json.dumps(ranked_rows, ensure_ascii=False)
+    config_json = json.dumps(config, ensure_ascii=False)
+    
+    html_content = f"""<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CV Değerlendirme Sonuçları - {config.get('title', 'Yerel Değerlendirme')}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {{
+      --bg: hsl(230, 25%, 8%);
+      --surface: rgba(255, 255, 255, 0.03);
+      --surface-border: rgba(255, 255, 255, 0.08);
+      --text: hsl(210, 20%, 98%);
+      --text-muted: hsl(210, 10%, 70%);
+      --primary: hsl(262, 85%, 60%);
+      --primary-glow: hsla(262, 85%, 60%, 0.35);
+      --secondary: hsl(316, 80%, 55%);
+      
+      --color-accept: hsl(142, 70%, 45%);
+      --color-accept-bg: rgba(22, 163, 74, 0.15);
+      --color-review: hsl(38, 92%, 50%);
+      --color-review-bg: rgba(217, 119, 6, 0.15);
+      --color-reject: hsl(0, 84%, 60%);
+      --color-reject-bg: rgba(220, 38, 38, 0.15);
+      
+      --font: 'Outfit', sans-serif;
+    }}
+    
+    * {{
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }}
+    
+    body {{
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 10% 20%, hsla(262, 80%, 20%, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, hsla(316, 70%, 20%, 0.1) 0%, transparent 40%);
+      background-attachment: fixed;
+    }}
+    
+    header {{
+      padding: 3rem 2rem 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }}
+    
+    .header-content {{
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      border-bottom: 1px solid var(--surface-border);
+      padding-bottom: 2rem;
+    }}
+    
+    h1 {{
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff 40%, var(--secondary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }}
+    
+    .job-badge {{
+      display: inline-flex;
+      align-items: center;
+      padding: 0.5rem 1rem;
+      border-radius: 50px;
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      width: fit-content;
+    }}
+    
+    .job-desc {{
+      font-size: 1rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      max-width: 900px;
+    }}
+
+    .stats-grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.5rem;
+      max-width: 1400px;
+      margin: 0 auto 3rem;
+      padding: 0 2rem;
+    }}
+    
+    .stat-card {{
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.3s ease, border-color 0.3s ease;
+    }}
+    
+    .stat-card:hover {{
+      transform: translateY(-3px);
+      border-color: rgba(255, 255, 255, 0.15);
+    }}
+    
+    .stat-card::before {{
+      content: '';
+      position: absolute;
+      top: 0; left: 0; width: 4px; height: 100%;
+      background: var(--primary);
+    }}
+    
+    .stat-card.accept::before {{ background: var(--color-accept); }}
+    .stat-card.review::before {{ background: var(--color-review); }}
+    .stat-card.reject::before {{ background: var(--color-reject); }}
+    .stat-card.avg::before {{ background: var(--secondary); }}
+    
+    .stat-val {{
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: var(--text);
+    }}
+    
+    .stat-label {{
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 500;
+    }}
+
+    .controls-container {{
+      max-width: 1400px;
+      margin: 0 auto 2rem;
+      padding: 0 2rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1.5rem;
+    }}
+    
+    .search-wrapper {{
+      position: relative;
+      flex: 1;
+      min-width: 300px;
+    }}
+    
+    .search-input {{
+      width: 100%;
+      padding: 0.85rem 1.25rem;
+      border-radius: 12px;
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 1rem;
+      outline: none;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(8px);
+    }}
+    
+    .search-input:focus {{
+      border-color: var(--primary);
+      box-shadow: 0 0 15px var(--primary-glow);
+    }}
+    
+    .filter-buttons {{
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }}
+    
+    .filter-btn {{
+      padding: 0.75rem 1.25rem;
+      border-radius: 10px;
+      border: 1px solid var(--surface-border);
+      background: var(--surface);
+      color: var(--text);
+      font-family: var(--font);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(8px);
+    }}
+    
+    .filter-btn:hover {{
+      border-color: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.05);
+    }}
+    
+    .filter-btn.active {{
+      background: var(--primary);
+      border-color: var(--primary);
+      box-shadow: 0 0 15px var(--primary-glow);
+    }}
+    
+    .candidate-grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 2rem;
+      max-width: 1400px;
+      margin: 0 auto 4rem;
+      padding: 0 2rem;
+    }}
+    
+    .candidate-card {{
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: 20px;
+      padding: 1.75rem;
+      backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease, box-shadow 0.3s ease;
+    }}
+    
+    .candidate-card:hover {{
+      transform: translateY(-5px);
+      border-color: rgba(255, 255, 255, 0.2);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }}
+    
+    .candidate-header {{
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+    }}
+    
+    .candidate-info-top {{
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      overflow: hidden;
+    }}
+    
+    .candidate-rank {{
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }}
+    
+    .candidate-name {{
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }}
+    
+    .score-badge {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      font-size: 1.1rem;
+      font-weight: 700;
+      border: 2px solid;
+      flex-shrink: 0;
+    }}
+    
+    .score-badge.recommended_accept {{
+      border-color: var(--color-accept);
+      color: var(--color-accept);
+      box-shadow: 0 0 10px rgba(22, 163, 74, 0.2);
+    }}
+    
+    .score-badge.recommended_review {{
+      border-color: var(--color-review);
+      color: var(--color-review);
+      box-shadow: 0 0 10px rgba(217, 119, 6, 0.2);
+    }}
+    
+    .score-badge.recommended_reject {{
+      border-color: var(--color-reject);
+      color: var(--color-reject);
+      box-shadow: 0 0 10px rgba(220, 38, 38, 0.2);
+    }}
+    
+    .decision-pill {{
+      align-self: flex-start;
+      padding: 0.35rem 0.75rem;
+      border-radius: 50px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }}
+    
+    .decision-pill.recommended_accept {{
+      background: var(--color-accept-bg);
+      color: var(--color-accept);
+    }}
+    
+    .decision-pill.recommended_review {{
+      background: var(--color-review-bg);
+      color: var(--color-review);
+    }}
+    
+    .decision-pill.recommended_reject {{
+      background: var(--color-reject-bg);
+      color: var(--color-reject);
+    }}
+    
+    .card-section {{
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }}
+    
+    .section-label {{
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }}
+    
+    .badge-container {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }}
+    
+    .skill-badge {{
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      color: var(--text);
+    }}
+    
+    .skill-badge.matched {{
+      background: rgba(22, 163, 74, 0.08);
+      border-color: rgba(22, 163, 74, 0.2);
+      color: hsl(142, 70%, 75%);
+    }}
+    
+    .skill-badge.missing {{
+      background: rgba(220, 38, 38, 0.05);
+      border-color: rgba(220, 38, 38, 0.15);
+      color: hsl(0, 84%, 80%);
+    }}
+    
+    .risk-badge {{
+      background: rgba(220, 38, 38, 0.12);
+      border: 1px solid rgba(220, 38, 38, 0.25);
+      color: var(--color-reject);
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+      font-weight: 500;
+    }}
+    
+    .summary-text {{
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }}
+
+    .modal-overlay {{
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(10, 11, 18, 0.85);
+      backdrop-filter: blur(20px);
+      z-index: 1000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      padding: 1.5rem;
+    }}
+    
+    .modal-overlay.active {{
+      opacity: 1;
+      pointer-events: auto;
+    }}
+    
+    .modal-container {{
+      background: hsl(230, 25%, 11%);
+      border: 1px solid var(--surface-border);
+      border-radius: 24px;
+      width: 100%;
+      max-width: 750px;
+      max-height: 90vh;
+      overflow-y: auto;
+      position: relative;
+      transform: scale(0.9) translateY(20px);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }}
+    
+    .modal-overlay.active .modal-container {{
+      transform: scale(1) translateY(0);
+    }}
+    
+    .modal-header {{
+      padding: 2rem;
+      border-bottom: 1px solid var(--surface-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      background: hsl(230, 25%, 11%);
+      z-index: 2;
+    }}
+    
+    .modal-title-wrapper {{
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      overflow: hidden;
+      padding-right: 1rem;
+    }}
+    
+    .modal-title {{
+      font-size: 1.4rem;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }}
+    
+    .modal-subtitle {{
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-family: monospace;
+      word-break: break-all;
+    }}
+    
+    .close-btn {{
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      color: var(--text);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1.25rem;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }}
+    
+    .close-btn:hover {{
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }}
+    
+    .modal-body {{
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }}
+    
+    .modal-row-grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.5rem;
+    }}
+    
+    .modal-block {{
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--surface-border);
+      border-radius: 16px;
+      padding: 1.5rem;
+    }}
+    
+    .score-breakdown-row {{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      font-size: 0.875rem;
+    }}
+    
+    .score-breakdown-row:last-child {{
+      border-bottom: none;
+    }}
+    
+    .explanation-box {{
+      background: rgba(255, 255, 255, 0.02);
+      border-left: 3px solid var(--primary);
+      border-radius: 0 12px 12px 0;
+      padding: 1.25rem;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: var(--text);
+    }}
+    
+    .empty-state {{
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 4rem 2rem;
+      background: var(--surface);
+      border: 1px dashed var(--surface-border);
+      border-radius: 20px;
+      color: var(--text-muted);
+    }}
+    
+    ::-webkit-scrollbar {{
+      width: 8px;
+    }}
+    ::-webkit-scrollbar-track {{
+      background: var(--bg);
+    }}
+    ::-webkit-scrollbar-thumb {{
+      background: var(--surface-border);
+      border-radius: 4px;
+    }}
+    ::-webkit-scrollbar-thumb:hover {{
+      background: rgba(255, 255, 255, 0.2);
+    }}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <div class="job-badge" id="jobTitleBadge">Kriter: {config.get('title', 'Yerel Değerlendirme')}</div>
+      <h1 id="mainTitle">CV Değerlendirme Raporu</h1>
+      <p class="job-desc" id="jobDescText"></p>
+    </div>
+  </header>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-val" id="statTotal">0</div>
+      <div class="stat-label">Toplam Aday</div>
+    </div>
+    <div class="stat-card accept">
+      <div class="stat-val" id="statAccept">0</div>
+      <div class="stat-label">Kabul Önerilen</div>
+    </div>
+    <div class="stat-card review">
+      <div class="stat-val" id="statReview">0</div>
+      <div class="stat-label">İnceleme Önerilen</div>
+    </div>
+    <div class="stat-card reject">
+      <div class="stat-val" id="statReject">0</div>
+      <div class="stat-label">Red Önerilen</div>
+    </div>
+    <div class="stat-card avg">
+      <div class="stat-val" id="statAvg">0</div>
+      <div class="stat-label">Ortalama Skor</div>
+    </div>
+  </div>
+
+  <div class="controls-container">
+    <div class="search-wrapper">
+      <input type="text" id="searchBar" class="search-input" placeholder="Aday adı, dosya veya yetenek ara..." oninput="filterAndRender()">
+    </div>
+    <div class="filter-buttons">
+      <button class="filter-btn active" id="btn-all" onclick="setFilter('all')">Tümü</button>
+      <button class="filter-btn" id="btn-accept" onclick="setFilter('recommended_accept')">Kabul</button>
+      <button class="filter-btn" id="btn-review" onclick="setFilter('recommended_review')">İnceleme</button>
+      <button class="filter-btn" id="btn-reject" onclick="setFilter('recommended_reject')">Red</button>
+    </div>
+  </div>
+
+  <div class="candidate-grid" id="candidateGrid">
+    <!-- Rendered dynamically -->
+  </div>
+
+  <div class="modal-overlay" id="detailModal" onclick="closeModal(event)">
+    <div class="modal-container" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title-wrapper">
+          <div class="modal-title" id="modalTitle">Aday Detayı</div>
+          <div class="modal-subtitle" id="modalSubtitle">Dosya yolu</div>
+        </div>
+        <button class="close-btn" onclick="closeModal(null)">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-row-grid">
+          <div class="modal-block" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem;">
+            <div class="score-badge" id="modalScoreBadge" style="width: 100px; height: 100px; font-size: 2.25rem;">0</div>
+            <div class="decision-pill" id="modalDecisionPill">KABUL</div>
+          </div>
+          <div class="modal-block">
+            <h3 class="section-label" style="margin-bottom: 0.75rem;">Skor Dağılımı</h3>
+            <div class="score-breakdown-row">
+              <span>Zorunlu Yetenekler</span>
+              <span id="breakdownRequired">0</span>
+            </div>
+            <div class="score-breakdown-row">
+              <span>Artı Yetenekler</span>
+              <span id="breakdownNice">0</span>
+            </div>
+            <div class="score-breakdown-row">
+              <span>İçerik Kalitesi</span>
+              <span id="breakdownContent">0</span>
+            </div>
+            <div class="score-breakdown-row" style="color: var(--color-reject);">
+              <span>Risk Cezası</span>
+              <span id="breakdownPenalty">0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-block">
+          <h3 class="section-label" style="margin-bottom: 1rem;">Detaylı Açıklama</h3>
+          <div class="explanation-box" id="modalExplanation">Açıklama yükleniyor...</div>
+        </div>
+
+        <div class="modal-block" id="modalRiskBlock" style="display: none;">
+          <h3 class="section-label" style="margin-bottom: 0.75rem; color: var(--color-reject);">Risk Bayrakları</h3>
+          <div class="badge-container" id="modalRiskContainer"></div>
+        </div>
+
+        <div class="modal-row-grid">
+          <div class="modal-block">
+            <h3 class="section-label" style="margin-bottom: 1rem;">Eşleşen Yetenekler</h3>
+            <div class="badge-container" id="modalMatchedSkills"></div>
+          </div>
+          <div class="modal-block">
+            <h3 class="section-label" style="margin-bottom: 1rem;">Eksik Yetenekler</h3>
+            <div class="badge-container" id="modalMissingSkills"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const candidates = {rows_json};
+    const jobConfig = {config_json};
+    let currentFilter = 'all';
+
+    if (jobConfig.description) {{
+      document.getElementById('jobDescText').textContent = jobConfig.description;
+    }} else {{
+      document.getElementById('jobDescText').textContent = 'Bu iş tanımı için herhangi bir detaylı açıklama girilmemiş.';
+    }}
+
+    function initStats() {{
+      const total = candidates.length;
+      const accept = candidates.filter(c => c.decision === 'recommended_accept').length;
+      const review = candidates.filter(c => c.decision === 'recommended_review').length;
+      const reject = candidates.filter(c => c.decision === 'recommended_reject').length;
+      
+      const sumScores = candidates.reduce((acc, c) => acc + (c.score || 0), 0);
+      const avg = total > 0 ? (sumScores / total).toFixed(1) : 0;
+      
+      document.getElementById('statTotal').textContent = total;
+      document.getElementById('statAccept').textContent = accept;
+      document.getElementById('statReview').textContent = review;
+      document.getElementById('statReject').textContent = reject;
+      document.getElementById('statAvg').textContent = avg;
+    }}
+
+    function getFileName(path) {{
+      if (!path) return 'Bilinmeyen Aday';
+      const parts = path.split(/[\\\\/]/);
+      return parts[parts.length - 1];
+    }}
+
+    function translateDecision(decision) {{
+      switch(decision) {{
+        case 'recommended_accept': return 'Kabul Önerilir';
+        case 'recommended_review': return 'İnceleme Önerilir';
+        case 'recommended_reject': return 'Red Önerilir';
+        default: return decision;
+      }}
+    }}
+
+    function renderCandidates(list) {{
+      const grid = document.getElementById('candidateGrid');
+      grid.innerHTML = '';
+      
+      if (list.length === 0) {{
+        grid.innerHTML = '<div class="empty-state"><h3>Kriterlere uygun aday bulunamadı</h3><p>Filtrelerinizi değiştirmeyi veya arama sorgunuzu temizlemeyi deneyin.</p></div>';
+        return;
+      }}
+      
+      list.forEach((c, index) => {{
+        const card = document.createElement('div');
+        card.className = 'candidate-card';
+        card.onclick = () => openModal(c);
+        
+        const fileName = getFileName(c.file);
+        
+        let matchedBadges = '';
+        if (c.matched_skills && c.matched_skills.length > 0) {{
+          matchedBadges = c.matched_skills.slice(0, 4).map(s => '<span class="skill-badge matched">' + s + '</span>').join('');
+          if (c.matched_skills.length > 4) {{
+            matchedBadges += '<span class="skill-badge">+' + (c.matched_skills.length - 4) + '</span>';
+          }}
+        }} else {{
+          matchedBadges = '<span class="skill-badge" style="opacity:0.5;">Yok</span>';
+        }}
+        
+        let riskBadges = '';
+        if (c.risk_flags && c.risk_flags.length > 0) {{
+          riskBadges = c.risk_flags.map(r => '<span class="risk-badge">' + r + '</span>').join('');
+        }}
+        
+        let riskSection = '';
+        if (riskBadges) {{
+          riskSection = `
+          <div class="card-section">
+            <span class="section-label" style="color: var(--color-reject);">Risk Tespitleri</span>
+            <div class="badge-container">${{riskBadges}}</div>
+          </div>`;
+        }}
+        
+        card.innerHTML = `
+          <div class="candidate-header">
+            <div class="candidate-info-top">
+              <span class="candidate-rank">SIRA #${{c.rank || (index + 1)}}</span>
+              <h2 class="candidate-name" title="${{fileName}}">${{fileName}}</h2>
+            </div>
+            <div class="score-badge ${{c.decision}}">${{c.score}}</div>
+          </div>
+          <div class="decision-pill ${{c.decision}}">${{translateDecision(c.decision)}}</div>
+          
+          <div class="card-section">
+            <span class="section-label">Eşleşen Yetenekler</span>
+            <div class="badge-container">${{matchedBadges}}</div>
+          </div>
+          
+          ${{riskSection}}
+          
+          <div class="card-section">
+            <span class="section-label">Özet</span>
+            <p class="summary-text">${{c.summary || c.explanation || ''}}</p>
+          </div>
+        `;
+        
+        grid.appendChild(card);
+      }});
+    }}
+
+    function filterAndRender() {{
+      const query = document.getElementById('searchBar').value.toLowerCase().trim();
+      
+      const filtered = candidates.filter(c => {{
+        if (currentFilter !== 'all' && c.decision !== currentFilter) return false;
+        
+        if (query) {{
+          const fileName = getFileName(c.file).toLowerCase();
+          const matchesFile = fileName.includes(query);
+          const matchesSkills = c.matched_skills && c.matched_skills.some(s => s.toLowerCase().includes(query));
+          const matchesMissing = c.missing_skills && c.missing_skills.some(s => s.toLowerCase().includes(query));
+          const matchesExplanation = c.explanation && c.explanation.toLowerCase().includes(query);
+          return matchesFile || matchesSkills || matchesMissing || matchesExplanation;
+        }}
+        
+        return true;
+      }});
+      
+      renderCandidates(filtered);
+    }}
+
+    function setFilter(filter) {{
+      currentFilter = filter;
+      
+      document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+      const activeBtnId = filter === 'all' ? 'btn-all' : 
+                          filter === 'recommended_accept' ? 'btn-accept' :
+                          filter === 'recommended_review' ? 'btn-review' : 'btn-reject';
+      document.getElementById(activeBtnId).classList.add('active');
+      
+      filterAndRender();
+    }}
+
+    function openModal(candidate) {{
+      document.getElementById('modalTitle').textContent = getFileName(candidate.file);
+      document.getElementById('modalSubtitle').textContent = candidate.file;
+      
+      const scoreBadge = document.getElementById('modalScoreBadge');
+      scoreBadge.className = 'score-badge ' + candidate.decision;
+      scoreBadge.textContent = candidate.score;
+      
+      const decisionPill = document.getElementById('modalDecisionPill');
+      decisionPill.className = 'decision-pill ' + candidate.decision;
+      decisionPill.textContent = translateDecision(candidate.decision);
+      
+      const breakdown = candidate.score_breakdown || {{}};
+      const reqWeight = jobConfig.scoring_weights?.required_skills !== undefined ? jobConfig.scoring_weights.required_skills : 70;
+      const niceWeight = jobConfig.scoring_weights?.nice_to_have_skills !== undefined ? jobConfig.scoring_weights.nice_to_have_skills : 20;
+      const contentWeight = jobConfig.scoring_weights?.content_quality !== undefined ? jobConfig.scoring_weights.content_quality : 10;
+      
+      document.getElementById('breakdownRequired').textContent = (breakdown.required_skills !== undefined ? breakdown.required_skills : 0) + ' / ' + reqWeight;
+      document.getElementById('breakdownNice').textContent = (breakdown.nice_to_have !== undefined ? breakdown.nice_to_have : 0) + ' / ' + niceWeight;
+      document.getElementById('breakdownContent').textContent = (breakdown.content_quality !== undefined ? breakdown.content_quality : 0) + ' / ' + contentWeight;
+      document.getElementById('breakdownPenalty').textContent = '-' + (breakdown.risk_penalty !== undefined ? breakdown.risk_penalty : 0);
+      
+      document.getElementById('modalExplanation').textContent = candidate.explanation || candidate.summary || 'Herhangi bir detaylı açıklama yok.';
+      
+      const riskBlock = document.getElementById('modalRiskBlock');
+      const riskContainer = document.getElementById('modalRiskContainer');
+      riskContainer.innerHTML = '';
+      if (candidate.risk_flags && candidate.risk_flags.length > 0) {{
+        riskBlock.style.display = 'block';
+        candidate.risk_flags.forEach(r => {{
+          const b = document.createElement('span');
+          b.className = 'risk-badge';
+          b.textContent = r;
+          riskContainer.appendChild(b);
+        }});
+      }} else {{
+        riskBlock.style.display = 'none';
+      }}
+      
+      const matchedContainer = document.getElementById('modalMatchedSkills');
+      matchedContainer.innerHTML = '';
+      if (candidate.matched_skills && candidate.matched_skills.length > 0) {{
+        candidate.matched_skills.forEach(s => {{
+          const b = document.createElement('span');
+          b.className = 'skill-badge matched';
+          b.textContent = s;
+          matchedContainer.appendChild(b);
+        }});
+      }} else {{
+        matchedContainer.innerHTML = '<span class="skill-badge" style="opacity: 0.5;">Uyumlu yetenek bulunamadı</span>';
+      }}
+      
+      const missingContainer = document.getElementById('modalMissingSkills');
+      missingContainer.innerHTML = '';
+      if (candidate.missing_skills && candidate.missing_skills.length > 0) {{
+        candidate.missing_skills.forEach(s => {{
+          const b = document.createElement('span');
+          b.className = 'skill-badge missing';
+          b.textContent = s;
+          missingContainer.appendChild(b);
+        }});
+      }} else {{
+        missingContainer.innerHTML = '<span class="skill-badge matched">Zorunlu yetenek eksiği yok</span>';
+      }}
+      
+      document.getElementById('detailModal').classList.add('active');
+    }}
+
+    function closeModal(event) {{
+      if (event && event.target !== document.getElementById('detailModal')) return;
+      document.getElementById('detailModal').classList.remove('active');
+    }}
+
+    window.addEventListener('keydown', (e) => {{
+      if (e.key === 'Escape') closeModal(null);
+    }});
+
+    initStats();
+    renderCandidates(candidates);
+  </script>
+</body>
+</html>"""
+    
+    html_path.write_text(html_content, encoding="utf-8")
 
 
 class LocalWorker:
@@ -689,6 +1577,7 @@ class LocalWorker:
 
         json_path = output / "local_worker_results.json"
         csv_path = output / "local_worker_results.csv"
+        html_path = output / "local_worker_results.html"
         sync_path = output / "sync_manifest.json"
         failed_path = output / "failed_files.txt"
         workspace_path = output / "local_worker_workspace.sqlite3"
@@ -743,8 +1632,10 @@ class LocalWorker:
         run_id = store.create_run(saved_job_id, config.get("title") or f"Local job {job_id}", str(folder), str(output), len(files))
         for row in ranked_rows:
             store.add_result(run_id, row)
+        _generate_html_report(ranked_rows, config, html_path)
         print(f"Results saved: {json_path}")
         print(f"CSV saved: {csv_path}")
+        print(f"HTML Report saved: {html_path}")
         print(f"Local workspace saved: {workspace_path}")
 
     def _heartbeat(self):
