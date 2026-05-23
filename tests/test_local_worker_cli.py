@@ -42,6 +42,7 @@ def test_local_folder_mode_writes_ranked_outputs(tmp_path):
     manifest = json.loads((output_dir / "sync_manifest.json").read_text(encoding="utf-8"))
 
     assert (output_dir / "local_worker_results.csv").exists()
+    assert (output_dir / "local_worker_results.html").exists()
     assert (output_dir / "local_worker_workspace.sqlite3").exists()
     assert len(results) == 2
     assert results[0]["score"] >= results[1]["score"]
