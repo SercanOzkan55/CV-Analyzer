@@ -548,12 +548,17 @@ class LocalWorkerApp:
         output.mkdir(parents=True, exist_ok=True)
         json_path = output / "local_worker_results.json"
         csv_path = output / "local_worker_results.csv"
+        html_path = output / "local_worker_results.html"
         failed_path = output / "failed_files.txt"
         sync_path = output / "sync_manifest.json"
         ranked_rows = sorted(rows, key=lambda item: float(item.get("score") or 0), reverse=True)
         for rank, row in enumerate(ranked_rows, start=1):
             row["rank"] = rank
         json_path.write_text(json.dumps(ranked_rows, ensure_ascii=False, indent=2), encoding="utf-8")
+        try:
+            worker_module._generate_html_report(ranked_rows, config, html_path)
+        except Exception:
+            pass
         with csv_path.open("w", newline="", encoding="utf-8-sig") as fh:
             writer = csv.DictWriter(fh, fieldnames=["rank", "file", "score", "decision", "confidence", "is_duplicate", "duplicate_of", "summary", "matched_skills", "missing_skills", "risk_flags", "explanation", "analyzed_at"])
             writer.writeheader()
