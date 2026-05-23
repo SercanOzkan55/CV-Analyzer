@@ -209,7 +209,7 @@ _HEADER_HINTS: Dict[str, re.Pattern] = {
         # FR
         r"|r[ée]sum[ée](?:\s+professionnel)?|profil\s+professionnel"
         # DE
-        r"|zusammenfassung|[üu]ber\s+mich|kurzprofil"
+        r"|pers[öo]nliche\s+zusammenfassung|zusammenfassung|[üu]ber\s+mich|kurzprofil"
         # ES
         r"|resumen(?:\s+profesional)?|perfil(?:\s+profesional)?|objetivo"
         # PT
@@ -995,7 +995,7 @@ _GLOBAL_ALIASES: Dict[str, str] = {
     # FR
     "résumé professionnel": "summary", "profil professionnel": "summary",
     # DE
-    "zusammenfassung": "summary", "über mich": "summary", "kurzprofil": "summary",
+    "persönliche zusammenfassung": "summary", "zusammenfassung": "summary", "über mich": "summary", "kurzprofil": "summary",
     # ES
     "resumen profesional": "summary", "perfil profesional": "summary",
     "resumen": "summary", "perfil": "summary",
@@ -3140,6 +3140,38 @@ def detect_sections(
                 all_scores, nearby_active, initial_label=label,
                 proximity=proximity,
             )
+
+
+
+            # If the block was initially classified as "header" or "other",
+            # do not allow overriding it with weak/structural scores of
+            # interests, languages, skills, projects, certifications, or summary
+            # unless there is an actual keyword signal for that section.
+            if label in ("header", "other") and scored_label in ("interests", "languages", "skills", "projects", "certifications", "summary"):
+                has_interest_kw = bool(_INTEREST_KEYWORDS.search(c_text))
+                lang_matches = len(_LANGUAGE_KEYWORDS.findall(c_text))
+                has_tech = bool(_TECH_NAMES_RE.search(c_text))
+                has_proj_kw = bool(_PROJECT_KEYWORDS.search(c_text))
+                has_cert_kw = bool(_CERT_KEYWORDS.search(c_text))
+                total_chars = sum(len(ln) for ln in c_lines)
+
+                has_signal = False
+                if scored_label == "interests" and has_interest_kw:
+                    has_signal = True
+                elif scored_label == "languages" and lang_matches >= 1:
+                    has_signal = True
+                elif scored_label == "skills" and has_tech:
+                    has_signal = True
+                elif scored_label == "projects" and (has_tech or has_proj_kw):
+                    has_signal = True
+                elif scored_label == "certifications" and has_cert_kw:
+                    has_signal = True
+                elif scored_label == "summary" and total_chars > 80:
+                    has_signal = True
+
+                if not has_signal:
+                    scored_score = 0.0
+
             if scored_score >= _conf_threshold:
                 label = scored_label
                 _source = "score"

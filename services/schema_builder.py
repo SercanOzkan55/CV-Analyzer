@@ -208,11 +208,19 @@ def _find_name_candidate(data: Dict[str, Any]) -> str:
                 continue
             if re.search(r"[@:/]|\d", candidate):
                 continue
-            if re.match(
-                r"^[A-ZÇĞİÖŞÜ][A-Za-zÀ-ÖØ-öø-ÿÇĞİÖŞÜçğıöşü'’-]+"
-                r"(?:\s+[A-ZÇĞİÖŞÜ][A-Za-zÀ-ÖØ-öø-ÿÇĞİÖŞÜçğıöşü'’-]+){1,3}$",
-                candidate,
-            ):
+            # Check if each word is Title Case with allowed punctuation
+            is_valid_name = True
+            for w in words:
+                if not w:
+                    is_valid_name = False
+                    break
+                if not w[0].isupper():
+                    is_valid_name = False
+                    break
+                if not all(c.isalpha() or c in "'’-" for c in w[1:]):
+                    is_valid_name = False
+                    break
+            if is_valid_name:
                 return candidate
 
     for text in ordered_texts:
