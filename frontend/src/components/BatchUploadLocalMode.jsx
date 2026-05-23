@@ -1,6 +1,10 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import api from '../api'
+import {
+  validateFileUploads,
+  formatErrorMessage,
+} from '../utils/recruiterErrorHandling'
 import './BatchUploadLocalMode.css'
 
 /**
@@ -27,16 +31,23 @@ export const BatchUploadLocalMode = ({
     e.preventDefault()
     setDragOver(false)
 
-    const dropped = Array.from(e.dataTransfer.files).filter((f) =>
-      f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.txt')
-    )
+    const dropped = Array.from(e.dataTransfer.files)
+    const validation = validateFileUploads([...files, ...dropped], {
+      maxFiles: 500,
+      maxSizeMB: 10,
+      allowedTypes: [
+        'application/pdf',
+        'text/plain',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ]
+    })
 
-    if (dropped.length === 0) {
-      setError('Only PDF and TXT files are supported')
+    if (!validation.valid) {
+      setError(validation.error)
       return
     }
 
-    setFiles((prev) => [...prev, ...dropped])
+    setFiles(validation.validFiles)
     setError(null)
   }
 
@@ -45,16 +56,23 @@ export const BatchUploadLocalMode = ({
   }
 
   const handleInputChange = (e) => {
-    const selected = Array.from(e.target.files || []).filter((f) =>
-      f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.txt')
-    )
+    const selected = Array.from(e.target.files || [])
+    const validation = validateFileUploads([...files, ...selected], {
+      maxFiles: 500,
+      maxSizeMB: 10,
+      allowedTypes: [
+        'application/pdf',
+        'text/plain',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ]
+    })
 
-    if (selected.length === 0) {
-      setError('Only PDF and TXT files are supported')
+    if (!validation.valid) {
+      setError(validation.error)
       return
     }
 
-    setFiles((prev) => [...prev, ...selected])
+    setFiles(validation.validFiles)
     setError(null)
   }
 
@@ -68,6 +86,11 @@ export const BatchUploadLocalMode = ({
 
     if (!file.name.toLowerCase().endsWith('.zip')) {
       setError('Please select a ZIP file from LinkedIn export')
+      return
+    }
+
+    if (file.size > 100 * 1_000_000) {
+      setError('LinkedIn export ZIP file must be under 100MB')
       return
     }
 
@@ -121,9 +144,10 @@ export const BatchUploadLocalMode = ({
         }
       } catch (error) {
         console.error('LinkedIn processing error:', error)
-        const errorMessage = error.response?.data?.detail ||
-                            error.message ||
-                            'LinkedIn export processing failed'
+        const errorMessage = await formatErrorMessage(
+          error,
+          'LinkedIn export processing failed'
+        )
         setError(errorMessage)
 
         if (onError) {
@@ -132,8 +156,18 @@ export const BatchUploadLocalMode = ({
       }
     } else {
       // Individual file processing
-      if (files.length > 500) {
-        setError('Maximum 500 files per upload')
+      const validation = validateFileUploads(files, {
+        maxFiles: 500,
+        maxSizeMB: 10,
+        allowedTypes: [
+          'application/pdf',
+          'text/plain',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ]
+      })
+
+      if (!validation.valid) {
+        setError(validation.error)
         setProcessing(false)
         return
       }
@@ -161,9 +195,10 @@ export const BatchUploadLocalMode = ({
         }
       } catch (error) {
         console.error('Processing error:', error)
-        const errorMessage = error.response?.data?.detail ||
-                            error.message ||
-                            'Processing failed'
+        const errorMessage = await formatErrorMessage(
+          error,
+          'Processing failed'
+        )
         setError(errorMessage)
 
         if (onError) {

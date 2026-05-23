@@ -2,6 +2,10 @@ import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { recruiterSaaSBatchUpload } from '../api'
 import BatchUploadProgress from './BatchUploadProgress'
+import {
+  validateFileUploads,
+  formatErrorMessage,
+} from '../utils/recruiterErrorHandling'
 import './BatchUploadModal.css'
 
 /**
@@ -25,16 +29,19 @@ export const BatchUploadModal = ({ isOpen, onClose, onSuccess = null, jobs = [],
     e.preventDefault()
     setDragOver(false)
 
-    const dropped = Array.from(e.dataTransfer.files).filter((f) =>
-      f.type === 'application/pdf'
-    )
+    const dropped = Array.from(e.dataTransfer.files)
+    const validation = validateFileUploads([...files, ...dropped], {
+      maxFiles: 50,
+      maxSizeMB: 10,
+      allowedTypes: ['application/pdf'],
+    })
 
-    if (dropped.length === 0) {
-      setUploadError('Only PDF files are supported')
+    if (!validation.valid) {
+      setUploadError(validation.error)
       return
     }
 
-    setFiles((prev) => [...prev, ...dropped])
+    setFiles(validation.validFiles)
     setUploadError(null)
   }
 
@@ -43,16 +50,19 @@ export const BatchUploadModal = ({ isOpen, onClose, onSuccess = null, jobs = [],
   }
 
   const handleInputChange = (e) => {
-    const selected = Array.from(e.target.files || []).filter((f) =>
-      f.type === 'application/pdf'
-    )
+    const selected = Array.from(e.target.files || [])
+    const validation = validateFileUploads([...files, ...selected], {
+      maxFiles: 50,
+      maxSizeMB: 10,
+      allowedTypes: ['application/pdf'],
+    })
 
-    if (selected.length === 0) {
-      setUploadError('Only PDF files are supported')
+    if (!validation.valid) {
+      setUploadError(validation.error)
       return
     }
 
-    setFiles((prev) => [...prev, ...selected])
+    setFiles(validation.validFiles)
     setUploadError(null)
   }
 
@@ -71,8 +81,14 @@ export const BatchUploadModal = ({ isOpen, onClose, onSuccess = null, jobs = [],
       return
     }
 
-    if (files.length > 5000) {
-      setUploadError('Maximum 5000 files per upload')
+    const validation = validateFileUploads(files, {
+      maxFiles: 50,
+      maxSizeMB: 10,
+      allowedTypes: ['application/pdf'],
+    })
+
+    if (!validation.valid) {
+      setUploadError(validation.error)
       return
     }
 
@@ -89,10 +105,8 @@ export const BatchUploadModal = ({ isOpen, onClose, onSuccess = null, jobs = [],
       }
     } catch (error) {
       console.error('Upload error:', error)
-      setUploadError(
-        error.message ||
-          'Upload failed'
-      )
+      const errorMsg = await formatErrorMessage(error, 'Upload failed')
+      setUploadError(errorMsg)
       setUploading(false)
     }
   }
@@ -157,32 +171,32 @@ export const BatchUploadModal = ({ isOpen, onClose, onSuccess = null, jobs = [],
               ) : (
                 /* File Selection View */
                 <div className="bum-file-selection">
-            {/* Job Selection */}
-              {jobs && jobs.length > 0 && (
-                <div className="bum-job-selection">
-                  <label htmlFor="job-select" className="bum-job-label">
-                    Select Job Position
-                  </label>
-                  <select
-                    id="job-select"
-                    className="bum-job-select"
-                    value={selectedJobId || ''}
-                    onChange={(e) =>
-                      setSelectedJobId(e.target.value ? parseInt(e.target.value) : null)
-                    }
-                    disabled={uploading}
-                  >
-                    <option value="">-- Choose a job --</option>
-                    {jobs.map((job) => (
-                      <option key={job.id} value={job.id}>
-                        {job.title || `Job ${job.id}`} ({job.salary_min || 'N/A'} - {job.salary_max || 'N/A'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+                  {/* Job Selection */}
+                  {jobs && jobs.length > 0 && (
+                    <div className="bum-job-selection">
+                      <label htmlFor="job-select" className="bum-job-label">
+                        Select Job Position
+                      </label>
+                      <select
+                        id="job-select"
+                        className="bum-job-select"
+                        value={selectedJobId || ''}
+                        onChange={(e) =>
+                          setSelectedJobId(e.target.value ? parseInt(e.target.value) : null)
+                        }
+                        disabled={uploading}
+                      >
+                        <option value="">-- Choose a job --</option>
+                        {jobs.map((job) => (
+                          <option key={job.id} value={job.id}>
+                            {job.title || `Job ${job.id}`} ({job.salary_min || 'N/A'} - {job.salary_max || 'N/A'})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
-              {/* Drop Zone */}
+                  {/* Drop Zone */}
                   <div
                     className={`bum-drop-zone ${dragOver ? 'drag-over' : ''}`}
                     onDrop={handleDrop}
