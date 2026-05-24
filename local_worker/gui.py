@@ -5,15 +5,51 @@ import queue
 import sys
 import threading
 import os
+import tempfile
+import traceback
 from datetime import UTC, datetime
 from pathlib import Path
+
+
+def _app_data_dir() -> Path:
+    base = os.environ.get("LOCALAPPDATA") or tempfile.gettempdir()
+    path = Path(base) / "CV Analyzer Local Worker"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _crash_log_path() -> Path:
+    return _app_data_dir() / "crash.log"
+
+
+def _write_crash_log(message: str) -> Path:
+    log_path = _crash_log_path()
+    log_path.write_text(
+        f"CV Analyzer Local Worker crash\n{datetime.now(UTC).isoformat().replace('+00:00', 'Z')}\n\n{message}\n",
+        encoding="utf-8",
+    )
+    return log_path
+
+
+def _show_fatal_error(message: str):
+    try:
+        import ctypes
+
+        ctypes.windll.user32.MessageBoxW(None, message, "CV Analyzer Local Worker", 0x10)
+    except Exception:
+        print(message, file=sys.stderr)
+
 
 try:
     from tkinter import BOTH, DISABLED, END, NORMAL, Button, Entry, Frame, Label, StringVar, Text, Tk, Toplevel, filedialog, messagebox, ttk
 except ImportError:
-    print("\n[ERROR] The 'tkinter' package is required for the Graphical User Interface but is not installed or available on your system.")
-    print("Please install tkinter (e.g., 'sudo apt-get install python3-tk' on Debian/Ubuntu, or ensure Python is installed with Tk support on your OS).")
-    print("You can also run the CLI-based worker instead.\n")
+    detail = traceback.format_exc()
+    log_path = _write_crash_log(detail)
+    _show_fatal_error(
+        "The graphical app cannot start because Python was installed without Tkinter support.\n\n"
+        "Install Python from python.org with the Tcl/Tk option enabled, then run start_here.cmd again.\n\n"
+        f"Details were written to:\n{log_path}"
+    )
     sys.exit(1)
 
 import worker as worker_module
@@ -304,7 +340,7 @@ class LocalWorkerApp:
         entries = []
         def collect(widget):
             for child in widget.winfo_children():
-                if isinstance(child, Entry):
+                if isinstance(child, Entry) and not isinstance(child, ttk.Combobox):
                     entries.append(child)
                 collect(child)
         collect(self.root)
@@ -1042,4 +1078,14 @@ class LocalWorkerApp:
 
 
 if __name__ == "__main__":
-    LocalWorkerApp().run()
+    try:
+        LocalWorkerApp().run()
+    except Exception:
+        detail = traceback.format_exc()
+        log_path = _write_crash_log(detail)
+        _show_fatal_error(
+            "The Local Worker app hit a startup error and closed.\n\n"
+            f"Details were written to:\n{log_path}\n\n"
+            "Open that file and send the last lines if this keeps happening."
+        )
+        sys.exit(1)
