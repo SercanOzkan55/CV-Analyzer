@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { createWorkerKey, downloadWorkerPackage, fetchWorkerProgress, fetchWorkerSessions, listWorkerKeys, recruiterListJobs, revokeWorkerKey } from '../api'
+import { createWorkerKey, downloadWorkerExecutable, fetchWorkerProgress, fetchWorkerSessions, listWorkerKeys, recruiterListJobs, revokeWorkerKey } from '../api'
 import { useAuth } from '../context/AuthContext'
 
 export default function LocalWorkerPanel({ organizationId }) {
@@ -106,18 +106,18 @@ export default function LocalWorkerPanel({ organizationId }) {
   async function handleDownloadPackage() {
     try {
       setLoading(true)
-      const blob = await downloadWorkerPackage(token)
+      const blob = await downloadWorkerExecutable(token)
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = 'cv-analyzer-local-worker.zip'
+      link.download = 'CV Analyzer Local Worker.exe'
       document.body.appendChild(link)
       link.click()
       link.remove()
       window.URL.revokeObjectURL(url)
     } catch (error) {
       console.error('Error downloading worker package:', error)
-      window.alert(error.message || 'Failed to download worker package')
+      window.alert(error.message || 'Failed to download worker app')
     } finally {
       setLoading(false)
     }
@@ -132,7 +132,7 @@ export default function LocalWorkerPanel({ organizationId }) {
           <p className="text-muted">Generate scoped worker keys for secure local CV processing.</p>
         </div>
         <button type="button" className="btn-outline" onClick={handleDownloadPackage} disabled={loading || !token}>
-          Download worker app
+          Download worker app (.exe)
         </button>
       </div>
 
