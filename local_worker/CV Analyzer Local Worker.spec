@@ -2,11 +2,11 @@
 
 
 a = Analysis(
-    ["gui.py"],
+    ["qt_gui.py"],
     pathex=[],
     binaries=[],
     datas=[("assets/cv_analyzer_worker.ico", "assets")],
-    hiddenimports=[],
+    hiddenimports=["PySide6.QtCore", "PySide6.QtGui", "PySide6.QtWidgets"],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

@@ -101,12 +101,25 @@ TXT fallback exists for older or text-only candidate records that do not have st
 
 Revoked keys, revoked sessions, expired sessions, expired claims, completed claims, and mismatched claim/CV ids cannot download the fallback text.
 
-## Python Worker
+## Local Worker App
 
-Employers can download a ready-to-run ZIP from the Settings > Local Worker panel. The
-download is served by `GET /api/worker/download-package` and contains:
+Recruiters should normally download the one-file Windows desktop app from the
+Recruiter > Local Worker panel. That download is served by
+`GET /api/worker/download-exe` and streams:
+
+- `CV Analyzer Local Worker.exe`
+
+The EXE is a prebuilt PySide6/Qt app. It is not committed to the Git repository
+because release binaries exceed normal source-control limits; staging/production
+must publish the Windows build artifact into `local_worker/dist/` before enabling
+the download button. If the executable is stored outside the repo checkout, set
+`WORKER_EXE_PATH` to the absolute path of the published `.exe`.
+
+The legacy/developer ZIP remains available as a fallback through
+`GET /api/worker/download-package` and contains:
 
 - `worker.py`
+- `qt_gui.py`
 - `gui.py`
 - `workspace.py`
 - `credentials.py`
@@ -130,7 +143,7 @@ cd local_worker
 python -m pip install -r requirements.txt
 ```
 
-Windows users can run `start_here.cmd` for a one-click setup that installs dependencies and opens the GUI. `install_windows.cmd` can also create a desktop shortcut. The package does not need Node.js.
+Windows users can run `start_here.cmd` for a one-click setup that installs dependencies and opens the Qt GUI. `install_windows.cmd` can also create a desktop shortcut. The package does not need Node.js.
 
 Use:
 

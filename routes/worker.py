@@ -10,7 +10,7 @@ import zipfile
 from datetime import datetime, timedelta
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, func
 from database import get_db
@@ -188,12 +188,27 @@ def _worker_key_payload(wk: WorkerKey) -> dict:
     }
 
 
+def _worker_exe_path() -> Path:
+    configured = os.getenv("WORKER_EXE_PATH")
+    if configured:
+        return Path(configured)
+    return _LOCAL_WORKER_DIR / "dist" / "CV Analyzer Local Worker.exe"
+
+
 def _worker_package_readme(api_base_url: str) -> str:
     return f"""# CV Analyzer Local Worker
 
+Most employers should download the one-file Windows app from the Recruiter Local Worker tab:
+
+```text
+CV Analyzer Local Worker.exe
+```
+
+This ZIP package is the fallback/developer package for machines that need to install Python dependencies or rebuild the executable locally.
+
 This package has two modes:
 
-1. **Local app mode**: one-click Windows setup, visual UI, local job description, local CV folder, local CSV/JSON output. This mode does not require site-side jobs.
+1. **Local app mode**: one-click Windows setup, modern tabbed Qt UI, local job description, local CV folder, local CSV/JSON output. This mode does not require site-side jobs.
 2. **Server worker mode**: authenticate with a worker API key, claim site-side CVs, process them locally, and submit results back to CV Analyzer.
 
 ## Recommended Windows setup
@@ -239,7 +254,7 @@ python -m venv .venv
 Then open the local visual app:
 
 ```powershell
-.\\.venv\\Scripts\\python.exe gui.py
+.\\.venv\\Scripts\\python.exe qt_gui.py
 ```
 
 ## Optional server worker mode
@@ -451,6 +466,7 @@ def download_worker_package(
     """
     package_files = [
         ("worker.py", _LOCAL_WORKER_DIR / "worker.py"),
+        ("qt_gui.py", _LOCAL_WORKER_DIR / "qt_gui.py"),
         ("gui.py", _LOCAL_WORKER_DIR / "gui.py"),
         ("workspace.py", _LOCAL_WORKER_DIR / "workspace.py"),
         ("credentials.py", _LOCAL_WORKER_DIR / "credentials.py"),
@@ -488,6 +504,40 @@ def download_worker_package(
         media_type="application/zip",
         headers={
             "Content-Disposition": 'attachment; filename="cv-analyzer-local-worker.zip"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get("/worker/download-exe")
+@limiter.limit("10/minute")
+def download_worker_exe(
+    request: Request,
+    recruiter = Depends(recruiter_required),
+):
+    """Return the prebuilt one-file Windows Local Worker executable."""
+    exe_path = _worker_exe_path()
+    if not exe_path.exists():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "The one-file Local Worker executable has not been built on this server yet. "
+                "Run local_worker/build_windows_exe.cmd on a Windows build machine and publish the dist executable, "
+                "or set WORKER_EXE_PATH to the published executable path."
+            ),
+        )
+
+    audit_log(
+        "worker_exe_downloaded",
+        organization_id=recruiter.organization_id,
+        user_id=recruiter.id,
+    )
+    return FileResponse(
+        exe_path,
+        media_type="application/vnd.microsoft.portable-executable",
+        filename="CV Analyzer Local Worker.exe",
+        headers={
             "Cache-Control": "no-store",
             "X-Content-Type-Options": "nosniff",
         },

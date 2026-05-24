@@ -106,6 +106,7 @@ def test_worker_package_download_contains_cli_without_plaintext_key(client, recr
         names = set(archive.namelist())
         assert {
             "worker.py",
+            "qt_gui.py",
             "gui.py",
             "workspace.py",
             "credentials.py",
@@ -135,6 +136,25 @@ def test_worker_package_download_contains_cli_without_plaintext_key(client, recr
     assert '"ai_max_reviews": 25' in config_example
     assert "sk_worker_live_" not in worker_py
     assert "http://testserver/api/worker" in readme
+
+
+def test_worker_executable_download_returns_single_exe(client, recruiter_user, tmp_path, monkeypatch):
+    import routes.worker as worker_routes
+
+    exe_dir = tmp_path / "dist"
+    exe_dir.mkdir()
+    exe_path = exe_dir / "CV Analyzer Local Worker.exe"
+    exe_path.write_bytes(b"MZqt-worker")
+
+    monkeypatch.setattr(worker_routes, "_LOCAL_WORKER_DIR", tmp_path)
+
+    response = client.get("/api/worker/download-exe")
+    assert response.status_code == 200, response.text
+    assert response.content == b"MZqt-worker"
+    assert response.headers["content-type"] == "application/vnd.microsoft.portable-executable"
+    content_disposition = response.headers["content-disposition"]
+    assert "attachment" in content_disposition
+    assert "CV%20Analyzer%20Local%20Worker.exe" in content_disposition
 
 
 def test_worker_auth_success_fail_revoked_and_expired(client, db_session, recruiter_user, test_job):

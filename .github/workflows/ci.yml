@@ -235,6 +235,7 @@ jobs:
           python -m py_compile \
             local_worker/worker.py \
             local_worker/gui.py \
+            local_worker/qt_gui.py \
             local_worker/workspace.py \
             local_worker/credentials.py
 
@@ -248,12 +249,15 @@ jobs:
           files = [
               "worker.py",
               "gui.py",
+              "qt_gui.py",
               "workspace.py",
               "credentials.py",
               "requirements.txt",
               "install_windows.cmd",
               "run_gui.cmd",
               "build_windows_exe.cmd",
+              "CV Analyzer Local Worker.spec",
+              "assets/cv_analyzer_worker.ico",
               "VERSION",
           ]
           root = Path("local_worker")

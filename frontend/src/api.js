@@ -1299,6 +1299,25 @@ export async function downloadWorkerPackage(token) {
   return res.blob()
 }
 
+export async function downloadWorkerExecutable(token) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/worker/download-exe`, { headers })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    let detail = ''
+    try {
+      const parsed = text ? JSON.parse(text) : {}
+      detail = parsed.detail || parsed.message || ''
+    } catch {
+      detail = text
+    }
+    throw new Error(detail || `Worker executable download failed: ${res.status}`)
+  }
+  return res.blob()
+}
+
 export function revokeWorkerKey(token, keyId) {
   return _workerJson(token, `/api/worker-keys/${keyId}/revoke`, 'POST', {})
 }
