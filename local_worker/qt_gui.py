@@ -29,6 +29,7 @@ try:
         QPlainTextEdit,
         QProgressBar,
         QPushButton,
+        QSizePolicy,
         QSpinBox,
         QTableWidget,
         QTableWidgetItem,
@@ -296,6 +297,7 @@ class MainWindow(QMainWindow):
         self._animations: list[QPropertyAnimation] = []
         self._progress_animation: QPropertyAnimation | None = None
         self._status_pulse: QPropertyAnimation | None = None
+        self.nav_buttons: list[QPushButton] = []
 
         self._build()
         self._apply_style()
@@ -306,11 +308,27 @@ class MainWindow(QMainWindow):
 
     def _build(self):
         root = QWidget()
-        outer = QVBoxLayout(root)
-        outer.setContentsMargins(22, 20, 22, 18)
-        outer.setSpacing(16)
+        root.setObjectName("Root")
+        root_layout = QHBoxLayout(root)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
+
+        sidebar = self._build_sidebar()
+        root_layout.addWidget(sidebar)
+
+        main_panel = QWidget()
+        main_panel.setObjectName("MainPanel")
+        root_layout.addWidget(main_panel, 1)
+
+        outer = QVBoxLayout(main_panel)
+        outer.setContentsMargins(28, 20, 28, 22)
+        outer.setSpacing(20)
 
         header = QHBoxLayout()
+        header.setSpacing(16)
+        header_icon = QLabel("✦")
+        header_icon.setObjectName("HeaderIcon")
+        header.addWidget(header_icon)
         title_box = QVBoxLayout()
         title = QLabel("CV Analyzer Local Worker")
         title.setObjectName("Title")
@@ -322,29 +340,138 @@ class MainWindow(QMainWindow):
         self.status_label = QLabel("Ready")
         self.status_label.setObjectName("StatusPill")
         header.addWidget(self.status_label)
+        sync_label = QLabel("↻  Last sync: local")
+        sync_label.setObjectName("SyncMeta")
+        header.addWidget(sync_label)
+        sync_button = QPushButton("↻  Sync now")
+        sync_button.setObjectName("PrimaryButton")
+        sync_button.setMinimumWidth(136)
+        header.addWidget(sync_button)
         outer.addLayout(header)
 
         self.tabs = QTabWidget()
+        self.tabs.tabBar().hide()
         self.tabs.addTab(self._build_analyze_tab(), "Analyze")
         self.tabs.addTab(self._build_results_tab(), "Results")
         self.tabs.addTab(self._build_history_tab(), "History")
         self.tabs.addTab(self._build_server_tab(), "Website Sync")
         self.tabs.currentChanged.connect(self._animate_tab_change)
+        self.tabs.currentChanged.connect(self._update_nav_state)
+        sync_button.clicked.connect(lambda: self.tabs.setCurrentIndex(3))
         outer.addWidget(self.tabs, 1)
         self.setCentralWidget(root)
 
         open_output = QAction("Open output folder", self)
         open_output.triggered.connect(self._open_output)
         self.addAction(open_output)
+        self._update_nav_state(0)
+
+    def _build_sidebar(self) -> QWidget:
+        sidebar = QFrame()
+        sidebar.setObjectName("Sidebar")
+        sidebar.setFixedWidth(228)
+        layout = QVBoxLayout(sidebar)
+        layout.setContentsMargins(14, 20, 14, 18)
+        layout.setSpacing(18)
+
+        brand = QHBoxLayout()
+        logo = QLabel("✧")
+        logo.setObjectName("LogoMark")
+        brand_text = QVBoxLayout()
+        brand_title = QLabel("CV Analyzer")
+        brand_title.setObjectName("SidebarBrand")
+        brand_sub = QLabel("Local Worker")
+        brand_sub.setObjectName("SidebarSub")
+        brand_text.addWidget(brand_title)
+        brand_text.addWidget(brand_sub)
+        brand.addWidget(logo)
+        brand.addLayout(brand_text, 1)
+        layout.addLayout(brand)
+        layout.addSpacing(18)
+
+        layout.addWidget(self._nav_button("⌁  Analyze", 0))
+        layout.addWidget(self._nav_button("▥  Results", 1))
+        layout.addWidget(self._nav_button("↺  History", 2))
+        layout.addWidget(self._nav_button("⟳  Sync", 3, has_dot=True))
+        layout.addSpacing(18)
+
+        insights = QLabel("INSIGHTS")
+        insights.setObjectName("SidebarSection")
+        layout.addWidget(insights)
+        layout.addWidget(self._passive_nav_button("▥  Dashboard"))
+        layout.addWidget(self._passive_nav_button("□  Reports"))
+        layout.addSpacing(12)
+
+        settings = QLabel("SETTINGS")
+        settings.setObjectName("SidebarSection")
+        layout.addWidget(settings)
+        layout.addWidget(self._passive_nav_button("⚙  Preferences"))
+        layout.addWidget(self._passive_nav_button("⚙  AI Models"))
+        layout.addStretch(1)
+
+        user_row = QHBoxLayout()
+        avatar = QLabel("AW")
+        avatar.setObjectName("Avatar")
+        user_text = QVBoxLayout()
+        user = QLabel("Admin User")
+        user.setObjectName("SidebarUser")
+        role = QLabel("Administrator")
+        role.setObjectName("SidebarSub")
+        user_text.addWidget(user)
+        user_text.addWidget(role)
+        user_row.addWidget(avatar)
+        user_row.addLayout(user_text, 1)
+        layout.addLayout(user_row)
+        return sidebar
+
+    def _nav_button(self, text: str, index: int, has_dot: bool = False) -> QPushButton:
+        button = QPushButton(text + ("      ●" if has_dot else ""))
+        button.setObjectName("SidebarNav")
+        button.setCheckable(True)
+        button.clicked.connect(lambda: self.tabs.setCurrentIndex(index))
+        self.nav_buttons.append(button)
+        return button
+
+    def _passive_nav_button(self, text: str) -> QPushButton:
+        button = QPushButton(text)
+        button.setObjectName("SidebarPassive")
+        button.setEnabled(False)
+        return button
+
+    def _update_nav_state(self, index: int):
+        for idx, button in enumerate(self.nav_buttons):
+            button.setChecked(idx == index)
 
     def _build_analyze_tab(self) -> QWidget:
         page = QWidget()
-        layout = QGridLayout(page)
-        layout.setColumnStretch(0, 1)
-        layout.setColumnStretch(1, 1)
+        page.setObjectName("AnalyzePage")
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 4, 0, 0)
+        layout.setSpacing(22)
 
-        job_group = QGroupBox("Local job")
-        form = QFormLayout(job_group)
+        metrics = QHBoxLayout()
+        metrics.setSpacing(20)
+        self.metric_candidates = QLabel("0")
+        self.metric_avg_score = QLabel("--")
+        self.metric_shortlisted = QLabel("0")
+        self.metric_hard_rejects = QLabel("0")
+        metrics.addWidget(self._metric_card("Candidates", self.metric_candidates, "Ready to analyze", "👥", "PurpleBadge"))
+        metrics.addWidget(self._metric_card("Avg. Match Score", self.metric_avg_score, "Across all candidates", "↗", "GreenBadge"))
+        metrics.addWidget(self._metric_card("Shortlisted", self.metric_shortlisted, "Above review threshold", "★", "BlueBadge"))
+        metrics.addWidget(self._metric_card("Hard Rejects", self.metric_hard_rejects, "Filtered out", "✕", "RedBadge"))
+        layout.addLayout(metrics)
+
+        setup_grid = QGridLayout()
+        setup_grid.setHorizontalSpacing(20)
+        setup_grid.setColumnStretch(0, 1)
+        setup_grid.setColumnStretch(1, 1)
+
+        job_group = QFrame()
+        job_group.setObjectName("ContentCard")
+        form = QVBoxLayout(job_group)
+        form.setContentsMargins(24, 22, 24, 24)
+        form.setSpacing(14)
+        form.addLayout(self._step_header("1", "Local job setup", "Select folders and configure analysis settings."))
         self.job_name = QLineEdit("New local job")
         self.cv_folder = QLineEdit()
         self.output_folder = QLineEdit(str(Path.cwd() / "local_results"))
@@ -356,33 +483,65 @@ class MainWindow(QMainWindow):
         self.review_threshold.setValue(50)
         self.ai_mode = QComboBox()
         self.ai_mode.addItems(["none", "customer_openai_key"])
-        form.addRow("Job name", self.job_name)
-        form.addRow("CV folder", self._path_row(self.cv_folder, self._choose_cv_folder))
-        form.addRow("Output folder", self._path_row(self.output_folder, self._choose_output_folder))
-        form.addRow("Accept threshold", self.accept_threshold)
-        form.addRow("Review threshold", self.review_threshold)
-        form.addRow("AI review", self.ai_mode)
+        self.cv_folder.setPlaceholderText("Select CV folder...")
+        form.addLayout(self._labeled_control("Job name", self.job_name))
+        form.addLayout(self._labeled_control("CV folder", self._path_row(self.cv_folder, self._choose_cv_folder)))
+        form.addLayout(self._labeled_control("Output folder", self._path_row(self.output_folder, self._choose_output_folder)))
 
-        terms_group = QGroupBox("Scoring criteria")
-        terms = QFormLayout(terms_group)
-        self.required_skills = QLineEdit()
-        self.nice_skills = QLineEdit()
-        self.hard_reject = QLineEdit()
-        terms.addRow("Required skills", self.required_skills)
-        terms.addRow("Nice to have", self.nice_skills)
-        terms.addRow("Hard reject criteria", self.hard_reject)
+        threshold_row = QHBoxLayout()
+        threshold_row.setSpacing(16)
+        threshold_row.addLayout(self._labeled_control("Accept threshold", self.accept_threshold), 1)
+        threshold_row.addLayout(self._labeled_control("Review threshold", self.review_threshold), 1)
+        form.addLayout(threshold_row)
+        form.addLayout(self._labeled_control("AI review", self.ai_mode))
+
+        terms_group = QFrame()
+        terms_group.setObjectName("ContentCard")
+        terms = QVBoxLayout(terms_group)
+        terms.setContentsMargins(24, 22, 24, 24)
+        terms.setSpacing(13)
+        terms.addLayout(self._step_header("2", "Scoring criteria", "Define how candidates will be evaluated."))
+        self.required_skills = QPlainTextEdit()
+        self.required_skills.setPlaceholderText("Enter required skills...")
+        self.nice_skills = QPlainTextEdit()
+        self.nice_skills.setPlaceholderText("Enter nice to have skills...")
+        self.hard_reject = QPlainTextEdit()
+        self.hard_reject.setPlaceholderText("Enter hard reject criteria...")
+        for field in (self.required_skills, self.nice_skills, self.hard_reject):
+            field.setMinimumHeight(72)
+            field.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        terms.addLayout(self._labeled_control("Required skills", self.required_skills))
+        terms.addLayout(self._labeled_control("Nice to have", self.nice_skills))
+        terms.addLayout(self._labeled_control("Hard reject criteria", self.hard_reject))
+
+        setup_grid.addWidget(job_group, 0, 0)
+        setup_grid.addWidget(terms_group, 0, 1)
+        layout.addLayout(setup_grid)
 
         self.description = QPlainTextEdit()
         self.description.setPlaceholderText("Paste the job description here. This stays local unless you explicitly sync later.")
+        self.description.setMinimumHeight(126)
+        description_group = QFrame()
+        description_group.setObjectName("ContentCard")
+        description_layout = QVBoxLayout(description_group)
+        description_layout.setContentsMargins(24, 22, 24, 24)
+        description_layout.setSpacing(14)
+        description_layout.addLayout(self._step_header("3", "Job description", "Paste the full job description. More context leads to better matching."))
+        description_layout.addWidget(self.description)
+        layout.addWidget(description_group)
 
         actions = QHBoxLayout()
-        self.run_button = QPushButton("Analyze local folder")
+        actions.setSpacing(16)
+        self.run_button = QPushButton("▷  Analyze local folder")
         self.run_button.setObjectName("PrimaryButton")
-        self.cancel_button = QPushButton("Cancel")
+        self.run_button.setMinimumWidth(230)
+        self.cancel_button = QPushButton("×  Cancel")
         self.cancel_button.setObjectName("SecondaryButton")
+        self.cancel_button.setMinimumWidth(136)
         self.cancel_button.setEnabled(False)
-        self.open_output_button = QPushButton("Open output")
+        self.open_output_button = QPushButton("↗  Open output")
         self.open_output_button.setObjectName("SecondaryButton")
+        self.open_output_button.setMinimumWidth(182)
         self.run_button.clicked.connect(self._start_analysis)
         self.cancel_button.clicked.connect(self._cancel_analysis)
         self.open_output_button.clicked.connect(self._open_output)
@@ -395,12 +554,19 @@ class MainWindow(QMainWindow):
         self.progress.setRange(0, 1)
         self.progress.setValue(0)
 
-        layout.addWidget(job_group, 0, 0)
-        layout.addWidget(terms_group, 0, 1)
-        layout.addWidget(QLabel("Job description"), 1, 0, 1, 2)
-        layout.addWidget(self.description, 2, 0, 1, 2)
-        layout.addLayout(actions, 3, 0, 1, 2)
-        layout.addWidget(self.progress, 4, 0, 1, 2)
+        footer = QFrame()
+        footer.setObjectName("FooterBar")
+        footer_layout = QHBoxLayout(footer)
+        footer_layout.setContentsMargins(16, 12, 16, 12)
+        footer_layout.setSpacing(18)
+        footer_layout.addLayout(actions)
+        footer_layout.addStretch(1)
+        ready = QLabel("✓  Ready to analyze")
+        ready.setObjectName("FooterReady")
+        footer_layout.addWidget(ready)
+        self.progress.setFixedWidth(360)
+        footer_layout.addWidget(self.progress)
+        layout.addWidget(footer)
         return page
 
     def _build_results_tab(self) -> QWidget:
@@ -482,12 +648,66 @@ class MainWindow(QMainWindow):
         row = QWidget()
         layout = QHBoxLayout(row)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
         button = QPushButton("Browse")
         button.setObjectName("SecondaryButton")
+        button.setMinimumWidth(110)
         button.clicked.connect(callback)
         layout.addWidget(field, 1)
         layout.addWidget(button)
         return row
+
+    def _metric_card(self, title: str, value_label: QLabel, subtitle: str, icon: str, badge_name: str) -> QWidget:
+        card = QFrame()
+        card.setObjectName("MetricCard")
+        layout = QHBoxLayout(card)
+        layout.setContentsMargins(22, 18, 22, 18)
+        layout.setSpacing(16)
+        copy = QVBoxLayout()
+        title_label = QLabel(title)
+        title_label.setObjectName("MetricTitle")
+        value_label.setObjectName("MetricValue")
+        subtitle_label = QLabel(subtitle)
+        subtitle_label.setObjectName("MetricSub")
+        copy.addWidget(title_label)
+        copy.addWidget(value_label)
+        copy.addWidget(subtitle_label)
+        layout.addLayout(copy, 1)
+        badge = QLabel(icon)
+        badge.setObjectName(badge_name)
+        badge.setAlignment(Qt.AlignCenter)
+        layout.addWidget(badge)
+        return card
+
+    def _step_header(self, number: str, title: str, subtitle: str) -> QHBoxLayout:
+        row = QHBoxLayout()
+        row.setSpacing(12)
+        badge = QLabel(number)
+        badge.setObjectName("StepBadge")
+        badge.setAlignment(Qt.AlignCenter)
+        text_box = QVBoxLayout()
+        heading = QLabel(title)
+        heading.setObjectName("StepTitle")
+        sub = QLabel(subtitle)
+        sub.setObjectName("StepSubtitle")
+        text_box.addWidget(heading)
+        text_box.addWidget(sub)
+        row.addWidget(badge)
+        row.addLayout(text_box, 1)
+        return row
+
+    def _labeled_control(self, label_text: str, widget_or_layout) -> QVBoxLayout:
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        label = QLabel(label_text)
+        label.setObjectName("FieldLabel")
+        layout.addWidget(label)
+        if isinstance(widget_or_layout, QWidget):
+            layout.addWidget(widget_or_layout)
+        else:
+            layout.addLayout(widget_or_layout)
+        return layout
 
     def _run_animation(self, animation: QPropertyAnimation):
         if not MOTION_ENABLED:
@@ -589,155 +809,315 @@ class MainWindow(QMainWindow):
     def _apply_style(self):
         self.setStyleSheet(
             """
-            QMainWindow, QWidget {
-                background: #101419;
-                color: #eef1f4;
+            QWidget#Root, QMainWindow {
+                background: #111c2e;
+            }
+            QWidget {
+                background: transparent;
+                color: #f3f7fb;
                 font-family: "Segoe UI";
                 font-size: 10pt;
             }
+            QWidget#MainPanel {
+                background: #fbfcff;
+                border-top-left-radius: 18px;
+                border-bottom-left-radius: 18px;
+            }
+            QFrame#Sidebar {
+                background: #041534;
+                border: none;
+            }
+            QLabel#LogoMark {
+                min-width: 54px;
+                min-height: 54px;
+                max-width: 54px;
+                max-height: 54px;
+                border-radius: 15px;
+                background: #4b4cff;
+                color: #ffffff;
+                font-size: 24px;
+                font-weight: 900;
+                qproperty-alignment: AlignCenter;
+            }
+            QLabel#SidebarBrand {
+                color: #ffffff;
+                font-size: 12pt;
+                font-weight: 900;
+            }
+            QLabel#SidebarSub, QLabel#SidebarSection {
+                color: #a9b8cf;
+                font-size: 9.5pt;
+            }
+            QLabel#SidebarSection {
+                font-size: 8.5pt;
+                letter-spacing: 1px;
+            }
+            QLabel#SidebarUser {
+                color: #ffffff;
+                font-weight: 800;
+            }
+            QLabel#Avatar {
+                min-width: 44px;
+                min-height: 44px;
+                max-width: 44px;
+                max-height: 44px;
+                border-radius: 22px;
+                background: #5a4cff;
+                color: #ffffff;
+                font-weight: 900;
+                qproperty-alignment: AlignCenter;
+            }
+            QPushButton#SidebarNav, QPushButton#SidebarPassive {
+                background: transparent;
+                border: none;
+                border-radius: 8px;
+                color: #c5d2e5;
+                padding: 14px 14px;
+                text-align: left;
+                font-size: 11pt;
+                font-weight: 750;
+            }
+            QPushButton#SidebarNav:hover {
+                background: #0c244a;
+                color: #ffffff;
+            }
+            QPushButton#SidebarNav:checked {
+                background: #2639e8;
+                color: #ffffff;
+            }
+            QPushButton#SidebarPassive:disabled {
+                color: #c5d2e5;
+                background: transparent;
+            }
             QLabel#Title {
-                color: #f7f8fa;
+                color: #10172a;
                 font-size: 26px;
                 font-weight: 800;
             }
             QLabel#Subtitle {
-                color: #9aa6b2;
+                color: #5f6b80;
+            }
+            QLabel#HeaderIcon {
+                min-width: 52px;
+                min-height: 52px;
+                max-width: 52px;
+                max-height: 52px;
+                border-radius: 12px;
+                background: #eef5ff;
+                color: #2f86ff;
+                font-size: 24px;
+                font-weight: 900;
+                qproperty-alignment: AlignCenter;
             }
             QLabel#StatusPill, QLabel#Metric {
-                padding: 7px 12px;
-                border: 1px solid #303943;
-                border-radius: 9px;
-                background: #171d24;
-                color: #c8d0d8;
+                padding: 8px 18px;
+                border: 1px solid #ccefe1;
+                border-radius: 18px;
+                background: #effdf6;
+                color: #0f8d4f;
+                font-weight: 800;
+            }
+            QLabel#SyncMeta {
+                color: #4f5c70;
+                font-weight: 750;
             }
             QTabWidget::pane {
-                border: 1px solid #2b333d;
-                border-radius: 10px;
-                background: #151a20;
-                top: -1px;
+                border: none;
+                background: transparent;
+                top: 0;
             }
             QTabBar::tab {
-                padding: 10px 18px;
-                margin-right: 4px;
-                border: 1px solid #2b333d;
-                border-bottom: none;
-                border-top-left-radius: 9px;
-                border-top-right-radius: 9px;
-                background: #171d24;
-                color: #a5adb6;
-                font-weight: 650;
+                padding: 14px 18px 13px;
+                margin-right: 8px;
+                border: none;
+                border-bottom: 2px solid transparent;
+                background: transparent;
+                color: #9faec0;
+                font-size: 11pt;
+                font-weight: 750;
             }
             QTabBar::tab:selected {
-                background: #202832;
-                color: #ffffff;
-                border-color: #56616f;
+                color: #48a2ff;
+                border-bottom: 2px solid #2f86ff;
             }
             QTabBar::tab:hover {
-                color: #eef1f4;
-                background: #1d242c;
+                color: #d7e7f8;
             }
             QGroupBox {
-                border: 1px solid #2b333d;
-                border-radius: 10px;
+                border: 1px solid #d8dfeb;
+                border-radius: 14px;
                 margin-top: 14px;
-                padding: 18px 14px 14px;
-                background: #171d24;
-                font-weight: 750;
+                padding: 22px 18px 18px;
+                background: #ffffff;
+                font-size: 12pt;
+                font-weight: 800;
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
-                left: 14px;
-                padding: 0 6px;
-                color: #e1e7ed;
+                left: 20px;
+                padding: 0 8px;
+                color: #10172a;
+            }
+            QFrame#MetricCard, QFrame#ContentCard, QFrame#FooterBar {
+                background: #ffffff;
+                border: 1px solid #dfe5ef;
+                border-radius: 14px;
+            }
+            QFrame#MetricCard {
+                min-height: 102px;
+            }
+            QLabel#MetricTitle {
+                color: #344057;
+                font-weight: 800;
+            }
+            QLabel#MetricValue {
+                color: #111827;
+                font-size: 24pt;
+                font-weight: 900;
+            }
+            QLabel#MetricSub {
+                color: #657287;
+                font-size: 9.5pt;
+            }
+            QLabel#PurpleBadge, QLabel#GreenBadge, QLabel#BlueBadge, QLabel#RedBadge {
+                min-width: 56px;
+                min-height: 56px;
+                max-width: 56px;
+                max-height: 56px;
+                border-radius: 12px;
+                font-size: 22px;
+                font-weight: 900;
+            }
+            QLabel#PurpleBadge { background: #eee4ff; color: #6a35df; }
+            QLabel#GreenBadge { background: #dcfbef; color: #21b981; }
+            QLabel#BlueBadge { background: #e8f0ff; color: #2c7ddd; }
+            QLabel#RedBadge { background: #ffe7ea; color: #c4364a; }
+            QLabel#StepBadge {
+                min-width: 30px;
+                min-height: 30px;
+                max-width: 30px;
+                max-height: 30px;
+                border-radius: 15px;
+                background: #4b55ff;
+                color: #ffffff;
+                font-weight: 900;
+            }
+            QLabel#StepTitle {
+                color: #111827;
+                font-size: 12.5pt;
+                font-weight: 900;
+            }
+            QLabel#StepSubtitle {
+                color: #657287;
+                font-size: 9.5pt;
+            }
+            QLabel#FooterReady {
+                color: #111827;
+                font-weight: 900;
+            }
+            QLabel#FieldLabel {
+                color: #4a5568;
+                font-size: 9.5pt;
+                font-weight: 800;
             }
             QLineEdit, QPlainTextEdit, QTextEdit, QComboBox, QSpinBox {
-                background: #11161c;
-                color: #eef1f4;
-                border: 1px solid #333d49;
-                border-radius: 7px;
-                padding: 8px 10px;
-                selection-background-color: #41546a;
+                background: #ffffff;
+                color: #111827;
+                border: 1px solid #d7deea;
+                border-radius: 9px;
+                padding: 11px 14px;
+                selection-background-color: #245fd6;
             }
             QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QComboBox:focus, QSpinBox:focus {
-                border-color: #788391;
-                background: #131922;
+                border-color: #3f82ff;
+                background: #ffffff;
             }
-            QPlainTextEdit, QTextEdit { line-height: 1.5; }
+            QLineEdit::placeholder, QPlainTextEdit::placeholder {
+                color: #93a2b5;
+            }
+            QPlainTextEdit, QTextEdit {
+                line-height: 1.5;
+            }
+            QComboBox::drop-down {
+                width: 28px;
+                border: none;
+            }
             QPushButton {
-                background: #202832;
-                color: #eef1f4;
-                border: 1px solid #3a4654;
-                border-radius: 8px;
-                padding: 9px 14px;
-                font-weight: 700;
+                background: #f8fafc;
+                color: #263348;
+                border: 1px solid #d8dfeb;
+                border-radius: 9px;
+                padding: 11px 18px;
+                font-size: 10.5pt;
+                font-weight: 800;
             }
             QPushButton:hover {
-                background: #28313d;
-                border-color: #576575;
+                background: #eef4ff;
+                border-color: #a9c5ff;
             }
             QPushButton:pressed {
-                background: #1a212a;
+                background: #dfeaff;
             }
             QPushButton:disabled {
-                color: #707a85;
-                background: #171c22;
-                border-color: #29313a;
+                color: #8d99aa;
+                background: #eef2f6;
+                border-color: #d8dfeb;
             }
             QPushButton#PrimaryButton {
-                background: #27415c;
-                border-color: #4f6b86;
-                color: #f7fafc;
+                background: #2367ff;
+                border-color: #2f7dff;
+                color: #ffffff;
             }
             QPushButton#PrimaryButton:hover {
-                background: #31506f;
-                border-color: #7089a3;
+                background: #2f7cff;
+                border-color: #63a3ff;
             }
             QPushButton#SecondaryButton {
-                background: #1d242d;
-                border-color: #37424e;
-                color: #d8e0e8;
+                background: #f8fafc;
+                border-color: #d8dfeb;
+                color: #263348;
             }
             QProgressBar {
-                border: 1px solid #333d49;
-                border-radius: 7px;
-                background: #11161c;
-                text-align: center;
-                color: #dbe2ea;
-                height: 17px;
+                border: none;
+                border-radius: 8px;
+                background: #eef2f6;
+                text-align: right;
+                color: #1e293b;
+                height: 18px;
             }
             QProgressBar::chunk {
-                border-radius: 7px;
-                background: #5f7f72;
+                border-radius: 8px;
+                background: #2367ff;
             }
             QTableWidget {
-                background: #12171d;
-                alternate-background-color: #171d24;
-                border: 1px solid #2b333d;
-                border-radius: 8px;
-                gridline-color: #242c35;
-                selection-background-color: #34465a;
+                background: #ffffff;
+                alternate-background-color: #f8fafc;
+                border: 1px solid #dfe5ef;
+                border-radius: 10px;
+                gridline-color: #e7edf5;
+                selection-background-color: #235ed0;
                 selection-color: #ffffff;
             }
             QHeaderView::section {
-                background: #1e2630;
-                color: #d8e0e8;
+                background: #f3f6fa;
+                color: #344057;
                 border: none;
-                border-right: 1px solid #2b333d;
-                padding: 8px;
+                border-right: 1px solid #dfe5ef;
+                padding: 10px;
                 font-weight: 800;
             }
             QScrollBar:vertical {
-                background: #11161c;
+                background: #edf2f7;
                 width: 12px;
                 margin: 0;
             }
             QScrollBar::handle:vertical {
-                background: #3a4654;
+                background: #b9c4d3;
                 border-radius: 6px;
                 min-height: 28px;
             }
             QScrollBar::handle:vertical:hover {
-                background: #4a5665;
+                background: #95a3b5;
             }
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 height: 0;
@@ -760,9 +1140,9 @@ class MainWindow(QMainWindow):
             "job_id": "local",
             "title": self.job_name.text().strip() or "Local job",
             "description": self.description.toPlainText().strip(),
-            "required_skills": split_terms(self.required_skills.text()),
-            "nice_to_have_skills": split_terms(self.nice_skills.text()),
-            "hard_reject_criteria": split_terms(self.hard_reject.text()),
+            "required_skills": split_terms(self.required_skills.toPlainText()),
+            "nice_to_have_skills": split_terms(self.nice_skills.toPlainText()),
+            "hard_reject_criteria": split_terms(self.hard_reject.toPlainText()),
             "accept_threshold": self.accept_threshold.value(),
             "review_threshold": self.review_threshold.value(),
             "reject_threshold": 0,
