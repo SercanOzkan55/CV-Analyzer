@@ -19,6 +19,11 @@ def _stable_runtime(monkeypatch):
         main_module._LOCAL_ABUSE_BANS.clear()
     except Exception:
         pass
+    try:
+        from routes.recruiter import _IN_MEMORY_CACHE
+        _IN_MEMORY_CACHE.clear()
+    except Exception:
+        pass
 
 
 def _setup_org_with_recruiter(db):
@@ -536,3 +541,97 @@ def test_jobs_includes_full_description(client, db_session):
     if data["jobs"]:
         first_job = data["jobs"][0]
         assert len(first_job["description"]) >= 350, "Description should not be truncated at 200"
+
+
+def test_jobs_caching_and_invalidation(client, db_session):
+    """Verify /jobs endpoint caching and invalidation on POST /jobs."""
+    from routes.recruiter import _IN_MEMORY_CACHE
+    _IN_MEMORY_CACHE.clear()
+
+    org, recruiter, job = _setup_org_with_recruiter(db_session)
+    
+    client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
+        "user_id": recruiter.supabase_id,
+        "email": recruiter.email,
+    }
+    
+    # 1. Warm up the cache
+    resp1 = client.get("/api/v1/recruiter/jobs")
+    assert resp1.status_code == 200
+    data1 = resp1.json()
+    assert len(data1["jobs"]) == 1
+    assert data1["jobs"][0]["title"] == "Senior Engineer"
+    
+    # 2. Modify the job in DB directly (bypass endpoint/API)
+    job.title = "Directly Modified Title"
+    db_session.add(job)
+    db_session.commit()
+    
+    # 3. GET /jobs again - should return cached "Senior Engineer"
+    resp2 = client.get("/api/v1/recruiter/jobs")
+    assert resp2.status_code == 200
+    data2 = resp2.json()
+    assert data2["jobs"][0]["title"] == "Senior Engineer"
+    
+    # 4. Create a new job via POST /jobs - should invalidate cache
+    resp3 = client.post(
+        "/api/v1/recruiter/jobs",
+        json={"title": "New Job via API", "description": "Some description"}
+    )
+    assert resp3.status_code == 200
+    
+    # 5. GET /jobs again - should reflect database state (both jobs, and title change)
+    resp4 = client.get("/api/v1/recruiter/jobs")
+    assert resp4.status_code == 200
+    data4 = resp4.json()
+    assert len(data4["jobs"]) == 2
+    titles = [j["title"] for j in data4["jobs"]]
+    assert "Directly Modified Title" in titles
+    assert "New Job via API" in titles
+
+
+def test_templates_caching_and_invalidation(client, db_session):
+    """Verify /templates endpoint caching and invalidation on POST and DELETE."""
+    from routes.recruiter import _IN_MEMORY_CACHE
+    _IN_MEMORY_CACHE.clear()
+
+    org, recruiter, _ = _setup_org_with_recruiter(db_session)
+    
+    client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
+        "user_id": recruiter.supabase_id,
+        "email": recruiter.email,
+    }
+    
+    # 1. Warm up cache (should be empty initially)
+    resp1 = client.get("/api/v1/recruiter/templates")
+    assert resp1.status_code == 200
+    assert len(resp1.json()["templates"]) == 0
+    
+    # 2. Create template via API - should invalidate cache
+    resp2 = client.post(
+        "/api/v1/recruiter/templates",
+        json={
+            "name": "Template 1",
+            "template_type": "accept",
+            "subject": "Hello",
+            "body": "Welcome",
+        }
+    )
+    assert resp2.status_code == 200
+    tpl_id = resp2.json()["id"]
+    
+    # 3. GET /templates again - cache should be invalidated, returns 1 template
+    resp3 = client.get("/api/v1/recruiter/templates")
+    assert resp3.status_code == 200
+    data3 = resp3.json()
+    assert len(data3["templates"]) == 1
+    assert data3["templates"][0]["name"] == "Template 1"
+    
+    # 4. DELETE template via API - should invalidate cache
+    resp4 = client.delete(f"/api/v1/recruiter/templates/{tpl_id}")
+    assert resp4.status_code == 200
+    
+    # 5. GET /templates again - cache should be invalidated, returns 0 templates
+    resp5 = client.get("/api/v1/recruiter/templates")
+    assert resp5.status_code == 200
+    assert len(resp5.json()["templates"]) == 0

@@ -17,6 +17,10 @@ except ImportError:
     sys.exit(1)
 
 import worker as worker_module
+try:
+    import windnd
+except ImportError:
+    windnd = None
 from credentials import save_worker_api_key
 from worker import API_BASE_URL, MAX_FILE_BYTES, LocalWorker, extract_text, maybe_apply_ai_review, score_cv
 from workspace import WorkspaceStore
@@ -99,6 +103,12 @@ class LocalWorkerApp:
         self._apply_theme()
         self._refresh_jobs()
         self.root.after(150, self._drain_queue)
+
+        if windnd:
+            try:
+                windnd.hook_dropfiles(self.root, self._on_drag_drop)
+            except Exception as e:
+                print(f"Failed to hook drag and drop: {e}")
 
     def _build(self):
         shell = Frame(self.root, padx=18, pady=18)
@@ -293,6 +303,21 @@ class LocalWorkerApp:
         folder = filedialog.askdirectory(title="Choose CV folder")
         if folder:
             self.folder_var.set(folder)
+
+    def _on_drag_drop(self, files):
+        if not files:
+            return
+        try:
+            path_str = os.fsdecode(files[0])
+            path = Path(path_str)
+            if path.is_dir():
+                self.folder_var.set(str(path))
+                self.status_var.set(f"Dragged folder: {path.name}")
+            else:
+                self.folder_var.set(str(path.parent))
+                self.status_var.set(f"Dragged file: {path.name} (Using parent folder)")
+        except Exception as e:
+            self.status_var.set(f"Drag drop error: {e}")
 
     def _save_server_key(self):
         api_key = self.api_key_var.get().strip()
