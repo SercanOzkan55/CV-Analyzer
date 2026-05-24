@@ -1,5 +1,7 @@
+import os
 import shutil
 import subprocess
+import sys
 
 import pytest
 
@@ -10,7 +12,11 @@ def test_dependency_audit():
     Known vulnerabilities without available fixes are ignored so that
     the CI gate only fails on *actionable* CVEs.
     """
-    if not shutil.which("pip-audit"):
+    venv_bin = os.path.join(sys.prefix, "Scripts" if os.name == "nt" else "bin")
+    search_path = os.pathsep.join([venv_bin, os.environ.get("PATH", "")])
+    pip_audit_path = shutil.which("pip-audit", path=search_path)
+
+    if not pip_audit_path:
         pytest.skip("pip-audit not installed")
 
     # Collect CVEs to ignore: transitive / no-fix-available / accepted-risk
@@ -39,7 +45,7 @@ def test_dependency_audit():
         "PYSEC-2026-161",   # starlette
     ]
 
-    cmd = ["pip-audit"]
+    cmd = [pip_audit_path]
     for cve in ignored_cves:
         cmd.extend(["--ignore-vuln", cve])
 
