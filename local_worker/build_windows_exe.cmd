@@ -10,10 +10,10 @@ if not exist ".venv\Scripts\python.exe" (
 )
 
 ".venv\Scripts\python.exe" -m pip install pyinstaller
-".venv\Scripts\python.exe" -m PyInstaller --noconfirm --clean --windowed --name "CV Analyzer Local Worker" gui.py
+".venv\Scripts\python.exe" -m PyInstaller --noconfirm --clean "CV Analyzer Local Worker.spec"
 
 echo.
 echo Build complete.
 echo Executable:
-echo %CD%\dist\CV Analyzer Local Worker\CV Analyzer Local Worker.exe
+echo %CD%\dist\CV Analyzer Local Worker.exe
 pause

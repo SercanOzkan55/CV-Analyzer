@@ -1,4 +1,4 @@
-import secrets
+﻿import secrets
 import hashlib
 import hmac
 import base64
@@ -272,6 +272,14 @@ build_windows_exe.cmd
 ```
 
 The generated executable is written under `dist/`. This build step installs PyInstaller into the worker-local `.venv`; it does not add PyInstaller to the CV Analyzer server application.
+
+The build output is a single file:
+
+```text
+dist\\CV Analyzer Local Worker.exe
+```
+
+The executable and desktop shortcut use the bundled `assets\\cv_analyzer_worker.ico` icon.
 """
 
 
@@ -365,7 +373,7 @@ def get_current_worker(credentials: HTTPAuthorizationCredentials = Depends(secur
     wk = db.query(WorkerKey).filter(WorkerKey.id == ws.worker_key_id).first()
     if not wk or wk.revoked_at or (wk.expires_at and wk.expires_at < datetime.utcnow()):
         raise HTTPException(status_code=401, detail="Worker key revoked or expired")
-    
+
     ws.last_seen_at = datetime.utcnow()
     db.commit()
     return {"session": ws, "key": wk}
@@ -444,6 +452,7 @@ def download_worker_package(
         ("run_gui.cmd", _LOCAL_WORKER_DIR / "run_gui.cmd"),
         ("build_windows_exe.cmd", _LOCAL_WORKER_DIR / "build_windows_exe.cmd"),
         ("CV Analyzer Local Worker.spec", _LOCAL_WORKER_DIR / "CV Analyzer Local Worker.spec"),
+        ("assets/cv_analyzer_worker.ico", _LOCAL_WORKER_DIR / "assets" / "cv_analyzer_worker.ico"),
         ("VERSION", _LOCAL_WORKER_DIR / "VERSION"),
     ]
     missing = [name for name, path in package_files if not path.exists()]
@@ -485,7 +494,7 @@ def revoke_worker_key(
     wk = db.query(WorkerKey).filter(WorkerKey.id == key_id, WorkerKey.organization_id == recruiter.organization_id).first()
     if not wk:
         raise HTTPException(status_code=404, detail="Key not found")
-    
+
     wk.revoked_at = datetime.utcnow()
     db.query(WorkerSession).filter(WorkerSession.worker_key_id == key_id).update({"revoked_at": datetime.utcnow()})
     db.commit()
@@ -530,7 +539,7 @@ def list_worker_sessions(
 def worker_auth(request: Request, req: WorkerAuthRequest, db: Session = Depends(get_db)):
     key_hash = hash_key(req.api_key)
     wk = db.query(WorkerKey).filter(WorkerKey.key_hash == key_hash).first()
-    
+
     if not wk or wk.revoked_at:
         audit_log("worker_auth_failed", reason="invalid_or_revoked", key_hash_prefix=key_hash[:12])
         raise HTTPException(status_code=401, detail="Invalid or revoked key")
@@ -589,7 +598,7 @@ def worker_job_config(jobId: int, worker=Depends(get_current_worker), db: Sessio
     job = db.query(RecruiterJob).filter(RecruiterJob.id == jobId, RecruiterJob.organization_id == wk.organization_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-        
+
     return JobConfigResponse(
         job_id=job.id,
         title=job.title,
@@ -625,7 +634,7 @@ def worker_claim(jobId: int, request: Request, req: ClaimRequest, worker=Depends
     claim_count = min(req.limit, 50, quota_remaining) # max 50 per batch
     if claim_count <= 0:
         raise HTTPException(status_code=402, detail="Quota exceeded")
-    
+
     # Select only candidates explicitly attached to this job via candidate_actions.
     # Falling back to the global candidate pool would leak unrelated company/job data.
     active_action_subq = db.query(WorkerClaim.candidate_action_id).filter(
@@ -640,7 +649,7 @@ def worker_claim(jobId: int, request: Request, req: ClaimRequest, worker=Depends
         WorkerAnalysisResult.organization_id == wk.organization_id,
         WorkerAnalysisResult.candidate_action_id != None,
     )
-    
+
     actions = db.query(CandidateAction).filter(
         CandidateAction.organization_id == wk.organization_id,
         CandidateAction.job_id == jobId,
@@ -651,7 +660,7 @@ def worker_claim(jobId: int, request: Request, req: ClaimRequest, worker=Depends
         CandidateAction.id.notin_(active_action_subq),
         CandidateAction.id.notin_(completed_action_subq),
     ).order_by(CandidateAction.created_at.asc()).with_for_update(skip_locked=True).limit(claim_count).all()
-    
+
     if not actions:
         return ClaimResponse(items=[], claim_expires_at=datetime.utcnow())
 
@@ -685,7 +694,7 @@ def worker_claim(jobId: int, request: Request, req: ClaimRequest, worker=Depends
         return ClaimResponse(items=[], claim_expires_at=datetime.utcnow())
 
     actual_count = len(candidates)
-    
+
     # Atomic quota check and reserve
     updated_rows = db.query(WorkerKey).filter(
         WorkerKey.id == wk.id,
@@ -695,7 +704,7 @@ def worker_claim(jobId: int, request: Request, req: ClaimRequest, worker=Depends
     ).update({
         WorkerKey.quota_reserved: WorkerKey.quota_reserved + actual_count
     }, synchronize_session=False)
-    
+
     if updated_rows == 0:
         db.rollback()
         raise HTTPException(status_code=402, detail="Quota exceeded or key revoked")
@@ -726,7 +735,7 @@ def worker_claim(jobId: int, request: Request, req: ClaimRequest, worker=Depends
             download_url = f"{request.url_for('worker_download_cv', claim_id=wc.id)}?token={download_token}"
             file_name = _safe_download_filename(action.candidate_name, wc.id)
             file_type = "txt"
-        
+
         items.append(ClaimItem(
             claim_id=wc.id,
             candidate_id=c.id,
@@ -817,7 +826,7 @@ def worker_submit_results(jobId: int, request: Request, req: AnalysisResultReque
     ws = worker["session"]
     if not (wk.permissions or {}).get("submit_results", True):
         raise HTTPException(status_code=403, detail="Worker key cannot submit results")
-    
+
     # Verify active claim
     claim = db.query(WorkerClaim).filter(
         WorkerClaim.candidate_id == req.candidate_id,
@@ -854,7 +863,7 @@ def worker_submit_results(jobId: int, request: Request, req: AnalysisResultReque
             ))
         db.commit()
         raise HTTPException(status_code=409, detail="Claim expired; request a new claim")
-        
+
     # Check if duplicate completion
     existing_result = db.query(WorkerAnalysisResult).filter(
         WorkerAnalysisResult.job_id == jobId,
@@ -870,7 +879,7 @@ def worker_submit_results(jobId: int, request: Request, req: AnalysisResultReque
             ),
         ),
     ).first()
-    
+
     if existing_result:
         # Already processed, maybe by another crashed worker that recovered, just mark claim expired to refund.
         claim.status = "expired"
@@ -916,10 +925,10 @@ def worker_submit_results(jobId: int, request: Request, req: AnalysisResultReque
         engine_version=req.engine_version
     )
     db.add(result)
-    
+
     claim.status = "completed"
     claim.completed_at = datetime.utcnow()
-    
+
     # Atomic transfer from reserved to used
     updated = db.query(WorkerKey).filter(
         WorkerKey.id == wk.id,
@@ -928,7 +937,7 @@ def worker_submit_results(jobId: int, request: Request, req: AnalysisResultReque
         WorkerKey.quota_reserved: WorkerKey.quota_reserved - 1,
         WorkerKey.quota_used: WorkerKey.quota_used + 1
     }, synchronize_session=False)
-    
+
     if updated == 0:
         db.rollback()
         raise HTTPException(status_code=409, detail="Reserved quota not found for this claim")
@@ -967,7 +976,7 @@ def worker_dashboard_progress(
     job = db.query(RecruiterJob).filter(RecruiterJob.id == job_id, RecruiterJob.organization_id == recruiter.organization_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-        
+
     total_cvs = db.query(CandidateAction).filter(
         CandidateAction.organization_id == recruiter.organization_id,
         CandidateAction.job_id == job_id,
@@ -982,7 +991,7 @@ def worker_dashboard_progress(
         WorkerClaim.status == "claimed",
         WorkerClaim.claim_expires_at >= datetime.utcnow(),
     ).count()
-    
+
     results = db.query(WorkerAnalysisResult).filter(
         WorkerAnalysisResult.organization_id == recruiter.organization_id,
         WorkerAnalysisResult.job_id == job_id,
@@ -993,11 +1002,11 @@ def worker_dashboard_progress(
         WorkerClaim.job_id == job_id,
         WorkerClaim.status == "failed",
     ).count()
-    
+
     rec_accept = sum(1 for r in results if r.decision == "recommended_accept")
     rec_review = sum(1 for r in results if r.decision == "recommended_review")
     rec_reject = sum(1 for r in results if r.decision == "recommended_reject")
-    
+
     keys = db.query(WorkerKey).filter(
         WorkerKey.organization_id == recruiter.organization_id,
         or_(WorkerKey.job_id == job_id, WorkerKey.job_id == None),
@@ -1006,7 +1015,7 @@ def worker_dashboard_progress(
     quota_used = sum(k.quota_used for k in keys)
     quota_reserved = sum(k.quota_reserved for k in keys)
     quota_remaining = max(0, quota_limit - quota_used - quota_reserved)
-    
+
     return {
       "total_cvs": total_cvs,
       "total": total_cvs,
@@ -1021,3 +1030,172 @@ def worker_dashboard_progress(
       "quota_reserved": quota_reserved,
       "quota_remaining": quota_remaining
     }
+
+
+from pydantic import BaseModel
+from typing import List, Optional
+
+class OfflineSyncResultItem(BaseModel):
+    file_name: str
+    file_type: str
+    file_hash: Optional[str] = None
+    duplicate_of: Optional[str] = None
+    score: float
+    decision: str
+    confidence: str
+    summary: str
+    matched_skills: List[str] = []
+    missing_skills: List[str] = []
+    risk_flags: List[str] = []
+    explanation: str
+    cv_text: Optional[str] = None
+    candidate_name: str
+    candidate_email: Optional[str] = None
+    worker_version: Optional[str] = None
+    engine_version: Optional[str] = None
+
+class OfflineSyncRequest(BaseModel):
+    job_id: int
+    results: List[OfflineSyncResultItem]
+
+@router.post("/worker/offline-sync")
+@limiter.limit("10/minute")
+def worker_offline_sync(
+    req: OfflineSyncRequest,
+    worker = Depends(get_current_worker),
+    db: Session = Depends(get_db)
+):
+    wk = worker["key"]
+    ws = worker["session"]
+
+    if not (wk.permissions or {}).get("submit_results", True):
+        raise HTTPException(status_code=403, detail="Worker key cannot submit results")
+
+    job = db.query(RecruiterJob).filter(
+        RecruiterJob.id == req.job_id,
+        RecruiterJob.organization_id == wk.organization_id
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job description not found on server")
+
+    actual_count = len(req.results)
+    if actual_count == 0:
+        return {"status": "ok", "synced_count": 0}
+
+    # Atomic quota check and increment
+    updated_rows = db.query(WorkerKey).filter(
+        WorkerKey.id == wk.id,
+        WorkerKey.revoked_at == None,
+        or_(WorkerKey.expires_at == None, WorkerKey.expires_at > datetime.utcnow()),
+        (WorkerKey.quota_used + WorkerKey.quota_reserved + actual_count) <= WorkerKey.quota_limit
+    ).update({
+        WorkerKey.quota_used: WorkerKey.quota_used + actual_count
+    }, synchronize_session=False)
+
+    if updated_rows == 0:
+        raise HTTPException(status_code=402, detail="Quota limit exceeded or key revoked")
+
+    synced_count = 0
+    for item in req.results:
+        candidate = None
+        if item.candidate_email:
+            candidate = db.query(Candidate).filter(
+                Candidate.organization_id == wk.organization_id,
+                Candidate.email == item.candidate_email
+            ).first()
+
+        if not candidate:
+            candidate = Candidate(
+                organization_id=wk.organization_id,
+                name=item.candidate_name,
+                email=item.candidate_email,
+                cv_text=item.cv_text,
+            )
+            db.add(candidate)
+            db.flush()
+
+        # Check if CandidateAction exists
+        action_record = db.query(CandidateAction).filter(
+            CandidateAction.job_id == req.job_id,
+            CandidateAction.organization_id == wk.organization_id,
+            CandidateAction.candidate_email == item.candidate_email
+        ).first() if item.candidate_email else None
+
+        if not action_record:
+            stage = "pending"
+            if item.decision == "recommended_accept":
+                stage = "shortlist"
+            elif item.decision == "recommended_reject":
+                stage = "rejected"
+
+            action_record = CandidateAction(
+                organization_id=wk.organization_id,
+                job_id=req.job_id,
+                recruiter_id=job.created_by,
+                candidate_name=item.candidate_name,
+                candidate_email=item.candidate_email,
+                cv_text=item.cv_text,
+                final_score=item.score,
+                ats_score=item.score,
+                action=stage,
+                analysis_snapshot=json.dumps({
+                    "score": item.score,
+                    "decision": item.decision,
+                    "confidence": item.confidence,
+                    "summary": item.summary,
+                    "matched_skills": item.matched_skills,
+                    "missing_skills": item.missing_skills,
+                    "risk_flags": item.risk_flags,
+                    "explanation": item.explanation,
+                }, default=str),
+                cv_file_name=item.file_name,
+                cv_file_type=item.file_type,
+            )
+            db.add(action_record)
+            db.flush()
+
+        # Create WorkerAnalysisResult
+        result_record = WorkerAnalysisResult(
+            organization_id=wk.organization_id,
+            job_id=req.job_id,
+            candidate_id=candidate.id,
+            candidate_action_id=action_record.id,
+            cv_id=candidate.id,
+            score=item.score,
+            decision=item.decision,
+            confidence=item.confidence,
+            summary=item.summary,
+            matched_skills=item.matched_skills,
+            missing_skills=item.missing_skills,
+            risk_flags=item.risk_flags,
+            explanation=item.explanation,
+            source="offline_sync",
+            worker_key_id=wk.id,
+            worker_version=item.worker_version or "1.0.0",
+            engine_version=item.engine_version or "1.0.0",
+        )
+        db.add(result_record)
+
+        # Log quota event
+        db.add(QuotaEvent(
+            worker_key_id=wk.id,
+            organization_id=wk.organization_id,
+            job_id=req.job_id,
+            cv_id=candidate.id,
+            event_type="completed",
+            amount=1,
+            metadata_={"sync_type": "offline_first"},
+        ))
+
+        synced_count += 1
+
+    db.commit()
+    audit_log(
+        "worker_offline_sync",
+        worker_key_id=wk.id,
+        organization_id=wk.organization_id,
+        session_id=ws.id,
+        job_id=req.job_id,
+        synced_count=synced_count,
+    )
+    return {"status": "ok", "synced_count": synced_count}

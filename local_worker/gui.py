@@ -1,4 +1,4 @@
-import csv
+﻿import csv
 import hashlib
 import json
 import queue
@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 try:
-    from tkinter import BOTH, DISABLED, END, NORMAL, Button, Entry, Frame, Label, StringVar, Text, Tk, filedialog, messagebox, ttk
+    from tkinter import BOTH, DISABLED, END, NORMAL, Button, Entry, Frame, Label, StringVar, Text, Tk, Toplevel, filedialog, messagebox, ttk
 except ImportError:
     print("\n[ERROR] The 'tkinter' package is required for the Graphical User Interface but is not installed or available on your system.")
     print("Please install tkinter (e.g., 'sudo apt-get install python3-tk' on Debian/Ubuntu, or ensure Python is installed with Tk support on your OS).")
@@ -21,35 +21,50 @@ try:
     import windnd
 except ImportError:
     windnd = None
-from credentials import save_worker_api_key
+from credentials import save_worker_api_key, load_worker_api_key
 from worker import API_BASE_URL, MAX_FILE_BYTES, LocalWorker, extract_text, maybe_apply_ai_review, score_cv
 from workspace import WorkspaceStore
 
 
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt"}
 
+
+def _resource_path(relative_path: str) -> Path:
+    """Resolve bundled assets in source and PyInstaller one-file builds."""
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    return base / relative_path
+
+
 THEMES = {
     "dark": {
-        "bg": "#0d1110",
-        "panel": "#121918",
-        "panel_2": "#18211f",
-        "text": "#e8efec",
-        "muted": "#98a8a2",
-        "accent": "#39c6a3",
-        "accent_2": "#d7b85b",
-        "border": "#263330",
-        "field": "#0f1514",
+        "bg": "#0b0f14",
+        "panel": "#121820",
+        "panel_2": "#19222d",
+        "panel_3": "#202b38",
+        "text": "#eef4f8",
+        "muted": "#9aa8b4",
+        "accent": "#58a6ff",
+        "accent_2": "#2dd4bf",
+        "warning": "#f2c14e",
+        "danger": "#fb7185",
+        "border": "#2b3645",
+        "field": "#0e141b",
+        "field_text": "#f7fbff",
     },
     "light": {
-        "bg": "#f4f7f5",
+        "bg": "#f5f7fb",
         "panel": "#ffffff",
-        "panel_2": "#eef4f1",
-        "text": "#17211e",
-        "muted": "#5d6b66",
-        "accent": "#12846f",
-        "accent_2": "#a37920",
-        "border": "#d9e4df",
+        "panel_2": "#eef3f8",
+        "panel_3": "#e5edf6",
+        "text": "#17202a",
+        "muted": "#607080",
+        "accent": "#2563eb",
+        "accent_2": "#0f766e",
+        "warning": "#9a6a00",
+        "danger": "#be123c",
+        "border": "#d7e0ea",
         "field": "#ffffff",
+        "field_text": "#17202a",
     },
 }
 
@@ -70,8 +85,14 @@ class LocalWorkerApp:
     def __init__(self):
         self.root = Tk()
         self.root.title("CV Analyzer Local Worker")
-        self.root.geometry("1080x760")
-        self.root.minsize(900, 620)
+        self.root.geometry("1180x820")
+        self.root.minsize(980, 680)
+        icon_path = _resource_path("assets/cv_analyzer_worker.ico")
+        if icon_path.exists():
+            try:
+                self.root.iconbitmap(default=str(icon_path))
+            except Exception:
+                pass
 
         self.store = WorkspaceStore()
         self.local_jobs: list[dict] = []
@@ -89,7 +110,8 @@ class LocalWorkerApp:
         self.review_var = StringVar(value="50")
         self.ai_mode_var = StringVar(value="none")
         self.api_url_var = StringVar(value=os.environ.get("CV_ANALYZER_API_URL", API_BASE_URL))
-        self.api_key_var = StringVar(value="")
+        saved_key = load_worker_api_key() or os.environ.get("CV_WORKER_API_KEY", "")
+        self.api_key_var = StringVar(value=saved_key)
         self.status_var = StringVar(value="Ready")
         self.server_status_var = StringVar(value="Server mode not connected")
         self.summary_var = StringVar(value="No run yet")
@@ -111,31 +133,32 @@ class LocalWorkerApp:
                 print(f"Failed to hook drag and drop: {e}")
 
     def _build(self):
-        shell = Frame(self.root, padx=18, pady=18)
+        shell = Frame(self.root, padx=20, pady=18)
         shell.pack(fill=BOTH, expand=True)
         self.shell = shell
 
-        header = Frame(shell)
+        header = Frame(shell, padx=4, pady=6)
         header.pack(fill="x", pady=(0, 14))
         self.header = header
         title_box = Frame(header)
         title_box.pack(side="left", fill="x", expand=True)
         self.title_box = title_box
-        self.title_label = Label(title_box, text="CV Analyzer Local Worker", font=("Segoe UI", 20, "bold"))
+        self.title_label = Label(title_box, text="CV Analyzer Local Worker", font=("Segoe UI", 23, "bold"))
         self.title_label.pack(anchor="w")
         self.subtitle_label = Label(
             title_box,
-            text="Offline-first CV ranking workspace for local employer folders.",
-            font=("Segoe UI", 10),
+            text="Local, private CV ranking workspace with exportable results and optional website sync.",
+            font=("Segoe UI", 10, "normal"),
         )
         self.subtitle_label.pack(anchor="w", pady=(2, 0))
         self.theme_button = Button(header, text="Light theme", command=self._toggle_theme)
         self.theme_button.pack(side="right")
 
-        server_box = Frame(shell, padx=10, pady=10)
-        server_box.pack(fill="x", pady=(0, 12))
+        server_box = Frame(shell, padx=14, pady=12)
+        server_box.pack(fill="x", pady=(0, 14))
         self.server_box = server_box
-        Label(server_box, text="Optional website connection", font=("Segoe UI", 10, "bold"), anchor="w").pack(fill="x")
+        self.server_title_label = Label(server_box, text="Optional website connection", font=("Segoe UI", 11, "bold"), anchor="w")
+        self.server_title_label.pack(fill="x")
         server_url_row = Frame(server_box)
         server_url_row.pack(fill="x", pady=(6, 3))
         Label(server_url_row, text="API URL", width=18, anchor="w").pack(side="left")
@@ -149,13 +172,13 @@ class LocalWorkerApp:
         self.server_status_label = Label(server_box, textvariable=self.server_status_var, anchor="w")
         self.server_status_label.pack(fill="x", pady=(5, 0))
 
-        job_row = Frame(shell)
+        job_row = Frame(shell, padx=4, pady=2)
         job_row.pack(fill="x", pady=4)
         Label(job_row, text="Local job name", width=18, anchor="w").pack(side="left")
         Entry(job_row, textvariable=self.job_name_var).pack(side="left", fill="x", expand=True, padx=(0, 8))
         Button(job_row, text="Save job", command=self._save_current_job).pack(side="left", padx=(0, 8))
 
-        saved_row = Frame(shell)
+        saved_row = Frame(shell, padx=4, pady=2)
         saved_row.pack(fill="x", pady=4)
         Label(saved_row, text="Saved jobs", width=18, anchor="w").pack(side="left")
         self.saved_jobs_combo = ttk.Combobox(saved_row, textvariable=self.saved_job_var, state="readonly")
@@ -163,33 +186,34 @@ class LocalWorkerApp:
         self.saved_jobs_combo.bind("<<ComboboxSelected>>", lambda _event: self._load_selected_job())
         Button(saved_row, text="Load", command=self._load_selected_job).pack(side="left")
 
-        run_row = Frame(shell)
+        run_row = Frame(shell, padx=4, pady=2)
         run_row.pack(fill="x", pady=4)
         Label(run_row, text="Run history", width=18, anchor="w").pack(side="left")
         self.saved_runs_combo = ttk.Combobox(run_row, textvariable=self.saved_run_var, state="readonly")
         self.saved_runs_combo.pack(side="left", fill="x", expand=True, padx=(0, 8))
-        Button(run_row, text="Open run", command=self._load_selected_run).pack(side="left")
+        Button(run_row, text="Open run", command=self._load_selected_run).pack(side="left", padx=(0, 8))
+        Button(run_row, text="Compare Runs", command=self._compare_runs).pack(side="left")
 
-        file_row = Frame(shell)
+        file_row = Frame(shell, padx=4, pady=2)
         file_row.pack(fill="x", pady=4)
         self.file_label = Label(file_row, text="CV folder", width=18, anchor="w")
         self.file_label.pack(side="left")
         Entry(file_row, textvariable=self.folder_var).pack(side="left", fill="x", expand=True, padx=(0, 8))
         Button(file_row, text="Choose folder", command=self._choose_folder).pack(side="left")
 
-        output_row = Frame(shell)
+        output_row = Frame(shell, padx=4, pady=2)
         output_row.pack(fill="x", pady=4)
         self.output_label = Label(output_row, text="Output folder", width=18, anchor="w")
         self.output_label.pack(side="left")
         Entry(output_row, textvariable=self.output_var).pack(side="left", fill="x", expand=True, padx=(0, 8))
         Button(output_row, text="Choose output", command=self._choose_output).pack(side="left")
 
-        self.jd_label = Label(shell, text="Job description", font=("Segoe UI", 10, "bold"))
+        self.jd_label = Label(shell, text="Job description", font=("Segoe UI", 11, "bold"))
         self.jd_label.pack(anchor="w", pady=(14, 4))
-        self.jd_text = Text(shell, height=7, wrap="word")
+        self.jd_text = Text(shell, height=7, wrap="word", padx=10, pady=8, font=("Segoe UI", 10))
         self.jd_text.pack(fill="x")
 
-        terms = Frame(shell)
+        terms = Frame(shell, padx=4, pady=2)
         terms.pack(fill="x", pady=(12, 4))
         for label, var in (
             ("Required skills", self.required_var),
@@ -201,7 +225,7 @@ class LocalWorkerApp:
             Label(box, text=label, anchor="w").pack(fill="x")
             Entry(box, textvariable=var).pack(fill="x")
 
-        thresholds = Frame(shell)
+        thresholds = Frame(shell, padx=4, pady=7)
         thresholds.pack(fill="x", pady=4)
         self.accept_label = Label(thresholds, text="Accept threshold")
         self.accept_label.pack(side="left")
@@ -214,13 +238,15 @@ class LocalWorkerApp:
         self.ai_combo["values"] = ["none", "customer_openai_key"]
         self.ai_combo.pack(side="left", padx=(6, 0))
 
-        actions = Frame(shell)
+        actions = Frame(shell, padx=4, pady=8)
         actions.pack(fill="x", pady=(12, 8))
         self.run_button = Button(actions, text="Analyze local folder", command=self._start_analysis)
         self.run_button.pack(side="left")
         self.retry_button = Button(actions, text="Retry failed files", command=self._retry_failed_files)
         self.retry_button.pack(side="left", padx=(8, 0))
         Button(actions, text="Open output folder", command=self._open_output).pack(side="left", padx=8)
+        self.sync_button = Button(actions, text="Sync to Server", command=self._sync_to_server)
+        self.sync_button.pack(side="left", padx=(0, 8))
         self.status_label = Label(actions, textvariable=self.status_var)
         self.status_label.pack(side="left", padx=12)
 
@@ -229,9 +255,9 @@ class LocalWorkerApp:
         self.summary_label = Label(shell, textvariable=self.summary_var, anchor="w")
         self.summary_label.pack(fill="x", pady=(0, 6))
 
-        columns = ("file", "score", "decision", "confidence", "duplicate", "matched", "missing")
+        columns = ("file", "score", "decision", "confidence", "duplicate", "sync", "matched", "missing")
         self.table = ttk.Treeview(shell, columns=columns, show="headings", height=12)
-        for col, width in (("file", 260), ("score", 70), ("decision", 110), ("confidence", 100), ("duplicate", 90), ("matched", 180), ("missing", 180)):
+        for col, width in (("file", 260), ("score", 70), ("decision", 110), ("confidence", 100), ("duplicate", 80), ("sync", 80), ("matched", 180), ("missing", 180)):
             self.table.heading(col, text=col.title())
             self.table.column(col, width=width, anchor="w")
         self.table.pack(fill=BOTH, expand=True, pady=(4, 8))
@@ -239,15 +265,17 @@ class LocalWorkerApp:
 
         self.detail_label = Label(shell, text="Selected result detail", font=("Segoe UI", 10, "bold"))
         self.detail_label.pack(anchor="w")
-        self.detail_text = Text(shell, height=6, wrap="word", state=DISABLED)
+        self.detail_text = Text(shell, height=6, wrap="word", state=DISABLED, padx=10, pady=8, font=("Segoe UI", 10))
         self.detail_text.pack(fill="x")
 
     def _all_frames(self):
-        frames = [self.root, self.shell, self.header, self.title_box, self.server_box]
-        for child in self.shell.winfo_children():
-            if isinstance(child, Frame):
-                frames.append(child)
-                frames.extend([nested for nested in child.winfo_children() if isinstance(nested, Frame)])
+        frames = [self.root]
+        def collect(widget):
+            for child in widget.winfo_children():
+                if isinstance(child, Frame):
+                    frames.append(child)
+                    collect(child)
+        collect(self.root)
         return frames
 
     def _all_labels(self):
@@ -264,10 +292,43 @@ class LocalWorkerApp:
             self.summary_label,
             self.detail_label,
         ]
-        for child in self.shell.winfo_children():
-            if isinstance(child, Frame):
-                labels.extend([nested for nested in child.winfo_children() if isinstance(nested, Label)])
+        def collect(widget):
+            for child in widget.winfo_children():
+                if isinstance(child, Label):
+                    labels.append(child)
+                collect(child)
+        collect(self.root)
         return list(dict.fromkeys(labels))
+
+    def _all_entries(self):
+        entries = []
+        def collect(widget):
+            for child in widget.winfo_children():
+                if isinstance(child, Entry):
+                    entries.append(child)
+                collect(child)
+        collect(self.root)
+        return entries
+
+    def _all_buttons(self):
+        buttons = []
+        def collect(widget):
+            for child in widget.winfo_children():
+                if isinstance(child, Button):
+                    buttons.append(child)
+                collect(child)
+        collect(self.root)
+        return buttons
+
+    def _all_text_widgets(self):
+        texts = []
+        def collect(widget):
+            for child in widget.winfo_children():
+                if isinstance(child, Text):
+                    texts.append(child)
+                collect(child)
+        collect(self.root)
+        return texts
 
     def _apply_theme(self):
         colors = THEMES[self.theme_name.get()]
@@ -276,21 +337,70 @@ class LocalWorkerApp:
             style.theme_use("clam")
         except Exception:
             pass
-        style.configure("Treeview", background=colors["panel"], fieldbackground=colors["panel"], foreground=colors["text"], rowheight=28, bordercolor=colors["border"])
-        style.configure("Treeview.Heading", background=colors["panel_2"], foreground=colors["text"], font=("Segoe UI", 9, "bold"))
-        style.configure("TCombobox", fieldbackground=colors["field"], background=colors["panel"], foreground=colors["text"])
-        style.configure("Horizontal.TProgressbar", troughcolor=colors["panel_2"], background=colors["accent"])
+        style.configure(
+            "Treeview",
+            background=colors["panel"],
+            fieldbackground=colors["panel"],
+            foreground=colors["text"],
+            rowheight=30,
+            bordercolor=colors["border"],
+            borderwidth=0,
+            font=("Segoe UI", 9),
+        )
+        style.configure("Treeview.Heading", background=colors["panel_3"], foreground=colors["text"], font=("Segoe UI", 9, "bold"), relief="flat")
+        style.map("Treeview", background=[("selected", colors["accent"])], foreground=[("selected", "#ffffff")])
+        style.configure("TCombobox", fieldbackground=colors["field"], background=colors["panel_2"], foreground=colors["field_text"], arrowcolor=colors["text"], bordercolor=colors["border"], lightcolor=colors["border"], darkcolor=colors["border"], padding=(8, 5))
+        style.map("TCombobox", fieldbackground=[("readonly", colors["field"])], foreground=[("readonly", colors["field_text"])])
+        style.configure("Horizontal.TProgressbar", troughcolor=colors["panel_2"], background=colors["accent"], bordercolor=colors["border"], lightcolor=colors["accent"], darkcolor=colors["accent"])
         for frame in self._all_frames():
-            frame.configure(bg=colors["bg"] if frame in {self.root, self.shell} else colors["panel"])
+            frame.configure(bg=colors["bg"] if frame in {self.root, self.shell, self.header, self.title_box} else colors["panel"])
+        self.server_box.configure(highlightbackground=colors["border"], highlightcolor=colors["border"], highlightthickness=1, bd=0)
         for label in self._all_labels():
             label.configure(bg=label.master.cget("bg"), fg=colors["text"])
         self.subtitle_label.configure(fg=colors["muted"])
         self.status_label.configure(fg=colors["accent"])
         self.server_status_label.configure(fg=colors["muted"])
-        self.summary_label.configure(fg=colors["accent_2"])
-        self.jd_text.configure(bg=colors["field"], fg=colors["text"], insertbackground=colors["text"], relief="flat", highlightthickness=1, highlightbackground=colors["border"])
-        self.detail_text.configure(bg=colors["field"], fg=colors["text"], insertbackground=colors["text"], relief="flat", highlightthickness=1, highlightbackground=colors["border"])
+        self.summary_label.configure(fg=colors["warning"])
+        for entry in self._all_entries():
+            entry.configure(
+                bg=colors["field"],
+                fg=colors["field_text"],
+                insertbackground=colors["field_text"],
+                relief="flat",
+                highlightthickness=1,
+                highlightbackground=colors["border"],
+                highlightcolor=colors["accent"],
+                font=("Segoe UI", 9),
+            )
+        for button in self._all_buttons():
+            is_primary = button in {self.run_button, self.sync_button}
+            button.configure(
+                bg=colors["accent"] if is_primary else colors["panel_2"],
+                fg="#ffffff" if is_primary else colors["text"],
+                activebackground=colors["accent_2"] if is_primary else colors["panel_3"],
+                activeforeground="#ffffff" if is_primary else colors["text"],
+                relief="flat",
+                bd=0,
+                padx=12,
+                pady=6,
+                font=("Segoe UI", 9, "bold" if is_primary else "normal"),
+                cursor="hand2",
+            )
+        for text_widget in self._all_text_widgets():
+            text_widget.configure(
+                bg=colors["field"],
+                fg=colors["field_text"],
+                insertbackground=colors["field_text"],
+                relief="flat",
+                highlightthickness=1,
+                highlightbackground=colors["border"],
+                highlightcolor=colors["accent"],
+            )
         self.theme_button.configure(text="Light theme" if self.theme_name.get() == "dark" else "Dark theme")
+        self.table.tag_configure("accept", foreground=colors["accent_2"])
+        self.table.tag_configure("review", foreground=colors["warning"])
+        self.table.tag_configure("reject", foreground=colors["danger"])
+        self.table.tag_configure("duplicate", foreground=colors["muted"])
 
     def _toggle_theme(self):
         self.theme_name.set("light" if self.theme_name.get() == "dark" else "dark")
@@ -357,6 +467,198 @@ class LocalWorkerApp:
             self.work_queue.put(("server_status", f"Connection failed: {exc}"))
         finally:
             worker_module.API_BASE_URL = original_url
+
+    def _sync_to_server(self):
+        api_url = self.api_url_var.get().strip()
+        api_key = self.api_key_var.get().strip()
+        if not api_url:
+            messagebox.showerror("Missing API URL", "Enter the website worker API URL.")
+            return
+        if not api_key:
+            messagebox.showerror("Missing worker key", "Please paste or save a worker key to sync.")
+            return
+
+        pending_results = self.store.list_pending_sync_results()
+        if not pending_results:
+            messagebox.showinfo("Sync complete", "All local analyses are already synced!")
+            return
+
+        self.status_var.set("Connecting to server to fetch jobs...")
+        threading.Thread(target=self._run_sync_worker, args=(api_url, api_key, pending_results), daemon=True).start()
+
+    def _run_sync_worker(self, api_url: str, api_key: str, pending_results: list):
+        original_url = worker_module.API_BASE_URL
+        try:
+            worker_module.API_BASE_URL = api_url.rstrip("/")
+            worker = LocalWorker(api_key, "server_files", "none", "desktop-gui")
+            worker.login()
+
+            resp = worker._request("GET", "/jobs")
+            if resp.status_code != 200:
+                raise Exception(f"Failed to fetch jobs: {resp.text}")
+
+            server_jobs = resp.json().get("jobs", [])
+            if not server_jobs:
+                self.work_queue.put(("status", "No jobs found on server. Create a job description first."))
+                return
+
+            self.work_queue.put(("prompt_sync_job", (server_jobs, pending_results, worker)))
+        except Exception as exc:
+            self.work_queue.put(("status", f"Sync connection failed: {exc}"))
+        finally:
+            worker_module.API_BASE_URL = original_url
+
+    def _sync_candidates_worker(self, job_id: int, pending_results: list, worker: LocalWorker):
+        original_url = worker_module.API_BASE_URL
+        try:
+            worker_module.API_BASE_URL = self.api_url_var.get().strip().rstrip("/")
+
+            results_payload = []
+            for r in pending_results:
+                results_payload.append({
+                    "file_name": Path(r["file"]).name,
+                    "file_type": Path(r["file"]).suffix.lstrip("."),
+                    "file_hash": r.get("file_hash"),
+                    "duplicate_of": Path(r["duplicate_of"]).name if r.get("duplicate_of") else None,
+                    "score": float(r.get("score") or 0),
+                    "decision": r.get("decision", "recommended_review"),
+                    "confidence": r.get("confidence", "medium"),
+                    "summary": r.get("summary", ""),
+                    "matched_skills": r.get("matched_skills") or [],
+                    "missing_skills": r.get("missing_skills") or [],
+                    "risk_flags": r.get("risk_flags") or [],
+                    "explanation": r.get("explanation", ""),
+                    "cv_text": r.get("cv_text"),
+                    "candidate_name": Path(r["file"]).stem,
+                    "candidate_email": None,
+                    "worker_version": r.get("worker_version", "1.0.0"),
+                    "engine_version": r.get("engine_version", "1.0.0"),
+                })
+
+            resp = worker._request("POST", "/worker/offline-sync", json={
+                "job_id": job_id,
+                "results": results_payload
+            })
+
+            if resp.status_code == 200:
+                for r in pending_results:
+                    self.store.update_result_sync_status(r["local_result_id"], "synced")
+                self.work_queue.put(("status", "Sync successful! All candidates uploaded."))
+                self.work_queue.put(("sync_success_dialog", len(pending_results)))
+            else:
+                error_msg = resp.text
+                for r in pending_results:
+                    self.store.update_result_sync_status(r["local_result_id"], "failed", error_msg)
+                self.work_queue.put(("status", f"Sync failed: {resp.status_code} - {error_msg}"))
+        except Exception as exc:
+            self.work_queue.put(("status", f"Sync error: {exc}"))
+        finally:
+            worker_module.API_BASE_URL = original_url
+
+    def _compare_runs(self):
+        compare_win = Toplevel(self.root)
+        compare_win.title("Compare Analysis Runs")
+        compare_win.geometry("900x600")
+        compare_win.transient(self.root)
+
+        shell = Frame(compare_win, padx=14, pady=14)
+        shell.pack(fill=BOTH, expand=True)
+
+        Label(shell, text="Compare Analysis Runs", font=("Segoe UI", 14, "bold")).pack(anchor="w", pady=(0, 10))
+
+        selector_frame = Frame(shell)
+        selector_frame.pack(fill="x", pady=6)
+
+        Label(selector_frame, text="Run A (Base):").pack(side="left")
+        run_a_var = StringVar()
+        run_a_combo = ttk.Combobox(selector_frame, textvariable=run_a_var, state="readonly", width=40)
+        run_a_combo.pack(side="left", padx=(6, 18))
+
+        Label(selector_frame, text="Run B (Compare):").pack(side="left")
+        run_b_var = StringVar()
+        run_b_combo = ttk.Combobox(selector_frame, textvariable=run_b_var, state="readonly", width=40)
+        run_b_combo.pack(side="left", padx=6)
+
+        run_values = [
+            f"#{run['id']} | {run['job_name']} | {run['total_files']} files | {run['created_at']}"
+            for run in self.local_runs
+        ]
+        run_a_combo["values"] = run_values
+        run_b_combo["values"] = run_values
+
+        if self.saved_run_var.get():
+            run_a_var.set(self.saved_run_var.get())
+            if len(run_values) > 1:
+                if run_values[0] == self.saved_run_var.get():
+                    run_b_var.set(run_values[1])
+                else:
+                    run_b_var.set(run_values[0])
+            else:
+                run_b_var.set(self.saved_run_var.get())
+        else:
+            if run_values:
+                run_a_var.set(run_values[0])
+                if len(run_values) > 1:
+                    run_b_var.set(run_values[1])
+                else:
+                    run_b_var.set(run_values[0])
+
+        columns = ("candidate", "score_a", "score_b", "diff", "decision_a", "decision_b")
+        compare_table = ttk.Treeview(shell, columns=columns, show="headings", height=15)
+        for col, width in (("candidate", 250), ("score_a", 100), ("score_b", 100), ("diff", 100), ("decision_a", 150), ("decision_b", 150)):
+            compare_table.heading(col, text=col.replace("_", " ").title())
+            compare_table.column(col, width=width, anchor="w")
+        compare_table.pack(fill=BOTH, expand=True, pady=(10, 10))
+
+        def do_compare(*args):
+            compare_table.delete(*compare_table.get_children())
+            val_a = run_a_var.get()
+            val_b = run_b_var.get()
+            if not val_a or not val_b:
+                return
+
+            try:
+                run_id_a = int(val_a.split("|", 1)[0].strip().lstrip("#"))
+                run_id_b = int(val_b.split("|", 1)[0].strip().lstrip("#"))
+            except ValueError:
+                return
+
+            results_a = self.store.get_run_results(run_id_a)
+            results_b = self.store.get_run_results(run_id_b)
+
+            map_a = {Path(r["file"]).name: r for r in results_a}
+            map_b = {Path(r["file"]).name: r for r in results_b}
+
+            all_files = sorted(list(set(map_a.keys()) | set(map_b.keys())))
+
+            for f in all_files:
+                ra = map_a.get(f)
+                rb = map_b.get(f)
+
+                name = Path(f).stem
+
+                score_a = ra["score"] if ra else "-"
+                score_b = rb["score"] if rb else "-"
+                dec_a = _decision_label(ra["decision"]) if ra else "-"
+                dec_b = _decision_label(rb["decision"]) if rb else "-"
+
+                if ra and rb:
+                    diff_val = rb["score"] - ra["score"]
+                    diff_str = f"{diff_val:+.1f}" if diff_val != 0 else "0.0"
+                elif ra:
+                    diff_str = "Missing"
+                else:
+                    diff_str = "New"
+
+                compare_table.insert(
+                    "",
+                    END,
+                    values=(name, score_a, score_b, diff_str, dec_a, dec_b)
+                )
+
+        run_a_combo.bind("<<ComboboxSelected>>", do_compare)
+        run_b_combo.bind("<<ComboboxSelected>>", do_compare)
+        do_compare()
 
     def _choose_output(self):
         folder = filedialog.askdirectory(title="Choose output folder")
@@ -537,6 +839,7 @@ class LocalWorkerApp:
                     "missing_skills": result["missing_skills"],
                     "risk_flags": result["risk_flags"],
                     "explanation": result["explanation"],
+                    "cv_text": text,
                     "analyzed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 }
             except Exception as exc:
@@ -555,6 +858,7 @@ class LocalWorkerApp:
                     "missing_skills": [],
                     "risk_flags": ["extraction_failed"],
                     "explanation": str(exc),
+                    "cv_text": "",
                     "analyzed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 }
             rows.append(row)
@@ -585,7 +889,11 @@ class LocalWorkerApp:
         except Exception:
             pass
         with csv_path.open("w", newline="", encoding="utf-8-sig") as fh:
-            writer = csv.DictWriter(fh, fieldnames=["rank", "file", "score", "decision", "confidence", "is_duplicate", "duplicate_of", "summary", "matched_skills", "missing_skills", "risk_flags", "explanation", "analyzed_at"])
+            writer = csv.DictWriter(
+                fh,
+                fieldnames=["rank", "file", "score", "decision", "confidence", "is_duplicate", "duplicate_of", "summary", "matched_skills", "missing_skills", "risk_flags", "explanation", "analyzed_at"],
+                extrasaction="ignore"
+            )
             writer.writeheader()
             for row in ranked_rows:
                 writer.writerow({
@@ -650,6 +958,7 @@ class LocalWorkerApp:
             f"File: {row.get('file')}",
             f"Score: {row.get('score')} | Decision: {_decision_label(row.get('decision'))} | Confidence: {row.get('confidence')}",
             f"Duplicate: {'yes' if row.get('is_duplicate') else 'no'}",
+            f"Sync Status: {row.get('sync_status') or 'pending'}" + (f" (Error: {row['sync_error']})" if row.get("sync_error") else ""),
             f"Breakdown: {json.dumps(row.get('score_breakdown') or {}, ensure_ascii=False)}",
             f"AI review: {row.get('ai_review_status') or 'not_used'}",
             f"Matched: {', '.join(row.get('matched_skills') or [])}",
@@ -675,9 +984,11 @@ class LocalWorkerApp:
                             _decision_label(payload["decision"]),
                             payload["confidence"],
                             "yes" if payload.get("is_duplicate") else "no",
+                            payload.get("sync_status", "pending"),
                             ", ".join(payload.get("matched_skills") or [])[:80],
                             ", ".join(payload.get("missing_skills") or [])[:80],
                         ),
+                        tags=self._row_tags(payload),
                     )
                     self.result_by_iid[iid] = payload
                 elif kind == "status":
@@ -692,6 +1003,22 @@ class LocalWorkerApp:
                     self.progress.configure(value=payload)
                 elif kind == "runs_refresh":
                     self._refresh_runs(payload)
+                elif kind == "prompt_sync_job":
+                    server_jobs, pending_results, worker = payload
+                    from tkinter import simpledialog
+                    selected_job_id = simpledialog.askinteger("Sync to Server", f"Available Server Job IDs:\n{', '.join(str(j) for j in server_jobs)}\n\nEnter the Job ID to sync {len(pending_results)} candidates to:")
+                    if not selected_job_id:
+                        self.status_var.set("Sync cancelled.")
+                        continue
+                    if selected_job_id not in server_jobs:
+                        messagebox.showerror("Invalid Job ID", f"Job ID {selected_job_id} is not associated with this worker key.")
+                        self.status_var.set("Sync failed: invalid Job ID.")
+                        continue
+                    self.status_var.set(f"Syncing {len(pending_results)} candidates to job #{selected_job_id}...")
+                    threading.Thread(target=self._sync_candidates_worker, args=(selected_job_id, pending_results, worker), daemon=True).start()
+                elif kind == "sync_success_dialog":
+                    messagebox.showinfo("Sync complete", f"Successfully synced {payload} candidates to the server!")
+                    self._load_selected_run()
                 elif kind == "done":
                     self.status_var.set(payload)
                     self.is_running = False
@@ -699,6 +1026,19 @@ class LocalWorkerApp:
         except queue.Empty:
             pass
         self.root.after(150, self._drain_queue)
+
+    def _row_tags(self, row: dict) -> tuple[str, ...]:
+        tags = []
+        if row.get("is_duplicate"):
+            tags.append("duplicate")
+        decision = row.get("decision")
+        if decision == "recommended_accept":
+            tags.append("accept")
+        elif decision == "recommended_review":
+            tags.append("review")
+        elif decision == "recommended_reject":
+            tags.append("reject")
+        return tuple(tags)
 
 
 if __name__ == "__main__":
