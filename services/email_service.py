@@ -156,83 +156,107 @@ def _send_feedback_email(record: dict) -> bool:
 # ── General email ────────────────────────────────────────────────────────
 
 def _do_send_email(to_email: str, subject: str, body: str, recruiter_email: str = "") -> bool:
-    """Send email via SMTP or SendGrid."""
+    """Send email via SMTP or SendGrid with retry support (3 attempts, exponential backoff)."""
     from email.utils import formataddr
 
     _logger = logging.getLogger("app.recruiter.email")
     default_from = (os.environ.get("REMINDER_EMAIL_FROM") or "sikayet.cvanalizor@gmail.com").strip()
 
-    # Try SendGrid first
-    sendgrid_key = os.environ.get("SENDGRID_API_KEY", "")
-    if sendgrid_key:
+    max_attempts = 3
+    backoff = 2.0
+    
+    for attempt in range(1, max_attempts + 1):
         try:
-            import sendgrid
-            from sendgrid.helpers.mail import Mail, Email, To, Content, Header
+            # Try SendGrid first
+            sendgrid_key = os.environ.get("SENDGRID_API_KEY", "")
+            if sendgrid_key:
+                try:
+                    import sendgrid
+                    from sendgrid.helpers.mail import Mail, Email, To, Content
 
-            sg = sendgrid.SendGridAPIClient(api_key=sendgrid_key)
-            platform_from = (os.environ.get("SENDGRID_FROM_EMAIL") or default_from).strip()
-            if recruiter_email and recruiter_email != platform_from:
-                from_email = Email(platform_from, name=recruiter_email)
-            else:
-                from_email = Email(platform_from)
-            mail = Mail(
-                from_email=from_email,
-                to_emails=To(to_email),
-                subject=subject,
-                plain_text_content=Content("text/plain", body),
-            )
-            if recruiter_email:
-                mail.reply_to = Email(recruiter_email)
-            response = sg.client.mail.send.post(request_body=mail.get())
-            _logger.info(
-                "sendgrid_sent to=%s reply_to=%s status=%s",
-                redact_for_log(to_email, key="to_email"),
-                redact_for_log(recruiter_email, key="recruiter_email"),
-                response.status_code,
-            )
-            return response.status_code in (200, 201, 202)
-        except Exception as e:
-            _logger.error("sendgrid_failed to=%s error=%s", redact_for_log(to_email, key="to_email"), e)
+                    sg = sendgrid.SendGridAPIClient(api_key=sendgrid_key)
+                    platform_from = (os.environ.get("SENDGRID_FROM_EMAIL") or default_from).strip()
+                    if recruiter_email and recruiter_email != platform_from:
+                        from_email = Email(platform_from, name=recruiter_email)
+                    else:
+                        from_email = Email(platform_from)
+                    mail = Mail(
+                        from_email=from_email,
+                        to_emails=To(to_email),
+                        subject=subject,
+                        plain_text_content=Content("text/plain", body),
+                    )
+                    if recruiter_email:
+                        mail.reply_to = Email(recruiter_email)
+                    response = sg.client.mail.send.post(request_body=mail.get())
+                    
+                    if response.status_code in (200, 201, 202):
+                        _logger.info(
+                            "sendgrid_sent to=%s reply_to=%s status=%s attempt=%d",
+                            redact_for_log(to_email, key="to_email"),
+                            redact_for_log(recruiter_email, key="recruiter_email"),
+                            response.status_code,
+                            attempt,
+                        )
+                        return True
+                    else:
+                        raise RuntimeError(f"SendGrid responded with status {response.status_code}")
+                except Exception as e:
+                    _logger.error("sendgrid_failed to=%s error=%s attempt=%d", redact_for_log(to_email, key="to_email"), e, attempt)
+                    if not os.environ.get("SMTP_HOST", ""):
+                        raise e
 
-    # Fallback to SMTP
-    smtp_host = os.environ.get("SMTP_HOST", "")
-    if smtp_host:
-        try:
-            from email.mime.text import MIMEText
+            # Fallback to SMTP
+            smtp_host = os.environ.get("SMTP_HOST", "")
+            if smtp_host:
+                try:
+                    from email.mime.text import MIMEText
 
-            smtp_port = int(os.environ.get("SMTP_PORT", "587"))
-            smtp_user = os.environ.get("SMTP_USER", "")
-            smtp_pass = os.environ.get("SMTP_PASS", "")
-            platform_from = (os.environ.get("SMTP_FROM") or default_from).strip()
+                    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+                    smtp_user = os.environ.get("SMTP_USER", "")
+                    smtp_pass = os.environ.get("SMTP_PASS", "")
+                    platform_from = (os.environ.get("SMTP_FROM") or default_from).strip()
 
-            if recruiter_email and recruiter_email != platform_from:
-                from_display = formataddr((recruiter_email, platform_from))
-            else:
-                from_display = platform_from
+                    if recruiter_email and recruiter_email != platform_from:
+                        from_display = formataddr((recruiter_email, platform_from))
+                    else:
+                        from_display = platform_from
 
-            msg = MIMEText(body, "plain", "utf-8")
-            msg["Subject"] = subject
-            msg["From"] = from_display
-            msg["To"] = to_email
-            if recruiter_email:
-                msg["Reply-To"] = recruiter_email
+                    msg = MIMEText(body, "plain", "utf-8")
+                    msg["Subject"] = subject
+                    msg["From"] = from_display
+                    msg["To"] = to_email
+                    if recruiter_email:
+                        msg["Reply-To"] = recruiter_email
 
-            with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
-                server.starttls()
-                if smtp_user:
-                    server.login(smtp_user, smtp_pass)
-                server.sendmail(platform_from, [to_email], msg.as_string())
+                    with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
+                        server.starttls()
+                        if smtp_user:
+                            server.login(smtp_user, smtp_pass)
+                        server.sendmail(platform_from, [to_email], msg.as_string())
 
-            _logger.info(
-                "smtp_sent to=%s reply_to=%s",
-                redact_for_log(to_email, key="to_email"),
-                redact_for_log(recruiter_email, key="recruiter_email"),
-            )
-            return True
-        except Exception as e:
-            _logger.error("smtp_failed to=%s error=%s", redact_for_log(to_email, key="to_email"), e)
+                    _logger.info(
+                        "smtp_sent to=%s reply_to=%s attempt=%d",
+                        redact_for_log(to_email, key="to_email"),
+                        redact_for_log(recruiter_email, key="recruiter_email"),
+                        attempt,
+                    )
+                    return True
+                except Exception as e:
+                    _logger.error("smtp_failed to=%s error=%s attempt=%d", redact_for_log(to_email, key="to_email"), e, attempt)
+                    raise e
 
-    _logger.warning("no_email_backend configured, email not sent to=%s", redact_for_log(to_email, key="to_email"))
+            _logger.warning("no_email_backend configured, email not sent to=%s", redact_for_log(to_email, key="to_email"))
+            return False
+
+        except Exception as exc:
+            if attempt == max_attempts:
+                _logger.error("all_email_attempts_failed to=%s final_error=%s", redact_for_log(to_email, key="to_email"), exc)
+                return False
+            _logger.info("email_retry_pending to=%s backoff=%.1fs", redact_for_log(to_email, key="to_email"), backoff)
+            time.sleep(backoff)
+            backoff *= 2.0
+
     return False
 
 

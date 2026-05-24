@@ -443,6 +443,7 @@ def download_worker_package(
         ("install_windows.cmd", _LOCAL_WORKER_DIR / "install_windows.cmd"),
         ("run_gui.cmd", _LOCAL_WORKER_DIR / "run_gui.cmd"),
         ("build_windows_exe.cmd", _LOCAL_WORKER_DIR / "build_windows_exe.cmd"),
+        ("CV Analyzer Local Worker.spec", _LOCAL_WORKER_DIR / "CV Analyzer Local Worker.spec"),
         ("VERSION", _LOCAL_WORKER_DIR / "VERSION"),
     ]
     missing = [name for name, path in package_files if not path.exists()]

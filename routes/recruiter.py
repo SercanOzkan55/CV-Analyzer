@@ -11,7 +11,9 @@ from sqlalchemy import or_, select, text
 
 from auth import verify_supabase_jwt
 from config.aws import MAX_UPLOAD_BYTES
-from core.runtime_bridge import main_module
+import time
+from typing import Any
+from core.runtime_bridge import main_module, redis_rate_client
 from database import get_db
 from models import (
     Analysis,
@@ -1053,6 +1055,66 @@ async def recruiter_batch_upload(
         )
 
 
+_IN_MEMORY_CACHE = {}
+
+
+def _get_cache(key: str) -> Any | None:
+    client = redis_rate_client()
+    if client:
+        try:
+            val = client.get(key)
+            if val:
+                return json.loads(val)
+            return None
+        except Exception as e:
+            logger.warning("Redis cache get failed, using fallback: %s", e)
+
+    if key in _IN_MEMORY_CACHE:
+        expire, val = _IN_MEMORY_CACHE[key]
+        if time.time() < expire:
+            return val
+        else:
+            del _IN_MEMORY_CACHE[key]
+    return None
+
+
+def _set_cache(key: str, val: Any, ttl: int = 300) -> None:
+    client = redis_rate_client()
+    if client:
+        try:
+            client.setex(key, ttl, json.dumps(val))
+            if key in _IN_MEMORY_CACHE:
+                del _IN_MEMORY_CACHE[key]
+            return
+        except Exception as e:
+            logger.warning("Redis cache set failed, using fallback: %s", e)
+
+    _IN_MEMORY_CACHE[key] = (time.time() + ttl, val)
+
+
+def _delete_cache(key: str) -> None:
+    client = redis_rate_client()
+    if client:
+        try:
+            client.delete(key)
+        except Exception as e:
+            logger.warning("Redis cache delete failed: %s", e)
+    if key in _IN_MEMORY_CACHE:
+        del _IN_MEMORY_CACHE[key]
+
+
+def _get_jobs_cache_key(org_id: int, limit: int, offset: int) -> str:
+    version = _get_cache(f"recruiter_jobs_version:{org_id}")
+    if not version:
+        version = str(time.time())
+        _set_cache(f"recruiter_jobs_version:{org_id}", version, ttl=86400)
+    return f"recruiter_jobs:{org_id}:{version}:{limit}:{offset}"
+
+
+def _invalidate_jobs_cache(org_id: int) -> None:
+    _delete_cache(f"recruiter_jobs_version:{org_id}")
+
+
 @router.post("/jobs")
 def recruiter_create_job(body: RecruiterJobCreate, db=Depends(get_db), recruiter=Depends(recruiter_required)):
     org_id = recruiter.organization_id
@@ -1062,6 +1124,7 @@ def recruiter_create_job(body: RecruiterJobCreate, db=Depends(get_db), recruiter
         raise HTTPException(status_code=400, detail="Job title is required")
 
     job = _rc_create_job(db, org_id, recruiter.id, body.title.strip(), body.description.strip())
+    _invalidate_jobs_cache(org_id)
     return {"id": job.id, "title": job.title, "created_at": str(job.created_at)}
 
 
@@ -1091,6 +1154,11 @@ def recruiter_list_jobs(
             status_code=400,
             detail="Recruiter profile is incomplete (no organization assigned)"
         )
+
+    cache_key = _get_jobs_cache_key(org_id, limit, offset)
+    cached_data = _get_cache(cache_key)
+    if cached_data:
+        return JobsResponse(**cached_data)
 
     if os.getenv("STORAGE_BACKEND") == "local":
         existing = db.query(RecruiterJob).filter(RecruiterJob.organization_id == org_id).first()
@@ -1136,7 +1204,9 @@ def recruiter_list_jobs(
         hasMore=(offset + limit) < total_count
     )
 
-    return JobsResponse(jobs=job_list, total=total_count, pagination=pagination)
+    response_data = JobsResponse(jobs=job_list, total=total_count, pagination=pagination)
+    _set_cache(cache_key, response_data.dict(), ttl=300)
+    return response_data
 
 
 @_get_limiter().limit("120/hour")
@@ -1398,6 +1468,7 @@ def recruiter_create_template(body: RecruiterEmailTemplateCreate, db=Depends(get
         body.subject.strip(),
         body.body.strip(),
     )
+    _delete_cache(f"recruiter_templates:{org_id}")
     return {"id": tpl.id, "name": tpl.name, "template_type": tpl.template_type}
 
 
@@ -1407,8 +1478,13 @@ def recruiter_list_templates(db=Depends(get_db), recruiter=Depends(recruiter_req
     if not org_id:
         raise HTTPException(status_code=400, detail="Recruiter has no organization")
 
+    cache_key = f"recruiter_templates:{org_id}"
+    cached_data = _get_cache(cache_key)
+    if cached_data:
+        return cached_data
+
     templates = _rc_get_tpls(db, org_id)
-    return {
+    response_data = {
         "templates": [
             {
                 "id": t.id,
@@ -1421,6 +1497,8 @@ def recruiter_list_templates(db=Depends(get_db), recruiter=Depends(recruiter_req
             for t in templates
         ]
     }
+    _set_cache(cache_key, response_data, ttl=300)
+    return response_data
 
 
 @router.delete("/templates/{template_id}")
@@ -1432,6 +1510,7 @@ def recruiter_delete_template(template_id: int, db=Depends(get_db), recruiter=De
     ok = _rc_del_tpl(db, template_id, org_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Template not found")
+    _delete_cache(f"recruiter_templates:{org_id}")
     return {"deleted": True}
 
 
