@@ -18,6 +18,7 @@ import SkeletonLoader from '../components/SkeletonLoader'
 import FilterChips from '../components/FilterChips'
 import { useToast } from '../components/Toast'
 import EnhancedCandidatePreview from '../components/EnhancedCandidatePreview'
+import LocalWorkerPanel from '../components/LocalWorkerPanel'
 import {
   fetchCandidates, fetchTopCandidates, searchRecruiter,
   fetchRecruiterCandidateDetail, recruiterBatchRank,
@@ -188,7 +189,7 @@ export default function RecruiterPage() {
   const [dbExportOpen, setDbExportOpen] = useState(false)
 
   // ── Dashboard state ──────────────────────────────────────────────────────────
-  const [activeSection, setActiveSection] = useState('overview') // overview | decisions | templates
+  const [activeSection, setActiveSection] = useState('overview') // overview | decisions | templates | workers
   const [jobs, setJobs]                   = useState([])
   const [selectedJob, setSelectedJob]     = useState(null)
   const [jobModal, setJobModal]           = useState(false)
@@ -1108,11 +1109,12 @@ export default function RecruiterPage() {
               </motion.button>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 4, borderTop: '1px solid var(--color-border)', paddingTop: 10 }}>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', borderTop: '1px solid var(--color-border)', paddingTop: 10 }}>
             {[
               { id: 'overview',  icon: Trophy,    label: t('recruiter.batch_title') || 'Overview' },
               { id: 'decisions', icon: FileText,  label: 'Decisions' },
               { id: 'templates', icon: Mail,      label: 'Email Templates' },
+              { id: 'workers',   icon: Briefcase, label: 'Local Worker' },
             ].map(tab => {
               const Icon = tab.icon
               const active = activeSection === tab.id
@@ -2179,6 +2181,11 @@ export default function RecruiterPage() {
                 </motion.div>
               )}
             </AnimatePresence>
+          </motion.div>
+        )}
+        {activeSection === 'workers' && (
+          <motion.div key="workers" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.3 }}>
+            <LocalWorkerPanel organizationId={user?.organization_id || user?.organizationId} />
           </motion.div>
         )}
         </AnimatePresence>
