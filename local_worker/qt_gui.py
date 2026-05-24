@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 try:
-    from PySide6.QtCore import QObject, Qt, QThread, Signal
+    from PySide6.QtCore import QAbstractAnimation, QEasingCurve, QPoint, QPropertyAnimation, QObject, Qt, QThread, QTimer, Signal
     from PySide6.QtGui import QAction, QIcon
     from PySide6.QtWidgets import (
         QApplication,
@@ -19,6 +19,7 @@ try:
         QFrame,
         QGridLayout,
         QGroupBox,
+        QGraphicsOpacityEffect,
         QHBoxLayout,
         QHeaderView,
         QLabel,
@@ -56,6 +57,7 @@ from workspace import WorkspaceStore
 
 
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt"}
+MOTION_ENABLED = os.environ.get("CV_WORKER_DISABLE_MOTION", "").lower() not in {"1", "true", "yes"}
 
 
 def resource_path(relative_path: str) -> Path:
@@ -291,10 +293,16 @@ class MainWindow(QMainWindow):
         self.worker: AnalysisWorker | None = None
         self.rows: list[dict] = []
         self.store = WorkspaceStore()
+        self._animations: list[QPropertyAnimation] = []
+        self._progress_animation: QPropertyAnimation | None = None
+        self._status_pulse: QPropertyAnimation | None = None
 
         self._build()
         self._apply_style()
         self._refresh_history()
+        if MOTION_ENABLED:
+            self.setWindowOpacity(0.0)
+            QTimer.singleShot(90, self._animate_startup)
 
     def _build(self):
         root = QWidget()
@@ -321,6 +329,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._build_results_tab(), "Results")
         self.tabs.addTab(self._build_history_tab(), "History")
         self.tabs.addTab(self._build_server_tab(), "Website Sync")
+        self.tabs.currentChanged.connect(self._animate_tab_change)
         outer.addWidget(self.tabs, 1)
         self.setCentralWidget(root)
 
@@ -479,6 +488,103 @@ class MainWindow(QMainWindow):
         layout.addWidget(field, 1)
         layout.addWidget(button)
         return row
+
+    def _run_animation(self, animation: QPropertyAnimation):
+        if not MOTION_ENABLED:
+            return
+        self._animations.append(animation)
+
+        def cleanup():
+            if animation in self._animations:
+                self._animations.remove(animation)
+
+        animation.finished.connect(cleanup)
+        animation.start(QAbstractAnimation.DeleteWhenStopped)
+
+    def _animate_startup(self):
+        if not MOTION_ENABLED:
+            self.setWindowOpacity(1.0)
+            return
+        fade = QPropertyAnimation(self, b"windowOpacity", self)
+        fade.setDuration(320)
+        fade.setStartValue(0.0)
+        fade.setEndValue(1.0)
+        fade.setEasingCurve(QEasingCurve.OutCubic)
+        self._run_animation(fade)
+        self._slide_widget(self.tabs, offset=14, duration=360)
+
+    def _slide_widget(self, widget: QWidget, offset: int = 10, duration: int = 240):
+        if not MOTION_ENABLED:
+            return
+        end = widget.pos()
+        start = QPoint(end.x(), end.y() + offset)
+        widget.move(start)
+        animation = QPropertyAnimation(widget, b"pos", self)
+        animation.setDuration(duration)
+        animation.setStartValue(start)
+        animation.setEndValue(end)
+        animation.setEasingCurve(QEasingCurve.OutCubic)
+        self._run_animation(animation)
+
+    def _animate_tab_change(self):
+        if not MOTION_ENABLED:
+            return
+        effect = self.tabs.graphicsEffect()
+        if not isinstance(effect, QGraphicsOpacityEffect):
+            effect = QGraphicsOpacityEffect(self.tabs)
+            self.tabs.setGraphicsEffect(effect)
+        effect.setOpacity(0.78)
+        animation = QPropertyAnimation(effect, b"opacity", self)
+        animation.setDuration(180)
+        animation.setStartValue(0.78)
+        animation.setEndValue(1.0)
+        animation.setEasingCurve(QEasingCurve.OutCubic)
+        self._run_animation(animation)
+
+    def _start_status_pulse(self):
+        if not MOTION_ENABLED:
+            return
+        effect = self.status_label.graphicsEffect()
+        if not isinstance(effect, QGraphicsOpacityEffect):
+            effect = QGraphicsOpacityEffect(self.status_label)
+            self.status_label.setGraphicsEffect(effect)
+        effect.setOpacity(1.0)
+        pulse = QPropertyAnimation(effect, b"opacity", self)
+        pulse.setDuration(780)
+        pulse.setStartValue(0.72)
+        pulse.setEndValue(1.0)
+        pulse.setEasingCurve(QEasingCurve.InOutSine)
+        pulse.setLoopCount(-1)
+        self._status_pulse = pulse
+        pulse.start()
+
+    def _stop_status_pulse(self):
+        if self._status_pulse:
+            self._status_pulse.stop()
+            self._status_pulse = None
+        effect = self.status_label.graphicsEffect()
+        if isinstance(effect, QGraphicsOpacityEffect):
+            effect.setOpacity(1.0)
+
+    def _set_progress_value(self, value: int):
+        if not MOTION_ENABLED:
+            self.progress.setValue(value)
+            return
+        if self._progress_animation:
+            self._progress_animation.stop()
+        animation = QPropertyAnimation(self.progress, b"value", self)
+        animation.setDuration(120)
+        animation.setStartValue(self.progress.value())
+        animation.setEndValue(value)
+        animation.setEasingCurve(QEasingCurve.OutCubic)
+        self._progress_animation = animation
+
+        def clear_progress_animation():
+            if self._progress_animation is animation:
+                self._progress_animation = None
+
+        animation.finished.connect(clear_progress_animation)
+        animation.start(QAbstractAnimation.DeleteWhenStopped)
 
     def _apply_style(self):
         self.setStyleSheet(
@@ -682,6 +788,7 @@ class MainWindow(QMainWindow):
         self.run_button.setEnabled(False)
         self.cancel_button.setEnabled(True)
         self.status_label.setText("Starting...")
+        self._start_status_pulse()
         self.tabs.setCurrentIndex(1)
 
         self.thread = QThread()
@@ -689,7 +796,7 @@ class MainWindow(QMainWindow):
         self.worker.moveToThread(self.thread)
         self.thread.started.connect(self.worker.run)
         self.worker.progress_max.connect(lambda value: self.progress.setRange(0, max(1, value)))
-        self.worker.progress.connect(self.progress.setValue)
+        self.worker.progress.connect(self._set_progress_value)
         self.worker.status.connect(self.status_label.setText)
         self.worker.row.connect(self._add_result_row)
         self.worker.done.connect(self._analysis_done)
@@ -705,6 +812,7 @@ class MainWindow(QMainWindow):
             self.status_label.setText("Cancelling...")
 
     def _analysis_done(self, message: str):
+        self._stop_status_pulse()
         self.table.setSortingEnabled(True)
         self.run_button.setEnabled(True)
         self.cancel_button.setEnabled(False)
@@ -712,6 +820,7 @@ class MainWindow(QMainWindow):
         self._refresh_history()
 
     def _analysis_failed(self, message: str):
+        self._stop_status_pulse()
         self.table.setSortingEnabled(True)
         self.run_button.setEnabled(True)
         self.cancel_button.setEnabled(False)
