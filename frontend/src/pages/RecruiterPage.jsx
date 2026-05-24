@@ -38,6 +38,12 @@ import {
 } from '../utils/exportUtils'
 import CameraScanModal from '../components/CameraScanModal'
 import BatchUploadModal from '../components/BatchUploadModal'
+import {
+  validateEmail,
+  validateFileUploads,
+  safeApiCall,
+  formatErrorMessage,
+} from '../utils/recruiterErrorHandling'
 
 function SortIcon({ sortKey, sortConfig }) {
   if (sortConfig.key !== sortKey) return <ArrowUpDown size={13} className="sort-icon" />
@@ -219,6 +225,45 @@ export default function RecruiterPage() {
   const [bulkEmailTplId, setBulkEmailTplId] = useState('')
   const [bulkSenderEmail, setBulkSenderEmail] = useState('')
 
+  const handleCvFilesChange = (e) => {
+    const selected = Array.from(e.target.files || [])
+    if (selected.length === 0) return
+    const validation = validateFileUploads(selected, {
+      maxFiles: 50,
+      maxSizeMB: 10,
+      allowedTypes: ['application/pdf'],
+    })
+
+    if (!validation.valid) {
+      setError(validation.error)
+      toast.error(validation.error)
+      return
+    }
+
+    setCvFiles(validation.validFiles)
+    setError(null)
+  }
+
+  const handleJdFileChange = (e) => {
+    const selected = e.target.files?.[0]
+    if (!selected) {
+      setJdFile(null)
+      return
+    }
+    const validation = validateFileUploads([selected], {
+      maxFiles: 1,
+      maxSizeMB: 10,
+      allowedTypes: ['application/pdf', 'text/plain'],
+    })
+
+    if (!validation.valid) {
+      toast.error(validation.error)
+      return
+    }
+
+    setJdFile(validation.validFiles[0])
+  }
+
   // email send
   const [emailModal, setEmailModal]       = useState(false)
   const [emailTarget, setEmailTarget]     = useState(null)
@@ -328,6 +373,18 @@ export default function RecruiterPage() {
     if (!token) return
     if (!cvFiles.length) { setError('Select at least one CV PDF'); return }
     if (!jdText.trim() && !jdFile) { setError('Enter job description or upload JD file'); return }
+    
+    const validation = validateFileUploads(cvFiles, {
+      maxFiles: 50,
+      maxSizeMB: 10,
+      allowedTypes: ['application/pdf'],
+    })
+    if (!validation.valid) {
+      setError(validation.error)
+      toast.error(validation.error)
+      return
+    }
+
     const preflightJdQuality = jdText.trim() ? assessJobDescriptionQuality(jdText) : null
     const preflightJdMeta = getJdQualityMeta(preflightJdQuality)
     if (preflightJdMeta?.level === 'invalid') {
@@ -361,7 +418,14 @@ export default function RecruiterPage() {
         setBatchProgress({ processed, total: cvFiles.length })
         toast.info(`${percent}% - Batch ${batchIdx + 1}/${batches.length} (${batchFiles.length} CVs)...`)
         
-        const result = await recruiterBatchRank(token, { jobDescription: jdText, jdFile: jd, cvFiles: batchFiles })
+        const callResult = await safeApiCall(
+          () => recruiterBatchRank(token, { jobDescription: jdText, jdFile: jd, cvFiles: batchFiles }),
+          `Batch Rank (Batch ${batchIdx + 1})`
+        )
+        if (!callResult.success) {
+          throw new Error(callResult.error || 'Batch ranking failed')
+        }
+        const result = callResult.data
         
         // Merge results - backend uses 'ranking' not 'ranked'
         if (result.ranking && Array.isArray(result.ranking)) {
@@ -597,13 +661,19 @@ export default function RecruiterPage() {
   async function handleCreateJob(e) {
     e.preventDefault()
     if (!jobForm.title.trim()) return
-    try {
-      await recruiterCreateJob(token, jobForm)
+    const result = await safeApiCall(
+      () => recruiterCreateJob(token, jobForm),
+      'Create Job'
+    )
+    if (result.success) {
       toast.success('Job created')
       setJobModal(false)
       setJobForm({ title: '', description: '' })
       loadJobs()
-    } catch (err) { toast.error(err.message) }
+    } else {
+      const errorMsg = await formatErrorMessage(result.error, 'Job creation failed')
+      toast.error(errorMsg)
+    }
   }
 
   // ── Accept / Reject candidate ────────────────────────────────────────────────
@@ -628,8 +698,8 @@ export default function RecruiterPage() {
 
   async function confirmAction() {
     const { candidate, action, message } = actionModal;
-    try {
-      await recruiterDashboardAction(token, {
+    const result = await safeApiCall(
+      () => recruiterDashboardAction(token, {
         job_id: selectedJob.id,
         candidate_name: candidate.candidate_name || candidate.name || '',
         candidate_email: candidate.email || candidate.candidate_email || '',
@@ -638,10 +708,12 @@ export default function RecruiterPage() {
         ats_score: candidate.ats_score ?? null,
         action,
         feedback: message
-      })
+      }),
+      `Candidate Action: ${action}`
+    )
+    if (result.success) {
       toast.success(`${candidate.candidate_name || candidate.name || 'Candidate'} ${action}`)
       setCandidateActions(prev => ({ ...prev, [candidate.candidate_name || candidate.name]: action }))
-      // Save to session
       recruiterSession.saveCandidateAction(candidate.candidate_name || candidate.name, action)
       recruiterSession.saveDecision({
         candidate_name: candidate.candidate_name || candidate.name || '',
@@ -653,7 +725,10 @@ export default function RecruiterPage() {
         feedback: message
       })
       setActionModal(prev => ({ ...prev, open: false }))
-    } catch (err) { toast.error(err.message) }
+    } else {
+      const errorMsg = await formatErrorMessage(result.error, 'Failed to update candidate status')
+      toast.error(errorMsg)
+    }
   }
 
   async function handleCandidateAction(candidate, action) {
@@ -701,10 +776,14 @@ export default function RecruiterPage() {
   // ── Send email ──────────────────────────────────────────────────────────────
   async function handleSendEmail() {
     if (!emailTarget || !emailTplId) { toast.error('Select a template'); return }
-    if (!emailAddr.trim()) { toast.error('Enter candidate email address'); return }
+    const emailValidation = validateEmail(emailAddr)
+    if (!emailValidation.valid) {
+      toast.error(emailValidation.error)
+      return
+    }
     setEmailSending(true)
-    try {
-      await recruiterSendEmail(token, {
+    const result = await safeApiCall(
+      () => recruiterSendEmail(token, {
         candidate_name: emailTarget.candidate_name || emailTarget.name || '',
         candidate_email: emailAddr.trim(),
         cv_text: emailTarget.cv_text || '',
@@ -712,47 +791,77 @@ export default function RecruiterPage() {
         template_id: Number(emailTplId),
         job_id: selectedJob?.id || null,
         sender_email: senderEmail.trim(),
-      })
+      }),
+      'Send Email'
+    )
+    setEmailSending(false)
+    if (result.success) {
       toast.success('Email sent successfully')
       setEmailModal(false)
-    } catch (err) { toast.error(err.message) }
-    finally { setEmailSending(false) }
+    } else {
+      const errorMsg = await formatErrorMessage(result.error, 'Failed to send email')
+      toast.error(errorMsg)
+    }
   }
 
   // ── Create email template ───────────────────────────────────────────────────
   async function handleCreateTemplate(e) {
     e.preventDefault()
     if (!tplForm.name.trim() || !tplForm.body.trim()) return
-    try {
-      await recruiterCreateTemplate(token, tplForm)
+    const result = await safeApiCall(
+      () => recruiterCreateTemplate(token, tplForm),
+      'Create Email Template'
+    )
+    if (result.success) {
       toast.success('Template created')
       setTplForm({ name: '', template_type: 'accept', subject: '', body: '' })
-      const data = await recruiterListTemplates(token)
-      setTemplates(Array.isArray(data) ? data : data?.templates || [])
-    } catch (err) { toast.error(err.message) }
+      const dataResult = await safeApiCall(
+        () => recruiterListTemplates(token),
+        'List Email Templates'
+      )
+      if (dataResult.success) {
+        const data = dataResult.data
+        setTemplates(Array.isArray(data) ? data : data?.templates || [])
+      }
+    } else {
+      const errorMsg = await formatErrorMessage(result.error, 'Failed to create template')
+      toast.error(errorMsg)
+    }
   }
 
   // ── Delete email template ───────────────────────────────────────────────────
   async function handleDeleteTemplate(id) {
-    try {
-      await recruiterDeleteTemplate(token, id)
+    const result = await safeApiCall(
+      () => recruiterDeleteTemplate(token, id),
+      'Delete Email Template'
+    )
+    if (result.success) {
       setTemplates(prev => prev.filter(t => t.id !== id))
       toast.success('Template deleted')
-    } catch (err) { toast.error(err.message) }
+    } else {
+      const errorMsg = await formatErrorMessage(result.error, 'Failed to delete template')
+      toast.error(errorMsg)
+    }
   }
 
   // ── Preview email template ──────────────────────────────────────────────────
   async function handlePreviewTemplate(tpl) {
-    try {
-      const data = await recruiterPreviewTemplate(token, {
+    const result = await safeApiCall(
+      () => recruiterPreviewTemplate(token, {
         template_id: tpl.id,
         candidate_name: 'Jane Doe',
         candidate_email: 'jane@example.com',
         cv_text: 'Sample CV text',
         job_description: jdText || 'Sample position',
-      })
-      setTplPreview(data)
-    } catch (err) { toast.error(err.message) }
+      }),
+      'Preview Email Template'
+    )
+    if (result.success) {
+      setTplPreview(result.data)
+    } else {
+      const errorMsg = await formatErrorMessage(result.error, 'Failed to preview template')
+      toast.error(errorMsg)
+    }
   }
 
   // ── Bulk toggle helpers ──────────────────────────────────────────────────────
@@ -845,25 +954,37 @@ export default function RecruiterPage() {
     if (!bulkEmailTplId) { toast.error('Select a template'); return }
     const selected = getSelectedCandidates()
     if (!selected.length) return
-    setBulkSending(true)
+    
+    const emails = selected.map(c => c.email || c.candidate_email || '').filter(Boolean)
+    if (!emails.length) {
+      toast.error('None of the selected candidates have a valid email address')
+      return
+    }
 
-    setBulkProgress(prev => prev.map(p => ({ ...p, status: 'sending' })))
-
-    try {
-      const emails = selected.map(c => c.email || c.candidate_email || '').filter(Boolean)
-      if (!emails.length) {
-        toast.error('None of the selected candidates have a valid email address')
-        setBulkSending(false)
+    // Validate emails first
+    for (const email of emails) {
+      const validation = validateEmail(email)
+      if (!validation.valid) {
+        toast.error(`Invalid email format detected: ${email}`)
         return
       }
+    }
 
-      const res = await recruiterSendEmailBulk(token, {
+    setBulkSending(true)
+    setBulkProgress(prev => prev.map(p => ({ ...p, status: 'sending' })))
+
+    const result = await safeApiCall(
+      () => recruiterSendEmailBulk(token, {
         template_id: Number(bulkEmailTplId),
         candidate_emails: emails,
         job_id: selectedJob?.id || null,
         sender_email: bulkSenderEmail.trim() || null
-      })
+      }),
+      'Send Bulk Email'
+    )
 
+    if (result.success) {
+      const res = result.data
       const resultsMap = {}
       if (res.results && Array.isArray(res.results)) {
         res.results.forEach(r => {
@@ -888,13 +1009,13 @@ export default function RecruiterPage() {
       } else {
         toast.success(`Bulk email sent successfully to ${res.successful} candidates`)
       }
-    } catch (err) {
-      toast.error(err.message || 'Failed to send bulk email')
-      setBulkProgress(prev => prev.map(p => ({ ...p, status: 'error', error: err.message || 'Failed' })))
-    } finally {
-      setBulkSending(false)
-      setBulkSelected(new Set())
+    } else {
+      const errorMsg = await formatErrorMessage(result.error, 'Failed to send bulk email')
+      toast.error(errorMsg)
+      setBulkProgress(prev => prev.map(p => ({ ...p, status: 'error', error: errorMsg })))
     }
+    setBulkSending(false)
+    setBulkSelected(new Set())
   }
 
   const fadeUp = {
@@ -1111,11 +1232,11 @@ export default function RecruiterPage() {
             <div className="recruiter-form-row">
               <div className="recruiter-form-group recruiter-file-group">
                 <label>{t('recruiter.jd_file_label')}</label>
-                <input type="file" accept=".txt,.pdf,text/plain,application/pdf" onChange={e => setJdFile(e.target.files?.[0] || null)} className="admin-input" disabled={!!jdText.trim()} style={jdText.trim() ? { opacity: 0.4 } : {}} />
+                <input type="file" accept=".txt,.pdf,text/plain,application/pdf" onChange={handleJdFileChange} className="admin-input" disabled={!!jdText.trim()} style={jdText.trim() ? { opacity: 0.4 } : {}} />
               </div>
               <div className="recruiter-form-group recruiter-file-group">
                 <label>{t('recruiter.cv_upload_label')}</label>
-                <input type="file" multiple accept="application/pdf,.pdf" onChange={e => setCvFiles(Array.from(e.target.files || []).slice(0, 5000))} className="admin-input" />
+                <input type="file" multiple accept="application/pdf,.pdf" onChange={handleCvFilesChange} className="admin-input" />
               </div>
             </div>
             <motion.button
