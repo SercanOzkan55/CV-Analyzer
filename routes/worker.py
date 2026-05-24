@@ -205,6 +205,14 @@ This package has two modes:
 
 The installer also creates a desktop shortcut named **CV Analyzer Local Worker**.
 
+If the app closes immediately, open:
+
+```text
+%LOCALAPPDATA%\\CV Analyzer Local Worker\\crash.log
+```
+
+The startup script keeps the terminal open when Python exits with an error, so the exact issue is visible instead of disappearing.
+
 The local app writes:
 
 - `local_worker_results.csv`
@@ -439,7 +447,7 @@ def download_worker_package(
     """Return a self-contained Local Worker ZIP for employers.
 
     The package intentionally does not include API keys or bearer tokens. Users
-    must paste the one-time worker key created in Settings.
+    must paste the one-time worker key created in the Recruiter Local Worker tab.
     """
     package_files = [
         ("worker.py", _LOCAL_WORKER_DIR / "worker.py"),
