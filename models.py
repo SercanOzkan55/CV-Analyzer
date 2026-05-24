@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import (TIMESTAMP, Boolean, Column, DateTime, Enum, Float, ForeignKey,
-                        Integer, JSON, String, Text)
+                        Integer, JSON, String, Text, CheckConstraint)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -274,6 +274,11 @@ class Reminder(Base):
     """Organization-level interview / application reminders."""
 
     __tablename__ = "reminders"
+    __table_args__ = (
+        CheckConstraint("event_date > created_at", name="check_future_date"),
+        CheckConstraint("length(title) >= 1 AND length(title) <= 500", name="check_title_length"),
+        CheckConstraint("target_email LIKE '%@%.%'", name="check_email_format"),
+    )
 
     id = Column(Integer, primary_key=True)
     organization_id = Column(
