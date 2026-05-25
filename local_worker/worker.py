@@ -247,6 +247,10 @@ def _extract_pdf_with_pdfplumber(file_bytes: bytes) -> str:
     return _fix_common_mojibake("\n\n".join(pages).strip())
 
 
+def _looks_like_pdf(file_bytes: bytes) -> bool:
+    return file_bytes.lstrip().startswith(b"%PDF")
+
+
 def extract_text(file_bytes: bytes, file_type: str, file_name: str = "") -> str:
     kind = (file_type or Path(file_name).suffix.lstrip(".") or "txt").lower()
     if kind in {"txt", "text", "plain"}:
@@ -263,7 +267,7 @@ def extract_text(file_bytes: bytes, file_type: str, file_name: str = "") -> str:
             text = _extract_pdf_with_pdfplumber(file_bytes)
         except Exception:
             pass
-        if not text.strip():
+        if not text.strip() and _looks_like_pdf(file_bytes):
             try:
                 try:
                     from pypdf import PdfReader
