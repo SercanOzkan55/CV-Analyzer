@@ -635,3 +635,92 @@ def test_templates_caching_and_invalidation(client, db_session):
     resp5 = client.get("/api/v1/recruiter/templates")
     assert resp5.status_code == 200
     assert len(resp5.json()["templates"]) == 0
+
+
+def test_dashboard_action_saves_decision_message_and_sends_email(client, db_session, monkeypatch):
+    """Approve/reject actions should persist reviewer message and optionally send candidate email."""
+    org, recruiter, job = _setup_org_with_recruiter(db_session)
+    sent = {}
+
+    def fake_send(to_email, subject, body, recruiter_email):
+        sent.update({
+            "to_email": to_email,
+            "subject": subject,
+            "body": body,
+            "recruiter_email": recruiter_email,
+        })
+        return True
+
+    monkeypatch.setattr("routes.recruiter._do_send_email", fake_send)
+    client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
+        "user_id": recruiter.supabase_id,
+        "email": recruiter.email,
+    }
+
+    resp = client.post(
+        "/api/v1/recruiter/dashboard/action",
+        json={
+            "job_id": job.id,
+            "candidate_name": "Jane Smith",
+            "candidate_email": "jane@example.com",
+            "cv_text": "Python developer with React and PostgreSQL experience",
+            "final_score": 86,
+            "ats_score": 82,
+            "action": "accepted",
+            "notes": "Strong Python and React match.",
+            "send_email": True,
+            "email_subject": "Next step",
+            "email_body": "Strong Python and React match.",
+            "analysis_snapshot": {
+                "final_score": 86,
+                "detected_skills": ["Python", "React"],
+                "missing_skills": ["Kubernetes"],
+            },
+        },
+    )
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["decision_message"] == "Strong Python and React match."
+    assert payload["email"]["sent"] is True
+    assert sent["to_email"] == "jane@example.com"
+
+    action = db_session.query(CandidateAction).filter_by(candidate_email="jane@example.com").one()
+    assert action.notes == "Strong Python and React match."
+    assert action.email_sent is True
+
+
+def test_dashboard_action_rejects_other_org_job(client, db_session):
+    """Recruiters must not create decisions against jobs outside their organization."""
+    _org, recruiter, _job = _setup_org_with_recruiter(db_session)
+    other = Organization(name="Other Org", domain="other.test")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    other_job = RecruiterJob(
+        organization_id=other.id,
+        created_by=recruiter.id,
+        title="Other job",
+        description="Private role",
+    )
+    db_session.add(other_job)
+    db_session.commit()
+    db_session.refresh(other_job)
+
+    client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
+        "user_id": recruiter.supabase_id,
+        "email": recruiter.email,
+    }
+
+    resp = client.post(
+        "/api/v1/recruiter/dashboard/action",
+        json={
+            "job_id": other_job.id,
+            "candidate_name": "Jane Smith",
+            "candidate_email": "jane@example.com",
+            "action": "rejected",
+        },
+    )
+
+    assert resp.status_code == 404
+    assert db_session.query(CandidateAction).filter_by(candidate_email="jane@example.com").count() == 0

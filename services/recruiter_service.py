@@ -324,6 +324,7 @@ def save_candidate_action(
     ats_score: float | None,
     action: str,
     analysis_snapshot: dict | None = None,
+    notes: str | None = None,
     cv_file_key: str | None = None,
     cv_file_name: str | None = None,
     cv_file_type: str | None = None,
@@ -341,6 +342,7 @@ def save_candidate_action(
         final_score=final_score,
         ats_score=ats_score,
         action=action,
+        notes=notes,
         analysis_snapshot=json.dumps(analysis_snapshot, default=str) if analysis_snapshot else None,
     )
     db.add(record)

@@ -511,7 +511,7 @@ def normalize(structured: Dict) -> Dict:
 
     # 6b. Strip empty / noise tokens from all flat-list sections
     _NOISE_TOKENS = frozenset({'""', '|', '||', ':', ',', '-', '–', '—', '•', '*', '/', '\\'})
-    for _flat_key in ("skills", "languages", "interests", "misc", "certifications"):
+    for _flat_key in ("skills", "languages", "interests", "misc"):
         _items = normalized.get(_flat_key)
         if isinstance(_items, list):
             normalized[_flat_key] = [
@@ -520,8 +520,8 @@ def normalize(structured: Dict) -> Dict:
                 and len(s.strip()) > 1
             ]
 
-    # 6c. Strip empty / noise tokens from dict-list sections (experience, education, projects)
-    for _dict_key in ("experiences", "education", "projects"):
+    # 6c. Strip empty / noise tokens from dict-list sections (experience, education, projects, certifications)
+    for _dict_key in ("experiences", "education", "projects", "certifications"):
         _entries = normalized.get(_dict_key)
         if not isinstance(_entries, list):
             continue

@@ -258,21 +258,45 @@ def extract_text(file_bytes: bytes, file_type: str, file_name: str = "") -> str:
         return file_bytes.decode("utf-8", errors="replace")
 
     if kind == "pdf":
+        text = ""
         try:
             text = _extract_pdf_with_pdfplumber(file_bytes)
-            if text.strip():
-                return text
         except Exception:
             pass
-        try:
+        if not text.strip():
             try:
-                from pypdf import PdfReader
-            except ImportError:
-                from PyPDF2 import PdfReader
-            reader = PdfReader(BytesIO(file_bytes))
-            return _fix_common_mojibake("\n".join((page.extract_text() or "") for page in reader.pages))
-        except Exception as exc:
-            raise LocalWorkerError(f"PDF extraction failed: {exc}") from exc
+                try:
+                    from pypdf import PdfReader
+                except ImportError:
+                    from PyPDF2 import PdfReader
+                reader = PdfReader(BytesIO(file_bytes))
+                text = _fix_common_mojibake("\n".join((page.extract_text() or "") for page in reader.pages))
+            except Exception:
+                pass
+        if text.strip():
+            return text
+            
+        # OCR Fallback path (Phase 7)
+        try:
+            from PIL import Image
+            import fitz  # PyMuPDF
+            import pytesseract
+            
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
+            ocr_pages = []
+            for page in doc:
+                pix = page.get_pixmap()
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                page_text = pytesseract.image_to_string(img)
+                if page_text:
+                    ocr_pages.append(page_text)
+            ocr_text = "\n".join(ocr_pages).strip()
+            if ocr_text:
+                return _fix_common_mojibake(ocr_text)
+        except Exception:
+            pass
+
+        raise LocalWorkerError("PDF extraction failed: no text could be extracted (scanned PDF without OCR or invalid file)")
 
     if kind == "docx":
         try:
@@ -1556,6 +1580,7 @@ class LocalWorker:
                 failed_files.append(str(path))
                 file_hash = ""
                 duplicate_of = ""
+                text = ""
                 result = self._failed_score(str(exc), risk_flag="extraction_failed", config=config)
             row = {
                 "file": str(path),
@@ -1566,6 +1591,7 @@ class LocalWorker:
                 "engine_version": ENGINE_VERSION,
                 "processed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 "sync_status": "pending",
+                "cv_text": text,
                 **result,
             }
             rows.append(row)
@@ -1592,6 +1618,7 @@ class LocalWorker:
                     "summary", "score_breakdown", "matched_skills", "missing_skills",
                     "risk_flags", "explanation", "processed_at",
                 ],
+                extrasaction="ignore",
             )
             writer.writeheader()
             for row in ranked_rows:

@@ -1454,6 +1454,10 @@ export const recruiterDashboardAction = async (token, payload) => {
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Candidate action failed: ${res.status}`)
+  }
   return res.json();
 }
 
