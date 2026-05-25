@@ -1,319 +1,341 @@
-# CV Analyzer: Enterprise-Grade AI Resume Intelligence & ATS Optimization Platform
+# CV Analyzer: Enterprise-Grade Resume Intelligence, ATS Calibration & Local Desktop Processing Grid
 
-CV Analyzer is a production-grade, high-throughput AI resume intelligence and ATS optimization platform. Spanning nearly **160,000 lines of code**, the codebase architecture is split into a modular **FastAPI** backend, a high-performance **React 18 + Vite** web client, a **React Native + Expo** mobile scaffold, and specialized AI/ML pipeline modules.
+Welcome to the official technical documentation for **CV Analyzer**, a production-grade, high-throughput enterprise SaaS platform and local processing grid designed to turn unstructured resume formats (PDF, DOCX, TXT) into structured hiring intelligence.
 
-The platform transforms raw, unstructured resume files (PDF, DOCX, TXT) into structured JSON entities, evaluates them against complex applicant tracking system (ATS) algorithms and job descriptions, delivers actionable improvement roadmaps, and facilitates recruiter workflows like batch ranking and pipeline exporting.
-
----
-
-## Table of Contents
-
-- [Core Product Capabilities](#core-product-capabilities)
-- [System & Data Architecture](#system--data-architecture)
-- [Deep Dive: Processing & Scoring Pipelines](#deep-dive-processing--scoring-pipelines)
-  - [1. Section Parsing & Resolution Pipeline](#1-section-parsing--resolution-pipeline)
-  - [2. ATS Evaluation & ML Calibration Engine](#2-ats-evaluation--ml-calibration-engine)
-  - [3. Auto-Fix & Section Floor Optimization Engine](#3-auto-fix--section-floor-optimization-engine)
-- [Technology Stack](#technology-stack)
-- [Project Directory Mapping](#project-directory-mapping)
-- [Environment Configuration](#environment-configuration)
-- [Installation & Quick Start](#installation--quick-start)
-  - [FastAPI Backend Setup](#fastapi-backend-setup)
-  - [React/Vite Frontend Setup](#reactvite-frontend-setup)
-- [Testing & Quality Assurance](#testing--quality-assurance)
-- [Multi-Agent UI Workflow](#multi-agent-ui-workflow)
+Spanning nearly **160,000 lines of code**, this repository integrates a modular **FastAPI** microservice backend, an interactive **React 18 + Vite** web client, a **React Native + Expo** mobile app scaffold, and a **PySide6 Local Desktop Client** with OCR fallback capabilities and offline-first queue synchronization.
 
 ---
 
-## Core Product Capabilities
+## Technical Overview & Architecture
 
-*   **Multi-Format Document Parsing:** Linearizes complex, multi-page, multi-column layouts into unified text blocks, utilizing regex heuristics and layout analyzers.
-*   **Comprehensive Resume Scoring:** Scores resumes out of 100 based on ATS formatting guidelines, keyword density, semantic relevance, skills, experience, layout, and content quality.
-*   **Smart ATS Auto-Fix:** Restructures resume text, injects powerful ATS action verbs, aligns formatting, and guarantees that core content (e.g., projects, skills, education) is never lost or shrunken during optimization.
-*   **Recruiter Workspaces:** Allows batch uploads (up to 5,000 resumes), runs concurrent scoring pipelines, calculates domain similarities, and generates Excel/CSV candidate reports.
-*   **Interactive CV Builder:** Re-compiles structured resume payloads back into clean templates, previewable in HTML and exportable to styled DOCX and PDF documents.
-*   **Enterprise SaaS Infrastructure:** Features user authentication, Stripe subscription webhooks, Redis-backed request caching and rate-limiting, and detailed operational health checks.
-
----
-
-## System & Data Architecture
-
-The application is structured to isolate compute-heavy AI and ML tasks from the web application loop. Under production settings, Redis coordinates task queues and caches semantic analysis objects, minimizing OpenAI/LLM API calls and database reads.
+CV Analyzer is designed around a distributed, local-first architecture. It accommodates two primary modes of operation:
+1.  **SaaS Mode (Cloud-Native):** Handles requests through FastAPI, verifies tenant roles via Supabase JWTs, controls resource access with a Redis-backed rate-limiter, routes files to AWS S3, and billing through Stripe.
+2.  **Local Worker Mode (Hybrid Edge):** A desktop GUI app (written in PySide6) processes directories of resumes locally, extracts text (falling back to OCR via Pytesseract if files are scanned PDFs), stores records in a local SQLite file, and synchronizes results with the cloud server's sync endpoints.
 
 ```mermaid
 flowchart TB
-  user["User / Recruiter"] --> web["React 18 + Vite Web App"]
-  user --> mobile["React Native / Expo App"]
+  subgraph Client_Surfaces ["User & Worker Clients"]
+    web["React 18 + Vite Client"]
+    mobile["React Native + Expo Client"]
+    gui["PySide6 Local Desktop App"]
+  end
 
-  web --> api["FastAPI Gateway Node"]
+  subgraph Cloud_Infrastructure ["FastAPI Server Node (:8001)"]
+    api["FastAPI App Gateway"]
+    auth["Supabase JWT Verification"]
+    quota["Quota & Stripe Billing Guard"]
+    redis_limit["Redis Caching & Limiters"]
+    
+    subgraph Processors ["Processing Engines"]
+        parser["Multi-Stage Parsing Pipeline"]
+        scoring["ATS & ML Evaluation Engine"]
+        sync_api["Offline-Sync Endpoint"]
+    end
+  end
+
+  subgraph Data_Storage ["Data & Object Stores"]
+    db["PostgreSQL Store (SQLAlchemy)"]
+    s3["S3-Compatible Object Store"]
+    local_sqlite["Local Worker SQLite"]
+    redis["Redis Memory Cache"]
+  end
+
+  web --> api
   mobile --> api
+  gui --> sync_api
 
-  subgraph Gateway ["API Guard Rails & Controls"]
-    api --> auth["Supabase JWT Validator"]
-    api --> quota["Tenant Quotas & Stripe Billing Guard"]
-    api --> redis_cache["Redis Caching & Token Buckets"]
-  end
+  api --> auth
+  api --> quota
+  api --> redis_limit
 
-  subgraph Pipelines ["Processing Engines"]
-    quota --> parser["Multi-stage CV Parser Pipeline"]
-    quota --> scoring["ATS & ML Scoring Engine"]
-    quota --> builder["CV Builder Template Engine"]
-  end
-
-  subgraph Datastores ["Storage & State Layer"]
-    parser --> db["PostgreSQL Database (SQLAlchemy)"]
-    parser --> s3["S3-Compatible Object Store"]
-    redis_cache --> redis["Redis Memory Grid"]
-  end
-
-  scoring --> ml_model["Local Scikit-Learn Match Predictor"]
-  scoring --> openai["LLM & Embeddings Middleware"]
+  quota --> parser
+  quota --> scoring
+  
+  parser --> db
+  parser --> s3
+  sync_api --> db
+  redis_limit --> redis
+  gui --> local_sqlite
 ```
 
 ---
 
-## Deep Dive: Processing & Scoring Pipelines
+## 1. Deep Dive: Parsing & Linearization (Layout-Aware NLP)
 
-### 1. Section Parsing & Resolution Pipeline
-
-Unstructured text extracted from files goes through a robust layout-aware parser before semantic extraction begins.
+PDF parsing often struggles with multi-column resume layouts, reading horizontally across columns and mixing up unrelated texts. CV Analyzer resolves this using a layout-aware multi-stage parsing pipeline:
 
 ```mermaid
 flowchart LR
-  file["Raw CV Document"] --> ext["Text Extraction (fitz / docx)"]
-  ext --> layout["Layout Analyzer (linearizes multi-columns)"]
-  layout --> classify["Section Classifier (labels sections)"]
-  classify --> resolver["Section Resolver (fixes key overlaps)"]
-  resolver --> normalize["Normalizer (strips formatting noise)"]
-  normalize --> validate["CVSchema Compliance Verification"]
+  raw["PDF / DOCX Upload"] --> ext["fitz / pdfplumber Text Extractor"]
+  ext --> layout["Layout Analyzer (Column Detection)"]
+  layout --> classify["Section Classifier (Block Detection)"]
+  classify --> resolver["Section Resolver (Drift Prevention)"]
+  resolver --> normalize["Normalizer (Sanitizer)"]
+  normalize --> pydantic["Pydantic CVSchema Builder"]
 ```
 
-1.  **Layout Analyzer:** Detects column structures and re-orders text blocks logically to ensure single-column reading order.
-2.  **Section Classifier:** Identifies candidate boundaries using multi-language heading patterns (Turkish and English).
-3.  **Section Resolver:** Eliminates ambiguities (e.g., preventing certificates from being swallowed by experience blocks).
-4.  **Normalizer:** Cleans stray bullets, whitespace markers, and normalizes contact, education, skills, and languages.
-5.  **CVSchema Validation:** Validates the structure using Pydantic models (`CVSchema`, `ProjectEntry`, `CertificationEntry`).
+### Layout-Aware Column Re-ordering
+1.  **Geometric Analysis:** The layout analyzer segments the document into bounding boxes, identifying multi-column boundaries.
+2.  **Linearization:** Text is re-ordered and linearized sequentially down each column before crossing boundaries. A special `multi_col_fixed` header is appended to notify downstream classifiers.
+3.  **Language Detection:** The `language_service` inspects text features to detect English vs. Turkish dynamically, configuring matching dictionaries.
+4.  **Section Classification:** Uses structural keywords to divide the text into sections: `summary`, `experience`, `education`, `projects`, `skills`, `certifications`, `languages`, `interests`, `misc`, `contact`.
+5.  **Section Resolver:** Re-evaluates classifications using cross-section scoring weights (e.g. moves degree matches from experience to education, routes misplaced contact info to headers).
 
-### 2. ATS Evaluation & ML Calibration Engine
+---
 
-Match scores are calculated via a hybrid logic that blends deterministic rules with machine learning:
+## 2. The Hybrid ATS Scoring & Calibration Model
 
-$$\text{Final Match Score} = \text{Rule-based Score (70\%)} + \text{ML-Calibrated Score (30\%)} $$
+CV Analyzer matches candidates against job descriptions using a hybrid score calculation model. It blends a deterministic, multi-factor rule engine (70% weight) with an ML match predictor model (30% weight):
+
+$$\text{Overall Match Score} = \text{Rule-based Score} \times 0.70 + \text{ML Predictor Score} \times 0.30 $$
 
 ```mermaid
 flowchart TD
-  cv["CV Text & Schema"] --> keywords["Keyword Coverage (35%)"]
-  cv --> skills["Skill Mapping (25%)"]
-  cv --> semantic["Semantic Similarity via Embeddings (25%)"]
-  cv --> seniority["Seniority Alignment (15%)"]
+  input["CV Payload & Job Description"] --> kw["Keyword Coverage (35%)"]
+  input --> skill["Skill Coverage (25%)"]
+  input --> sem["Semantic Similarity (25%)"]
+  input --> sen["Seniority Match (15%)"]
 
-  keywords --> rule_calc["Weighted Match Calculator"]
-  skills --> rule_calc
-  semantic --> rule_calc
-  seniority --> rule_calc
+  kw --> rules["Rule Engine (ATS Weights)"]
+  skill --> rules
+  sem --> rules
+  sen --> rules
 
-  rule_calc --> ml_blend["ML Calibrator (Scikit-Learn)"]
-  ml_blend --> final_score["Final ATS & Job Match Score"]
+  rules --> blend["ML Calibrator (Scikit-Learn)"]
+  blend --> final["Final Match Score (0 - 100)"]
 ```
 
-*   **Keyword Match:** Evaluates keyword coverage against the target job description (weighted at 35%).
-*   **Skill Coverage:** Compares CV skills to the requirements of the job (weighted at 25%).
-*   **Semantic Matching:** Computes cosine similarity between OpenAI/Mock embeddings of the CV and job description (weighted at 25%).
-*   **Seniority Matching:** Resolves matching levels (intern, junior, mid, senior, lead) using token-based mapping (weighted at 15%).
-*   **ML Calibration:** A pre-trained model (`resume_model.pkl`) fine-tunes the rule-based output based on historical evaluations.
-*   **Outage Safeguard:** If the job description is absent, the overall score defaults to the structural ATS quality score. If embeddings fail, a conservative cap of 40 is applied to prevent score inflation.
+### Scoring Components
+*   **Keyword Match (35%):** Scans the CV for overlapping terms from the job description (using NLTK tokenizers and Turkish/English lemma helpers).
+*   **Skill Coverage (25%):** Categorizes and matches technical/soft skills against requirements.
+*   **Semantic Similarity (25%):** Extracts embeddings via OpenAI API (or mock vectors locally) and calculates the cosine similarity.
+*   **Seniority Matching (15%):** Extracts seniority levels (intern, junior, mid, senior, lead/manager) from both documents and scores the discrepancy.
+*   **Outage Fallback & Capping:** 
+    *   If no Job Description is provided, the overall match score defaults directly to the structural **ATS Quality Score** (evaluating layout, formatting, section presence, and lengths).
+    *   If the embedding service is offline but a Job Description is present, the semantic score falls back to 0.0, and the overall score is capped at **40** to prevent inflation.
 
-### 3. Auto-Fix & Section Floor Optimization Engine
+---
 
-When users trigger the "Auto-Fix" flow, the application optimizes their CV text for ATS parser compatibility.
+## 3. Auto-Fix & Section Floor Optimization Engine
+
+The "Auto-Fix" tool restructures CV text to maximize ATS scoring compatibility, employing a safety-first feedback loop:
 
 ```mermaid
 sequenceDiagram
-  participant U as User / Client
+  participant U as Client
   participant AF as Auto-Fix Service
-  participant Norm as Normalization Pipeline
-  participant Floor as Floor Guardrail
+  participant Norm as Normalizer Agent
+  participant Guard as Section Floor Guard
   participant ATS as ATS Scorer
 
-  U->>AF: Send CV text (safe mode)
-  AF->>AF: Extract, clean, and reconstruct sections
-  AF->>Norm: Wording polish & ATS verb injection
-  AF->>Floor: Compare line counts per section
+  U->>AF: Original CV Text
+  AF->>Norm: Inject Action Verbs & standard formatting
+  AF->>Guard: Analyze line counts of protected sections
   alt Optimized section is shorter than original
-    Floor->>Floor: Restore original section lines (Preservation)
+    Guard->>Guard: Restore original section text (Floor preserved)
   end
-  Floor-->>AF: Safe structured text
+  Guard-->>AF: Normalized Text
   AF->>ATS: Score optimized text
-  alt Score regressed from original CV
-    AF->>AF: Fallback to original CV with identity header
+  alt Optimized Score < Original Score
+    AF->>AF: Roll back to minimal header rewrite / original CV
   end
-  AF-->>U: Optimized CV Text + Improvement details
+  AF-->>U: Final Safe Optimized CV + Applied Changes List
 ```
 
-*   **Action Verb Injection:** Replaces passive verbs with strong, ATS-recognized action verbs.
-*   **Protected Section Floor Guard:** Compares line counts of critical sections (Skills, Projects, Certifications, Education, Languages) before and after optimization. If an optimization shrinks a section, it automatically restores the original text to prevent evidence loss.
-*   **Regression Guard:** Evaluates the score of the rewritten text. If the score is lower than the original CV, it rolls back to a minimal heading-only rewrite or preserves the source CV text.
+*   **Action Verb Injection:** Replaces passive verbs with strong action verbs (e.g., "Responsible for writing backend APIs" becomes "Developed and scaled backend APIs").
+*   **Protected Floor Guard:** Sections classified as `skills`, `education`, `projects`, `certifications`, or `languages` are marked as protected. If the normalizer accidentally shrinks these sections, the engine restores the original lines.
+*   **Regression Guard:** Automatically evaluates the generated text. If the score decreases compared to the original CV, it discards the text and falls back to preserving the source file.
 
 ---
 
-## Technology Stack
+## 4. PySide6 Desktop GUI & Local Folder Scanning
 
-*   **Backend Framework:** FastAPI (Python 3.12)
-*   **Database Tooling:** SQLAlchemy ORM, Alembic Migrations
-*   **Frontend Library:** React 18, Vite, Framer Motion, TailwindCSS (for public pages), Vanilla CSS Variables (design tokens)
-*   **Mobile App:** React Native, Expo, TypeScript
-*   **Machine Learning & Data:** Scikit-Learn, Pytest, Pandas, Numpy, Pydantic v2
-*   **Infrastructure Support:** Redis (rate-limiting/cache), Docker/Docker-compose, AWS S3-compatible SDKs
+For recruiters processing files locally, the platform includes a local worker system in `local_worker/`:
+
+```mermaid
+flowchart TD
+  folder["Local Folder Path"] --> scan["Directory Scanner"]
+  scan --> read["fitz Text Extractor"]
+  read -- "Text empty?" --> check_pdf{"Is Scanned PDF?"}
+  check_pdf -- "Yes" --> ocr["OCR Pipeline (Pytesseract)"]
+  check_pdf -- "No" --> queue["Local SQLite Queue"]
+  ocr --> queue
+  queue --> sync["Sync to Server (POST /worker/offline-sync)"]
+```
+
+*   **Offline Storage Queue:** Scans directories for PDF, DOCX, and TXT files. Progress, parsed text, and sync statuses (`pending`, `synced`, `failed`) are cached locally in a SQLite database (`local_worker.db`).
+*   **OCR Fallback:** If `fitz` fails to extract text (indicating a scanned document), the system falls back to `pytesseract` to OCR the pages.
+*   **Batch Synchronization:** Synchronizes results to the cloud server, checking tenant quotas before processing.
 
 ---
 
-## Project Directory Mapping
+## 5. Database Schema Mapping
+
+The database schema manages SaaS user states, recruiter operations, local worker logs, and usage details:
+
+```text
+  +-------------------+          +-------------------+
+  |       User        |          |        Job        |
+  +-------------------+          +-------------------+
+  | id (PK)           |          | id (PK)           |
+  | email             |          | user_id (FK)      |
+  | plan_tier         |          | title             |
+  | quota_limit       |          | description       |
+  | quota_used        |          +---------+---------+
+  +---------+---------+                    |
+            |                              |
+            +---------------+--------------+
+                            |
+                            v
+                  +-------------------+
+                  |     Analysis      |
+                  +-------------------+
+                  | id (PK)           |
+                  | user_id (FK)      |
+                  | job_id (FK)       |
+                  | cv_text           |
+                  | match_score       |
+                  | ats_score         |
+                  | created_at        |
+                  +---------+---------+
+                            |
+            +---------------+---------------+
+            |                               |
+            v                               v
+  +-------------------+           +-------------------+
+  |     Candidate     |           |WorkerAnalysisRes  |
+  +-------------------+           +-------------------+
+  | id (PK)           |           | id (PK)           |
+  | job_id (FK)       |           | candidate_id (FK) |
+  | name              |           | worker_session    |
+  | email             |           | cv_text           |
+  | match_score       |           | sync_status       |
+  +-------------------+           +-------------------+
+```
+
+---
+
+## 6. Project Directory Mapping
+
+The project structure keeps route handlers separated from parsing logic and normalizers:
 
 ```text
 cv-analyzer/
-├── agents/                       # Extract and Normalize pipeline agents
-│   ├── extract_agent.py          # Extracts raw text into structured JSON schema
-│   └── normalize_agent.py        # Cleans noise, dedupes, caps sizes, formats sections
-├── core/                         # Operational core of the FastAPI application
-│   ├── config.py                 # Handles settings, secrets, and environment loading
-│   ├── database.py               # SQL database connection pooling and sessions
-│   ├── metrics.py                # Prometheus-compatible application metrics
-│   ├── quota.py                  # Rate-limiting, billing boundaries, Redis hooks
+├── agents/                       # Extraction and normalization agent logic
+│   ├── extract_agent.py          # LLM/regex helper parsing raw text to JSON schemas
+│   └── normalize_agent.py        # Cleans noise, dedupes lists, and structures schemas
+├── core/                         # Core runtime, security, and logging config
+│   ├── config.py                 # Environment variables and secrets setup
+│   ├── database.py               # Engine connection pooling and sessions
+│   ├── metrics.py                # Prometheus application metrics
+│   ├── quota.py                  # Quota, plan tiers, and daily limits
 │   └── security.py               # Request validation, CSRF, and CORS headers
-├── routes/                       # FastAPI router modules (HTTP endpoints)
-│   ├── ai_tools.py               # Auto-fix, AI rewrite, roadmaps, and custom tips
-│   ├── analysis.py               # Upload endpoints, parsing, and history
-│   ├── billing.py                # Subscription controls, Stripe callbacks, plans
-│   ├── dashboard.py              # Recruiter lists, shared links, metrics, logs
-│   ├── user_data.py              # User profiles, preferences, and data exports
-│   └── worker.py                 # Offline local worker sync and candidate management
-├── services/                     # Business logic and computations
-│   ├── ats_scoring.py            # Keyword density, structure, layout rules
-│   ├── ats_service.py            # Combines scoring rules and ML predictors
-│   ├── cv_autofix_service.py     # Heading normalization, section floors, verb injection
+├── routes/                       # FastAPI router handlers
+│   ├── ai_tools.py               # Auto-fix, AI rewrites, and roadmaps
+│   ├── analysis.py               # Uploads, parsing, evaluations, and history
+│   ├── billing.py                # Plans, subscriptions, and Stripe webhooks
+│   ├── dashboard.py              # Recruiter lists, shared pages, and analytics
+│   ├── user_data.py              # User profiles, privacy exports, and notes
+│   └── worker.py                 # Offline GUI worker sync endpoints
+├── services/                     # Business services
+│   ├── ats_scoring.py            # Hardcoded ATS guidelines and formatting checks
+│   ├── ats_service.py            # Blends rules, embeddings, and ML calibrator
+│   ├── cv_autofix_service.py     # Heading mapping, floor rules, action verbs
 │   ├── embedding_service.py      # OpenAI embedding calls and fallback mock logic
-│   ├── language_service.py       # Sentence-level language detection
-│   ├── pdf_text_extractor.py     # Handles fitz, pdfplumber, and raw parsing
-│   ├── pipeline_runtime.py       # Main pipeline execution entry point
-│   ├── rewrite_service.py        # OpenAI/Claude LLM resume rewriting wrappers
-│   ├── schema_builder.py         # Converts raw extraction dict into validated schema
-│   └── storage_service.py        # File upload logic (Local disk vs AWS S3 buckets)
+│   ├── language_service.py       # Language classification (TR/EN)
+│   ├── pdf_text_extractor.py     # PyMuPDF and pdfplumber extraction wrappers
+│   ├── pipeline_runtime.py       # Core runner for parsing and scoring pipelines
+│   ├── rewrite_service.py        # LLM integration for rewrites
+│   ├── schema_builder.py         # Schema compliance, repairs, and fallbacks
+│   └── storage_service.py        # File storage (Local disk vs AWS S3 buckets)
+├── local_worker/                 # PySide6 desktop app and OCR engines
+│   ├── qt_gui.py                 # PySide6 GUI interface for folder scanning
+│   ├── worker.py                 # OCR fallback parser and SQLite tracker
+│   └── workspace.py              # Worker environment setup
 ├── frontend/                     # React Single Page Application (SPA)
-│   ├── src/pages/                # Major views (Landing, Dashboard, Analyze, Recruiter)
-│   ├── src/components/           # Reusable components (Navbar, Modal, Skeletons)
+│   ├── src/pages/                # Main views (Landing, Dashboard, Analyze, Recruiter)
+│   ├── src/components/           # Shared views (Navbar, Footer, Skeleton)
 │   └── src/style.css             # Main styling, HSL colors, design tokens
-├── mobile/                       # Expo-based React Native mobile workspace
+├── mobile/                       # Expo mobile app scaffold
 ├── security/                     # Encryption, sanitization, XSS, and replay guards
-└── tests/                        # Comprehensive unit and regression test suite
+└── tests/                        # 790+ unit, integration, and security checks
 ```
 
 ---
 
-## Environment Configuration
+## 7. Main API Catalog
 
-Copy the example configuration to begin local setup:
-
-```bash
-cp .env.example .env
-```
-
-Key configuration parameters inside `.env`:
-
-```env
-ENV=development
-PORT=8001
-MOCK_SERVICES=true
-MOCK_DATABASE_URL=sqlite:///./mock_dev.db
-
-# Production integrations (Uncomment and populate for cloud deployment)
-# DATABASE_URL=postgresql://user:pass@host:5432/dbname
-# REDIS_URL=redis://localhost:6379/0
-# SUPABASE_URL=https://your-project.supabase.co
-# SUPABASE_JWT_SECRET=your-jwt-secret
-# OPENAI_API_KEY=your-openai-api-key
-# STRIPE_SECRET_KEY=your-stripe-secret-key
-# S3_BUCKET_NAME=your-s3-bucket
-```
+| Endpoint | Method | Purpose | Key Parameters |
+| :--- | :--- | :--- | :--- |
+| `/api/v1/analyze-pdf` | `POST` | Upload and evaluate a resume file against a JD | `file` (PDF/DOCX), `job_description` (text) |
+| `/api/v1/cv-builder/auto-fix` | `POST` | Optimize resume formatting, inject action verbs | `cv_text` (text), `job_description` (text) |
+| `/api/v1/usage` | `GET` | Retrieve account plan quota usage status | None (Supabase JWT Header) |
+| `/api/v1/worker/offline-sync` | `POST` | Upload locally parsed worker records to the cloud | `candidate_data` (JSON list), `worker_id` |
+| `/api/v1/billing/webhook` | `POST` | Stripe subscription state synchronization | Raw signature and request payload |
 
 ---
 
-## Installation & Quick Start
+## 8. Installation & Quick Start
 
-### FastAPI Backend Setup
-
-1.  Create and activate a Python virtual environment:
+### Backend Service Setup
+1.  Verify you have **Python 3.12+** installed.
+2.  Set up your virtual environment and install packages:
     ```bash
     python -m venv .venv
     # Windows:
     .\.venv\Scripts\activate
     # macOS/Linux:
     source .venv/bin/activate
-    ```
-2.  Install required packages:
-    ```bash
+
     python -m pip install --upgrade pip
     python -m pip install -r requirements.txt
     ```
-3.  Launch the Uvicorn development server:
+3.  Configure the environment:
+    ```bash
+    cp .env.example .env
+    ```
+    Verify `MOCK_SERVICES=true` is enabled for local mock development without Supabase/OpenAI.
+4.  Run the application server:
     ```bash
     python -m uvicorn main:app --host 127.0.0.1 --port 8001
     ```
-4.  Access the OpenAPI documentation:
-    [http://127.0.0.1:8001/docs](http://127.0.0.1:8001/docs)
 
-### React/Vite Frontend Setup
-
+### React Web Client Setup
 1.  Navigate to the frontend directory:
     ```bash
     cd frontend
     ```
-2.  Install package dependencies:
+2.  Install packages and start the server:
     ```bash
     npm install
-    ```
-3.  Start the Vite development server:
-    ```bash
     npm run dev
     ```
-4.  Open the web application:
-    [http://127.0.0.1:5173/](http://127.0.0.1:5173/) (Vite automatically proxies API calls to port `8001`).
+3.  Open [http://127.0.0.1:5173/](http://127.0.0.1:5173/) to interact with the application.
+
+### PySide6 Desktop GUI Setup
+1.  Verify Tesseract OCR is installed on your system if you require scanned PDF scanning.
+2.  Run the desktop app:
+    ```bash
+    python local_worker/qt_gui.py
+    ```
 
 ---
 
-## Testing & Quality Assurance
+## 9. Testing & Quality Assurance
 
-The codebase maintains strict stability rules. Both backend test suites and frontend builds must pass successfully before checking in code.
+All code updates must pass our unit tests, security audits, and typechecking rules:
 
-### Run Backend Tests
-
-We utilize `pytest` to run our test suite, containing **over 790 unit and integration tests** verifying parser accuracy, scoring weight boundaries, tenant isolation, and security controls:
-
+### Python Backend Checks
+Execute `pytest` to run our test suite, containing **over 790 tests**:
 ```bash
 python -m pytest
 ```
 
-### Validate Frontend Quality
-
-Execute typechecks, unit tests, and production bundling from the `frontend/` directory:
-
+### React Web Checks
+Run typescript checks, unit tests, and production packaging:
 ```bash
-npx tsc --noEmit
-npm test
-npm run build
+# Inside frontend/ directory
+npx.cmd tsc --noEmit
+npm.cmd test
+npm.cmd run build
 ```
-
----
-
-## Multi-Agent UI Workflow
-
-This repository utilizes a **Multi-Agent UI Design Workflow** to align codebase changes with design objectives. When modifying primary views (`LandingPage.jsx`, `DashboardPage.jsx`, `AnalyzePage.jsx`, `RecruiterPage.jsx`), modifications are routed through consecutive agent stages:
-
-```mermaid
-flowchart LR
-  design["Product Designer Agent (SKILL.md)"] --> token["Design System Agent (SKILL.md)"]
-  token --> motion["Motion Design Agent (Framer Motion)"]
-  motion --> implement["Frontend Implementation Agent"]
-  implement --> qa["QA Review Agent (Viewports & Access)"]
-```
-
-Refer to [AGENTS.md](file:///c:/Users/ASUS/Desktop/cv-analyzer/AGENTS.md) for full instructions, local Figma workspace configurations, and checklist rules.
