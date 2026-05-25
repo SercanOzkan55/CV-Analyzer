@@ -152,6 +152,82 @@ function getRowJdQuality(row, batchResult) {
   return row?.job_description_quality?.status ? row.job_description_quality : getBatchJdQuality(batchResult)
 }
 
+function normalizeInsightList(value, limit = 5) {
+  const raw = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(/[,;\n]+/)
+      : []
+  const seen = new Set()
+  const items = []
+  raw.forEach(item => {
+    const text = String(item || '').trim()
+    if (!text || seen.has(text) || !Number.isNaN(Number(text))) return
+    seen.add(text)
+    items.push(text)
+  })
+  return items.slice(0, limit)
+}
+
+function getCandidateDecisionInsights(candidate = {}) {
+  const snapshot = candidate.analysis_snapshot || candidate.analysis || candidate.result || candidate
+  const strengths = normalizeInsightList(
+    candidate.strengths
+    || snapshot.strengths
+    || snapshot.matched_skills
+    || snapshot.detected_skills
+    || candidate.details?.strong_keywords
+    || candidate.details?.skills_found,
+    5,
+  )
+  const weaknesses = normalizeInsightList(
+    candidate.weaknesses
+    || snapshot.weaknesses
+    || snapshot.missing_skills
+    || snapshot.missing_keywords
+    || candidate.details?.missing_skills,
+    5,
+  )
+  const risks = normalizeInsightList(snapshot.risk_flags || snapshot.warnings, 4)
+  const matched = normalizeInsightList(snapshot.matched_skills || snapshot.detected_skills || candidate.detected_skills, 8)
+  const missing = normalizeInsightList(snapshot.missing_skills || candidate.missing_skills, 8)
+  const score = Number(candidate.final_score ?? snapshot.final_score ?? snapshot.ats_score ?? 0)
+  const whySelected = [
+    Number.isFinite(score) && score > 0 ? `Overall match score is ${Math.round(score)}%.` : null,
+    matched.length ? `Matched core skills: ${matched.slice(0, 5).join(', ')}.` : null,
+    strengths[0] || null,
+  ].filter(Boolean)
+  return {
+    strengths,
+    weaknesses,
+    risks,
+    matched,
+    missing,
+    score: Number.isFinite(score) ? score : 0,
+    whySelected: whySelected.length ? whySelected : ['Decision is based on the available CV analysis and recruiter review.'],
+  }
+}
+
+function buildDecisionCopy(candidate, action, selectedJob) {
+  const insights = getCandidateDecisionInsights(candidate)
+  const name = candidate?.candidate_name || candidate?.name || 'Candidate'
+  const role = selectedJob?.title || 'the role'
+  const strong = (insights.strengths.length ? insights.strengths : insights.matched).slice(0, 3).join(', ')
+  const gaps = (insights.weaknesses.length ? insights.weaknesses : insights.missing).slice(0, 3).join(', ')
+  if (action === 'accepted') {
+    return {
+      insights,
+      subject: `Next steps for ${role}`,
+      message: `Hi ${name},\n\nThank you for your application for ${role}. We reviewed your CV and would like to move forward. What stood out: ${strong || 'your relevant experience and profile alignment'}.\n\nOur team will contact you with the next steps.\n\nBest regards,\nRecruiting Team`,
+    }
+  }
+  return {
+    insights,
+    subject: `Update on ${role}`,
+    message: `Hi ${name},\n\nThank you for your interest in ${role}. After reviewing your CV, we will not move forward for this opening. The main gaps for this role were: ${gaps || 'the current role requirements'}.\n\nWe appreciate your time and wish you success in your search.\n\nBest regards,\nRecruiting Team`,
+  }
+}
+
 function SkeletonTableRows({ count = 5 }) {
   return Array.from({ length: count }).map((_, i) => (
     <tr key={i} className="skeleton-row">
@@ -215,7 +291,16 @@ export default function RecruiterPage() {
   const [batchUploadOpen, setBatchUploadOpen] = useState(false)
 
   // decision feedback modal
-  const [actionModal, setActionModal]     = useState({ open: false, candidate: null, action: null, message: '' })
+  const [actionModal, setActionModal]     = useState({
+    open: false,
+    candidate: null,
+    action: null,
+    message: '',
+    subject: '',
+    sendEmail: false,
+    insights: null,
+    sending: false,
+  })
 
   // bulk selection
   const [bulkSelected, setBulkSelected]   = useState(new Set())
@@ -680,25 +765,23 @@ export default function RecruiterPage() {
   // ── Accept / Reject candidate ────────────────────────────────────────────────
   function openActionModal(candidate, action) {
     if (!selectedJob?.id) { toast.error('Select a job first'); return }
-    let msg = '';
-    const strengths = candidate.strengths || candidate.details?.strong_keywords || candidate.details?.skills_found || [];
-    const weaknesses = candidate.weaknesses || candidate.missing_skills || candidate.details?.missing_skills || [];
-    
-    // Filter out numbers
-    const validStr = strengths.filter(s => typeof s === 'string' && isNaN(Number(s))).slice(0, 3).join(', ');
-    const validWeak = weaknesses.filter(s => typeof s === 'string' && isNaN(Number(s))).slice(0, 3).join(', ');
-
-    if (action === 'accepted') {
-      msg = `Tebrikler! Özgeçmişiniz ${selectedJob.title || 'ilgili pozisyon'} ilanımızla yüksek oranda eşleştiği için seçildiniz. Özellikle ${validStr ? validStr + ' gibi ' : ''}nitelikleriniz ve yetkinlikleriniz dikkatimizi çekti.`;
-    } else {
-      msg = `Üzgünüz, özgeçmişinizi detaylı bir şekilde inceledik ancak bu rol için aradığımız bazı özellikler (${validWeak || 'gerekli teknik yetkinlikler'}) eksik olduğundan sizinle devam edemiyoruz.`;
-    }
-    
-    setActionModal({ open: true, candidate, action, message: msg });
+    const copy = buildDecisionCopy(candidate, action, selectedJob)
+    const email = candidate.email || candidate.candidate_email || ''
+    setActionModal({
+      open: true,
+      candidate,
+      action,
+      message: copy.message,
+      subject: copy.subject,
+      sendEmail: Boolean(email),
+      insights: copy.insights,
+      sending: false,
+    })
   }
 
   async function confirmAction() {
-    const { candidate, action, message } = actionModal;
+    const { candidate, action, message, subject, sendEmail } = actionModal;
+    setActionModal(prev => ({ ...prev, sending: true }))
     const result = await safeApiCall(
       () => recruiterDashboardAction(token, {
         job_id: selectedJob.id,
@@ -708,12 +791,22 @@ export default function RecruiterPage() {
         final_score: candidate.final_score ?? null,
         ats_score: candidate.ats_score ?? null,
         action,
-        feedback: message
+        feedback: message,
+        notes: message,
+        analysis_snapshot: candidate.analysis_snapshot || candidate.analysis || candidate,
+        send_email: sendEmail,
+        email_subject: subject,
+        email_body: message,
+        sender_email: user?.email || '',
       }),
       `Candidate Action: ${action}`
     )
     if (result.success) {
-      toast.success(`${candidate.candidate_name || candidate.name || 'Candidate'} ${action}`)
+      const emailStatus = result.data?.email
+      const emailSuffix = emailStatus?.requested
+        ? (emailStatus.sent ? ' and email sent' : `; email not sent (${emailStatus.reason || 'provider unavailable'})`)
+        : ''
+      toast.success(`${candidate.candidate_name || candidate.name || 'Candidate'} ${action}${emailSuffix}`)
       setCandidateActions(prev => ({ ...prev, [candidate.candidate_name || candidate.name]: action }))
       recruiterSession.saveCandidateAction(candidate.candidate_name || candidate.name, action)
       recruiterSession.saveDecision({
@@ -726,10 +819,16 @@ export default function RecruiterPage() {
         feedback: message
       })
       setActionModal(prev => ({ ...prev, open: false }))
+      if (activeSection === 'decisions' && selectedJob?.id) {
+        recruiterDashboardActions(token, selectedJob.id)
+          .then(data => setActions(Array.isArray(data) ? data : data?.actions || []))
+          .catch(() => {})
+      }
     } else {
       const errorMsg = await formatErrorMessage(result.error, 'Failed to update candidate status')
       toast.error(errorMsg)
     }
+    setActionModal(prev => ({ ...prev, sending: false }))
   }
 
   async function handleCandidateAction(candidate, action) {
@@ -2413,6 +2512,39 @@ export default function RecruiterPage() {
             <p style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>
               Are you sure you want to <strong>{actionModal.action}</strong> {actionModal.candidate?.candidate_name || actionModal.candidate?.name}?
             </p>
+            {actionModal.insights && (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+                gap: 12,
+              }}>
+                <div style={{ padding: 12, borderRadius: 10, background: 'var(--status-accent-bg)', border: '1px solid var(--status-accent-border)' }}>
+                  <div style={{ fontWeight: 800, color: 'var(--status-accent)', marginBottom: 8 }}>Why this decision</div>
+                  {(actionModal.insights.whySelected || []).map((item, index) => (
+                    <div key={index} style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginBottom: 6 }}>
+                      {index + 1}. {item}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <div style={{ padding: 10, borderRadius: 10, background: 'var(--status-success-bg)', border: '1px solid var(--status-success-border)' }}>
+                    <div style={{ fontWeight: 800, color: 'var(--status-success)', marginBottom: 6 }}>Strengths</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
+                      {(actionModal.insights.strengths?.length ? actionModal.insights.strengths : actionModal.insights.matched || []).slice(0, 3).join(', ') || 'No strong signal detected yet.'}
+                    </div>
+                  </div>
+                  <div style={{ padding: 10, borderRadius: 10, background: 'var(--status-warning-bg)', border: '1px solid var(--status-warning-border)' }}>
+                    <div style={{ fontWeight: 800, color: 'var(--status-warning)', marginBottom: 6 }}>Gaps / risks</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
+                      {[
+                        ...(actionModal.insights.weaknesses || []),
+                        ...(actionModal.insights.risks || []),
+                      ].slice(0, 3).join(', ') || 'No major gap detected.'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             <div>
               <label style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, display: 'block' }}>Feedback Reason (Optional)</label>
               <textarea 
@@ -2424,16 +2556,38 @@ export default function RecruiterPage() {
               />
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4, display: 'block' }}>This feedback is saved with the decision and can be used in emails later.</span>
             </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', fontWeight: 700 }}>
+              <input
+                type="checkbox"
+                checked={Boolean(actionModal.sendEmail)}
+                onChange={e => setActionModal(prev => ({ ...prev, sendEmail: e.target.checked }))}
+              />
+              Send this message to the candidate now
+            </label>
+            {actionModal.sendEmail && (
+              <div style={{ display: 'grid', gap: 10 }}>
+                <input
+                  className="admin-input"
+                  value={actionModal.subject || ''}
+                  onChange={e => setActionModal(prev => ({ ...prev, subject: e.target.value }))}
+                  placeholder="Email subject"
+                />
+                <div style={{ fontSize: '0.76rem', color: 'var(--color-text-secondary)' }}>
+                  Uses the candidate email on the selected row. If no email provider is configured, the decision is still saved and the response says email was not sent.
+                </div>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8 }}>
               <motion.button
                 className="btn-primary"
                 onClick={confirmAction}
+                disabled={actionModal.sending}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 style={{ flex: 1, background: actionModal.action === 'accepted' ? 'var(--status-success)' : 'var(--status-danger)', borderColor: actionModal.action === 'accepted' ? 'var(--status-success)' : 'var(--status-danger)' }}
               >
                 {actionModal.action === 'accepted' ? <ThumbsUp size={16} /> : <ThumbsDown size={16} />}
-                Confirm {actionModal.action === 'accepted' ? 'Acceptance' : 'Rejection'}
+                {actionModal.sending ? 'Saving...' : `Confirm ${actionModal.action === 'accepted' ? 'Acceptance' : 'Rejection'}`}
               </motion.button>
             </div>
           </div>

@@ -172,14 +172,20 @@ class WorkspaceStore:
         with self._connect() as conn:
             rows = conn.execute(
                 """
-                SELECT result_json
+                SELECT result_json, sync_status, id
                 FROM analysis_results
                 WHERE run_id = ?
                 ORDER BY score DESC, id ASC
                 """,
                 (run_id,),
             ).fetchall()
-        return [json.loads(row[0]) for row in rows]
+        results = []
+        for row in rows:
+            payload = json.loads(row[0])
+            payload["sync_status"] = row[1]
+            payload["local_result_id"] = row[2]
+            results.append(payload)
+        return results
 
     def list_pending_sync_results(self, limit: int = 100) -> list[dict]:
         with self._connect() as conn:

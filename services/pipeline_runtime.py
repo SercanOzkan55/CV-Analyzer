@@ -536,7 +536,7 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
     # If embeddings fail, fall back to conservative defaults and mark
     warnings: list[str] = []
     embedding_failed = False
-    if not cv_embedding or not job_embedding:
+    if _has_jd and (not cv_embedding or not job_embedding):
         semantic_score = 0.0
         embedding_failed = True
         warnings.append(
@@ -545,7 +545,7 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
         )
     else:
         try:
-            semantic_score = calculate_similarity(cv_embedding, job_embedding) * 100
+            semantic_score = calculate_similarity(cv_embedding, job_embedding) * 100 if (_has_jd and cv_embedding and job_embedding) else 0.0
         except Exception:
             semantic_score = 0.0
     keyword_score = keyword_match_score(cv_text, job_description)

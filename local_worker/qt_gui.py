@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import traceback
 from datetime import UTC, datetime
 from pathlib import Path
@@ -298,6 +299,8 @@ class MainWindow(QMainWindow):
         self._progress_animation: QPropertyAnimation | None = None
         self._status_pulse: QPropertyAnimation | None = None
         self.nav_buttons: list[QPushButton] = []
+        self.analysis_started_at: float | None = None
+        self.analysis_total_files = 0
 
         self._build()
         self._apply_style()
@@ -355,6 +358,10 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._build_results_tab(), "Results")
         self.tabs.addTab(self._build_history_tab(), "History")
         self.tabs.addTab(self._build_server_tab(), "Website Sync")
+        self.tabs.addTab(self._build_dashboard_tab(), "Dashboard")
+        self.tabs.addTab(self._build_reports_tab(), "Reports")
+        self.tabs.addTab(self._build_preferences_tab(), "Preferences")
+        self.tabs.addTab(self._build_ai_models_tab(), "AI Models")
         self.tabs.currentChanged.connect(self._animate_tab_change)
         self.tabs.currentChanged.connect(self._update_nav_state)
         sync_button.clicked.connect(lambda: self.tabs.setCurrentIndex(3))
@@ -433,6 +440,15 @@ class MainWindow(QMainWindow):
         return button
 
     def _passive_nav_button(self, text: str) -> QPushButton:
+        route_map = {
+            "Dashboard": 4,
+            "Reports": 5,
+            "Preferences": 6,
+            "AI Models": 7,
+        }
+        for label, index in route_map.items():
+            if label in text:
+                return self._nav_button(text, index)
         button = QPushButton(text)
         button.setObjectName("SidebarPassive")
         button.setEnabled(False)
@@ -561,6 +577,12 @@ class MainWindow(QMainWindow):
         footer_layout.setSpacing(18)
         footer_layout.addLayout(actions)
         footer_layout.addStretch(1)
+        self.queue_status_label = QLabel("Queue: idle")
+        self.queue_status_label.setObjectName("FooterMeta")
+        self.eta_status_label = QLabel("ETA: --")
+        self.eta_status_label.setObjectName("FooterMeta")
+        footer_layout.addWidget(self.queue_status_label)
+        footer_layout.addWidget(self.eta_status_label)
         ready = QLabel("✓  Ready to analyze")
         ready.setObjectName("FooterReady")
         footer_layout.addWidget(ready)
@@ -644,6 +666,98 @@ class MainWindow(QMainWindow):
         layout.addStretch(1)
         return page
 
+    def _build_dashboard_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setSpacing(18)
+        top = QHBoxLayout()
+        self.dashboard_total = QLabel("0 candidates")
+        self.dashboard_queue = QLabel("No active queue")
+        self.dashboard_eta = QLabel("ETA: --")
+        top.addWidget(self._summary_card("Run volume", self.dashboard_total, "Processed in the current run"))
+        top.addWidget(self._summary_card("Live queue", self.dashboard_queue, "Current local processing state"))
+        top.addWidget(self._summary_card("Estimated finish", self.dashboard_eta, "Calculated while analysis is running"))
+        layout.addLayout(top)
+
+        trust = QFrame()
+        trust.setObjectName("ContentCard")
+        trust_layout = QVBoxLayout(trust)
+        trust_layout.setContentsMargins(24, 22, 24, 24)
+        trust_layout.setSpacing(10)
+        trust_layout.addLayout(self._step_header("✓", "Enterprise trust controls", "Local analysis is designed for large employer folders."))
+        for text in (
+            "CV files stay on this computer unless you explicitly sync results.",
+            "Website API keys are stored in the OS credential store when available.",
+            "Only scores, decisions, explanations, and optional sync payloads are sent back.",
+            "Duplicate files are detected locally to avoid noisy ranking output.",
+        ):
+            label = QLabel("•  " + text)
+            label.setObjectName("TrustLine")
+            trust_layout.addWidget(label)
+        layout.addWidget(trust)
+        layout.addStretch(1)
+        return page
+
+    def _build_reports_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setSpacing(18)
+        self.report_preview = QTextEdit()
+        self.report_preview.setReadOnly(True)
+        self.report_preview.setPlainText("No report yet. Run a local analysis to generate JSON and CSV outputs.")
+        self.report_preview.setMinimumHeight(240)
+        layout.addWidget(self._panel_with_title("Report preview", self.report_preview))
+        actions = QHBoxLayout()
+        open_output = QPushButton("Open output folder")
+        open_output.setObjectName("PrimaryButton")
+        open_output.clicked.connect(self._open_output)
+        actions.addWidget(open_output)
+        actions.addStretch(1)
+        layout.addLayout(actions)
+        layout.addStretch(1)
+        return page
+
+    def _build_preferences_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setSpacing(18)
+        prefs = QFrame()
+        prefs.setObjectName("ContentCard")
+        form = QFormLayout(prefs)
+        form.setContentsMargins(24, 24, 24, 24)
+        theme = QComboBox()
+        theme.addItems(["Professional light", "System managed"])
+        max_size = QLabel(f"{MAX_FILE_BYTES // (1024 * 1024)} MB per file")
+        motion = QLabel("Enabled, respects CV_WORKER_DISABLE_MOTION=1")
+        form.addRow("Theme", theme)
+        form.addRow("Max file guard", max_size)
+        form.addRow("Motion", motion)
+        layout.addWidget(prefs)
+        layout.addWidget(self._info_block("Operational defaults", [
+            "Use SSD-backed folders for 4,000+ CV batches.",
+            "Keep output folders outside the input CV folder to avoid reprocessing reports.",
+            "Use the Website Sync tab only when you want to upload results back to the SaaS account.",
+        ]))
+        layout.addStretch(1)
+        return page
+
+    def _build_ai_models_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setSpacing(18)
+        layout.addWidget(self._info_block("AI review modes", [
+            "none: fastest and cheapest; uses deterministic rule-based scoring.",
+            "customer_openai_key: reserved for local customer-owned review in a later package.",
+            "No platform OpenAI key is embedded in the desktop app.",
+        ]))
+        layout.addWidget(self._info_block("Current MVP scoring", [
+            "Required skills, nice-to-have skills, hard reject rules, job description overlap, and text quality.",
+            "PDF, DOCX, and TXT extraction run locally.",
+            "A low-confidence result is still explainable and can be reviewed before sync.",
+        ]))
+        layout.addStretch(1)
+        return page
+
     def _path_row(self, field: QLineEdit, callback) -> QWidget:
         row = QWidget()
         layout = QHBoxLayout(row)
@@ -678,6 +792,48 @@ class MainWindow(QMainWindow):
         badge.setAlignment(Qt.AlignCenter)
         layout.addWidget(badge)
         return card
+
+    def _summary_card(self, title: str, value_label: QLabel, subtitle: str) -> QWidget:
+        card = QFrame()
+        card.setObjectName("MetricCard")
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(22, 18, 22, 18)
+        title_label = QLabel(title)
+        title_label.setObjectName("MetricTitle")
+        value_label.setObjectName("MetricValue")
+        subtitle_label = QLabel(subtitle)
+        subtitle_label.setObjectName("MetricSub")
+        layout.addWidget(title_label)
+        layout.addWidget(value_label)
+        layout.addWidget(subtitle_label)
+        return card
+
+    def _panel_with_title(self, title: str, widget: QWidget) -> QWidget:
+        panel = QFrame()
+        panel.setObjectName("ContentCard")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(24, 22, 24, 24)
+        heading = QLabel(title)
+        heading.setObjectName("StepTitle")
+        layout.addWidget(heading)
+        layout.addWidget(widget)
+        return panel
+
+    def _info_block(self, title: str, lines: list[str]) -> QWidget:
+        panel = QFrame()
+        panel.setObjectName("ContentCard")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(24, 22, 24, 24)
+        layout.setSpacing(10)
+        heading = QLabel(title)
+        heading.setObjectName("StepTitle")
+        layout.addWidget(heading)
+        for line in lines:
+            label = QLabel("•  " + line)
+            label.setObjectName("TrustLine")
+            label.setWordWrap(True)
+            layout.addWidget(label)
+        return panel
 
     def _step_header(self, number: str, title: str, subtitle: str) -> QHBoxLayout:
         row = QHBoxLayout()
@@ -805,6 +961,39 @@ class MainWindow(QMainWindow):
 
         animation.finished.connect(clear_progress_animation)
         animation.start(QAbstractAnimation.DeleteWhenStopped)
+
+    def _on_progress_max(self, value: int):
+        total = max(1, int(value or 1))
+        self.analysis_total_files = total
+        self.progress.setRange(0, total)
+        self._update_live_status(0, total)
+
+    def _on_progress(self, value: int):
+        current = int(value or 0)
+        total = max(1, self.analysis_total_files or self.progress.maximum() or 1)
+        self._set_progress_value(current)
+        self._update_live_status(current, total)
+
+    def _update_live_status(self, current: int, total: int):
+        remaining = max(0, total - current)
+        queue_text = f"Queue: {current}/{total}"
+        if hasattr(self, "queue_status_label"):
+            self.queue_status_label.setText(queue_text)
+        if hasattr(self, "dashboard_queue"):
+            self.dashboard_queue.setText(f"{remaining} remaining")
+
+        eta_text = "ETA: --"
+        if self.analysis_started_at and current > 0:
+            elapsed = max(0.1, time.monotonic() - self.analysis_started_at)
+            seconds = int((elapsed / current) * remaining)
+            if seconds >= 60:
+                eta_text = f"ETA: {seconds // 60}m {seconds % 60}s"
+            else:
+                eta_text = f"ETA: {seconds}s"
+        if hasattr(self, "eta_status_label"):
+            self.eta_status_label.setText(eta_text)
+        if hasattr(self, "dashboard_eta"):
+            self.dashboard_eta.setText(eta_text.replace("ETA: ", "") or "--")
 
     def _apply_style(self):
         self.setStyleSheet(
@@ -1015,6 +1204,10 @@ class MainWindow(QMainWindow):
                 color: #111827;
                 font-weight: 900;
             }
+            QLabel#FooterMeta, QLabel#TrustLine {
+                color: #516074;
+                font-weight: 700;
+            }
             QLabel#FieldLabel {
                 color: #4a5568;
                 font-size: 9.5pt;
@@ -1175,8 +1368,10 @@ class MainWindow(QMainWindow):
         self.worker = AnalysisWorker(folder, output, config, self.ai_mode.currentText(), config["title"])
         self.worker.moveToThread(self.thread)
         self.thread.started.connect(self.worker.run)
-        self.worker.progress_max.connect(lambda value: self.progress.setRange(0, max(1, value)))
-        self.worker.progress.connect(self._set_progress_value)
+        self.analysis_started_at = time.monotonic()
+        self.analysis_total_files = 0
+        self.worker.progress_max.connect(self._on_progress_max)
+        self.worker.progress.connect(self._on_progress)
         self.worker.status.connect(self.status_label.setText)
         self.worker.row.connect(self._add_result_row)
         self.worker.done.connect(self._analysis_done)
@@ -1197,6 +1392,11 @@ class MainWindow(QMainWindow):
         self.run_button.setEnabled(True)
         self.cancel_button.setEnabled(False)
         self.status_label.setText(message)
+        if hasattr(self, "queue_status_label"):
+            self.queue_status_label.setText("Queue: complete")
+        if hasattr(self, "eta_status_label"):
+            self.eta_status_label.setText("ETA: done")
+        self._refresh_live_panels()
         self._refresh_history()
 
     def _analysis_failed(self, message: str):
@@ -1205,6 +1405,8 @@ class MainWindow(QMainWindow):
         self.run_button.setEnabled(True)
         self.cancel_button.setEnabled(False)
         self.status_label.setText("Failed")
+        if hasattr(self, "queue_status_label"):
+            self.queue_status_label.setText("Queue: failed")
         QMessageBox.critical(self, "Analysis failed", message)
 
     def _add_result_row(self, row: dict):
@@ -1234,10 +1436,36 @@ class MainWindow(QMainWindow):
         accept = sum(1 for row in self.rows if row.get("decision") == "recommended_accept")
         review = sum(1 for row in self.rows if row.get("decision") == "recommended_review")
         reject = sum(1 for row in self.rows if row.get("decision") == "recommended_reject")
+        avg_score = round(sum(float(row.get("score") or 0) for row in self.rows) / total, 1) if total else 0
         self.total_label.setText(f"Total: {total}")
         self.accept_label.setText(f"Accept: {accept}")
         self.review_label.setText(f"Review: {review}")
         self.reject_label.setText(f"Reject: {reject}")
+        self.metric_candidates.setText(str(total))
+        self.metric_avg_score.setText(f"{avg_score}%" if total else "--")
+        self.metric_shortlisted.setText(str(accept))
+        self.metric_hard_rejects.setText(str(reject))
+        if hasattr(self, "dashboard_total"):
+            self.dashboard_total.setText(f"{total} candidates")
+        self._refresh_live_panels()
+
+    def _refresh_live_panels(self):
+        if hasattr(self, "report_preview"):
+            if not self.rows:
+                self.report_preview.setPlainText("No report yet. Run a local analysis to generate JSON and CSV outputs.")
+                return
+            top = sorted(self.rows, key=lambda row: float(row.get("score") or 0), reverse=True)[:5]
+            lines = [
+                f"Output folder: {self.output_folder.text().strip()}",
+                f"Total candidates: {len(self.rows)}",
+                "",
+                "Top candidates:",
+            ]
+            for index, row in enumerate(top, 1):
+                lines.append(
+                    f"{index}. {Path(row.get('file', '')).name} - {row.get('score')} - {decision_label(row.get('decision', ''))}"
+                )
+            self.report_preview.setPlainText("\n".join(lines))
 
     def _show_selected_detail(self):
         items = self.table.selectedItems()

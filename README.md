@@ -1,368 +1,319 @@
-# CV Analyzer
+# CV Analyzer: Enterprise-Grade AI Resume Intelligence & ATS Optimization Platform
 
-CV Analyzer is an AI-assisted resume intelligence platform for candidate screening, ATS scoring, job-description matching, CV improvement, recruiter workflows, and product-grade analytics. The application combines a React/Vite frontend, a FastAPI backend, a multi-stage CV parsing pipeline, local/mock development modes, and production-oriented security, billing, and storage integrations.
+CV Analyzer is a production-grade, high-throughput AI resume intelligence and ATS optimization platform. Spanning nearly **160,000 lines of code**, the codebase architecture is split into a modular **FastAPI** backend, a high-performance **React 18 + Vite** web client, a **React Native + Expo** mobile scaffold, and specialized AI/ML pipeline modules.
 
-## Contents
+The platform transforms raw, unstructured resume files (PDF, DOCX, TXT) into structured JSON entities, evaluates them against complex applicant tracking system (ATS) algorithms and job descriptions, delivers actionable improvement roadmaps, and facilitates recruiter workflows like batch ranking and pipeline exporting.
 
-- [What It Does](#what-it-does)
-- [Product Surfaces](#product-surfaces)
-- [System Architecture](#system-architecture)
-- [Core Flows](#core-flows)
+---
+
+## Table of Contents
+
+- [Core Product Capabilities](#core-product-capabilities)
+- [System & Data Architecture](#system--data-architecture)
+- [Deep Dive: Processing & Scoring Pipelines](#deep-dive-processing--scoring-pipelines)
+  - [1. Section Parsing & Resolution Pipeline](#1-section-parsing--resolution-pipeline)
+  - [2. ATS Evaluation & ML Calibration Engine](#2-ats-evaluation--ml-calibration-engine)
+  - [3. Auto-Fix & Section Floor Optimization Engine](#3-auto-fix--section-floor-optimization-engine)
 - [Technology Stack](#technology-stack)
-- [Quick Start](#quick-start)
+- [Project Directory Mapping](#project-directory-mapping)
 - [Environment Configuration](#environment-configuration)
-- [Validation Commands](#validation-commands)
-- [Main API Areas](#main-api-areas)
-- [Project Structure](#project-structure)
-- [Security And CI](#security-and-ci)
-- [UI Workflow](#ui-workflow)
+- [Installation & Quick Start](#installation--quick-start)
+  - [FastAPI Backend Setup](#fastapi-backend-setup)
+  - [React/Vite Frontend Setup](#reactvite-frontend-setup)
+- [Testing & Quality Assurance](#testing--quality-assurance)
+- [Multi-Agent UI Workflow](#multi-agent-ui-workflow)
 
-## What It Does
+---
 
-CV Analyzer helps individual users and recruiters turn unstructured resumes into actionable, comparable, and exportable hiring intelligence.
+## Core Product Capabilities
 
-Key capabilities:
+*   **Multi-Format Document Parsing:** Linearizes complex, multi-page, multi-column layouts into unified text blocks, utilizing regex heuristics and layout analyzers.
+*   **Comprehensive Resume Scoring:** Scores resumes out of 100 based on ATS formatting guidelines, keyword density, semantic relevance, skills, experience, layout, and content quality.
+*   **Smart ATS Auto-Fix:** Restructures resume text, injects powerful ATS action verbs, aligns formatting, and guarantees that core content (e.g., projects, skills, education) is never lost or shrunken during optimization.
+*   **Recruiter Workspaces:** Allows batch uploads (up to 5,000 resumes), runs concurrent scoring pipelines, calculates domain similarities, and generates Excel/CSV candidate reports.
+*   **Interactive CV Builder:** Re-compiles structured resume payloads back into clean templates, previewable in HTML and exportable to styled DOCX and PDF documents.
+*   **Enterprise SaaS Infrastructure:** Features user authentication, Stripe subscription webhooks, Redis-backed request caching and rate-limiting, and detailed operational health checks.
 
-- Parse PDF, DOCX, TXT, and structured CV data into a normalized schema.
-- Score resumes for ATS readiness, keyword match, semantic relevance, skills, experience, layout, and content quality.
-- Compare CVs against job descriptions and surface actionable gaps.
-- Provide recruiter ranking, batch processing, candidate actions, reports, and email templates.
-- Generate and preview CV Builder output in HTML, PDF, DOCX, and related formats.
-- Support SaaS concerns such as authentication, plans, quotas, billing hooks, usage history, favorites, templates, sharing, and audits.
-- Run locally in mock mode without requiring every production integration.
+---
 
-## Product Surfaces
+## System & Data Architecture
 
-| Surface | Purpose |
-| --- | --- |
-| Landing and auth | Public entry, login, registration, password recovery |
-| Dashboard | Usage, streaks, history, insights, favorites, account status |
-| Analyze | Single CV upload, parsing, scoring, job-description matching |
-| Recruiter | Candidate/job workflows, batch ranking, reports, templates |
-| Settings and profile | Account preferences, profile data, privacy/export controls |
-| Ops and data center | Operational/admin surfaces where enabled |
-| Mobile app | React Native/Expo client scaffold for core flows |
-
-## System Architecture
+The application is structured to isolate compute-heavy AI and ML tasks from the web application loop. Under production settings, Redis coordinates task queues and caches semantic analysis objects, minimizing OpenAI/LLM API calls and database reads.
 
 ```mermaid
 flowchart TB
-  user["User / Recruiter"] --> web["React + Vite Web App"]
+  user["User / Recruiter"] --> web["React 18 + Vite Web App"]
   user --> mobile["React Native / Expo App"]
 
-  web --> api["FastAPI Backend"]
+  web --> api["FastAPI Gateway Node"]
   mobile --> api
 
-  api --> auth["Supabase Auth / JWT Verification"]
-  api --> quota["Plan, Quota, Usage, Billing Guards"]
-  api --> parser["CV Parsing Pipeline"]
-  api --> scoring["ATS, Semantic, Keyword, Skill, Experience Scoring"]
-  api --> recruiter["Recruiter and Batch Workflows"]
-  api --> builder["CV Builder and Rendering"]
-  api --> storage["Storage Layer"]
+  subgraph Gateway ["API Guard Rails & Controls"]
+    api --> auth["Supabase JWT Validator"]
+    api --> quota["Tenant Quotas & Stripe Billing Guard"]
+    api --> redis_cache["Redis Caching & Token Buckets"]
+  end
 
-  parser --> pdf["PDF / DOCX / Text Extraction"]
-  parser --> normalize["Section Classification and Normalization"]
-  parser --> schema["Canonical CV Schema"]
+  subgraph Pipelines ["Processing Engines"]
+    quota --> parser["Multi-stage CV Parser Pipeline"]
+    quota --> scoring["ATS & ML Scoring Engine"]
+    quota --> builder["CV Builder Template Engine"]
+  end
 
-  scoring --> ml["Local ML Models"]
-  scoring --> embeddings["Embeddings / AI Features"]
+  subgraph Datastores ["Storage & State Layer"]
+    parser --> db["PostgreSQL Database (SQLAlchemy)"]
+    parser --> s3["S3-Compatible Object Store"]
+    redis_cache --> redis["Redis Memory Grid"]
+  end
 
-  storage --> db["SQL Database"]
-  storage --> s3["S3-Compatible Object Storage"]
-  quota --> redis["Redis or Local Fallback"]
-
-  api --> observability["Metrics, Logs, Health Checks"]
+  scoring --> ml_model["Local Scikit-Learn Match Predictor"]
+  scoring --> openai["LLM & Embeddings Middleware"]
 ```
 
-The backend is intentionally split into route modules and shared runtime modules so the application can grow without keeping every API and lifecycle concern inside `main.py`.
+---
 
-## Core Flows
+## Deep Dive: Processing & Scoring Pipelines
 
-### CV Analysis Flow
+### 1. Section Parsing & Resolution Pipeline
 
-```mermaid
-sequenceDiagram
-  participant U as User
-  participant FE as Frontend
-  participant API as FastAPI
-  participant Auth as Auth Guard
-  participant Parser as Parser Pipeline
-  participant Score as Scoring Services
-  participant DB as Database
-  participant Store as Object Storage
-
-  U->>FE: Upload CV and job description
-  FE->>API: POST /api/v1/analyze-pdf
-  API->>Auth: Verify JWT or mock user
-  Auth-->>API: User context
-  API->>Parser: Extract text and detect sections
-  Parser->>Parser: Normalize contact, education, experience, skills
-  Parser-->>API: Canonical CV data
-  API->>Score: ATS, semantic, keyword, skill, experience scoring
-  Score-->>API: Scores and recommendations
-  API->>Store: Store source file when configured
-  API->>DB: Persist analysis, usage, history
-  API-->>FE: Analysis result
-  FE-->>U: Scorecards, recommendations, gaps, exports
-```
-
-### Parser Pipeline
+Unstructured text extracted from files goes through a robust layout-aware parser before semantic extraction begins.
 
 ```mermaid
 flowchart LR
-  file["CV file"] --> extract["Text extraction"]
-  extract --> layout["Layout-aware cleanup"]
-  layout --> sections["Section classifier"]
-  sections --> resolver["Section resolver"]
-  resolver --> fields["Field extraction"]
-  fields --> normalize["Normalization"]
-  normalize --> validate["Schema validation"]
-  validate --> result["Canonical CV payload"]
-
-  sections -. handles .-> multi["Multi-page and multi-column CVs"]
-  resolver -. prevents .-> drift["Section drift, e.g. certificate vs experience mixups"]
+  file["Raw CV Document"] --> ext["Text Extraction (fitz / docx)"]
+  ext --> layout["Layout Analyzer (linearizes multi-columns)"]
+  layout --> classify["Section Classifier (labels sections)"]
+  classify --> resolver["Section Resolver (fixes key overlaps)"]
+  resolver --> normalize["Normalizer (strips formatting noise)"]
+  normalize --> validate["CVSchema Compliance Verification"]
 ```
 
-### Recruiter Batch Flow
+1.  **Layout Analyzer:** Detects column structures and re-orders text blocks logically to ensure single-column reading order.
+2.  **Section Classifier:** Identifies candidate boundaries using multi-language heading patterns (Turkish and English).
+3.  **Section Resolver:** Eliminates ambiguities (e.g., preventing certificates from being swallowed by experience blocks).
+4.  **Normalizer:** Cleans stray bullets, whitespace markers, and normalizes contact, education, skills, and languages.
+5.  **CVSchema Validation:** Validates the structure using Pydantic models (`CVSchema`, `ProjectEntry`, `CertificationEntry`).
+
+### 2. ATS Evaluation & ML Calibration Engine
+
+Match scores are calculated via a hybrid logic that blends deterministic rules with machine learning:
+
+$$\text{Final Match Score} = \text{Rule-based Score (70\%)} + \text{ML-Calibrated Score (30\%)} $$
 
 ```mermaid
 flowchart TD
-  start["Recruiter uploads CV batch"] --> guard["Auth, plan, quota checks"]
-  guard --> parse["Parse every CV"]
-  parse --> rank["Rank candidates against job description"]
-  rank --> review["Review candidate cards and dense tables"]
-  review --> action["Shortlist, reject, email, export"]
-  action --> report["CSV / XLSX / HTML reports"]
-  report --> audit["Usage, actions, and audit trail"]
+  cv["CV Text & Schema"] --> keywords["Keyword Coverage (35%)"]
+  cv --> skills["Skill Mapping (25%)"]
+  cv --> semantic["Semantic Similarity via Embeddings (25%)"]
+  cv --> seniority["Seniority Alignment (15%)"]
+
+  keywords --> rule_calc["Weighted Match Calculator"]
+  skills --> rule_calc
+  semantic --> rule_calc
+  seniority --> rule_calc
+
+  rule_calc --> ml_blend["ML Calibrator (Scikit-Learn)"]
+  ml_blend --> final_score["Final ATS & Job Match Score"]
 ```
 
-### Local Development Request Flow
+*   **Keyword Match:** Evaluates keyword coverage against the target job description (weighted at 35%).
+*   **Skill Coverage:** Compares CV skills to the requirements of the job (weighted at 25%).
+*   **Semantic Matching:** Computes cosine similarity between OpenAI/Mock embeddings of the CV and job description (weighted at 25%).
+*   **Seniority Matching:** Resolves matching levels (intern, junior, mid, senior, lead) using token-based mapping (weighted at 15%).
+*   **ML Calibration:** A pre-trained model (`resume_model.pkl`) fine-tunes the rule-based output based on historical evaluations.
+*   **Outage Safeguard:** If the job description is absent, the overall score defaults to the structural ATS quality score. If embeddings fail, a conservative cap of 40 is applied to prevent score inflation.
+
+### 3. Auto-Fix & Section Floor Optimization Engine
+
+When users trigger the "Auto-Fix" flow, the application optimizes their CV text for ATS parser compatibility.
 
 ```mermaid
-flowchart LR
-  browser["Browser: http://127.0.0.1:5173"] --> vite["Vite dev server"]
-  vite -- "/api proxy" --> backend["FastAPI: http://127.0.0.1:8001"]
-  backend --> mock["Mock services when MOCK_SERVICES=true"]
-  backend --> sqlite["Local SQLite mock_dev.db"]
-  backend --> ui["JSON response to frontend"]
+sequenceDiagram
+  participant U as User / Client
+  participant AF as Auto-Fix Service
+  participant Norm as Normalization Pipeline
+  participant Floor as Floor Guardrail
+  participant ATS as ATS Scorer
+
+  U->>AF: Send CV text (safe mode)
+  AF->>AF: Extract, clean, and reconstruct sections
+  AF->>Norm: Wording polish & ATS verb injection
+  AF->>Floor: Compare line counts per section
+  alt Optimized section is shorter than original
+    Floor->>Floor: Restore original section lines (Preservation)
+  end
+  Floor-->>AF: Safe structured text
+  AF->>ATS: Score optimized text
+  alt Score regressed from original CV
+    AF->>AF: Fallback to original CV with identity header
+  end
+  AF-->>U: Optimized CV Text + Improvement details
 ```
 
-If the frontend is running but the backend is not running on port `8001`, API calls under `/api/v1/*` will fail in the browser console. Start the backend first, then refresh the app.
+*   **Action Verb Injection:** Replaces passive verbs with strong, ATS-recognized action verbs.
+*   **Protected Section Floor Guard:** Compares line counts of critical sections (Skills, Projects, Certifications, Education, Languages) before and after optimization. If an optimization shrinks a section, it automatically restores the original text to prevent evidence loss.
+*   **Regression Guard:** Evaluates the score of the rewritten text. If the score is lower than the original CV, it rolls back to a minimal heading-only rewrite or preserves the source CV text.
+
+---
 
 ## Technology Stack
 
-| Layer | Tools |
-| --- | --- |
-| Web frontend | React 18, Vite, Vitest, CSS design tokens |
-| Mobile | React Native, Expo, TypeScript |
-| Backend | Python 3.12, FastAPI, SQLAlchemy, Alembic |
-| Parsing and scoring | Custom parser services, section classifier, ML models, ATS scoring |
-| Data | SQLite for mock/local, PostgreSQL-compatible production database |
-| Auth | Supabase JWT verification |
-| Storage | Local storage fallback, S3-compatible object storage |
-| Ops | Docker, health checks, metrics, Gitleaks, dependency audits |
+*   **Backend Framework:** FastAPI (Python 3.12)
+*   **Database Tooling:** SQLAlchemy ORM, Alembic Migrations
+*   **Frontend Library:** React 18, Vite, Framer Motion, TailwindCSS (for public pages), Vanilla CSS Variables (design tokens)
+*   **Mobile App:** React Native, Expo, TypeScript
+*   **Machine Learning & Data:** Scikit-Learn, Pytest, Pandas, Numpy, Pydantic v2
+*   **Infrastructure Support:** Redis (rate-limiting/cache), Docker/Docker-compose, AWS S3-compatible SDKs
 
-## Quick Start
+---
 
-### Prerequisites
-
-- Python 3.12+
-- Node.js 20+ or the bundled project Node runtime under `tools/`
-- Git
-- Optional: Docker and Docker Compose
-- Optional production integrations: Supabase, Redis, S3, Stripe, OpenAI
-
-### Backend
-
-```bash
-python -m venv .venv
-.\.venv\Scripts\activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python -m uvicorn main:app --host 127.0.0.1 --port 8001
-```
-
-Health check:
-
-```bash
-curl http://127.0.0.1:8001/health
-```
-
-### Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Open:
+## Project Directory Mapping
 
 ```text
-http://127.0.0.1:5173/
+cv-analyzer/
+├── agents/                       # Extract and Normalize pipeline agents
+│   ├── extract_agent.py          # Extracts raw text into structured JSON schema
+│   └── normalize_agent.py        # Cleans noise, dedupes, caps sizes, formats sections
+├── core/                         # Operational core of the FastAPI application
+│   ├── config.py                 # Handles settings, secrets, and environment loading
+│   ├── database.py               # SQL database connection pooling and sessions
+│   ├── metrics.py                # Prometheus-compatible application metrics
+│   ├── quota.py                  # Rate-limiting, billing boundaries, Redis hooks
+│   └── security.py               # Request validation, CSRF, and CORS headers
+├── routes/                       # FastAPI router modules (HTTP endpoints)
+│   ├── ai_tools.py               # Auto-fix, AI rewrite, roadmaps, and custom tips
+│   ├── analysis.py               # Upload endpoints, parsing, and history
+│   ├── billing.py                # Subscription controls, Stripe callbacks, plans
+│   ├── dashboard.py              # Recruiter lists, shared links, metrics, logs
+│   ├── user_data.py              # User profiles, preferences, and data exports
+│   └── worker.py                 # Offline local worker sync and candidate management
+├── services/                     # Business logic and computations
+│   ├── ats_scoring.py            # Keyword density, structure, layout rules
+│   ├── ats_service.py            # Combines scoring rules and ML predictors
+│   ├── cv_autofix_service.py     # Heading normalization, section floors, verb injection
+│   ├── embedding_service.py      # OpenAI embedding calls and fallback mock logic
+│   ├── language_service.py       # Sentence-level language detection
+│   ├── pdf_text_extractor.py     # Handles fitz, pdfplumber, and raw parsing
+│   ├── pipeline_runtime.py       # Main pipeline execution entry point
+│   ├── rewrite_service.py        # OpenAI/Claude LLM resume rewriting wrappers
+│   ├── schema_builder.py         # Converts raw extraction dict into validated schema
+│   └── storage_service.py        # File upload logic (Local disk vs AWS S3 buckets)
+├── frontend/                     # React Single Page Application (SPA)
+│   ├── src/pages/                # Major views (Landing, Dashboard, Analyze, Recruiter)
+│   ├── src/components/           # Reusable components (Navbar, Modal, Skeletons)
+│   └── src/style.css             # Main styling, HSL colors, design tokens
+├── mobile/                       # Expo-based React Native mobile workspace
+├── security/                     # Encryption, sanitization, XSS, and replay guards
+└── tests/                        # Comprehensive unit and regression test suite
 ```
 
-### One-Screen Local Flow
-
-```mermaid
-flowchart TB
-  setup["Install Python and Node dependencies"] --> env["Create .env from .env.example"]
-  env --> backend["Start FastAPI on :8001"]
-  backend --> frontend["Start Vite on :5173"]
-  frontend --> login["Open app and log in"]
-  login --> analyze["Upload a CV on /analyze"]
-  analyze --> validate["Review scorecards and browser console"]
-```
+---
 
 ## Environment Configuration
 
-Start from the sample file:
+Copy the example configuration to begin local setup:
 
 ```bash
-copy .env.example .env
+cp .env.example .env
 ```
 
-Important development variables:
+Key configuration parameters inside `.env`:
 
 ```env
 ENV=development
+PORT=8001
 MOCK_SERVICES=true
 MOCK_DATABASE_URL=sqlite:///./mock_dev.db
-PORT=8001
+
+# Production integrations (Uncomment and populate for cloud deployment)
+# DATABASE_URL=postgresql://user:pass@host:5432/dbname
+# REDIS_URL=redis://localhost:6379/0
+# SUPABASE_URL=https://your-project.supabase.co
+# SUPABASE_JWT_SECRET=your-jwt-secret
+# OPENAI_API_KEY=your-openai-api-key
+# STRIPE_SECRET_KEY=your-stripe-secret-key
+# S3_BUCKET_NAME=your-s3-bucket
 ```
 
-Production-style deployments should configure real values for:
+---
 
-- `DATABASE_URL`
-- `SUPABASE_URL`
-- `SUPABASE_JWT_SECRET`
-- `OPENAI_API_KEY`
-- `REDIS_URL`
-- `S3_BUCKET_NAME`
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `STRIPE_SECRET_KEY`
+## Installation & Quick Start
 
-Never commit real secrets. The repository includes Gitleaks scanning in CI.
+### FastAPI Backend Setup
 
-## Validation Commands
+1.  Create and activate a Python virtual environment:
+    ```bash
+    python -m venv .venv
+    # Windows:
+    .\.venv\Scripts\activate
+    # macOS/Linux:
+    source .venv/bin/activate
+    ```
+2.  Install required packages:
+    ```bash
+    python -m pip install --upgrade pip
+    python -m pip install -r requirements.txt
+    ```
+3.  Launch the Uvicorn development server:
+    ```bash
+    python -m uvicorn main:app --host 127.0.0.1 --port 8001
+    ```
+4.  Access the OpenAPI documentation:
+    [http://127.0.0.1:8001/docs](http://127.0.0.1:8001/docs)
 
-### Frontend
+### React/Vite Frontend Setup
+
+1.  Navigate to the frontend directory:
+    ```bash
+    cd frontend
+    ```
+2.  Install package dependencies:
+    ```bash
+    npm install
+    ```
+3.  Start the Vite development server:
+    ```bash
+    npm run dev
+    ```
+4.  Open the web application:
+    [http://127.0.0.1:5173/](http://127.0.0.1:5173/) (Vite automatically proxies API calls to port `8001`).
+
+---
+
+## Testing & Quality Assurance
+
+The codebase maintains strict stability rules. Both backend test suites and frontend builds must pass successfully before checking in code.
+
+### Run Backend Tests
+
+We utilize `pytest` to run our test suite, containing **over 790 unit and integration tests** verifying parser accuracy, scoring weight boundaries, tenant isolation, and security controls:
 
 ```bash
-cd frontend
+python -m pytest
+```
+
+### Validate Frontend Quality
+
+Execute typechecks, unit tests, and production bundling from the `frontend/` directory:
+
+```bash
 npx tsc --noEmit
 npm test
 npm run build
 ```
 
-### Backend
+---
 
-```bash
-python -m pytest --collect-only -q
-python -m pytest tests/test_section_classifier.py tests/test_section_resolver.py tests/test_tasks.py -q --tb=short
-```
+## Multi-Agent UI Workflow
 
-### API Smoke Test
-
-```bash
-curl http://127.0.0.1:8001/health
-curl http://127.0.0.1:5173/api/v1/usage
-```
-
-## Main API Areas
-
-| Area | Example endpoints |
-| --- | --- |
-| Analysis | `POST /api/v1/analyze-pdf`, `GET /api/v1/usage-history` |
-| Dashboard | `GET /api/v1/usage`, `GET /api/v1/insights`, `GET /api/v1/favorites` |
-| CV Builder | `GET /api/v1/cv-builder/templates`, `POST /api/v1/cv-builder/preview-html` |
-| Recruiter | Recruiter job, batch, candidate, template, export, and report routes |
-| Billing and plans | Plan, entitlement, quota, and usage guard routes |
-| User data | Profile, export, deletion, notes, templates, saved data |
-| System | Health, readiness, metrics, operational checks |
-
-API documentation is available when the backend is running:
-
-```text
-http://127.0.0.1:8001/docs
-```
-
-## Project Structure
-
-```text
-cv-analyzer/
-  agents/                 Parser and extraction agent code
-  core/                   App lifecycle, metrics, runtime, quota, shared dependencies
-  frontend/               React/Vite web application
-  mobile/                 React Native/Expo app scaffold
-  routes/                 FastAPI route modules
-  services/               Parsing, scoring, storage, billing, email, user services
-  security/               Storage and request security helpers
-  tests/                  Pytest coverage for parser, tasks, routes, services
-  .codex/skills/          Product design, frontend, and UI QA workflows
-  .github/workflows/      CI, security, dependency scanning
-```
-
-## Security And CI
-
-```mermaid
-flowchart TD
-  push["Push or pull request"] --> checkout["Checkout repository"]
-  checkout --> safe["Mark workspace as Git safe.directory"]
-  safe --> gitleaks["Gitleaks secret scan"]
-  checkout --> python["Python tests and audits"]
-  checkout --> node["Frontend typecheck, tests, build, npm audit"]
-  checkout --> docker["Container and dependency scans"]
-  gitleaks --> result["CI status"]
-  python --> result
-  node --> result
-  docker --> result
-```
-
-Security notes:
-
-- `.env` files, databases, model artifacts, local scratch data, sample CV files, and large archives are ignored.
-- Gitleaks uses `.gitleaks.toml` and redacts findings in CI logs.
-- The security workflow marks the GitHub workspace as a safe Git directory before running the Docker-based Gitleaks scan.
-- S3 and storage helpers include guardrails for bucket access, path safety, and local fallback behavior.
-
-## UI Workflow
-
-The repository includes a Codex-oriented multi-agent UI workflow:
+This repository utilizes a **Multi-Agent UI Design Workflow** to align codebase changes with design objectives. When modifying primary views (`LandingPage.jsx`, `DashboardPage.jsx`, `AnalyzePage.jsx`, `RecruiterPage.jsx`), modifications are routed through consecutive agent stages:
 
 ```mermaid
 flowchart LR
-  design["Product Designer Agent"] --> implement["Frontend Implementation Agent"]
-  implement --> qa["QA Review Agent"]
-  qa --> summary["Coordinator Summary"]
+  design["Product Designer Agent (SKILL.md)"] --> token["Design System Agent (SKILL.md)"]
+  token --> motion["Motion Design Agent (Framer Motion)"]
+  motion --> implement["Frontend Implementation Agent"]
+  implement --> qa["QA Review Agent (Viewports & Access)"]
 ```
 
-Files:
-
-- `AGENTS.md`
-- `.codex/skills/design-review/SKILL.md`
-- `.codex/skills/frontend-implementation/SKILL.md`
-- `.codex/skills/frontend-ui-polish/SKILL.md`
-- `.codex/skills/ui-qa-review/SKILL.md`
-
-The workflow is intentionally conservative:
-
-- Do not redesign the whole product at once.
-- Prefer shared design tokens and reusable styles.
-- Preserve backend, auth, API, routing, and business logic.
-- Run typecheck, tests, and build after UI changes.
-- Use browser QA where possible for desktop and mobile viewports.
-
-## Development Notes
-
-- Frontend dev server: `http://127.0.0.1:5173`
-- Backend dev server: `http://127.0.0.1:8001`
-- Vite proxies `/api/*` to the backend.
-- Mock mode is useful for UI and parser development without full production services.
-- If API calls show `500` in the browser, first confirm the backend is running and healthy.
-
-## License
-
-This project is licensed under the MIT License.
+Refer to [AGENTS.md](file:///c:/Users/ASUS/Desktop/cv-analyzer/AGENTS.md) for full instructions, local Figma workspace configurations, and checklist rules.

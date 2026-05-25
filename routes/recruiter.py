@@ -120,6 +120,119 @@ def _billable_usage(db, recruiter: User | None, endpoint: str, response: Respons
     return _main()._consume_billable_usage(db, recruiter, endpoint, response=response)
 
 
+def _as_clean_list(value: Any, *, limit: int = 5) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        raw_items = re.split(r"[,;\n]+", value)
+    elif isinstance(value, (list, tuple, set)):
+        raw_items = list(value)
+    else:
+        return []
+    items: list[str] = []
+    for item in raw_items:
+        text = str(item or "").strip()
+        if not text or text.replace(".", "", 1).isdigit():
+            continue
+        if text not in items:
+            items.append(text[:140])
+        if len(items) >= limit:
+            break
+    return items
+
+
+def _decision_insights(snapshot: dict | None) -> dict:
+    data = snapshot or {}
+    strengths = _as_clean_list(data.get("strengths"), limit=4)
+    weaknesses = _as_clean_list(data.get("weaknesses"), limit=4)
+    if not strengths or not weaknesses:
+        try:
+            generated = _rc_sw(data)
+            strengths = strengths or _as_clean_list(generated.get("strengths"), limit=4)
+            weaknesses = weaknesses or _as_clean_list(generated.get("weaknesses"), limit=4)
+        except Exception:
+            pass
+
+    matched = _as_clean_list(
+        data.get("matched_skills")
+        or data.get("detected_skills")
+        or data.get("top_skills")
+        or data.get("skills_found"),
+        limit=8,
+    )
+    missing = _as_clean_list(
+        data.get("missing_skills")
+        or data.get("missing_keywords")
+        or ((data.get("keyword_gap") or {}).get("missing_words") if isinstance(data.get("keyword_gap"), dict) else None),
+        limit=8,
+    )
+    risks = _as_clean_list(data.get("risk_flags") or data.get("warnings"), limit=5)
+    score = data.get("final_score", data.get("ats_score"))
+    try:
+        score = round(float(score), 1)
+    except Exception:
+        score = None
+
+    why = []
+    if score is not None:
+        why.append(f"Overall match score is {score}%.")
+    if matched:
+        why.append(f"Matched skills: {', '.join(matched[:5])}.")
+    if strengths:
+        why.append(strengths[0])
+    if not why:
+        why.append("Decision is based on the recruiter review and available CV analysis.")
+
+    return {
+        "why_selected": why,
+        "strengths": strengths,
+        "weaknesses": weaknesses,
+        "matched_skills": matched,
+        "missing_skills": missing,
+        "risk_flags": risks,
+        "score": score,
+    }
+
+
+def _default_decision_message(action: str, candidate_name: str, job_title: str, insights: dict) -> str:
+    name = (candidate_name or "Candidate").strip() or "Candidate"
+    role = (job_title or "the role").strip() or "the role"
+    strengths = insights.get("strengths") or insights.get("matched_skills") or []
+    gaps = insights.get("weaknesses") or insights.get("missing_skills") or []
+    strengths_text = ", ".join(strengths[:3]) if strengths else "your profile alignment and relevant experience"
+    gaps_text = ", ".join(gaps[:3]) if gaps else "the current role requirements"
+    if action in {"accepted", "shortlist", "interview", "offer"}:
+        return (
+            f"Hi {name},\n\n"
+            f"Thank you for your application for {role}. We reviewed your CV and would like to move forward. "
+            f"What stood out: {strengths_text}.\n\n"
+            "Our team will contact you with the next steps.\n\n"
+            "Best regards,\nRecruiting Team"
+        )
+    if action == "rejected":
+        return (
+            f"Hi {name},\n\n"
+            f"Thank you for your interest in {role}. After reviewing your CV, we will not move forward for this opening. "
+            f"The main gaps for this role were: {gaps_text}.\n\n"
+            "We appreciate your time and wish you success in your search.\n\n"
+            "Best regards,\nRecruiting Team"
+        )
+    return (
+        f"Hi {name},\n\n"
+        f"We reviewed your application for {role}. Current review note: {strengths_text}.\n\n"
+        "Best regards,\nRecruiting Team"
+    )
+
+
+def _default_decision_subject(action: str, job_title: str) -> str:
+    role = (job_title or "your application").strip() or "your application"
+    if action in {"accepted", "shortlist", "interview", "offer"}:
+        return f"Next steps for {role}"
+    if action == "rejected":
+        return f"Update on {role}"
+    return f"Application update: {role}"
+
+
 def _serialize_action(action: CandidateAction) -> dict:
     snapshot = {}
     if action.analysis_snapshot:
@@ -127,6 +240,7 @@ def _serialize_action(action: CandidateAction) -> dict:
             snapshot = json.loads(action.analysis_snapshot)
         except Exception:
             snapshot = {}
+    insights = _decision_insights(snapshot)
     return {
         "id": action.id,
         "job_id": action.job_id,
@@ -139,6 +253,8 @@ def _serialize_action(action: CandidateAction) -> dict:
         "email_sent": action.email_sent,
         "email_sent_at": str(action.email_sent_at) if action.email_sent_at else None,
         "notes": action.notes,
+        "decision_message": action.notes,
+        "decision_insights": insights,
         "created_at": str(action.created_at) if action.created_at else None,
         "analysis_snapshot": snapshot,
     }
@@ -189,6 +305,12 @@ class RecruiterActionRequest(BaseModel):
     action: str
     analysis_snapshot: dict | None = None
     template_id: int | None = None
+    feedback: str | None = None
+    notes: str | None = None
+    send_email: bool = False
+    email_subject: str | None = None
+    email_body: str | None = None
+    sender_email: str | None = None
 
 
 class RecruiterStageUpdateRequest(BaseModel):
@@ -1301,16 +1423,28 @@ def recruiter_dashboard_action(body: RecruiterActionRequest, db=Depends(get_db),
 
     final_score = body.final_score
     ats_score = body.ats_score
+    job = (
+        db.query(RecruiterJob)
+        .filter(RecruiterJob.id == body.job_id, RecruiterJob.organization_id == org_id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
 
     if final_score is None and body.cv_text:
         try:
-            job = db.query(RecruiterJob).filter(RecruiterJob.id == body.job_id).first()
-            jd = job.description if job else ""
-            result = _pipeline(body.cv_text, jd)
+            result = _pipeline(body.cv_text, job.description or "")
             final_score = float(result.get("final_score") or 0)
             ats_score = float(result.get("ats_score") or 0)
+            if body.analysis_snapshot is None:
+                body.analysis_snapshot = result
         except Exception:
             pass
+
+    insights = _decision_insights(body.analysis_snapshot)
+    decision_message = str(body.notes or body.feedback or "").strip()
+    if not decision_message:
+        decision_message = _default_decision_message(stage, body.candidate_name, job.title, insights)
 
     record = _rc_save_action(
         db=db,
@@ -1324,7 +1458,34 @@ def recruiter_dashboard_action(body: RecruiterActionRequest, db=Depends(get_db),
         ats_score=ats_score,
         action=stage,
         analysis_snapshot=body.analysis_snapshot,
+        notes=decision_message[:4000],
     )
+
+    email_status = {"requested": bool(body.send_email), "sent": False, "reason": "not_requested"}
+    if body.send_email:
+        candidate_email = str(body.candidate_email or "").strip()
+        if not candidate_email or "@" not in candidate_email or "." not in candidate_email:
+            email_status = {"requested": True, "sent": False, "reason": "missing_or_invalid_candidate_email"}
+        else:
+            sender = str(body.sender_email or recruiter.email or "").strip()
+            subject = str(body.email_subject or "").strip() or _default_decision_subject(stage, job.title)
+            email_body = str(body.email_body or "").strip() or decision_message
+            try:
+                sent = _do_send_email(
+                    to_email=candidate_email,
+                    subject=subject,
+                    body=email_body,
+                    recruiter_email=sender,
+                )
+                if sent:
+                    _rc_mark_sent(db, record.id)
+                    db.refresh(record)
+                    email_status = {"requested": True, "sent": True, "reason": "sent", "subject": subject}
+                else:
+                    email_status = {"requested": True, "sent": False, "reason": "email_provider_failed", "subject": subject}
+            except Exception as exc:
+                logger.warning("candidate_decision_email_failed action_id=%s error=%s", record.id, exc)
+                email_status = {"requested": True, "sent": False, "reason": "send_error", "subject": subject}
 
     response_data = {
         "id": record.id,
@@ -1333,6 +1494,9 @@ def recruiter_dashboard_action(body: RecruiterActionRequest, db=Depends(get_db),
         "candidate_name": record.candidate_name,
         "final_score": record.final_score,
         "ats_score": record.ats_score,
+        "decision_message": record.notes,
+        "decision_insights": insights,
+        "email": email_status,
     }
 
     if stage == "accepted" and body.template_id:

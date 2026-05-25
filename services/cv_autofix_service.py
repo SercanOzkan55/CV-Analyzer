@@ -2247,6 +2247,26 @@ def _looks_like_description(line: str) -> bool:
     return False
 
 
+_KNOWN_TECHS = {
+    "python", "javascript", "java", "c++", "c#", "ruby", "php", "go", "rust",
+    "react", "angular", "vue", "django", "flask", "spring", "node", "express",
+    "sql", "mysql", "postgresql", "mongodb", "redis", "elasticsearch",
+    "aws", "azure", "gcp", "docker", "kubernetes", "jenkins", "git",
+    "html", "css", "sass", "less", "bootstrap", "tailwind", "typescript",
+    "jquery", "redux", "graphql", "rest", "api", "apis", "fastapi",
+    "pytorch", "tensorflow", "keras", "opencv", "numpy", "pandas", "scipy",
+    "scikit-learn", "matlab", "r", "swift", "kotlin", "android", "ios",
+    "flutter", "dart", "scala", "haskell", "perl", "bash", "shell", "powershell",
+    "linux", "unix", "windows", "macos", "ansible", "terraform", "vagrant", "firebase",
+    "sqlite", "oracle", "mssql", "cassandra", "mariadb", "dynamodb", "neo4j",
+    "kafka", "rabbitmq", "celery", "webpack", "babel", "vite", "npm", "yarn", "pnpm",
+    "c", "assembly", "lisp", "prolog", "clojure", "elixir", "erlang", "lua",
+    "oop", "restful", "ci", "cd", "agile", "scrum", "kanban", "github", "gitlab",
+    "nginx", "apache", "iis", "tomcat", "springboot", "hibernate", "jpa", "jdbc",
+    "unity", "unreal", "godot", "blender", "photoshop", "figma", "sketch",
+    "tcp", "udp", "ip", "dns", "http", "https", "ssh", "ssl", "tls"
+}
+
 def _looks_like_tech_list(line: str) -> bool:
     """Return True if *line* is a comma/pipe-separated list of short tokens.
 
@@ -2261,6 +2281,16 @@ def _looks_like_tech_list(line: str) -> bool:
     tokens = [t.strip() for t in tokens if t.strip()]
     if len(tokens) < 3:
         return False
+
+    # If the first token starts with an uppercase word that is NOT a known technology,
+    # it is likely a project name + tech stack combined on one line (e.g. "FoodApp HTML, CSS, MySQL").
+    # We should not treat the whole line as a pure tech list to be folded.
+    first_token = tokens[0]
+    first_word = first_token.split()[0].lower() if first_token.split() else ""
+    first_word = re.sub(r"[^\w+##\-#]", "", first_word)
+    if first_token and first_token[0].isupper() and first_word not in _KNOWN_TECHS:
+        return False
+
     # All tokens must be short (≤4 words each) — structural, not a sentence
     return all(len(t.split()) <= 4 for t in tokens)
 
@@ -2289,13 +2319,33 @@ def _parse_project_entries(lines: list[str]) -> list[dict]:
         re.I,
     )
 
-    def _looks_like_project_continuation(value: str) -> bool:
+    def _looks_like_project_continuation(value: str, current_entry: dict | None = None) -> bool:
         text = (value or "").strip()
         if not text or _BULLET_RE_PROJ.match(text):
             return False
-        if len(text.split()) >= 6 and not text.isupper():
+        
+        is_continuation_word = bool(_PROJECT_CONTINUATION_RE.match(text))
+        
+        first_char = text[0] if text else ""
+        if first_char.islower() or is_continuation_word:
             return True
-        return bool(_PROJECT_CONTINUATION_RE.match(text))
+            
+        # If the previous bullet ended with a period, and this line starts with a capital letter,
+        # it is highly likely a new project or entry, not a continuation.
+        if current_entry and current_entry.get("bullets"):
+            prev_bullet = current_entry["bullets"][-1].strip()
+            if prev_bullet.endswith((".", "!", "?")):
+                return False
+                
+        # Length check fallback with title/capitalization guard:
+        if len(text.split()) >= 6 and not text.isupper():
+            words = text.split()
+            cap_words = sum(1 for w in words if w and w[0].isupper())
+            if cap_words >= len(words) // 2: # More than half the words capitalized -> likely a title
+                return False
+            return True
+            
+        return False
 
     entries: list[dict] = []
     current: dict | None = None
@@ -2386,7 +2436,7 @@ def _parse_project_entries(lines: list[str]) -> list[dict]:
             current["description"] = (desc + " " + line).rstrip(",").strip()
             continue
 
-        if current is not None and current.get("bullets") and _looks_like_project_continuation(line):
+        if current is not None and current.get("bullets") and _looks_like_project_continuation(line, current):
             current["bullets"][-1] = (current["bullets"][-1].rstrip() + " " + line).strip()
             continue
 
