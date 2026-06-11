@@ -1,4 +1,5 @@
-from models import AuditLog, Notification, RolePermission, User, WorkerAnalysisResult
+from auth import verify_supabase_jwt
+from models import AuditLog, CandidateAction, Notification, RolePermission, User, WorkerAnalysisResult
 from services.owner_workflow_service import check_permission, decision_to_candidate_status
 from tests.test_worker_mvp import _claim_one, _create_action, _create_worker_key, _submit_result, _worker_headers
 
@@ -122,3 +123,97 @@ def test_owner_can_override_role_permission(client, db_session, recruiter_user):
     assert override.is_allowed is False
     notification = db_session.query(Notification).filter_by(type="user_permission_changed").one()
     assert notification.audit_log_id is not None
+
+
+def test_owner_candidate_action_controls_and_privacy(client, db_session, recruiter_user, test_job):
+    action = CandidateAction(
+        organization_id=recruiter_user["organization_id"],
+        job_id=test_job.id,
+        recruiter_id=recruiter_user["user_id"],
+        candidate_name="Private Candidate",
+        candidate_email="private@example.com",
+        cv_text="Private CV text",
+        final_score=70,
+        ats_score=65,
+        action="pending",
+    )
+    db_session.add(action)
+    db_session.commit()
+    db_session.refresh(action)
+
+    score_response = client.put(
+        f"/api/v1/owner/candidate-actions/{action.id}/score",
+        json={"final_score": 82, "ats_score": 80},
+    )
+    assert score_response.status_code == 200, score_response.text
+    assert score_response.json()["action"]["final_score"] == 82
+
+    delete_response = client.delete(f"/api/v1/owner/candidate-actions/{action.id}")
+    assert delete_response.status_code == 200, delete_response.text
+    assert delete_response.json()["action"]["deleted_at"] is not None
+
+    visible_response = client.get("/api/v1/owner/candidate-actions")
+    assert visible_response.status_code == 200, visible_response.text
+    assert visible_response.json()["items"] == []
+
+    deleted_response = client.get("/api/v1/owner/candidate-actions", params={"include_deleted": True})
+    assert deleted_response.status_code == 200, deleted_response.text
+    assert len(deleted_response.json()["items"]) == 1
+
+    anonymize_response = client.post(f"/api/v1/owner/candidate-actions/{action.id}/anonymize")
+    assert anonymize_response.status_code == 200, anonymize_response.text
+    payload = anonymize_response.json()["action"]
+    assert payload["candidate_email"] is None
+    assert payload["candidate_name"].startswith("Anonymized Candidate")
+    assert payload["anonymized_at"] is not None
+
+    db_session.expire_all()
+    stored = db_session.query(CandidateAction).filter_by(id=action.id).one()
+    assert stored.candidate_email is None
+    assert stored.cv_text is None
+    events = [row.event_type for row in db_session.query(AuditLog).all()]
+    assert "candidate_score_changed" in events
+    assert "candidate_deleted" in events
+
+
+def test_limited_user_sees_only_assigned_candidate_actions(client, db_session, recruiter_user, test_job):
+    limited = User(
+        supabase_id="limited-owner-user",
+        email="limited@example.com",
+        organization_id=recruiter_user["organization_id"],
+        role="limited",
+    )
+    db_session.add(limited)
+    db_session.commit()
+    db_session.refresh(limited)
+
+    assigned = CandidateAction(
+        organization_id=recruiter_user["organization_id"],
+        job_id=test_job.id,
+        recruiter_id=recruiter_user["user_id"],
+        assigned_user_id=limited.id,
+        candidate_name="Assigned Candidate",
+        candidate_email="assigned@example.com",
+        action="pending",
+    )
+    unassigned = CandidateAction(
+        organization_id=recruiter_user["organization_id"],
+        job_id=test_job.id,
+        recruiter_id=recruiter_user["user_id"],
+        candidate_name="Unassigned Candidate",
+        candidate_email="unassigned@example.com",
+        action="pending",
+    )
+    db_session.add_all([assigned, unassigned])
+    db_session.commit()
+
+    client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
+        "user_id": limited.supabase_id,
+        "email": limited.email,
+    }
+
+    response = client.get("/api/v1/owner/candidate-actions")
+    assert response.status_code == 200, response.text
+    items = response.json()["items"]
+    assert len(items) == 1
+    assert items[0]["candidate_email"] == "assigned@example.com"

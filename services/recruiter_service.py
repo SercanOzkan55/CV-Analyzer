@@ -365,6 +365,7 @@ def get_actions_for_job(db: Session, job_id: int, org_id: int) -> list[Candidate
         .filter(
             CandidateAction.job_id == job_id,
             CandidateAction.organization_id == org_id,
+            CandidateAction.deleted_at == None,
         )
         .order_by(CandidateAction.created_at.desc())
         .all()
