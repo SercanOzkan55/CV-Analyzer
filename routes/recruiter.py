@@ -42,6 +42,14 @@ from services.recruiter_service import (
     validate_email_send as _rc_validate_email,
     extract_variables as _rc_vars,
 )
+from services.owner_workflow_service import (
+    candidate_event_title,
+    candidate_event_message,
+    create_audit_log,
+    create_owner_notification,
+    record_candidate_status_event,
+    stage_to_candidate_status,
+)
 from services.recruiter_helpers import (
     _MAX_SEARCH_QUERY_LEN,
     _do_send_email,
@@ -1460,6 +1468,24 @@ def recruiter_dashboard_action(body: RecruiterActionRequest, db=Depends(get_db),
         analysis_snapshot=body.analysis_snapshot,
         notes=decision_message[:4000],
     )
+    candidate_status = stage_to_candidate_status(stage)
+    record_candidate_status_event(
+        db,
+        organization_id=org_id,
+        candidate_status=candidate_status,
+        candidate_name=record.candidate_name,
+        decision=stage,
+        score=record.final_score,
+        actor_user_id=recruiter.id,
+        actor_role=recruiter.role,
+        candidate_action_id=record.id,
+        recipient_user_id=job.created_by,
+        metadata={
+            "job_id": job.id,
+            "source": "recruiter_dashboard_action",
+        },
+    )
+    db.commit()
 
     email_status = {"requested": bool(body.send_email), "sent": False, "reason": "not_requested"}
     if body.send_email:
@@ -1544,10 +1570,53 @@ def recruiter_update_action_stage(
     if not record:
         raise HTTPException(status_code=404, detail="Candidate action not found")
 
+    previous_stage = record.action
+    previous_notes = record.notes
     record.action = stage
     if body.notes is not None:
         record.notes = str(body.notes or "")[:2000]
     db.add(record)
+    db.flush()
+    candidate_status = stage_to_candidate_status(stage)
+    event_type = "candidate_decision_changed"
+    message = candidate_event_message(
+        candidate_name=record.candidate_name,
+        candidate_status=candidate_status,
+        decision=stage,
+        score=record.final_score,
+    )
+    audit = create_audit_log(
+        db,
+        organization_id=org_id,
+        event_type=event_type,
+        actor_user_id=recruiter.id,
+        actor_role=recruiter.role,
+        resource_type="candidate",
+        resource_id=record.id,
+        description=message,
+        old_values={
+            "stage": previous_stage,
+            "notes": previous_notes,
+        },
+        new_values={
+            "stage": stage,
+            "notes": record.notes,
+            "candidate_status": candidate_status,
+        },
+        metadata={"job_id": record.job_id, "source": "recruiter_update_action_stage"},
+    )
+    create_owner_notification(
+        db,
+        organization_id=org_id,
+        event_type=event_type,
+        title=candidate_event_title(event_type),
+        message=message,
+        recipient_user_id=record.recruiter_id,
+        actor_user_id=recruiter.id,
+        audit_log_id=audit.id,
+        candidate_action_id=record.id,
+        metadata={"job_id": record.job_id, "source": "recruiter_update_action_stage"},
+    )
     db.commit()
     db.refresh(record)
     _log_event("candidate_stage_updated", action_id=record.id, stage=stage, recruiter_id=recruiter.id)

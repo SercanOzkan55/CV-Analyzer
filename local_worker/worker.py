@@ -14,6 +14,7 @@ from pathlib import Path
 
 import requests
 
+from owner_workflow import build_candidate_notification, enrich_row_with_owner_workflow
 from credentials import load_worker_api_key, save_worker_api_key
 from workspace import WorkspaceStore
 
@@ -29,16 +30,21 @@ SKILL_SYNONYMS = {
     "javascript": ["js", "ecmascript"],
     "typescript": ["ts"],
     "react": ["reactjs", "react.js"],
-    "node": ["nodejs", "node.js"],
+    "node": ["nodejs", "node.js", "expressjs", "express.js"],
     "postgresql": ["postgres", "psql"],
-    "machine learning": ["ml"],
-    "artificial intelligence": ["ai"],
-    "continuous integration": ["ci"],
-    "continuous deployment": ["cd"],
+    "machine learning": ["ml", "deep learning", "nlp", "llm", "neural networks", "pytorch", "tensorflow"],
+    "artificial intelligence": ["ai", "openai", "gemini", "claude", "deepseek", "chatgpt"],
+    "continuous integration": ["ci", "github actions", "gitlab ci", "jenkins"],
+    "continuous deployment": ["cd", "github actions", "gitlab ci", "jenkins"],
     "amazon web services": ["aws"],
-    "google cloud": ["gcp"],
+    "google cloud": ["gcp", "google cloud platform"],
     "microsoft azure": ["azure"],
-    "object oriented programming": ["oop"],
+    "object oriented programming": ["oop", "oops"],
+    "backend": ["django", "fastapi", "flask", "spring boot", "asp.net", "expressjs", "laravel", "symfony", "back-end", "database", "api", "node"],
+    "frontend": ["react", "angular", "vue", "nextjs", "html", "css", "javascript", "typescript", "front-end", "ui", "ux", "tailwind"],
+    "database": ["sql", "postgresql", "mysql", "mongodb", "redis", "sqlite", "oracle", "mssql", "db"],
+    "mobile": ["flutter", "react native", "android", "ios", "swift", "kotlin", "objective-c"],
+    "devops": ["docker", "kubernetes", "jenkins", "ci/cd", "terraform", "ansible", "aws", "gcp", "azure"],
 }
 
 STOPWORDS = {
@@ -1422,6 +1428,8 @@ class LocalWorker:
         output_folder: str | None = None,
     ):
         if self.processing_mode == "local_folder":
+            if not self.access_token:
+                self.login()
             self._run_local_folder(job_id, local_folder, local_config, output_folder)
             return
 
@@ -1556,6 +1564,13 @@ class LocalWorker:
             files.extend(glob.glob(str(folder / "**" / pattern), recursive=True))
         files = sorted({str(Path(path)) for path in files})
         print(f"Found {len(files)} local file(s).")
+        if self.quota_remaining <= 0:
+            raise LocalWorkerError("No remaining CV scan quota. Renew your worker key or wait for quota reset.")
+        if len(files) > self.quota_remaining:
+            raise LocalWorkerError(
+                f"Folder has {len(files)} CV file(s), but this worker key has "
+                f"{self.quota_remaining} scan(s) left."
+            )
         rows = []
         failed_files = []
         seen_hashes: dict[str, str] = {}
@@ -1598,8 +1613,14 @@ class LocalWorker:
                 "cv_text": text,
                 **result,
             }
+            row = enrich_row_with_owner_workflow(row, config, actor_name=self.device_name or "Local Worker")
             rows.append(row)
-            print(json.dumps({"file": str(path), "score": row["score"], "decision": row["decision"]}, ensure_ascii=False))
+            print(json.dumps({
+                "file": str(path),
+                "score": row["score"],
+                "decision": row["decision"],
+                "candidate_status": row["candidate_status"],
+            }, ensure_ascii=False))
 
         ranked_rows = sorted(rows, key=lambda item: float(item.get("score") or 0), reverse=True)
         for rank, row in enumerate(ranked_rows, start=1):
@@ -1618,9 +1639,10 @@ class LocalWorker:
                 fh,
                 fieldnames=[
                     "rank", "file", "score", "decision", "confidence", "is_duplicate",
+                    "candidate_status", "notification_event_type",
                     "duplicate_of", "file_hash", "worker_version", "engine_version", "sync_status",
                     "summary", "score_breakdown", "matched_skills", "missing_skills",
-                    "risk_flags", "explanation", "processed_at",
+                    "risk_flags", "explanation", "notification_title", "notification_message", "processed_at",
                 ],
                 extrasaction="ignore",
             )
@@ -1661,13 +1683,45 @@ class LocalWorker:
         store = WorkspaceStore(workspace_path)
         saved_job_id = store.save_job(config.get("title") or f"Local job {job_id}", config)
         run_id = store.create_run(saved_job_id, config.get("title") or f"Local job {job_id}", str(folder), str(output), len(files))
+        notification_count = 0
         for row in ranked_rows:
-            store.add_result(run_id, row)
+            result_id = store.add_result(run_id, row)
+            store.create_audit_log(
+                run_id=run_id,
+                result_id=result_id,
+                action_type=row.get("notification_event_type", "cv_analysis_completed"),
+                module="local_worker",
+                resource_type="analysis_result",
+                resource_id=row.get("file", ""),
+                description=f"Local CV analysis completed for {row.get('file', '')}",
+                after_data={
+                    "score": row.get("score"),
+                    "decision": row.get("decision"),
+                    "candidate_status": row.get("candidate_status"),
+                    "rank": row.get("rank"),
+                },
+            )
+            notification = build_candidate_notification(row, config, actor_name=self.device_name or "Local Worker")
+            if notification:
+                store.create_notification(
+                    run_id=run_id,
+                    result_id=result_id,
+                    title=notification["title"],
+                    message=notification["message"],
+                    type=notification["event_type"],
+                    channel=notification["channel"],
+                    candidate_name=notification["candidate_name"],
+                    file_path=row.get("file", ""),
+                )
+                notification_count += 1
         _generate_html_report(ranked_rows, config, html_path)
+        self.quota_remaining = max(0, self.quota_remaining - len(files))
         print(f"Results saved: {json_path}")
         print(f"CSV saved: {csv_path}")
         print(f"HTML Report saved: {html_path}")
         print(f"Local workspace saved: {workspace_path}")
+        print(f"Owner notifications created: {notification_count}")
+        print(f"Quota remaining locally: {self.quota_remaining}")
 
     def _heartbeat(self):
         try:
@@ -1759,6 +1813,7 @@ def main():
             worker.list_jobs()
         elif args.command == "run":
             if args.processing_mode == "local_folder":
+                worker.login()
                 worker.run(
                     args.job_id,
                     args.batch_size,

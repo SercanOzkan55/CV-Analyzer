@@ -2,6 +2,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LOCAL_WORKER_DIR = PROJECT_ROOT / "local_worker"
@@ -10,6 +12,13 @@ if str(LOCAL_WORKER_DIR) not in sys.path:
 
 from worker import LocalWorker, score_cv  # noqa: E402
 from workspace import WorkspaceStore  # noqa: E402
+
+
+def _synced_local_worker(quota_remaining=100):
+    worker = LocalWorker(api_key="test-worker-key", processing_mode="local_folder", ai_mode="none", device_name="test")
+    worker.access_token = "test-access-token"
+    worker.quota_remaining = quota_remaining
+    return worker
 
 
 def test_local_folder_mode_writes_ranked_outputs(tmp_path):
@@ -35,7 +44,7 @@ def test_local_folder_mode_writes_ranked_outputs(tmp_path):
         "review_threshold": 45,
     }
 
-    worker = LocalWorker(api_key="", processing_mode="local_folder", ai_mode="none", device_name="test")
+    worker = _synced_local_worker()
     worker.run(1, local_folder=str(cv_dir), local_config=config, output_folder=str(output_dir))
 
     results = json.loads((output_dir / "local_worker_results.json").read_text(encoding="utf-8"))
@@ -56,6 +65,12 @@ def test_local_folder_mode_writes_ranked_outputs(tmp_path):
     assert len(runs) == 1
     saved_rows = store.get_run_results(runs[0]["id"])
     assert len(saved_rows) == 2
+    assert all(row["candidate_status"] in {"accepted", "rejected", "needs_manual_review"} for row in saved_rows)
+    audit_logs = store.list_audit_logs(runs[0]["id"])
+    assert len(audit_logs) == 2
+    notifications = store.list_notifications()
+    assert len(notifications) == 2
+    assert all(notification["channel"] == "in_app" for notification in notifications)
     pending_rows = store.list_pending_sync_results()
     assert len(pending_rows) == 2
     assert all(row["sync_status"] == "pending" for row in pending_rows)
@@ -83,15 +98,65 @@ def test_local_folder_mode_marks_duplicates_and_failed_files(tmp_path):
         "review_threshold": 45,
     }
 
-    worker = LocalWorker(api_key="", processing_mode="local_folder", ai_mode="none", device_name="test")
+    worker = _synced_local_worker()
     worker.run(1, local_folder=str(cv_dir), local_config=config, output_folder=str(output_dir))
 
     results = json.loads((output_dir / "local_worker_results.json").read_text(encoding="utf-8"))
     failed = (output_dir / "failed_files.txt").read_text(encoding="utf-8")
 
     assert any(row["is_duplicate"] for row in results)
-    assert any("broken.pdf" in row["file"] and "extraction_failed" in row["risk_flags"] for row in results)
+    assert any(
+        "broken.pdf" in row["file"]
+        and "extraction_failed" in row["risk_flags"]
+        and row["candidate_status"] == "needs_manual_review"
+        for row in results
+    )
     assert "broken.pdf" in failed
+
+    store = WorkspaceStore(output_dir / "local_worker_workspace.sqlite3")
+    notifications = store.list_notifications()
+    assert any(notification["type"] == "candidate_needs_manual_review" for notification in notifications)
+
+
+def test_local_folder_mode_requires_synced_worker(tmp_path):
+    cv_dir = tmp_path / "cvs"
+    output_dir = tmp_path / "out"
+    cv_dir.mkdir()
+    (cv_dir / "alice.txt").write_text("Alice\nPython SQL.", encoding="utf-8")
+    config = {
+        "title": "Backend Engineer",
+        "description": "Backend engineer",
+        "required_skills": ["Python"],
+        "nice_to_have_skills": [],
+        "hard_reject_criteria": [],
+        "accept_threshold": 70,
+        "review_threshold": 45,
+    }
+
+    worker = LocalWorker(api_key="", processing_mode="local_folder", ai_mode="none", device_name="test")
+    with pytest.raises(Exception, match="Missing API key"):
+        worker.run(1, local_folder=str(cv_dir), local_config=config, output_folder=str(output_dir))
+
+
+def test_local_folder_mode_blocks_when_quota_is_too_low(tmp_path):
+    cv_dir = tmp_path / "cvs"
+    output_dir = tmp_path / "out"
+    cv_dir.mkdir()
+    (cv_dir / "alice.txt").write_text("Alice\nPython SQL.", encoding="utf-8")
+    (cv_dir / "bob.txt").write_text("Bob\nPython SQL.", encoding="utf-8")
+    config = {
+        "title": "Backend Engineer",
+        "description": "Backend engineer",
+        "required_skills": ["Python"],
+        "nice_to_have_skills": [],
+        "hard_reject_criteria": [],
+        "accept_threshold": 70,
+        "review_threshold": 45,
+    }
+
+    worker = _synced_local_worker(quota_remaining=1)
+    with pytest.raises(Exception, match="has 1 scan"):
+        worker.run(1, local_folder=str(cv_dir), local_config=config, output_folder=str(output_dir))
 
 
 def test_score_cv_honors_custom_scoring_weights():

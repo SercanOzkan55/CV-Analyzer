@@ -8,7 +8,7 @@ import json
 import pytest
 from auth import verify_supabase_jwt
 import main as main_module
-from models import Candidate, Organization, User, Reminder, CandidateAction, RecruiterJob
+from models import AuditLog, Candidate, Organization, User, Reminder, CandidateAction, Notification, RecruiterJob
 
 
 @pytest.fixture(autouse=True)
@@ -688,6 +688,44 @@ def test_dashboard_action_saves_decision_message_and_sends_email(client, db_sess
     action = db_session.query(CandidateAction).filter_by(candidate_email="jane@example.com").one()
     assert action.notes == "Strong Python and React match."
     assert action.email_sent is True
+
+
+def test_stage_update_writes_owner_audit_before_after(client, db_session):
+    """Candidate stage changes should preserve old and new values for owner audit history."""
+    _org, recruiter, job = _setup_org_with_recruiter(db_session)
+    action = CandidateAction(
+        organization_id=recruiter.organization_id,
+        job_id=job.id,
+        recruiter_id=recruiter.id,
+        candidate_name="Jane Audit",
+        candidate_email="audit@example.com",
+        action="pending",
+        notes="Initial review",
+        final_score=74,
+    )
+    db_session.add(action)
+    db_session.commit()
+    db_session.refresh(action)
+
+    client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
+        "user_id": recruiter.supabase_id,
+        "email": recruiter.email,
+    }
+
+    resp = client.put(
+        f"/api/v1/recruiter/dashboard/actions/{action.id}/stage",
+        json={"stage": "accepted", "notes": "Owner approved"},
+    )
+
+    assert resp.status_code == 200, resp.text
+    audit = db_session.query(AuditLog).filter_by(event_type="candidate_decision_changed").one()
+    assert audit.old_values["stage"] == "pending"
+    assert audit.new_values["stage"] == "accepted"
+    assert audit.new_values["candidate_status"] == "accepted"
+
+    notification = db_session.query(Notification).filter_by(type="candidate_decision_changed").one()
+    assert notification.audit_log_id == audit.id
+    assert notification.is_read is False
 
 
 def test_dashboard_action_rejects_other_org_job(client, db_session):
