@@ -261,10 +261,13 @@ class CandidateAction(Base):
     final_score = Column(Float, nullable=True)
     ats_score = Column(Float, nullable=True)
     action = Column(String, nullable=False)  # accepted | rejected | pending
+    assigned_user_id = Column(Integer, ForeignKey("app_users.id", ondelete="SET NULL"), nullable=True, index=True)
     email_sent = Column(Boolean, default=False)
     email_sent_at = Column(DateTime, nullable=True)
     notes = Column(Text, nullable=True)
     analysis_snapshot = Column(Text, nullable=True)  # JSON blob of full analysis
+    deleted_at = Column(DateTime, nullable=True, index=True)
+    anonymized_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
     job = relationship("RecruiterJob", back_populates="actions")

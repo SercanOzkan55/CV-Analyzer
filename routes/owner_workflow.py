@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from auth import verify_supabase_jwt
 from database import get_db
-from models import AuditLog, Notification, NotificationRule, RolePermission, User
+from models import AuditLog, CandidateAction, Notification, NotificationRule, RolePermission, User
 from services.user_service import get_or_create_user
 from services.owner_workflow_service import (
     DEFAULT_ROLE_PERMISSIONS,
@@ -47,6 +47,15 @@ class OwnerMemberRoleUpdate(BaseModel):
 
 class RolePermissionUpdate(BaseModel):
     is_allowed: bool
+
+
+class CandidateAssignmentUpdate(BaseModel):
+    assigned_user_id: int | None = None
+
+
+class CandidateScoreUpdate(BaseModel):
+    final_score: float | None = None
+    ats_score: float | None = None
 
 
 def _require_permission(db: Session, user, permission_key: str) -> None:
@@ -156,6 +165,26 @@ def _role_permission_payload(row: RolePermission) -> dict[str, Any]:
         "is_allowed": row.is_allowed,
         "created_at": _iso(row.created_at),
         "updated_at": _iso(row.updated_at),
+    }
+
+
+def _candidate_action_payload(row: CandidateAction) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "organization_id": row.organization_id,
+        "job_id": row.job_id,
+        "recruiter_id": row.recruiter_id,
+        "assigned_user_id": row.assigned_user_id,
+        "candidate_name": row.candidate_name,
+        "candidate_email": row.candidate_email,
+        "final_score": row.final_score,
+        "ats_score": row.ats_score,
+        "action": row.action,
+        "email_sent": row.email_sent,
+        "notes": row.notes,
+        "created_at": _iso(row.created_at),
+        "deleted_at": _iso(row.deleted_at),
+        "anonymized_at": _iso(row.anonymized_at),
     }
 
 
@@ -400,6 +429,230 @@ def owner_update_role_permission(
     db.commit()
     db.refresh(row)
     return {"permission": _role_permission_payload(row)}
+
+
+@router.get("/candidate-actions")
+def owner_candidate_actions(
+    include_deleted: bool = Query(False),
+    limit: int = Query(100, ge=1, le=300),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    recruiter=Depends(owner_workflow_user),
+):
+    _require_permission(db, recruiter, "candidates.view")
+    query = db.query(CandidateAction).filter(CandidateAction.organization_id == recruiter.organization_id)
+    if normalize_role(recruiter.role) == "limited":
+        query = query.filter(CandidateAction.assigned_user_id == recruiter.id)
+    if not include_deleted:
+        query = query.filter(CandidateAction.deleted_at == None)
+    rows = query.order_by(CandidateAction.created_at.desc(), CandidateAction.id.desc()).offset(offset).limit(limit).all()
+    return {
+        "items": [_candidate_action_payload(row) for row in rows],
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+@router.put("/candidate-actions/{action_id}/assignment")
+def owner_assign_candidate_action(
+    action_id: int,
+    body: CandidateAssignmentUpdate,
+    db: Session = Depends(get_db),
+    recruiter=Depends(owner_workflow_user),
+):
+    _require_permission(db, recruiter, "candidates.manage")
+    row = (
+        db.query(CandidateAction)
+        .filter(CandidateAction.id == action_id, CandidateAction.organization_id == recruiter.organization_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Candidate action not found")
+    assigned_user_id = body.assigned_user_id
+    if assigned_user_id is not None:
+        assignee = (
+            db.query(User)
+            .filter(User.id == assigned_user_id, User.organization_id == recruiter.organization_id)
+            .first()
+        )
+        if not assignee:
+            raise HTTPException(status_code=404, detail="Assigned user not found")
+    old_assigned_user_id = row.assigned_user_id
+    row.assigned_user_id = assigned_user_id
+    db.flush()
+    create_audit_log(
+        db,
+        organization_id=recruiter.organization_id,
+        event_type="candidate_decision_changed",
+        actor_user_id=recruiter.id,
+        actor_role=recruiter.role,
+        resource_type="candidate",
+        resource_id=row.id,
+        description=f"{row.candidate_name} assignment updated.",
+        old_values={"assigned_user_id": old_assigned_user_id},
+        new_values={"assigned_user_id": assigned_user_id},
+        metadata={"source": "owner_assign_candidate_action"},
+    )
+    db.commit()
+    db.refresh(row)
+    return {"action": _candidate_action_payload(row)}
+
+
+@router.put("/candidate-actions/{action_id}/score")
+def owner_update_candidate_score(
+    action_id: int,
+    body: CandidateScoreUpdate,
+    db: Session = Depends(get_db),
+    recruiter=Depends(owner_workflow_user),
+):
+    _require_permission(db, recruiter, "candidate_status.update")
+    row = (
+        db.query(CandidateAction)
+        .filter(
+            CandidateAction.id == action_id,
+            CandidateAction.organization_id == recruiter.organization_id,
+            CandidateAction.deleted_at == None,
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Candidate action not found")
+    old_values = {"final_score": row.final_score, "ats_score": row.ats_score}
+    if body.final_score is not None:
+        row.final_score = body.final_score
+    if body.ats_score is not None:
+        row.ats_score = body.ats_score
+    new_values = {"final_score": row.final_score, "ats_score": row.ats_score}
+    db.flush()
+    audit = create_audit_log(
+        db,
+        organization_id=recruiter.organization_id,
+        event_type="candidate_score_changed",
+        actor_user_id=recruiter.id,
+        actor_role=recruiter.role,
+        resource_type="candidate",
+        resource_id=row.id,
+        description=f"{row.candidate_name} score updated.",
+        old_values=old_values,
+        new_values=new_values,
+        metadata={"source": "owner_update_candidate_score"},
+    )
+    create_owner_notification(
+        db,
+        organization_id=recruiter.organization_id,
+        event_type="candidate_score_changed",
+        title=candidate_event_title("candidate_score_changed"),
+        message=f"{row.candidate_name} score updated.",
+        recipient_user_id=row.recruiter_id,
+        actor_user_id=recruiter.id,
+        audit_log_id=audit.id,
+        candidate_action_id=row.id,
+        metadata={"source": "owner_update_candidate_score"},
+    )
+    db.commit()
+    db.refresh(row)
+    return {"action": _candidate_action_payload(row)}
+
+
+@router.delete("/candidate-actions/{action_id}")
+def owner_soft_delete_candidate_action(
+    action_id: int,
+    db: Session = Depends(get_db),
+    recruiter=Depends(owner_workflow_user),
+):
+    _require_permission(db, recruiter, "candidates.manage")
+    row = (
+        db.query(CandidateAction)
+        .filter(
+            CandidateAction.id == action_id,
+            CandidateAction.organization_id == recruiter.organization_id,
+            CandidateAction.deleted_at == None,
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Candidate action not found")
+    row.deleted_at = datetime.utcnow()
+    db.flush()
+    audit = create_audit_log(
+        db,
+        organization_id=recruiter.organization_id,
+        event_type="candidate_deleted",
+        actor_user_id=recruiter.id,
+        actor_role=recruiter.role,
+        resource_type="candidate",
+        resource_id=row.id,
+        description=f"{row.candidate_name} soft deleted.",
+        old_values={"deleted_at": None},
+        new_values={"deleted_at": _iso(row.deleted_at)},
+        metadata={"source": "owner_soft_delete_candidate_action"},
+    )
+    create_owner_notification(
+        db,
+        organization_id=recruiter.organization_id,
+        event_type="candidate_deleted",
+        title=candidate_event_title("candidate_deleted"),
+        message=f"{row.candidate_name} soft deleted.",
+        recipient_user_id=row.recruiter_id,
+        actor_user_id=recruiter.id,
+        audit_log_id=audit.id,
+        candidate_action_id=row.id,
+        metadata={"source": "owner_soft_delete_candidate_action"},
+    )
+    db.commit()
+    db.refresh(row)
+    return {"action": _candidate_action_payload(row)}
+
+
+@router.post("/candidate-actions/{action_id}/anonymize")
+def owner_anonymize_candidate_action(
+    action_id: int,
+    db: Session = Depends(get_db),
+    recruiter=Depends(owner_workflow_user),
+):
+    _require_permission(db, recruiter, "candidates.manage")
+    row = (
+        db.query(CandidateAction)
+        .filter(CandidateAction.id == action_id, CandidateAction.organization_id == recruiter.organization_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Candidate action not found")
+    old_values = {
+        "candidate_name": row.candidate_name,
+        "candidate_email": row.candidate_email,
+        "candidate_phone": None,
+        "has_cv_text": bool(row.cv_text),
+    }
+    row.candidate_name = f"Anonymized Candidate #{row.id}"
+    row.candidate_email = None
+    row.cv_text = None
+    row.cv_file_key = None
+    row.cv_file_name = None
+    row.cv_file_type = None
+    row.anonymized_at = datetime.utcnow()
+    db.flush()
+    create_audit_log(
+        db,
+        organization_id=recruiter.organization_id,
+        event_type="candidate_deleted",
+        actor_user_id=recruiter.id,
+        actor_role=recruiter.role,
+        resource_type="candidate",
+        resource_id=row.id,
+        description=f"Candidate #{row.id} anonymized.",
+        old_values=old_values,
+        new_values={
+            "candidate_name": row.candidate_name,
+            "candidate_email": row.candidate_email,
+            "has_cv_text": bool(row.cv_text),
+            "anonymized_at": _iso(row.anonymized_at),
+        },
+        metadata={"source": "owner_anonymize_candidate_action"},
+    )
+    db.commit()
+    db.refresh(row)
+    return {"action": _candidate_action_payload(row)}
 
 
 @router.get("/audit-logs")
