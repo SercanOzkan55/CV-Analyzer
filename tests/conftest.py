@@ -25,6 +25,9 @@ os.environ.setdefault("API_KEY", "test-key")
 os.environ.setdefault("ENV", "test")
 # Ensure MOCK_SERVICES is disabled so quota/rate-limit logic runs in tests
 os.environ.setdefault("MOCK_SERVICES", "0")
+# Keep rewrite endpoints deterministic in local/CI tests even when a developer
+# .env selects a real AI provider.
+os.environ.setdefault("REWRITE_PROVIDER", "mock")
 # Disable background model worker during tests to avoid concurrency issues
 os.environ.setdefault("MODEL_WORKER_DISABLED", "1")
 from fastapi.testclient import TestClient

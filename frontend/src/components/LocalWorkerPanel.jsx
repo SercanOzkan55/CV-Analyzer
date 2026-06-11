@@ -1,5 +1,25 @@
 import React, { useEffect, useState } from 'react'
-import { createWorkerKey, downloadWorkerExecutable, fetchWorkerProgress, fetchWorkerSessions, listWorkerKeys, recruiterListJobs, revokeWorkerKey } from '../api'
+import {
+  createWorkerKey,
+  createOwnerUser,
+  downloadWorkerExecutable,
+  fetchOwnerAuditLogs,
+  fetchOwnerNotificationRules,
+  fetchOwnerNotifications,
+  fetchOwnerPermissions,
+  fetchOwnerRolePermissions,
+  fetchOwnerUsers,
+  fetchWorkerProgress,
+  fetchWorkerQuota,
+  fetchWorkerSessions,
+  listWorkerKeys,
+  markOwnerNotificationRead,
+  recruiterListJobs,
+  revokeWorkerKey,
+  updateOwnerNotificationRule,
+  updateOwnerRolePermission,
+  updateOwnerUserRole,
+} from '../api'
 import { useAuth } from '../context/AuthContext'
 
 export default function LocalWorkerPanel({ organizationId }) {
@@ -8,17 +28,31 @@ export default function LocalWorkerPanel({ organizationId }) {
   const [jobs, setJobs] = useState([])
   const [progressByJob, setProgressByJob] = useState({})
   const [sessions, setSessions] = useState([])
+  const [quotaSummary, setQuotaSummary] = useState(null)
+  const [ownerPermissions, setOwnerPermissions] = useState(null)
+  const [ownerNotifications, setOwnerNotifications] = useState([])
+  const [ownerAuditLogs, setOwnerAuditLogs] = useState([])
+  const [ownerNotificationRules, setOwnerNotificationRules] = useState([])
+  const [ownerUsers, setOwnerUsers] = useState([])
+  const [ownerRolePermissions, setOwnerRolePermissions] = useState(null)
   const [loading, setLoading] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
   const [newKeyJobId, setNewKeyJobId] = useState('')
   const [newKeyQuota, setNewKeyQuota] = useState(1000)
+  const [newMemberEmail, setNewMemberEmail] = useState('')
+  const [newMemberRole, setNewMemberRole] = useState('hr')
+  const [permissionRole, setPermissionRole] = useState('hr')
+  const [permissionKey, setPermissionKey] = useState('candidates.view')
+  const [permissionAllowed, setPermissionAllowed] = useState(true)
   const [createdKeyData, setCreatedKeyData] = useState(null)
 
   useEffect(() => {
     if (!token) return
     fetchKeys()
+    fetchQuota()
     fetchJobs()
     fetchSessions()
+    fetchOwnerWorkflow()
   }, [token])
 
   async function fetchKeys() {
@@ -33,6 +67,20 @@ export default function LocalWorkerPanel({ organizationId }) {
     }
   }
 
+  async function fetchQuota() {
+    try {
+      const data = await fetchWorkerQuota(token)
+      setQuotaSummary(data)
+      const remaining = Number(data?.quota_remaining ?? 0)
+      if (remaining > 0) {
+        setNewKeyQuota((value) => Math.min(Number(value) || 1000, remaining))
+      }
+    } catch (error) {
+      console.warn('Worker quota unavailable', error)
+      setQuotaSummary(null)
+    }
+  }
+
   async function fetchSessions() {
     try {
       const data = await fetchWorkerSessions(token)
@@ -40,6 +88,40 @@ export default function LocalWorkerPanel({ organizationId }) {
     } catch (error) {
       console.warn('Worker sessions unavailable', error)
       setSessions([])
+    }
+  }
+
+  async function fetchOwnerWorkflow() {
+    try {
+      const permissions = await fetchOwnerPermissions(token)
+      const canViewNotifications = Boolean(permissions?.permissions?.['notifications.view'])
+      const canViewAudit = Boolean(permissions?.permissions?.['audit.view'])
+      const canManageRules = Boolean(permissions?.permissions?.['notifications.manage'])
+      const canViewUsers = Boolean(permissions?.permissions?.['users.view'])
+      const canManagePermissions = Boolean(permissions?.permissions?.['permissions.manage'])
+      const [notifications, auditLogs, rules] = await Promise.all([
+        canViewNotifications ? fetchOwnerNotifications(token, { limit: 5 }) : Promise.resolve({ items: [] }),
+        canViewAudit ? fetchOwnerAuditLogs(token, { limit: 5 }) : Promise.resolve({ items: [] }),
+        canManageRules ? fetchOwnerNotificationRules(token) : Promise.resolve({ items: [] }),
+      ])
+      const [users, rolePermissions] = await Promise.all([
+        canViewUsers ? fetchOwnerUsers(token, { limit: 100 }) : Promise.resolve({ items: [] }),
+        canManagePermissions ? fetchOwnerRolePermissions(token) : Promise.resolve(null),
+      ])
+      setOwnerPermissions(permissions)
+      setOwnerNotifications(notifications.items || [])
+      setOwnerAuditLogs(auditLogs.items || [])
+      setOwnerNotificationRules(rules.items || [])
+      setOwnerUsers(users.items || [])
+      setOwnerRolePermissions(rolePermissions)
+    } catch (error) {
+      console.warn('Owner workflow unavailable', error)
+      setOwnerPermissions(null)
+      setOwnerNotifications([])
+      setOwnerAuditLogs([])
+      setOwnerNotificationRules([])
+      setOwnerUsers([])
+      setOwnerRolePermissions(null)
     }
   }
 
@@ -79,7 +161,11 @@ export default function LocalWorkerPanel({ organizationId }) {
       setNewKeyName('')
       setNewKeyJobId('')
       setNewKeyQuota(1000)
-      await fetchKeys()
+      try {
+        await Promise.all([fetchKeys(), fetchQuota()])
+      } catch (refreshError) {
+        console.warn('Worker key was created, but refresh failed:', refreshError)
+      }
     } catch (error) {
       console.error('Error creating worker key:', error)
       window.alert(error.message || 'Failed to create worker key')
@@ -94,12 +180,76 @@ export default function LocalWorkerPanel({ organizationId }) {
       setLoading(true)
       await revokeWorkerKey(token, id)
       await fetchKeys()
+      await fetchQuota()
       await fetchSessions()
     } catch (error) {
       console.error('Error revoking worker key:', error)
       window.alert(error.message || 'Failed to revoke worker key')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleMarkOwnerNotificationRead(notificationId) {
+    try {
+      await markOwnerNotificationRead(token, notificationId)
+      await fetchOwnerWorkflow()
+    } catch (error) {
+      console.warn('Could not mark notification as read', error)
+    }
+  }
+
+  async function handleToggleOwnerRule(rule) {
+    try {
+      await updateOwnerNotificationRule(token, rule.event_type, {
+        channel: rule.channel || 'in_app',
+        is_enabled: !rule.is_enabled,
+      })
+      await fetchOwnerWorkflow()
+    } catch (error) {
+      console.warn('Could not update notification rule', error)
+      window.alert(error.message || 'Failed to update notification rule')
+    }
+  }
+
+  async function handleCreateOwnerUser(event) {
+    event.preventDefault()
+    if (!newMemberEmail) return
+    try {
+      await createOwnerUser(token, {
+        email: newMemberEmail,
+        role: newMemberRole,
+      })
+      setNewMemberEmail('')
+      setNewMemberRole('hr')
+      await fetchOwnerWorkflow()
+    } catch (error) {
+      console.warn('Could not create owner user', error)
+      window.alert(error.message || 'Failed to add team member')
+    }
+  }
+
+  async function handleUpdateOwnerUserRole(userId, role) {
+    try {
+      await updateOwnerUserRole(token, userId, { role })
+      await fetchOwnerWorkflow()
+    } catch (error) {
+      console.warn('Could not update owner user role', error)
+      window.alert(error.message || 'Failed to update team member role')
+    }
+  }
+
+  async function handleRolePermissionSubmit(event) {
+    event.preventDefault()
+    if (!permissionRole || !permissionKey) return
+    try {
+      await updateOwnerRolePermission(token, permissionRole, permissionKey, {
+        is_allowed: permissionAllowed,
+      })
+      await fetchOwnerWorkflow()
+    } catch (error) {
+      console.warn('Could not update role permission', error)
+      window.alert(error.message || 'Failed to update role permission')
     }
   }
 
@@ -123,6 +273,24 @@ export default function LocalWorkerPanel({ organizationId }) {
     }
   }
 
+  const monthlyLimit = Number(quotaSummary?.monthly_limit ?? 4000)
+  const quotaAllocated = Number(quotaSummary?.quota_allocated ?? 0)
+  const quotaUsedReserved = Number(quotaSummary?.quota_used_reserved ?? 0)
+  const quotaRemaining = Math.max(0, Number(quotaSummary?.quota_remaining ?? monthlyLimit))
+  const quotaPercent = monthlyLimit ? Math.min(100, Math.round((quotaAllocated / monthlyLimit) * 100)) : 0
+  const isQuotaBlocked = Boolean(quotaSummary && quotaRemaining <= 0)
+  const canViewOwnerWorkflow = Boolean(
+    ownerPermissions?.permissions?.['notifications.view'] ||
+    ownerPermissions?.permissions?.['audit.view']
+  )
+  const canManageOwnerRules = Boolean(ownerPermissions?.permissions?.['notifications.manage'])
+  const canManageOwnerUsers = Boolean(ownerPermissions?.permissions?.['users.manage'])
+  const canManageRolePermissions = Boolean(ownerPermissions?.permissions?.['permissions.manage'])
+  const unreadOwnerCount = ownerNotifications.filter((item) => !item.is_read).length
+  const managedRoles = ownerRolePermissions?.roles || ['owner', 'recruiter', 'hr', 'limited']
+  const permissionOptions = Object.entries(ownerRolePermissions?.permissions || ownerPermissions?.available_permissions || {})
+  const permissionOverrides = ownerRolePermissions?.overrides || []
+
   return (
     <div className="card product-card worker-panel">
       <div className="worker-panel-header">
@@ -136,6 +304,24 @@ export default function LocalWorkerPanel({ organizationId }) {
         </button>
       </div>
 
+      <div className={`worker-quota-summary ${isQuotaBlocked ? 'is-exhausted' : ''}`}>
+        <div>
+          <span className="product-page-kicker">Monthly quota</span>
+          <strong>{quotaRemaining}/{monthlyLimit} CV left</strong>
+          <p className="text-muted">
+            Premium Local Worker keys can allocate up to {monthlyLimit} CVs per month.
+          </p>
+        </div>
+        <div className="worker-quota-meter" aria-label={`Local Worker quota ${quotaPercent}% allocated`}>
+          <span style={{ width: `${quotaPercent}%` }} />
+        </div>
+        <dl>
+          <dt>Allocated</dt><dd>{quotaAllocated}</dd>
+          <dt>Used + reserved</dt><dd>{quotaUsedReserved}</dd>
+          <dt>Plan</dt><dd>{quotaSummary?.plan || 'pro'}</dd>
+        </dl>
+      </div>
+
       {createdKeyData && (
         <div className="worker-secret-box" role="status">
           <h3>Worker key created</h3>
@@ -144,6 +330,183 @@ export default function LocalWorkerPanel({ organizationId }) {
           <button type="button" className="btn-outline btn-sm" onClick={() => setCreatedKeyData(null)}>
             I have saved the key
           </button>
+        </div>
+      )}
+
+      {canViewOwnerWorkflow && (
+        <div className="owner-workflow-panel">
+          <div className="owner-workflow-summary">
+            <div>
+              <span className="product-page-kicker">Owner workflow</span>
+              <strong>{unreadOwnerCount} unread owner alerts</strong>
+            </div>
+            <dl>
+              <dt>Role</dt><dd>{ownerPermissions?.role || '-'}</dd>
+              <dt>Audit rows</dt><dd>{ownerAuditLogs.length}</dd>
+              <dt>Rules</dt><dd>{ownerNotificationRules.length}</dd>
+            </dl>
+          </div>
+
+          <div className="owner-workflow-grid">
+            <section className="owner-workflow-section">
+              <h3>Recent Notifications</h3>
+              {ownerNotifications.length === 0 ? (
+                <p className="text-muted">No owner notifications yet.</p>
+              ) : (
+                <div className="owner-workflow-list">
+                  {ownerNotifications.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`owner-workflow-item ${item.is_read ? '' : 'is-unread'}`}
+                      onClick={() => handleMarkOwnerNotificationRead(item.id)}
+                    >
+                      <span>
+                        <strong>{item.title}</strong>
+                        <small>{item.message}</small>
+                      </span>
+                      <em>{item.is_read ? 'Read' : 'New'}</em>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="owner-workflow-section">
+              <h3>Audit History</h3>
+              {ownerAuditLogs.length === 0 ? (
+                <p className="text-muted">No audit records yet.</p>
+              ) : (
+                <div className="owner-workflow-list">
+                  {ownerAuditLogs.map((item) => (
+                    <div key={item.id} className="owner-workflow-item">
+                      <span>
+                        <strong>{item.event_type}</strong>
+                        <small>{item.description || 'Audit event recorded'}</small>
+                      </span>
+                      <em>{item.created_at ? new Date(item.created_at).toLocaleDateString() : '-'}</em>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {canManageOwnerRules && (
+              <section className="owner-workflow-section">
+                <h3>Notification Rules</h3>
+                {ownerNotificationRules.length === 0 ? (
+                  <p className="text-muted">No rules available.</p>
+                ) : (
+                  <div className="owner-rule-list">
+                    {ownerNotificationRules.map((rule) => (
+                      <label key={`${rule.event_type}-${rule.channel}`} className="owner-rule-item">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(rule.is_enabled)}
+                          onChange={() => handleToggleOwnerRule(rule)}
+                        />
+                        <span>
+                          <strong>{rule.event_type}</strong>
+                          <small>{rule.channel || 'in_app'}</small>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {ownerPermissions?.permissions?.['users.view'] && (
+              <section className="owner-workflow-section">
+                <h3>Team Members</h3>
+                {canManageOwnerUsers && (
+                  <form className="owner-member-form" onSubmit={handleCreateOwnerUser}>
+                    <input
+                      type="email"
+                      value={newMemberEmail}
+                      onChange={(event) => setNewMemberEmail(event.target.value)}
+                      placeholder="hr@example.com"
+                      required
+                    />
+                    <select value={newMemberRole} onChange={(event) => setNewMemberRole(event.target.value)}>
+                      {managedRoles.map((role) => (
+                        <option key={role} value={role}>{role}</option>
+                      ))}
+                    </select>
+                    <button type="submit" className="btn-outline btn-sm">Add</button>
+                  </form>
+                )}
+                {ownerUsers.length === 0 ? (
+                  <p className="text-muted">No team members yet.</p>
+                ) : (
+                  <div className="owner-member-list">
+                    {ownerUsers.map((member) => (
+                      <div key={member.id} className="owner-member-item">
+                        <span>
+                          <strong>{member.email}</strong>
+                          <small>{member.supabase_id?.startsWith('pending-owner-') ? 'Pending local member' : `User #${member.id}`}</small>
+                        </span>
+                        {canManageOwnerUsers ? (
+                          <select
+                            value={member.role || 'limited'}
+                            onChange={(event) => handleUpdateOwnerUserRole(member.id, event.target.value)}
+                          >
+                            {managedRoles.map((role) => (
+                              <option key={role} value={role}>{role}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <em>{member.role}</em>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {canManageRolePermissions && (
+              <section className="owner-workflow-section">
+                <h3>Permission Overrides</h3>
+                <form className="owner-permission-form" onSubmit={handleRolePermissionSubmit}>
+                  <select value={permissionRole} onChange={(event) => setPermissionRole(event.target.value)}>
+                    {managedRoles.map((role) => (
+                      <option key={role} value={role}>{role}</option>
+                    ))}
+                  </select>
+                  <select value={permissionKey} onChange={(event) => setPermissionKey(event.target.value)}>
+                    {permissionOptions.map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={permissionAllowed}
+                      onChange={(event) => setPermissionAllowed(event.target.checked)}
+                    />
+                    Allow
+                  </label>
+                  <button type="submit" className="btn-outline btn-sm">Save</button>
+                </form>
+                {permissionOverrides.length === 0 ? (
+                  <p className="text-muted">No permission overrides yet.</p>
+                ) : (
+                  <div className="owner-workflow-list">
+                    {permissionOverrides.slice(0, 6).map((item) => (
+                      <div key={item.id} className="owner-workflow-item">
+                        <span>
+                          <strong>{item.role}</strong>
+                          <small>{item.permission_key}</small>
+                        </span>
+                        <em>{item.is_allowed ? 'Allow' : 'Deny'}</em>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+          </div>
         </div>
       )}
 
@@ -165,9 +528,21 @@ export default function LocalWorkerPanel({ organizationId }) {
           </div>
           <div className="settings-field">
             <label>CV quota limit</label>
-            <input type="number" value={newKeyQuota} min="1" onChange={(e) => setNewKeyQuota(e.target.value)} required />
+            <input
+              type="number"
+              value={newKeyQuota}
+              min="1"
+              max={quotaRemaining || monthlyLimit}
+              onChange={(e) => setNewKeyQuota(e.target.value)}
+              required
+            />
+            <small className={isQuotaBlocked ? 'text-danger' : 'text-muted'}>
+              {isQuotaBlocked
+                ? 'Monthly Local Worker quota is full. Revoke unused keys or wait for renewal.'
+                : `${quotaRemaining} CV allocation remaining this month.`}
+            </small>
           </div>
-          <button type="submit" className="btn-primary" disabled={loading}>
+          <button type="submit" className="btn-primary" disabled={loading || isQuotaBlocked}>
             {loading ? 'Processing...' : 'Generate key'}
           </button>
         </form>

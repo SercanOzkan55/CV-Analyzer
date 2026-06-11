@@ -97,6 +97,60 @@ def test_worker_key_create_returns_plaintext_once(client, db_session, recruiter_
     assert row.key_prefix == created["api_key"][:20]
 
 
+def test_worker_key_create_enforces_premium_monthly_limit(client, db_session, recruiter_user, test_job):
+    assert _create_worker_key(client, job_id=test_job.id, quota_limit=1000)["quota_remaining"] == 1000
+    _create_worker_key(client, job_id=test_job.id, quota_limit=1000)
+    _create_worker_key(client, job_id=test_job.id, quota_limit=2000)
+
+    quota = client.get("/api/worker/quota")
+    assert quota.status_code == 200, quota.text
+    assert quota.json()["monthly_limit"] == 4000
+    assert quota.json()["quota_remaining"] == 0
+
+    response = client.post("/api/worker-keys", json={
+        "name": "overflow",
+        "job_id": test_job.id,
+        "quota_limit": 1,
+    })
+    assert response.status_code == 403
+    assert "Monthly Local Worker quota exceeded" in response.json()["detail"]
+
+
+def test_worker_key_create_rejects_single_key_over_premium_monthly_limit(client, recruiter_user, test_job):
+    response = client.post("/api/worker-keys", json={
+        "name": "too large",
+        "job_id": test_job.id,
+        "quota_limit": 4001,
+    })
+    assert response.status_code == 403
+    assert "Monthly Local Worker quota exceeded" in response.json()["detail"]
+
+
+def test_revoked_unused_worker_quota_is_reusable(client, recruiter_user, test_job):
+    created = _create_worker_key(client, job_id=test_job.id, quota_limit=4000)
+    assert client.post(f"/api/worker-keys/{created['id']}/revoke").status_code == 200
+
+    replacement = _create_worker_key(client, job_id=test_job.id, quota_limit=4000)
+    assert replacement["quota_limit"] == 4000
+
+
+def test_revoked_used_worker_quota_counts_for_month(client, db_session, recruiter_user, test_job):
+    _create_action(db_session, recruiter_user, test_job)
+    created = _create_worker_key(client, job_id=test_job.id, quota_limit=1)
+    headers = _worker_headers(client, created["api_key"])
+    item = _claim_one(client, headers, test_job.id)
+    assert _submit_result(client, headers, test_job.id, item).status_code == 200
+    assert client.post(f"/api/worker-keys/{created['id']}/revoke").status_code == 200
+
+    response = client.post("/api/worker-keys", json={
+        "name": "replacement-too-large",
+        "job_id": test_job.id,
+        "quota_limit": 4000,
+    })
+    assert response.status_code == 403
+    assert _create_worker_key(client, job_id=test_job.id, quota_limit=3999)["quota_limit"] == 3999
+
+
 def test_worker_package_download_contains_cli_without_plaintext_key(client, recruiter_user):
     response = client.get("/api/worker/download-package")
     assert response.status_code == 200, response.text

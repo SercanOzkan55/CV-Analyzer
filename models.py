@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import (TIMESTAMP, Boolean, Column, DateTime, Enum, Float, ForeignKey,
-                        Integer, JSON, String, Text, CheckConstraint)
+                        Integer, JSON, String, Text, CheckConstraint, UniqueConstraint)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -529,6 +529,7 @@ class WorkerAnalysisResult(Base):
     cv_id = Column(Integer, nullable=True)
     score = Column(Float, nullable=True)
     decision = Column(String, nullable=True)
+    candidate_status = Column(String, nullable=True, index=True)
     confidence = Column(String, nullable=True)
     summary = Column(Text, nullable=True)
     matched_skills = Column(JSON, nullable=True)
@@ -554,3 +555,95 @@ class QuotaEvent(Base):
     amount = Column(Integer, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     metadata_ = Column("metadata", JSON, nullable=True)
+
+
+# --- Owner Workflow Models -------------------------------------------------
+
+
+class RolePermission(Base):
+    """Per-organization role permission overrides for owner/HR workflows."""
+
+    __tablename__ = "role_permissions"
+    __table_args__ = (
+        UniqueConstraint(
+            "organization_id",
+            "role",
+            "permission_key",
+            name="uq_role_permissions_org_role_permission",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = Column(String, nullable=False, index=True)
+    permission_key = Column(String, nullable=False, index=True)
+    is_allowed = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AuditLog(Base):
+    """Durable audit trail for owner-visible recruitment actions."""
+
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    actor_user_id = Column(Integer, ForeignKey("app_users.id", ondelete="SET NULL"), nullable=True, index=True)
+    actor_role = Column(String, nullable=True)
+    event_type = Column(String, nullable=False, index=True)
+    resource_type = Column(String, nullable=True, index=True)
+    resource_id = Column(Integer, nullable=True, index=True)
+    description = Column(Text, nullable=True)
+    old_values = Column(JSON, nullable=True)
+    new_values = Column(JSON, nullable=True)
+    ip_address = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="success", index=True)
+    metadata_ = Column("metadata", JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class NotificationRule(Base):
+    """Organization-level notification preferences for important owner events."""
+
+    __tablename__ = "notification_rules"
+    __table_args__ = (
+        UniqueConstraint(
+            "organization_id",
+            "event_type",
+            "channel",
+            name="uq_notification_rules_org_event_channel",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    event_type = Column(String, nullable=False, index=True)
+    channel = Column(String, nullable=False, default="in_app")
+    is_enabled = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Notification(Base):
+    """Owner-visible in-app notifications generated from audit-worthy events."""
+
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    recipient_user_id = Column(Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=True, index=True)
+    actor_user_id = Column(Integer, ForeignKey("app_users.id", ondelete="SET NULL"), nullable=True, index=True)
+    audit_log_id = Column(Integer, ForeignKey("audit_logs.id", ondelete="SET NULL"), nullable=True, index=True)
+    candidate_id = Column(Integer, ForeignKey("candidates.id", ondelete="SET NULL"), nullable=True, index=True)
+    candidate_action_id = Column(Integer, ForeignKey("candidate_actions.id", ondelete="SET NULL"), nullable=True, index=True)
+    analysis_result_id = Column(Integer, ForeignKey("worker_analysis_results.id", ondelete="SET NULL"), nullable=True, index=True)
+    type = Column(String, nullable=False, index=True)
+    title = Column(String, nullable=False)
+    message = Column(Text, nullable=False)
+    channel = Column(String, nullable=False, default="in_app")
+    is_read = Column(Boolean, default=False, nullable=False, index=True)
+    read_at = Column(DateTime, nullable=True)
+    metadata_ = Column("metadata", JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)

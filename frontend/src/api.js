@@ -1280,6 +1280,10 @@ export function createWorkerKey(token, payload) {
   return _workerJson(token, '/api/worker-keys', 'POST', payload)
 }
 
+export function fetchWorkerQuota(token) {
+  return _workerJson(token, '/api/worker/quota')
+}
+
 export async function downloadWorkerPackage(token) {
   const headers = {}
   const auth = authHeaderFrom(token)
@@ -1328,6 +1332,87 @@ export function fetchWorkerProgress(token, jobId) {
 
 export function fetchWorkerSessions(token) {
   return _workerJson(token, '/api/worker/sessions')
+}
+
+async function _ownerJson(token, path, method = 'GET', payload) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers,
+    body: payload === undefined ? undefined : JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    let detail = ''
+    try {
+      const parsed = text ? JSON.parse(text) : {}
+      detail = Array.isArray(parsed.detail)
+        ? parsed.detail.map((item) => item.msg || JSON.stringify(item)).join('; ')
+        : parsed.detail || parsed.message || ''
+    } catch {
+      detail = text
+    }
+    throw new Error(detail || `Owner workflow request failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export function fetchOwnerPermissions(token) {
+  return _ownerJson(token, '/api/v1/owner/permissions')
+}
+
+export function fetchOwnerUsers(token, { limit = 100, offset = 0 } = {}) {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
+  return _ownerJson(token, `/api/v1/owner/users?${params.toString()}`)
+}
+
+export function createOwnerUser(token, payload) {
+  return _ownerJson(token, '/api/v1/owner/users', 'POST', payload)
+}
+
+export function updateOwnerUserRole(token, userId, payload) {
+  return _ownerJson(token, `/api/v1/owner/users/${encodeURIComponent(userId)}/role`, 'PUT', payload)
+}
+
+export function fetchOwnerAuditLogs(token, { limit = 20, offset = 0 } = {}) {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
+  return _ownerJson(token, `/api/v1/owner/audit-logs?${params.toString()}`)
+}
+
+export function fetchOwnerNotifications(token, { unreadOnly = false, limit = 20, offset = 0 } = {}) {
+  const params = new URLSearchParams({
+    unread_only: unreadOnly ? 'true' : 'false',
+    limit: String(limit),
+    offset: String(offset),
+  })
+  return _ownerJson(token, `/api/v1/owner/notifications?${params.toString()}`)
+}
+
+export function markOwnerNotificationRead(token, notificationId) {
+  return _ownerJson(token, `/api/v1/owner/notifications/${encodeURIComponent(notificationId)}/read`, 'POST', {})
+}
+
+export function fetchOwnerNotificationRules(token) {
+  return _ownerJson(token, '/api/v1/owner/notification-rules')
+}
+
+export function updateOwnerNotificationRule(token, eventType, payload) {
+  return _ownerJson(token, `/api/v1/owner/notification-rules/${encodeURIComponent(eventType)}`, 'PUT', payload)
+}
+
+export function fetchOwnerRolePermissions(token) {
+  return _ownerJson(token, '/api/v1/owner/role-permissions')
+}
+
+export function updateOwnerRolePermission(token, role, permissionKey, payload) {
+  return _ownerJson(
+    token,
+    `/api/v1/owner/role-permissions/${encodeURIComponent(role)}/${encodeURIComponent(permissionKey)}`,
+    'PUT',
+    payload
+  )
 }
 
 

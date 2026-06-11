@@ -22,6 +22,10 @@ from schemas.worker import (
 )
 from routes.recruiter import recruiter_required
 from core.http_runtime import audit_log, limiter
+from services.owner_workflow_service import (
+    decision_to_candidate_status,
+    record_candidate_status_event,
+)
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 router = APIRouter()
@@ -29,6 +33,11 @@ security = HTTPBearer()
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _LOCAL_WORKER_DIR = _PROJECT_ROOT / "local_worker"
+LOCAL_WORKER_PLAN_LIMITS = {
+    "free": int(os.getenv("LOCAL_WORKER_MONTHLY_LIMIT_FREE", "0")),
+    "pro": int(os.getenv("LOCAL_WORKER_MONTHLY_LIMIT_PRO", "4000")),
+    "enterprise": int(os.getenv("LOCAL_WORKER_MONTHLY_LIMIT_ENTERPRISE", "4000")),
+}
 
 def hash_key(api_key: str) -> str:
     return hashlib.sha256(api_key.encode("utf-8")).hexdigest()
@@ -168,6 +177,18 @@ def _ensure_candidate_for_action(db: Session, action: CandidateAction) -> Candid
     return candidate
 
 
+def _safe_permissions(value) -> dict:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            return {}
+    return {}
+
+
 def _worker_key_payload(wk: WorkerKey) -> dict:
     remaining = max(0, int(wk.quota_limit or 0) - int(wk.quota_used or 0) - int(wk.quota_reserved or 0))
     return {
@@ -184,7 +205,86 @@ def _worker_key_payload(wk: WorkerKey) -> dict:
         "revoked_at": wk.revoked_at,
         "last_used_at": wk.last_used_at,
         "created_at": wk.created_at,
-        "permissions": wk.permissions or {},
+        "permissions": _safe_permissions(wk.permissions),
+    }
+
+
+def _normalize_worker_plan(plan: str | None) -> str:
+    value = (plan or "free").strip().lower()
+    if value == "premium":
+        value = "pro"
+    return value if value in LOCAL_WORKER_PLAN_LIMITS else "free"
+
+
+def _resolve_worker_plan(db: Session, organization_id: int, recruiter=None) -> str:
+    org_plan = None
+    if organization_id:
+        from models import Organization
+
+        org = db.query(Organization).filter(Organization.id == organization_id).first()
+        org_plan = getattr(org, "plan_type", None) if org else None
+    return _normalize_worker_plan(org_plan or getattr(recruiter, "plan_type", None))
+
+
+def _active_worker_key_filter(now: datetime):
+    return and_(
+        WorkerKey.revoked_at == None,
+        or_(WorkerKey.expires_at == None, WorkerKey.expires_at > now),
+    )
+
+
+def _month_start(now: datetime | None = None) -> datetime:
+    now = now or datetime.utcnow()
+    return datetime(now.year, now.month, 1)
+
+
+def _completed_this_month_for_keys(db: Session, organization_id: int, key_ids: set[int], now: datetime) -> int:
+    if not key_ids:
+        return 0
+    amount = db.query(func.coalesce(func.sum(QuotaEvent.amount), 0)).filter(
+        QuotaEvent.organization_id == organization_id,
+        QuotaEvent.worker_key_id.in_(key_ids),
+        QuotaEvent.event_type == "completed",
+        QuotaEvent.created_at >= _month_start(now),
+    ).scalar()
+    return int(amount or 0)
+
+
+def _worker_quota_snapshot(db: Session, organization_id: int, plan: str | None = None, now: datetime | None = None) -> dict:
+    now = now or datetime.utcnow()
+    normalized_plan = _normalize_worker_plan(plan)
+    monthly_limit = int(LOCAL_WORKER_PLAN_LIMITS.get(normalized_plan, 0))
+
+    all_keys = db.query(WorkerKey).filter(WorkerKey.organization_id == organization_id).all()
+    active_keys = [
+        key for key in all_keys
+        if key.revoked_at is None and (key.expires_at is None or key.expires_at > now)
+    ]
+    active_key_ids = {key.id for key in active_keys}
+    inactive_key_ids = {key.id for key in all_keys if key.id not in active_key_ids}
+
+    active_quota_limit = sum(int(key.quota_limit or 0) for key in active_keys)
+    active_used_reserved = sum(
+        int(key.quota_used or 0) + int(key.quota_reserved or 0)
+        for key in active_keys
+    )
+    inactive_completed_this_month = _completed_this_month_for_keys(db, organization_id, inactive_key_ids, now)
+
+    allocated = active_quota_limit + inactive_completed_this_month
+    used_reserved = active_used_reserved + inactive_completed_this_month
+    quota_remaining = max(0, monthly_limit - allocated)
+    runtime_remaining = max(0, monthly_limit - used_reserved)
+
+    return {
+        "plan": normalized_plan,
+        "monthly_limit": monthly_limit,
+        "quota_allocated": allocated,
+        "quota_used_reserved": used_reserved,
+        "quota_remaining": quota_remaining,
+        "runtime_quota_remaining": runtime_remaining,
+        "active_quota_limit": active_quota_limit,
+        "inactive_completed_this_month": inactive_completed_this_month,
+        "month_start": _month_start(now),
     }
 
 
@@ -422,6 +522,19 @@ def create_worker_key(
         if not job:
             raise HTTPException(status_code=404, detail="Job not found for this company")
 
+    plan = _resolve_worker_plan(db, org_id, recruiter)
+    quota = _worker_quota_snapshot(db, org_id, plan=plan)
+    if quota["monthly_limit"] <= 0:
+        raise HTTPException(status_code=403, detail="Local Worker is available for premium plans only")
+    if req.quota_limit > quota["quota_remaining"]:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"Monthly Local Worker quota exceeded. "
+                f"Remaining: {quota['quota_remaining']} of {quota['monthly_limit']}"
+            ),
+        )
+
     raw_key = "sk_worker_live_" + secrets.token_urlsafe(32)
     key_hash = hash_key(raw_key)
 
@@ -438,9 +551,13 @@ def create_worker_key(
         created_by_user_id=recruiter.id,
         permissions=req.permissions,
     )
-    db.add(new_key)
-    db.commit()
-    db.refresh(new_key)
+    try:
+        db.add(new_key)
+        db.commit()
+        db.refresh(new_key)
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Worker key could not be created")
 
     return {**_worker_key_payload(new_key), "api_key": raw_key}
 
@@ -451,6 +568,21 @@ def list_worker_keys(
 ):
     keys = db.query(WorkerKey).filter(WorkerKey.organization_id == recruiter.organization_id).all()
     return [_worker_key_payload(k) for k in keys]
+
+
+@router.get("/worker/quota")
+def worker_quota_summary(
+    db: Session = Depends(get_db),
+    recruiter = Depends(recruiter_required),
+):
+    if not recruiter.organization_id:
+        raise HTTPException(status_code=400, detail="Recruiter profile is incomplete")
+    plan = _resolve_worker_plan(db, recruiter.organization_id, recruiter)
+    quota = _worker_quota_snapshot(db, recruiter.organization_id, plan=plan)
+    return {
+        **quota,
+        "organization_id": recruiter.organization_id,
+    }
 
 
 @router.get("/worker/download-package")
@@ -752,6 +884,18 @@ def worker_claim(jobId: int, request: Request, req: ClaimRequest, worker=Depends
         return ClaimResponse(items=[], claim_expires_at=datetime.utcnow())
 
     actual_count = len(candidates)
+    db.query(WorkerKey).filter(WorkerKey.organization_id == wk.organization_id).with_for_update().all()
+    org_plan = _resolve_worker_plan(db, wk.organization_id)
+    org_quota = _worker_quota_snapshot(db, wk.organization_id, plan=org_plan)
+    if org_quota["monthly_limit"] <= 0 or org_quota["runtime_quota_remaining"] < actual_count:
+        db.rollback()
+        raise HTTPException(
+            status_code=402,
+            detail=(
+                f"Monthly Local Worker quota exceeded. "
+                f"Remaining: {org_quota['runtime_quota_remaining']} of {org_quota['monthly_limit']}"
+            ),
+        )
 
     # Atomic quota check and reserve
     updated_rows = db.query(WorkerKey).filter(
@@ -964,6 +1108,7 @@ def worker_submit_results(jobId: int, request: Request, req: AnalysisResultReque
         )
         return {"status": "already_processed"}
 
+    candidate_status = decision_to_candidate_status(req.decision)
     result = WorkerAnalysisResult(
         organization_id=wk.organization_id,
         job_id=jobId,
@@ -972,6 +1117,7 @@ def worker_submit_results(jobId: int, request: Request, req: AnalysisResultReque
         cv_id=req.cv_id,
         score=req.score,
         decision=req.decision,
+        candidate_status=candidate_status,
         confidence=req.confidence,
         summary=req.summary,
         matched_skills=req.matched_skills,
@@ -983,6 +1129,41 @@ def worker_submit_results(jobId: int, request: Request, req: AnalysisResultReque
         engine_version=req.engine_version
     )
     db.add(result)
+    db.flush()
+    candidate_name = None
+    if claim.candidate_action_id:
+        action = db.query(CandidateAction).filter(
+            CandidateAction.id == claim.candidate_action_id,
+            CandidateAction.organization_id == wk.organization_id,
+        ).first()
+        if action:
+            candidate_name = action.candidate_name
+    if not candidate_name:
+        candidate = db.query(Candidate).filter(
+            Candidate.id == req.candidate_id,
+            Candidate.organization_id == wk.organization_id,
+        ).first()
+        candidate_name = candidate.name if candidate else None
+    record_candidate_status_event(
+        db,
+        organization_id=wk.organization_id,
+        candidate_status=candidate_status,
+        candidate_name=candidate_name,
+        decision=req.decision,
+        score=req.score,
+        actor_user_id=wk.created_by_user_id,
+        actor_role="local_worker",
+        candidate_id=req.candidate_id,
+        candidate_action_id=claim.candidate_action_id,
+        analysis_result_id=result.id,
+        recipient_user_id=wk.created_by_user_id,
+        metadata={
+            "job_id": jobId,
+            "worker_key_id": wk.id,
+            "worker_session_id": ws.id,
+            "source": "worker_submit_results",
+        },
+    )
 
     claim.status = "completed"
     claim.completed_at = datetime.utcnow()
@@ -1140,6 +1321,18 @@ def worker_offline_sync(
     if actual_count == 0:
         return {"status": "ok", "synced_count": 0}
 
+    db.query(WorkerKey).filter(WorkerKey.organization_id == wk.organization_id).with_for_update().all()
+    org_plan = _resolve_worker_plan(db, wk.organization_id)
+    org_quota = _worker_quota_snapshot(db, wk.organization_id, plan=org_plan)
+    if org_quota["monthly_limit"] <= 0 or org_quota["runtime_quota_remaining"] < actual_count:
+        raise HTTPException(
+            status_code=402,
+            detail=(
+                f"Monthly Local Worker quota exceeded. "
+                f"Remaining: {org_quota['runtime_quota_remaining']} of {org_quota['monthly_limit']}"
+            ),
+        )
+
     # Atomic quota check and increment
     updated_rows = db.query(WorkerKey).filter(
         WorkerKey.id == wk.id,
@@ -1212,6 +1405,8 @@ def worker_offline_sync(
             db.add(action_record)
             db.flush()
 
+        candidate_status = decision_to_candidate_status(item.decision)
+
         # Create WorkerAnalysisResult
         result_record = WorkerAnalysisResult(
             organization_id=wk.organization_id,
@@ -1221,6 +1416,7 @@ def worker_offline_sync(
             cv_id=candidate.id,
             score=item.score,
             decision=item.decision,
+            candidate_status=candidate_status,
             confidence=item.confidence,
             summary=item.summary,
             matched_skills=item.matched_skills,
@@ -1233,6 +1429,27 @@ def worker_offline_sync(
             engine_version=item.engine_version or "1.0.0",
         )
         db.add(result_record)
+        db.flush()
+        record_candidate_status_event(
+            db,
+            organization_id=wk.organization_id,
+            candidate_status=candidate_status,
+            candidate_name=item.candidate_name,
+            decision=item.decision,
+            score=item.score,
+            actor_user_id=wk.created_by_user_id,
+            actor_role="local_worker",
+            candidate_id=candidate.id,
+            candidate_action_id=action_record.id,
+            analysis_result_id=result_record.id,
+            recipient_user_id=job.created_by,
+            metadata={
+                "job_id": req.job_id,
+                "worker_key_id": wk.id,
+                "worker_session_id": ws.id,
+                "source": "offline_sync",
+            },
+        )
 
         # Log quota event
         db.add(QuotaEvent(

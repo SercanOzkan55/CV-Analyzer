@@ -2137,9 +2137,15 @@ class MainWindow(QMainWindow):
         self.theme_apply_buttons: dict[str, QPushButton] = {}
         self.theme_preview_container: QFrame | None = None
         self.theme_preview_layout: QVBoxLayout | None = None
+        self.server_connected = False
+        self.server_quota_remaining: int | None = None
+        self.server_allowed_jobs: list[int] = []
+        self.server_company_id: int | None = None
+        self._active_analysis_quota_amount = 0
 
         self._build()
         self._apply_style()
+        self._set_server_connection(False, reason="Website sync required")
         self._refresh_history()
         if MOTION_ENABLED:
             self.setWindowOpacity(0.0)
@@ -2209,9 +2215,12 @@ class MainWindow(QMainWindow):
         self.status_group.addAnimation(anim_fade_out)
         self.status_group.setLoopCount(-1)
         self.status_group.start()
-        sync_label = QLabel("↻  Last sync: local")
-        sync_label.setObjectName("SyncMeta")
-        header.addWidget(sync_label)
+        self.sync_label = QLabel("Website sync required")
+        self.sync_label.setObjectName("SyncMeta")
+        header.addWidget(self.sync_label)
+        self.quota_label = QLabel("Quota: connect")
+        self.quota_label.setObjectName("SyncMeta")
+        header.addWidget(self.quota_label)
         sync_button = AnimatedButton("↻  Sync now")
         sync_button.setObjectName("PrimaryButton")
         sync_button.setMinimumWidth(136)
@@ -2398,8 +2407,17 @@ class MainWindow(QMainWindow):
                         button.setIcon(QIcon(svg_to_pixmap(svg_data, 18, 18)))
 
     def _build_analyze_tab(self) -> QWidget:
+        scroll = QScrollArea()
+        scroll.setObjectName("AnalyzePage")
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; } QScrollArea > QWidget > QWidget { background: transparent; }")
+
         page = QWidget()
-        page.setObjectName("AnalyzePage")
+        page.setObjectName("AnalyzePageContent")
+        page.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.MinimumExpanding)
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 4, 0, 0)
         layout.setSpacing(22)
@@ -2423,6 +2441,7 @@ class MainWindow(QMainWindow):
 
         job_group = HoverDepthFrame()
         job_group.setObjectName("ContentCard")
+        job_group.setMinimumHeight(420)
         form = QVBoxLayout(job_group)
         form.setContentsMargins(24, 22, 24, 22)
         form.setSpacing(14)
@@ -2480,6 +2499,7 @@ class MainWindow(QMainWindow):
 
         terms_group = HoverDepthFrame()
         terms_group.setObjectName("ContentCard")
+        terms_group.setMinimumHeight(420)
         terms = QVBoxLayout(terms_group)
         terms.setContentsMargins(24, 22, 24, 22)
         terms.setSpacing(13)
@@ -2521,6 +2541,7 @@ class MainWindow(QMainWindow):
 
         description_group = HoverDepthFrame()
         description_group.setObjectName("ContentCard")
+        description_group.setMinimumHeight(260)
         description_layout = QVBoxLayout(description_group)
         description_layout.setContentsMargins(24, 22, 24, 22)
         description_layout.setSpacing(14)
@@ -2537,6 +2558,7 @@ class MainWindow(QMainWindow):
         # Right side: Email Templates Quick Card
         templates_group = HoverDepthFrame()
         templates_group.setObjectName("ContentCard")
+        templates_group.setMinimumHeight(260)
         templates_layout = QVBoxLayout(templates_group)
         templates_layout.setContentsMargins(24, 22, 24, 22)
         templates_layout.setSpacing(10)
@@ -2594,6 +2616,7 @@ class MainWindow(QMainWindow):
 
         footer = QFrame()
         footer.setObjectName("FooterBar")
+        footer.setMinimumHeight(82)
         footer_layout = QHBoxLayout(footer)
         footer_layout.setContentsMargins(20, 14, 20, 14)
         footer_layout.setSpacing(20)
@@ -2614,16 +2637,18 @@ class MainWindow(QMainWindow):
         self.queue_status_label.setObjectName("FooterMeta")
         self.eta_status_label = QLabel("ETA: --")
         self.eta_status_label.setObjectName("FooterMeta")
-        ready = QLabel("✓  Ready to analyze")
-        ready.setObjectName("FooterReady")
+        self.footer_ready_label = QLabel("Connect Website Sync first")
+        self.footer_ready_label.setObjectName("FooterReady")
 
         status_text_row.addWidget(self.queue_status_label)
         status_text_row.addWidget(self.eta_status_label)
-        status_text_row.addWidget(ready)
+        status_text_row.addWidget(self.footer_ready_label)
 
         status_layout.addLayout(status_text_row)
 
-        self.progress.setFixedWidth(380)
+        self.progress.setMinimumWidth(160)
+        self.progress.setMaximumWidth(380)
+        self.progress.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         status_layout.addWidget(self.progress)
 
         footer_layout.addWidget(status_container)
@@ -2648,14 +2673,15 @@ class MainWindow(QMainWindow):
 
         bottom_tips.addStretch(1)
 
-        right_tip_lbl = QLabel("Server sync is optional and can be configured in Website Sync.  ›")
+        right_tip_lbl = QLabel("Website Sync is required before local analysis and recruiter actions.  ›")
         right_tip_lbl.setObjectName("StepSubtitle")
         right_tip_lbl.setStyleSheet("font-size: 8.5pt;")
         bottom_tips.addWidget(right_tip_lbl)
 
         layout.addLayout(bottom_tips)
         layout.addWidget(footer, 0)
-        return page
+        scroll.setWidget(page)
+        return scroll
 
     def _build_results_tab(self) -> QWidget:
         page = QWidget()
@@ -2681,31 +2707,31 @@ class MainWindow(QMainWindow):
         bulk_layout = QHBoxLayout()
         bulk_layout.setSpacing(10)
 
-        btn_select_all = AnimatedButton("☑  Select All")
-        btn_select_all.setObjectName("SecondaryButton")
-        btn_select_all.setCursor(Qt.PointingHandCursor)
-        btn_select_all.clicked.connect(self._select_all_candidates)
+        self.btn_select_all = AnimatedButton("☑  Select All")
+        self.btn_select_all.setObjectName("SecondaryButton")
+        self.btn_select_all.setCursor(Qt.PointingHandCursor)
+        self.btn_select_all.clicked.connect(self._select_all_candidates)
 
-        btn_deselect_all = AnimatedButton("☐  Deselect All")
-        btn_deselect_all.setObjectName("SecondaryButton")
-        btn_deselect_all.setCursor(Qt.PointingHandCursor)
-        btn_deselect_all.clicked.connect(self._deselect_all_candidates)
+        self.btn_deselect_all = AnimatedButton("☐  Deselect All")
+        self.btn_deselect_all.setObjectName("SecondaryButton")
+        self.btn_deselect_all.setCursor(Qt.PointingHandCursor)
+        self.btn_deselect_all.clicked.connect(self._deselect_all_candidates)
 
-        btn_bulk_accept = AnimatedButton("✓  Accept Selected")
-        btn_bulk_accept.setObjectName("SuccessButton")
-        btn_bulk_accept.setCursor(Qt.PointingHandCursor)
-        btn_bulk_accept.clicked.connect(lambda: self._bulk_decision("accepted"))
+        self.btn_bulk_accept = AnimatedButton("✓  Accept Selected")
+        self.btn_bulk_accept.setObjectName("SuccessButton")
+        self.btn_bulk_accept.setCursor(Qt.PointingHandCursor)
+        self.btn_bulk_accept.clicked.connect(lambda: self._bulk_decision("accepted"))
 
-        btn_bulk_reject = AnimatedButton("✕  Reject Selected")
-        btn_bulk_reject.setObjectName("DangerButton")
-        btn_bulk_reject.setCursor(Qt.PointingHandCursor)
-        btn_bulk_reject.clicked.connect(lambda: self._bulk_decision("rejected"))
+        self.btn_bulk_reject = AnimatedButton("✕  Reject Selected")
+        self.btn_bulk_reject.setObjectName("DangerButton")
+        self.btn_bulk_reject.setCursor(Qt.PointingHandCursor)
+        self.btn_bulk_reject.clicked.connect(lambda: self._bulk_decision("rejected"))
 
-        bulk_layout.addWidget(btn_select_all)
-        bulk_layout.addWidget(btn_deselect_all)
+        bulk_layout.addWidget(self.btn_select_all)
+        bulk_layout.addWidget(self.btn_deselect_all)
         bulk_layout.addSpacing(20)
-        bulk_layout.addWidget(btn_bulk_accept)
-        bulk_layout.addWidget(btn_bulk_reject)
+        bulk_layout.addWidget(self.btn_bulk_accept)
+        bulk_layout.addWidget(self.btn_bulk_reject)
         bulk_layout.addStretch(1)
         layout.addLayout(bulk_layout)
 
@@ -2812,13 +2838,21 @@ class MainWindow(QMainWindow):
     def _build_server_tab(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
-        box = QGroupBox("Optional website connection")
+        box = QGroupBox("Required website sync")
         form = QFormLayout(box)
         self.api_url = QLineEdit(os.environ.get("CV_ANALYZER_API_URL", API_BASE_URL))
         self.api_key = QLineEdit(load_worker_api_key() or os.environ.get("CV_WORKER_API_KEY", ""))
         self.api_key.setEchoMode(QLineEdit.Password)
+        self.api_url.textChanged.connect(self._mark_sync_required)
+        self.api_key.textChanged.connect(self._mark_sync_required)
         form.addRow("API URL", self.api_url)
         form.addRow("Worker key", self.api_key)
+        self.server_status_label = QLabel("Not connected. Test Website Sync before using local analysis.")
+        self.server_status_label.setObjectName("FooterReady")
+        self.server_quota_label = QLabel("Remaining CV scans: connect first")
+        self.server_quota_label.setObjectName("SyncMeta")
+        form.addRow("Status", self.server_status_label)
+        form.addRow("Quota", self.server_quota_label)
         buttons = QHBoxLayout()
         save = QPushButton("Save key locally")
         test = QPushButton("Test connection")
@@ -2830,7 +2864,7 @@ class MainWindow(QMainWindow):
         buttons.addStretch(1)
         form.addRow("", buttons)
         layout.addWidget(box)
-        note = QLabel("Server sync is optional. Local folder analysis works without a website job or API key.")
+        note = QLabel("Website sync is required. Local analysis, recruiter actions, and email features stay locked until this worker key is verified.")
         note.setObjectName("Subtitle")
         layout.addWidget(note)
         layout.addStretch(1)
@@ -4601,7 +4635,101 @@ class MainWindow(QMainWindow):
             "scoring_weights": {"required_skills": 70, "nice_to_have_skills": 20, "content_quality": 10},
         }
 
+    def _quota_text(self) -> str:
+        if self.server_quota_remaining is None:
+            return "Quota: connect"
+        return f"Quota: {self.server_quota_remaining} CV left"
+
+    def _set_local_controls_enabled(self, enabled: bool):
+        for attr_name in (
+            "run_button",
+            "btn_edit_templates",
+            "btn_select_all",
+            "btn_deselect_all",
+            "btn_bulk_accept",
+            "btn_bulk_reject",
+            "open_output_button",
+        ):
+            widget = getattr(self, attr_name, None)
+            if widget is not None:
+                widget.setEnabled(enabled)
+                widget.setToolTip("" if enabled else "Test Website Sync first.")
+
+    def _set_server_connection(
+        self,
+        connected: bool,
+        *,
+        quota_remaining: int | None = None,
+        allowed_jobs: list[int] | None = None,
+        company_id: int | None = None,
+        reason: str = "",
+    ):
+        self.server_connected = connected
+        if quota_remaining is not None:
+            self.server_quota_remaining = max(0, int(quota_remaining))
+        elif not connected:
+            self.server_quota_remaining = None
+        if allowed_jobs is not None:
+            self.server_allowed_jobs = list(allowed_jobs)
+        elif not connected:
+            self.server_allowed_jobs = []
+        if company_id is not None:
+            self.server_company_id = int(company_id)
+        elif not connected:
+            self.server_company_id = None
+
+        quota_text = self._quota_text()
+        if hasattr(self, "sync_label"):
+            self.sync_label.setText("Website sync active" if connected else (reason or "Website sync required"))
+        if hasattr(self, "quota_label"):
+            self.quota_label.setText(quota_text)
+        if hasattr(self, "server_status_label"):
+            status = "Connected and ready" if connected else (reason or "Not connected")
+            self.server_status_label.setText(status)
+        if hasattr(self, "server_quota_label"):
+            if self.server_quota_remaining is None:
+                self.server_quota_label.setText("Remaining CV scans: connect first")
+            else:
+                self.server_quota_label.setText(f"Remaining CV scans: {self.server_quota_remaining}")
+        if hasattr(self, "footer_ready_label"):
+            if connected and (self.server_quota_remaining is None or self.server_quota_remaining > 0):
+                self.footer_ready_label.setText("✓  Ready to analyze")
+            elif connected:
+                self.footer_ready_label.setText("Quota exhausted")
+            else:
+                self.footer_ready_label.setText("Connect Website Sync first")
+        if hasattr(self, "status_label") and not connected:
+            self.status_label.setText("Sync required")
+
+        controls_enabled = connected and (
+            self.server_quota_remaining is None or self.server_quota_remaining > 0
+        )
+        self._set_local_controls_enabled(controls_enabled)
+
+    def _mark_sync_required(self):
+        self._set_server_connection(False, reason="Website sync changed")
+
+    def _require_website_sync(self) -> bool:
+        if self.server_connected:
+            return True
+        QMessageBox.warning(
+            self,
+            "Website Sync required",
+            "Connect and test your Worker key in Website Sync before using local analysis.",
+        )
+        self.tabs.setCurrentIndex(3)
+        return False
+
+    def _count_supported_cv_files(self, folder: Path) -> int:
+        total = 0
+        for path in folder.rglob("*"):
+            if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS:
+                total += 1
+        return total
+
     def _start_analysis(self):
+        if not self._require_website_sync():
+            return
         folder = Path(self.cv_folder.text().strip())
         output = Path(self.output_folder.text().strip())
         config = self._config()
@@ -4611,6 +4739,19 @@ class MainWindow(QMainWindow):
         if not config["description"] and not config["required_skills"]:
             QMessageBox.warning(self, "Missing criteria", "Add a job description or at least one required skill.")
             return
+        cv_count = self._count_supported_cv_files(folder)
+        if cv_count <= 0:
+            QMessageBox.warning(self, "No CV files", "Choose a folder with PDF, DOCX, or TXT CV files.")
+            return
+        if self.server_quota_remaining is not None and cv_count > self.server_quota_remaining:
+            QMessageBox.warning(
+                self,
+                "Quota limit",
+                f"This folder has {cv_count} CV file(s), but your worker key has "
+                f"{self.server_quota_remaining} scan(s) left.",
+            )
+            return
+        self._active_analysis_quota_amount = cv_count
 
         self.rows = []
         self.table.setSortingEnabled(False)
@@ -4649,8 +4790,17 @@ class MainWindow(QMainWindow):
     def _analysis_done(self, message: str):
         self._stop_status_pulse()
         self.table.setSortingEnabled(True)
-        self.run_button.setEnabled(True)
         self.cancel_button.setEnabled(False)
+        if self.server_quota_remaining is not None and self._active_analysis_quota_amount:
+            charged = min(self._active_analysis_quota_amount, len(self.rows) or self._active_analysis_quota_amount)
+            self.server_quota_remaining = max(0, self.server_quota_remaining - charged)
+        self._active_analysis_quota_amount = 0
+        self._set_server_connection(
+            self.server_connected,
+            quota_remaining=self.server_quota_remaining,
+            allowed_jobs=self.server_allowed_jobs,
+            company_id=self.server_company_id,
+        )
         self.status_label.setText(message)
         if hasattr(self, "queue_status_label"):
             self.queue_status_label.setText("Queue: complete")
@@ -4662,8 +4812,14 @@ class MainWindow(QMainWindow):
     def _analysis_failed(self, message: str):
         self._stop_status_pulse()
         self.table.setSortingEnabled(True)
-        self.run_button.setEnabled(True)
         self.cancel_button.setEnabled(False)
+        self._active_analysis_quota_amount = 0
+        self._set_server_connection(
+            self.server_connected,
+            quota_remaining=self.server_quota_remaining,
+            allowed_jobs=self.server_allowed_jobs,
+            company_id=self.server_company_id,
+        )
         self.status_label.setText("Failed")
         if hasattr(self, "queue_status_label"):
             self.queue_status_label.setText("Queue: failed")
@@ -4908,6 +5064,8 @@ class MainWindow(QMainWindow):
                 item.setCheckState(Qt.Unchecked)
 
     def _bulk_decision(self, decision_type: str):
+        if not self._require_website_sync():
+            return
         from PySide6.QtWidgets import QDialog, QDialogButtonBox, QCheckBox, QTextEdit, QLabel
 
         checked_rows = []
@@ -5010,6 +5168,8 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(self, "Success", f"Updated decisions for {success_count} candidate(s).")
 
     def _send_bulk_emails(self, targets: list[dict]):
+        if not self._require_website_sync():
+            return
         api_key = self.api_key.text().strip()
         api_url = self.api_url.text().strip().rstrip("/")
 
@@ -5094,8 +5254,19 @@ class MainWindow(QMainWindow):
             if jobs_resp.status_code != 200:
                 raise RuntimeError(f"Connected, but job list failed: {jobs_resp.text}")
             jobs = jobs_resp.json().get("jobs", [])
-            QMessageBox.information(self, "Connected", f"Connected. Allowed jobs: {jobs or 'none'}")
+            self._set_server_connection(
+                True,
+                quota_remaining=worker.quota_remaining,
+                allowed_jobs=jobs,
+                company_id=worker.company_id,
+            )
+            QMessageBox.information(
+                self,
+                "Connected",
+                f"Connected. Remaining CV scans: {worker.quota_remaining}. Allowed jobs: {jobs or 'none'}",
+            )
         except Exception as exc:
+            self._set_server_connection(False, reason="Connection failed")
             QMessageBox.critical(self, "Connection failed", str(exc))
         finally:
             worker_module.API_BASE_URL = old_base
