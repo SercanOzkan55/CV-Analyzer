@@ -1440,6 +1440,15 @@ export function anonymizeOwnerCandidateAction(token, actionId) {
   return _ownerJson(token, `/api/v1/owner/candidate-actions/${encodeURIComponent(actionId)}/anonymize`, 'POST', {})
 }
 
+export function fetchOwnerCandidateComments(token, actionId, { limit = 50, offset = 0 } = {}) {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
+  return _ownerJson(token, `/api/v1/owner/candidate-actions/${encodeURIComponent(actionId)}/comments?${params.toString()}`)
+}
+
+export function createOwnerCandidateComment(token, actionId, payload) {
+  return _ownerJson(token, `/api/v1/owner/candidate-actions/${encodeURIComponent(actionId)}/comments`, 'POST', payload)
+}
+
 
 // ¦¦ Recruiter SaaS Batch Hub ¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦
 

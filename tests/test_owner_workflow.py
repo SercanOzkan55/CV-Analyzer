@@ -1,5 +1,5 @@
 from auth import verify_supabase_jwt
-from models import AuditLog, CandidateAction, Notification, RolePermission, User, WorkerAnalysisResult
+from models import AuditLog, CandidateAction, CandidateComment, Notification, RolePermission, User, WorkerAnalysisResult
 from services.owner_workflow_service import check_permission, decision_to_candidate_status
 from tests.test_worker_mvp import _claim_one, _create_action, _create_worker_key, _submit_result, _worker_headers
 
@@ -217,3 +217,67 @@ def test_limited_user_sees_only_assigned_candidate_actions(client, db_session, r
     items = response.json()["items"]
     assert len(items) == 1
     assert items[0]["candidate_email"] == "assigned@example.com"
+
+
+def test_limited_user_can_comment_only_on_assigned_candidate(client, db_session, recruiter_user, test_job):
+    limited = User(
+        supabase_id="limited-comment-user",
+        email="limited-comment@example.com",
+        organization_id=recruiter_user["organization_id"],
+        role="limited",
+    )
+    db_session.add(limited)
+    db_session.commit()
+    db_session.refresh(limited)
+
+    assigned = CandidateAction(
+        organization_id=recruiter_user["organization_id"],
+        job_id=test_job.id,
+        recruiter_id=recruiter_user["user_id"],
+        assigned_user_id=limited.id,
+        candidate_name="Assigned Comment Candidate",
+        candidate_email="assigned-comment@example.com",
+        action="pending",
+    )
+    unassigned = CandidateAction(
+        organization_id=recruiter_user["organization_id"],
+        job_id=test_job.id,
+        recruiter_id=recruiter_user["user_id"],
+        candidate_name="Blocked Comment Candidate",
+        candidate_email="blocked-comment@example.com",
+        action="pending",
+    )
+    db_session.add_all([assigned, unassigned])
+    db_session.commit()
+    db_session.refresh(assigned)
+    db_session.refresh(unassigned)
+
+    client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
+        "user_id": limited.supabase_id,
+        "email": limited.email,
+    }
+
+    created = client.post(
+        f"/api/v1/owner/candidate-actions/{assigned.id}/comments",
+        json={"body": "Looks promising for manual review."},
+    )
+    assert created.status_code == 200, created.text
+    assert created.json()["comment"]["body"] == "Looks promising for manual review."
+    assert created.json()["action"]["comment_count"] == 1
+
+    blocked = client.post(
+        f"/api/v1/owner/candidate-actions/{unassigned.id}/comments",
+        json={"body": "Should not be allowed."},
+    )
+    assert blocked.status_code == 404, blocked.text
+
+    comments = client.get(f"/api/v1/owner/candidate-actions/{assigned.id}/comments")
+    assert comments.status_code == 200, comments.text
+    assert len(comments.json()["items"]) == 1
+
+    db_session.expire_all()
+    stored = db_session.query(CandidateComment).filter_by(candidate_action_id=assigned.id).one()
+    assert stored.author_user_id == limited.id
+    assert db_session.query(CandidateComment).count() == 1
+    assert db_session.query(AuditLog).filter_by(event_type="candidate_comment_added").count() == 1
+    assert db_session.query(Notification).filter_by(type="candidate_comment_added").count() == 1

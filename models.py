@@ -273,6 +273,22 @@ class CandidateAction(Base):
     job = relationship("RecruiterJob", back_populates="actions")
 
 
+class CandidateComment(Base):
+    """User comments on candidate actions for limited/HR review workflows."""
+
+    __tablename__ = "candidate_comments"
+
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    candidate_action_id = Column(Integer, ForeignKey("candidate_actions.id", ondelete="CASCADE"), nullable=False, index=True)
+    author_user_id = Column(Integer, ForeignKey("app_users.id", ondelete="SET NULL"), nullable=True, index=True)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    action = relationship("CandidateAction")
+    author = relationship("User")
+
+
 class Reminder(Base):
     """Organization-level interview / application reminders."""
 

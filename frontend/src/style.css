@@ -1931,6 +1931,13 @@ button.owner-workflow-item:hover { border-color: var(--color-accent); background
 .owner-candidate-fields input:focus,
 .owner-candidate-fields select:focus { border-color: var(--color-accent); box-shadow: var(--focus-ring); }
 .owner-readonly-value { min-height: 38px; display: inline-flex; align-items: center; padding: 9px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--color-text); overflow-wrap: anywhere; }
+.owner-candidate-comments { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--bg-secondary); }
+.owner-candidate-comments > div { display: grid; gap: 4px; min-width: 0; }
+.owner-candidate-comments strong { color: var(--color-text); font-size: 0.82rem; }
+.owner-candidate-comments small { color: var(--color-text-secondary); font-size: 0.78rem; overflow-wrap: anywhere; }
+.owner-candidate-comments form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.owner-candidate-comments input { min-width: 0; width: 100%; padding: 9px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--bg-input); color: var(--color-text); font-size: 0.84rem; outline: none; }
+.owner-candidate-comments input:focus { border-color: var(--color-accent); box-shadow: var(--focus-ring); }
 .owner-candidate-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .worker-key-prefix { display: block; margin-top: 4px; color: var(--color-text-muted); font-size: 0.76rem; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 .worker-table .is-muted { opacity: 0.58; }
@@ -2162,6 +2169,7 @@ button.owner-workflow-item:hover { border-color: var(--color-accent); background
   .owner-permission-form,
   .owner-member-item,
   .owner-candidate-fields { grid-template-columns: 1fr; }
+  .owner-candidate-comments form { grid-template-columns: 1fr; }
   .owner-candidate-main,
   .owner-section-header { align-items: flex-start; flex-direction: column; }
   .owner-candidate-actions { justify-content: flex-start; }
