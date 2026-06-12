@@ -1415,6 +1415,31 @@ export function updateOwnerRolePermission(token, role, permissionKey, payload) {
   )
 }
 
+export function fetchOwnerCandidateActions(token, { includeDeleted = false, limit = 50, offset = 0 } = {}) {
+  const params = new URLSearchParams({
+    include_deleted: includeDeleted ? 'true' : 'false',
+    limit: String(limit),
+    offset: String(offset),
+  })
+  return _ownerJson(token, `/api/v1/owner/candidate-actions?${params.toString()}`)
+}
+
+export function assignOwnerCandidateAction(token, actionId, payload) {
+  return _ownerJson(token, `/api/v1/owner/candidate-actions/${encodeURIComponent(actionId)}/assignment`, 'PUT', payload)
+}
+
+export function updateOwnerCandidateScore(token, actionId, payload) {
+  return _ownerJson(token, `/api/v1/owner/candidate-actions/${encodeURIComponent(actionId)}/score`, 'PUT', payload)
+}
+
+export function deleteOwnerCandidateAction(token, actionId) {
+  return _ownerJson(token, `/api/v1/owner/candidate-actions/${encodeURIComponent(actionId)}`, 'DELETE')
+}
+
+export function anonymizeOwnerCandidateAction(token, actionId) {
+  return _ownerJson(token, `/api/v1/owner/candidate-actions/${encodeURIComponent(actionId)}/anonymize`, 'POST', {})
+}
+
 
 // ¦¦ Recruiter SaaS Batch Hub ¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦
 

@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from 'react'
 import {
+  anonymizeOwnerCandidateAction,
+  assignOwnerCandidateAction,
   createWorkerKey,
   createOwnerUser,
+  deleteOwnerCandidateAction,
   downloadWorkerExecutable,
+  fetchOwnerCandidateActions,
   fetchOwnerAuditLogs,
   fetchOwnerNotificationRules,
   fetchOwnerNotifications,
@@ -16,6 +20,7 @@ import {
   markOwnerNotificationRead,
   recruiterListJobs,
   revokeWorkerKey,
+  updateOwnerCandidateScore,
   updateOwnerNotificationRule,
   updateOwnerRolePermission,
   updateOwnerUserRole,
@@ -35,6 +40,9 @@ export default function LocalWorkerPanel({ organizationId }) {
   const [ownerNotificationRules, setOwnerNotificationRules] = useState([])
   const [ownerUsers, setOwnerUsers] = useState([])
   const [ownerRolePermissions, setOwnerRolePermissions] = useState(null)
+  const [ownerCandidateActions, setOwnerCandidateActions] = useState([])
+  const [candidateScoreDrafts, setCandidateScoreDrafts] = useState({})
+  const [showDeletedCandidates, setShowDeletedCandidates] = useState(false)
   const [loading, setLoading] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
   const [newKeyJobId, setNewKeyJobId] = useState('')
@@ -53,7 +61,7 @@ export default function LocalWorkerPanel({ organizationId }) {
     fetchJobs()
     fetchSessions()
     fetchOwnerWorkflow()
-  }, [token])
+  }, [token, showDeletedCandidates])
 
   async function fetchKeys() {
     try {
@@ -99,14 +107,18 @@ export default function LocalWorkerPanel({ organizationId }) {
       const canManageRules = Boolean(permissions?.permissions?.['notifications.manage'])
       const canViewUsers = Boolean(permissions?.permissions?.['users.view'])
       const canManagePermissions = Boolean(permissions?.permissions?.['permissions.manage'])
+      const canViewCandidates = Boolean(permissions?.permissions?.['candidates.view'])
       const [notifications, auditLogs, rules] = await Promise.all([
         canViewNotifications ? fetchOwnerNotifications(token, { limit: 5 }) : Promise.resolve({ items: [] }),
         canViewAudit ? fetchOwnerAuditLogs(token, { limit: 5 }) : Promise.resolve({ items: [] }),
         canManageRules ? fetchOwnerNotificationRules(token) : Promise.resolve({ items: [] }),
       ])
-      const [users, rolePermissions] = await Promise.all([
+      const [users, rolePermissions, candidateActions] = await Promise.all([
         canViewUsers ? fetchOwnerUsers(token, { limit: 100 }) : Promise.resolve({ items: [] }),
         canManagePermissions ? fetchOwnerRolePermissions(token) : Promise.resolve(null),
+        canViewCandidates
+          ? fetchOwnerCandidateActions(token, { includeDeleted: showDeletedCandidates, limit: 20 })
+          : Promise.resolve({ items: [] }),
       ])
       setOwnerPermissions(permissions)
       setOwnerNotifications(notifications.items || [])
@@ -114,6 +126,16 @@ export default function LocalWorkerPanel({ organizationId }) {
       setOwnerNotificationRules(rules.items || [])
       setOwnerUsers(users.items || [])
       setOwnerRolePermissions(rolePermissions)
+      setOwnerCandidateActions(candidateActions.items || [])
+      setCandidateScoreDrafts(
+        Object.fromEntries((candidateActions.items || []).map((item) => [
+          item.id,
+          {
+            final_score: item.final_score ?? '',
+            ats_score: item.ats_score ?? '',
+          },
+        ]))
+      )
     } catch (error) {
       console.warn('Owner workflow unavailable', error)
       setOwnerPermissions(null)
@@ -122,6 +144,8 @@ export default function LocalWorkerPanel({ organizationId }) {
       setOwnerNotificationRules([])
       setOwnerUsers([])
       setOwnerRolePermissions(null)
+      setOwnerCandidateActions([])
+      setCandidateScoreDrafts({})
     }
   }
 
@@ -253,6 +277,66 @@ export default function LocalWorkerPanel({ organizationId }) {
     }
   }
 
+  function handleCandidateScoreDraft(actionId, field, value) {
+    setCandidateScoreDrafts((current) => ({
+      ...current,
+      [actionId]: {
+        ...(current[actionId] || {}),
+        [field]: value,
+      },
+    }))
+  }
+
+  async function handleAssignCandidateAction(actionId, assignedUserId) {
+    try {
+      await assignOwnerCandidateAction(token, actionId, {
+        assigned_user_id: assignedUserId ? Number(assignedUserId) : null,
+      })
+      await fetchOwnerWorkflow()
+    } catch (error) {
+      console.warn('Could not assign candidate action', error)
+      window.alert(error.message || 'Failed to assign candidate')
+    }
+  }
+
+  async function handleSaveCandidateScore(action) {
+    const draft = candidateScoreDrafts[action.id] || {}
+    const finalScore = draft.final_score === '' ? null : Number(draft.final_score)
+    const atsScore = draft.ats_score === '' ? null : Number(draft.ats_score)
+    try {
+      await updateOwnerCandidateScore(token, action.id, {
+        final_score: Number.isFinite(finalScore) ? finalScore : null,
+        ats_score: Number.isFinite(atsScore) ? atsScore : null,
+      })
+      await fetchOwnerWorkflow()
+    } catch (error) {
+      console.warn('Could not update candidate score', error)
+      window.alert(error.message || 'Failed to update candidate score')
+    }
+  }
+
+  async function handleDeleteCandidateAction(actionId) {
+    if (!window.confirm('Soft delete this candidate action?')) return
+    try {
+      await deleteOwnerCandidateAction(token, actionId)
+      await fetchOwnerWorkflow()
+    } catch (error) {
+      console.warn('Could not delete candidate action', error)
+      window.alert(error.message || 'Failed to delete candidate')
+    }
+  }
+
+  async function handleAnonymizeCandidateAction(actionId) {
+    if (!window.confirm('Anonymize this candidate and remove stored CV text/file links?')) return
+    try {
+      await anonymizeOwnerCandidateAction(token, actionId)
+      await fetchOwnerWorkflow()
+    } catch (error) {
+      console.warn('Could not anonymize candidate action', error)
+      window.alert(error.message || 'Failed to anonymize candidate')
+    }
+  }
+
   async function handleDownloadPackage() {
     try {
       setLoading(true)
@@ -281,15 +365,20 @@ export default function LocalWorkerPanel({ organizationId }) {
   const isQuotaBlocked = Boolean(quotaSummary && quotaRemaining <= 0)
   const canViewOwnerWorkflow = Boolean(
     ownerPermissions?.permissions?.['notifications.view'] ||
-    ownerPermissions?.permissions?.['audit.view']
+    ownerPermissions?.permissions?.['audit.view'] ||
+    ownerPermissions?.permissions?.['candidates.view']
   )
   const canManageOwnerRules = Boolean(ownerPermissions?.permissions?.['notifications.manage'])
   const canManageOwnerUsers = Boolean(ownerPermissions?.permissions?.['users.manage'])
   const canManageRolePermissions = Boolean(ownerPermissions?.permissions?.['permissions.manage'])
+  const canViewCandidateActions = Boolean(ownerPermissions?.permissions?.['candidates.view'])
+  const canManageCandidateActions = Boolean(ownerPermissions?.permissions?.['candidates.manage'])
+  const canUpdateCandidateScores = Boolean(ownerPermissions?.permissions?.['candidate_status.update'])
   const unreadOwnerCount = ownerNotifications.filter((item) => !item.is_read).length
   const managedRoles = ownerRolePermissions?.roles || ['owner', 'recruiter', 'hr', 'limited']
   const permissionOptions = Object.entries(ownerRolePermissions?.permissions || ownerPermissions?.available_permissions || {})
   const permissionOverrides = ownerRolePermissions?.overrides || []
+  const assignableUsers = ownerUsers.filter((member) => !member.deleted_at)
 
   return (
     <div className="card product-card worker-panel">
@@ -460,6 +549,121 @@ export default function LocalWorkerPanel({ organizationId }) {
                         )}
                       </div>
                     ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {canViewCandidateActions && (
+              <section className="owner-workflow-section owner-candidate-section">
+                <div className="owner-section-header">
+                  <h3>Candidate Controls</h3>
+                  <label className="owner-inline-toggle">
+                    <input
+                      type="checkbox"
+                      checked={showDeletedCandidates}
+                      onChange={(event) => setShowDeletedCandidates(event.target.checked)}
+                    />
+                    Show deleted
+                  </label>
+                </div>
+                {ownerCandidateActions.length === 0 ? (
+                  <p className="text-muted">No candidate actions yet.</p>
+                ) : (
+                  <div className="owner-candidate-list">
+                    {ownerCandidateActions.map((action) => {
+                      const draft = candidateScoreDrafts[action.id] || {}
+                      const assignee = assignableUsers.find((member) => member.id === action.assigned_user_id)
+                      return (
+                        <div key={action.id} className={`owner-candidate-item ${action.deleted_at ? 'is-muted' : ''}`}>
+                          <div className="owner-candidate-main">
+                            <span>
+                              <strong>{action.candidate_name || `Candidate #${action.id}`}</strong>
+                              <small>{action.candidate_email || 'No email'} - Job #{action.job_id}</small>
+                            </span>
+                            <em>{action.deleted_at ? 'Deleted' : action.anonymized_at ? 'Anonymized' : action.action || 'Active'}</em>
+                          </div>
+
+                          <div className="owner-candidate-fields">
+                            <label>
+                              Final
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                value={draft.final_score ?? ''}
+                                onChange={(event) => handleCandidateScoreDraft(action.id, 'final_score', event.target.value)}
+                                disabled={!canUpdateCandidateScores || Boolean(action.deleted_at)}
+                              />
+                            </label>
+                            <label>
+                              ATS
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                value={draft.ats_score ?? ''}
+                                onChange={(event) => handleCandidateScoreDraft(action.id, 'ats_score', event.target.value)}
+                                disabled={!canUpdateCandidateScores || Boolean(action.deleted_at)}
+                              />
+                            </label>
+                            <label>
+                              Owner
+                              {canManageCandidateActions ? (
+                                <select
+                                  value={action.assigned_user_id || ''}
+                                  onChange={(event) => handleAssignCandidateAction(action.id, event.target.value)}
+                                  disabled={Boolean(action.deleted_at)}
+                                >
+                                  <option value="">Unassigned</option>
+                                  {assignableUsers.map((member) => (
+                                    <option key={member.id} value={member.id}>{member.email}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <span className="owner-readonly-value">{assignee?.email || 'Unassigned'}</span>
+                              )}
+                            </label>
+                          </div>
+
+                          <div className="owner-candidate-actions">
+                            {canUpdateCandidateScores && (
+                              <button
+                                type="button"
+                                className="btn-outline btn-sm"
+                                onClick={() => handleSaveCandidateScore(action)}
+                                disabled={Boolean(action.deleted_at)}
+                              >
+                                Save score
+                              </button>
+                            )}
+                            {canManageCandidateActions && (
+                              <>
+                                <button
+                                  type="button"
+                                  className="btn-outline btn-sm"
+                                  onClick={() => handleAnonymizeCandidateAction(action.id)}
+                                  disabled={Boolean(action.anonymized_at)}
+                                >
+                                  Anonymize
+                                </button>
+                                {!action.deleted_at && (
+                                  <button
+                                    type="button"
+                                    className="btn-danger btn-sm"
+                                    onClick={() => handleDeleteCandidateAction(action.id)}
+                                  >
+                                    Delete
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </section>
