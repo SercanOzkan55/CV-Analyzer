@@ -22,11 +22,9 @@ def _clean_psycopg2_url(url):
 
 CLEAN_DB_URL = _clean_psycopg2_url(DATABASE_URL)
 
-# Initialize OpenAI client conditionally
-MOCK_SERVICES_ON = os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes")
 _OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 
-if MOCK_SERVICES_ON or not _OPENAI_KEY:
+if not _OPENAI_KEY:
     client = None  # Will be checked in functions
 else:
     client = OpenAI(api_key=_OPENAI_KEY)
@@ -48,6 +46,10 @@ ALLOWED_DOMAINS = [
     "General Labor",
     "Other",
 ]
+
+
+def _mock_services_on():
+    return os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes")
 
 
 # ==========================================================
@@ -131,7 +133,7 @@ def update_domain_centroid(cur, domain_id, embedding):
 # ==========================================================
 def classify_domain_llm(job_text):
     # Allow mocking for testing without OpenAI API
-    if MOCK_SERVICES_ON or not client:
+    if _mock_services_on() or not client:
         return "Engineering & Technology"  # Default mock domain
 
     prompt = f"""
