@@ -103,6 +103,39 @@ def test_owner_can_create_member_and_update_role(client, db_session, recruiter_u
     assert "user_permission_changed" in events
 
 
+def test_owner_member_invite_email_is_sent_when_enabled(client, recruiter_user, monkeypatch):
+    sent_messages = []
+
+    def fake_send_email(to_email, subject, body, recruiter_email=""):
+        sent_messages.append(
+            {
+                "to_email": to_email,
+                "subject": subject,
+                "body": body,
+                "recruiter_email": recruiter_email,
+            }
+        )
+        return True
+
+    monkeypatch.setenv("OWNER_INVITE_EMAIL_ENABLED", "true")
+    monkeypatch.setenv("OWNER_APP_URL", "https://app.example.test")
+    monkeypatch.setattr("routes.owner_workflow._do_send_email", fake_send_email)
+
+    response = client.post(
+        "/api/v1/owner/users",
+        json={"email": "email.invite@example.com", "role": "hr"},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["invite_email"]["requested"] is True
+    assert payload["invite_email"]["sent"] is True
+    assert len(sent_messages) == 1
+    assert sent_messages[0]["to_email"] == "email.invite@example.com"
+    assert sent_messages[0]["subject"] == "CV Analyzer team access"
+    assert "https://app.example.test" in sent_messages[0]["body"]
+    assert "as hr" in sent_messages[0]["body"]
+
+
 def test_pending_owner_member_is_adopted_on_first_login(client, db_session, recruiter_user):
     create_response = client.post(
         "/api/v1/owner/users",
