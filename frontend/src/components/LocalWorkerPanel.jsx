@@ -7,6 +7,7 @@ import {
   createOwnerUser,
   deleteOwnerCandidateAction,
   downloadWorkerExecutable,
+  fetchOwnerCandidateComments,
   fetchOwnerCandidateActions,
   fetchOwnerAuditLogs,
   fetchOwnerNotificationRules,
@@ -44,6 +45,9 @@ export default function LocalWorkerPanel({ organizationId }) {
   const [ownerCandidateActions, setOwnerCandidateActions] = useState([])
   const [candidateScoreDrafts, setCandidateScoreDrafts] = useState({})
   const [candidateCommentDrafts, setCandidateCommentDrafts] = useState({})
+  const [expandedCandidateComments, setExpandedCandidateComments] = useState({})
+  const [candidateCommentsByAction, setCandidateCommentsByAction] = useState({})
+  const [candidateCommentsLoading, setCandidateCommentsLoading] = useState({})
   const [showDeletedCandidates, setShowDeletedCandidates] = useState(false)
   const [loading, setLoading] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
@@ -141,6 +145,9 @@ export default function LocalWorkerPanel({ organizationId }) {
       setCandidateCommentDrafts((current) => (
         Object.fromEntries((candidateActions.items || []).map((item) => [item.id, current[item.id] || '']))
       ))
+      setExpandedCandidateComments((current) => (
+        Object.fromEntries((candidateActions.items || []).map((item) => [item.id, Boolean(current[item.id])]))
+      ))
     } catch (error) {
       console.warn('Owner workflow unavailable', error)
       setOwnerPermissions(null)
@@ -152,6 +159,9 @@ export default function LocalWorkerPanel({ organizationId }) {
       setOwnerCandidateActions([])
       setCandidateScoreDrafts({})
       setCandidateCommentDrafts({})
+      setExpandedCandidateComments({})
+      setCandidateCommentsByAction({})
+      setCandidateCommentsLoading({})
     }
   }
 
@@ -328,10 +338,37 @@ export default function LocalWorkerPanel({ organizationId }) {
     try {
       await createOwnerCandidateComment(token, actionId, { body })
       setCandidateCommentDrafts((current) => ({ ...current, [actionId]: '' }))
+      if (expandedCandidateComments[actionId]) {
+        await loadCandidateComments(actionId)
+      }
       await fetchOwnerWorkflow()
     } catch (error) {
       console.warn('Could not add candidate comment', error)
       window.alert(error.message || 'Failed to add candidate comment')
+    }
+  }
+
+  async function loadCandidateComments(actionId) {
+    try {
+      setCandidateCommentsLoading((current) => ({ ...current, [actionId]: true }))
+      const data = await fetchOwnerCandidateComments(token, actionId, { limit: 50 })
+      setCandidateCommentsByAction((current) => ({
+        ...current,
+        [actionId]: data.items || [],
+      }))
+    } catch (error) {
+      console.warn('Could not load candidate comments', error)
+      window.alert(error.message || 'Failed to load comments')
+    } finally {
+      setCandidateCommentsLoading((current) => ({ ...current, [actionId]: false }))
+    }
+  }
+
+  async function handleToggleCandidateComments(actionId) {
+    const willExpand = !expandedCandidateComments[actionId]
+    setExpandedCandidateComments((current) => ({ ...current, [actionId]: willExpand }))
+    if (willExpand && !candidateCommentsByAction[actionId]) {
+      await loadCandidateComments(actionId)
     }
   }
 
@@ -650,16 +687,49 @@ export default function LocalWorkerPanel({ organizationId }) {
                           </div>
 
                           <div className="owner-candidate-comments">
-                            <div>
-                              <strong>{action.comment_count || 0} comments</strong>
-                              {action.latest_comment ? (
-                                <small>
-                                  {action.latest_comment.author_email || 'Team'}: {action.latest_comment.body}
-                                </small>
-                              ) : (
-                                <small>No comments yet.</small>
+                            <div className="owner-comment-summary">
+                              <span>
+                                <strong>{action.comment_count || 0} comments</strong>
+                                {action.latest_comment ? (
+                                  <small>
+                                    {action.latest_comment.author_email || 'Team'}: {action.latest_comment.body}
+                                  </small>
+                                ) : (
+                                  <small>No comments yet.</small>
+                                )}
+                              </span>
+                              {Number(action.comment_count || 0) > 0 && (
+                                <button
+                                  type="button"
+                                  className="btn-outline btn-sm"
+                                  onClick={() => handleToggleCandidateComments(action.id)}
+                                  disabled={Boolean(candidateCommentsLoading[action.id])}
+                                >
+                                  {expandedCandidateComments[action.id] ? 'Hide history' : 'View history'}
+                                </button>
                               )}
                             </div>
+                            {expandedCandidateComments[action.id] && (
+                              <div className="owner-comment-history">
+                                {candidateCommentsLoading[action.id] ? (
+                                  <small>Loading comments...</small>
+                                ) : (candidateCommentsByAction[action.id] || []).length === 0 ? (
+                                  <small>No comments loaded.</small>
+                                ) : (
+                                  (candidateCommentsByAction[action.id] || []).map((comment) => (
+                                    <article key={comment.id} className="owner-comment-row">
+                                      <div>
+                                        <strong>{comment.author_email || 'Team'}</strong>
+                                        <time dateTime={comment.created_at || undefined}>
+                                          {comment.created_at ? new Date(comment.created_at).toLocaleString() : '-'}
+                                        </time>
+                                      </div>
+                                      <p>{comment.body}</p>
+                                    </article>
+                                  ))
+                                )}
+                              </div>
+                            )}
                             {canCreateCandidateComments && !action.deleted_at && (
                               <form onSubmit={(event) => handleCreateCandidateComment(event, action.id)}>
                                 <input

@@ -1,5 +1,6 @@
 from datetime import datetime
 import hashlib
+import os
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,6 +11,7 @@ from sqlalchemy.orm import Session
 from auth import verify_supabase_jwt
 from database import get_db
 from models import AuditLog, CandidateAction, CandidateComment, Notification, NotificationRule, RolePermission, User
+from services.email_service import _do_send_email
 from services.user_service import get_or_create_user
 from services.owner_workflow_service import (
     DEFAULT_ROLE_PERMISSIONS,
@@ -102,6 +104,50 @@ def _normalize_member_role(role: str | None) -> str:
 def _pending_supabase_id(organization_id: int, email: str) -> str:
     digest = hashlib.sha256(f"{organization_id}:{email.lower()}".encode("utf-8")).hexdigest()[:20]
     return f"pending-owner-{organization_id}-{digest}"
+
+
+def _env_bool(value: str | None) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _owner_app_url() -> str:
+    return (
+        os.getenv("OWNER_APP_URL")
+        or os.getenv("FRONTEND_URL")
+        or os.getenv("APP_URL")
+        or ""
+    ).strip().rstrip("/")
+
+
+def _owner_invite_email_enabled() -> bool:
+    explicit = os.getenv("OWNER_INVITE_EMAIL_ENABLED")
+    if explicit is not None:
+        return _env_bool(explicit)
+    return bool(os.getenv("SENDGRID_API_KEY") or os.getenv("SMTP_HOST"))
+
+
+def _send_owner_invite_email(email: str, role: str, recruiter_email: str, organization_id: int) -> dict[str, Any]:
+    if not _owner_invite_email_enabled():
+        return {"requested": False, "sent": False, "reason": "email_backend_not_configured"}
+
+    app_url = _owner_app_url()
+    lines = [
+        "Hello,",
+        "",
+        f"You have been invited to CV Analyzer as {role}.",
+        "Sign in with this email address to activate your access.",
+    ]
+    if app_url:
+        lines.extend(["", f"Sign in: {app_url}"])
+    lines.extend(["", f"Organization ID: {organization_id}", "", "CV Analyzer"])
+
+    sent = _do_send_email(
+        email,
+        "CV Analyzer team access",
+        "\n".join(lines),
+        recruiter_email=recruiter_email or "",
+    )
+    return {"requested": True, "sent": bool(sent), "reason": "sent" if sent else "send_failed"}
 
 
 def _audit_payload(row: AuditLog) -> dict[str, Any]:
@@ -300,6 +346,12 @@ def owner_create_user(
         db.add(row)
 
     db.flush()
+    invite_email_status = _send_owner_invite_email(
+        email,
+        role,
+        recruiter.email or "",
+        recruiter.organization_id,
+    )
     audit = create_audit_log(
         db,
         organization_id=recruiter.organization_id,
@@ -314,8 +366,10 @@ def owner_create_user(
             "email": email,
             "role": role,
             "organization_id": recruiter.organization_id,
+            "invite_email_requested": invite_email_status["requested"],
+            "invite_email_sent": invite_email_status["sent"],
         },
-        metadata={"source": "owner_create_user"},
+        metadata={"source": "owner_create_user", "invite_email": invite_email_status},
     )
     create_owner_notification(
         db,
@@ -326,11 +380,11 @@ def owner_create_user(
         recipient_user_id=recruiter.id,
         actor_user_id=recruiter.id,
         audit_log_id=audit.id,
-        metadata={"source": "owner_create_user", "member_user_id": row.id},
+        metadata={"source": "owner_create_user", "member_user_id": row.id, "invite_email": invite_email_status},
     )
     db.commit()
     db.refresh(row)
-    return {"user": _user_payload(row, db)}
+    return {"user": _user_payload(row, db), "invite_email": invite_email_status}
 
 
 @router.put("/users/{user_id}/role")
