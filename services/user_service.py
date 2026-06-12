@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 
 from models import Analysis, Organization, User
@@ -25,19 +26,23 @@ logger = logging.getLogger("app.user")
 def get_or_create_user(db, supabase_id: str, email: str):
     """Get existing user or create new one."""
     user = db.query(User).filter(User.supabase_id == supabase_id).first()
+    adopted_pending_member = False
 
     if not user:
-        initial_plan = _resolve_initial_user_plan(email)
-        initial_billing = "trialing" if initial_plan != "free" else "trialing"
-        user = User(
-            supabase_id=supabase_id,
-            email=email,
-            plan_type=initial_plan,
-            billing_status=initial_billing,
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+        user = _adopt_pending_owner_member(db, supabase_id, email)
+        adopted_pending_member = user is not None
+        if not user:
+            initial_plan = _resolve_initial_user_plan(email)
+            initial_billing = "trialing" if initial_plan != "free" else "trialing"
+            user = User(
+                supabase_id=supabase_id,
+                email=email,
+                plan_type=initial_plan,
+                billing_status=initial_billing,
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
 
     # Auto-detect admin role from BILLING_ADMIN_ALLOWED_EMAILS env
     admin_emails_raw = str(os.getenv("BILLING_ADMIN_ALLOWED_EMAILS", "")).strip()
@@ -50,7 +55,7 @@ def get_or_create_user(db, supabase_id: str, email: str):
         db.refresh(user)
 
     # Domain-based auto role assignment
-    if user.role != "admin":
+    if user.role != "admin" and not adopted_pending_member:
         try:
             domain = None
             if isinstance(email, str) and "@" in email:
@@ -71,6 +76,71 @@ def get_or_create_user(db, supabase_id: str, email: str):
             pass
 
     return user
+
+
+def _adopt_pending_owner_member(db, supabase_id: str, email: str) -> User | None:
+    """Convert an owner-created pending member into the real authenticated user."""
+    email_value = str(email or "").strip().lower()
+    supabase_value = str(supabase_id or "").strip()
+    if not email_value or not supabase_value:
+        return None
+
+    pending = (
+        db.query(User)
+        .filter(
+            func.lower(User.email) == email_value,
+            User.supabase_id.like("pending-owner-%"),
+        )
+        .order_by(User.created_at.desc(), User.id.desc())
+        .first()
+    )
+    if not pending:
+        return None
+
+    old_supabase_id = pending.supabase_id
+    pending.supabase_id = supabase_value
+    pending.email = email_value
+    db.add(pending)
+    db.flush()
+
+    try:
+        from services.owner_workflow_service import (
+            candidate_event_title,
+            create_audit_log,
+            create_owner_notification,
+        )
+
+        if pending.organization_id:
+            audit = create_audit_log(
+                db,
+                organization_id=pending.organization_id,
+                event_type="hr_user_activated",
+                actor_user_id=pending.id,
+                actor_role=pending.role,
+                resource_type="user",
+                resource_id=pending.id,
+                description=f"{pending.email} activated pending access.",
+                old_values={"supabase_id": old_supabase_id},
+                new_values={"supabase_id": pending.supabase_id, "role": pending.role},
+                metadata={"source": "get_or_create_user"},
+            )
+            create_owner_notification(
+                db,
+                organization_id=pending.organization_id,
+                event_type="hr_user_activated",
+                title=candidate_event_title("hr_user_activated"),
+                message=f"{pending.email} activated pending access.",
+                recipient_user_id=None,
+                actor_user_id=pending.id,
+                audit_log_id=audit.id,
+                metadata={"source": "get_or_create_user", "member_user_id": pending.id},
+            )
+    except Exception as exc:
+        logger.warning("Pending owner member activation audit skipped: %s", exc)
+
+    db.commit()
+    db.refresh(pending)
+    return pending
 
 
 def _get_owned_analysis_or_404(db, analysis_id: int, db_user: User) -> Analysis:

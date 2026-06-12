@@ -116,3 +116,11 @@ Notifications, and NotificationRules.
 - CV and personal data must be stored securely.
 - Delete operations should prefer soft delete.
 - Candidate data should be anonymizable or deletable for KVKK and GDPR support.
+
+## Implemented Activation Note
+
+- Owner-created HR or limited users start as `pending-owner-*` records.
+- When the invited email signs in with a real Supabase user id, the pending
+  record is adopted instead of creating a duplicate user.
+- The adopted user keeps the owner-assigned organization and role.
+- Activation is written to audit history and creates an owner notification.
