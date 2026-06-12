@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import {
   anonymizeOwnerCandidateAction,
   assignOwnerCandidateAction,
+  createOwnerCandidateComment,
   createWorkerKey,
   createOwnerUser,
   deleteOwnerCandidateAction,
@@ -42,6 +43,7 @@ export default function LocalWorkerPanel({ organizationId }) {
   const [ownerRolePermissions, setOwnerRolePermissions] = useState(null)
   const [ownerCandidateActions, setOwnerCandidateActions] = useState([])
   const [candidateScoreDrafts, setCandidateScoreDrafts] = useState({})
+  const [candidateCommentDrafts, setCandidateCommentDrafts] = useState({})
   const [showDeletedCandidates, setShowDeletedCandidates] = useState(false)
   const [loading, setLoading] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
@@ -136,6 +138,9 @@ export default function LocalWorkerPanel({ organizationId }) {
           },
         ]))
       )
+      setCandidateCommentDrafts((current) => (
+        Object.fromEntries((candidateActions.items || []).map((item) => [item.id, current[item.id] || '']))
+      ))
     } catch (error) {
       console.warn('Owner workflow unavailable', error)
       setOwnerPermissions(null)
@@ -146,6 +151,7 @@ export default function LocalWorkerPanel({ organizationId }) {
       setOwnerRolePermissions(null)
       setOwnerCandidateActions([])
       setCandidateScoreDrafts({})
+      setCandidateCommentDrafts({})
     }
   }
 
@@ -315,6 +321,20 @@ export default function LocalWorkerPanel({ organizationId }) {
     }
   }
 
+  async function handleCreateCandidateComment(event, actionId) {
+    event.preventDefault()
+    const body = String(candidateCommentDrafts[actionId] || '').trim()
+    if (!body) return
+    try {
+      await createOwnerCandidateComment(token, actionId, { body })
+      setCandidateCommentDrafts((current) => ({ ...current, [actionId]: '' }))
+      await fetchOwnerWorkflow()
+    } catch (error) {
+      console.warn('Could not add candidate comment', error)
+      window.alert(error.message || 'Failed to add candidate comment')
+    }
+  }
+
   async function handleDeleteCandidateAction(actionId) {
     if (!window.confirm('Soft delete this candidate action?')) return
     try {
@@ -374,6 +394,7 @@ export default function LocalWorkerPanel({ organizationId }) {
   const canViewCandidateActions = Boolean(ownerPermissions?.permissions?.['candidates.view'])
   const canManageCandidateActions = Boolean(ownerPermissions?.permissions?.['candidates.manage'])
   const canUpdateCandidateScores = Boolean(ownerPermissions?.permissions?.['candidate_status.update'])
+  const canCreateCandidateComments = Boolean(ownerPermissions?.permissions?.['candidate_comments.create'])
   const unreadOwnerCount = ownerNotifications.filter((item) => !item.is_read).length
   const managedRoles = ownerRolePermissions?.roles || ['owner', 'recruiter', 'hr', 'limited']
   const permissionOptions = Object.entries(ownerRolePermissions?.permissions || ownerPermissions?.available_permissions || {})
@@ -626,6 +647,33 @@ export default function LocalWorkerPanel({ organizationId }) {
                                 <span className="owner-readonly-value">{assignee?.email || 'Unassigned'}</span>
                               )}
                             </label>
+                          </div>
+
+                          <div className="owner-candidate-comments">
+                            <div>
+                              <strong>{action.comment_count || 0} comments</strong>
+                              {action.latest_comment ? (
+                                <small>
+                                  {action.latest_comment.author_email || 'Team'}: {action.latest_comment.body}
+                                </small>
+                              ) : (
+                                <small>No comments yet.</small>
+                              )}
+                            </div>
+                            {canCreateCandidateComments && !action.deleted_at && (
+                              <form onSubmit={(event) => handleCreateCandidateComment(event, action.id)}>
+                                <input
+                                  value={candidateCommentDrafts[action.id] || ''}
+                                  onChange={(event) => setCandidateCommentDrafts((current) => ({
+                                    ...current,
+                                    [action.id]: event.target.value,
+                                  }))}
+                                  maxLength={2000}
+                                  placeholder="Add comment"
+                                />
+                                <button type="submit" className="btn-outline btn-sm">Comment</button>
+                              </form>
+                            )}
                           </div>
 
                           <div className="owner-candidate-actions">

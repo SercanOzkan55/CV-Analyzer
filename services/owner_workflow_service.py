@@ -11,6 +11,8 @@ from models import AuditLog, Notification, NotificationRule, RolePermission, Use
 PERMISSIONS = {
     "candidates.view": "View candidates",
     "candidates.manage": "Manage candidates",
+    "candidate_comments.view": "View candidate comments",
+    "candidate_comments.create": "Add candidate comments",
     "candidate_status.update": "Update candidate status",
     "jobs.view": "View jobs",
     "jobs.manage": "Manage jobs",
@@ -28,6 +30,8 @@ DEFAULT_ROLE_PERMISSIONS = {
     "recruiter": {
         "candidates.view",
         "candidates.manage",
+        "candidate_comments.view",
+        "candidate_comments.create",
         "candidate_status.update",
         "jobs.view",
         "jobs.manage",
@@ -41,6 +45,8 @@ DEFAULT_ROLE_PERMISSIONS = {
     "hr": {
         "candidates.view",
         "candidates.manage",
+        "candidate_comments.view",
+        "candidate_comments.create",
         "candidate_status.update",
         "jobs.view",
         "audit.view",
@@ -48,6 +54,8 @@ DEFAULT_ROLE_PERMISSIONS = {
     },
     "limited": {
         "candidates.view",
+        "candidate_comments.view",
+        "candidate_comments.create",
         "jobs.view",
         "notifications.view",
     },
@@ -62,6 +70,7 @@ IMPORTANT_EVENTS = {
     "candidate_needs_manual_review",
     "candidate_decision_changed",
     "candidate_score_changed",
+    "candidate_comment_added",
     "candidate_deleted",
     "user_permission_changed",
     "new_hr_user_added",
@@ -105,6 +114,7 @@ EVENT_TITLES = {
     "candidate_needs_manual_review": "Candidate needs manual review",
     "candidate_decision_changed": "Candidate decision changed",
     "candidate_score_changed": "Candidate score changed",
+    "candidate_comment_added": "Candidate comment added",
     "candidate_deleted": "Candidate deleted",
     "user_permission_changed": "User permission changed",
     "new_hr_user_added": "New HR user added",

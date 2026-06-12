@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from auth import verify_supabase_jwt
 from database import get_db
-from models import AuditLog, CandidateAction, Notification, NotificationRule, RolePermission, User
+from models import AuditLog, CandidateAction, CandidateComment, Notification, NotificationRule, RolePermission, User
 from services.user_service import get_or_create_user
 from services.owner_workflow_service import (
     DEFAULT_ROLE_PERMISSIONS,
@@ -56,6 +56,10 @@ class CandidateAssignmentUpdate(BaseModel):
 class CandidateScoreUpdate(BaseModel):
     final_score: float | None = None
     ats_score: float | None = None
+
+
+class CandidateCommentCreate(BaseModel):
+    body: str
 
 
 def _require_permission(db: Session, user, permission_key: str) -> None:
@@ -168,8 +172,20 @@ def _role_permission_payload(row: RolePermission) -> dict[str, Any]:
     }
 
 
-def _candidate_action_payload(row: CandidateAction) -> dict[str, Any]:
+def _candidate_comment_payload(row: CandidateComment) -> dict[str, Any]:
     return {
+        "id": row.id,
+        "organization_id": row.organization_id,
+        "candidate_action_id": row.candidate_action_id,
+        "author_user_id": row.author_user_id,
+        "author_email": row.author.email if row.author else None,
+        "body": row.body,
+        "created_at": _iso(row.created_at),
+    }
+
+
+def _candidate_action_payload(row: CandidateAction, db: Session | None = None) -> dict[str, Any]:
+    data = {
         "id": row.id,
         "organization_id": row.organization_id,
         "job_id": row.job_id,
@@ -186,6 +202,30 @@ def _candidate_action_payload(row: CandidateAction) -> dict[str, Any]:
         "deleted_at": _iso(row.deleted_at),
         "anonymized_at": _iso(row.anonymized_at),
     }
+    if db is not None:
+        data["comment_count"] = (
+            db.query(CandidateComment)
+            .filter(CandidateComment.candidate_action_id == row.id)
+            .count()
+        )
+        latest_comment = (
+            db.query(CandidateComment)
+            .filter(CandidateComment.candidate_action_id == row.id)
+            .order_by(CandidateComment.created_at.desc(), CandidateComment.id.desc())
+            .first()
+        )
+        data["latest_comment"] = _candidate_comment_payload(latest_comment) if latest_comment else None
+    return data
+
+
+def _candidate_action_query_for_user(db: Session, recruiter, action_id: int):
+    query = db.query(CandidateAction).filter(
+        CandidateAction.id == action_id,
+        CandidateAction.organization_id == recruiter.organization_id,
+    )
+    if normalize_role(recruiter.role) == "limited":
+        query = query.filter(CandidateAction.assigned_user_id == recruiter.id)
+    return query
 
 
 @router.get("/permissions")
@@ -447,10 +487,93 @@ def owner_candidate_actions(
         query = query.filter(CandidateAction.deleted_at == None)
     rows = query.order_by(CandidateAction.created_at.desc(), CandidateAction.id.desc()).offset(offset).limit(limit).all()
     return {
-        "items": [_candidate_action_payload(row) for row in rows],
+        "items": [_candidate_action_payload(row, db) for row in rows],
         "limit": limit,
         "offset": offset,
     }
+
+
+@router.get("/candidate-actions/{action_id}/comments")
+def owner_candidate_comments(
+    action_id: int,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    recruiter=Depends(owner_workflow_user),
+):
+    _require_permission(db, recruiter, "candidate_comments.view")
+    action = _candidate_action_query_for_user(db, recruiter, action_id).first()
+    if not action:
+        raise HTTPException(status_code=404, detail="Candidate action not found")
+    rows = (
+        db.query(CandidateComment)
+        .filter(
+            CandidateComment.organization_id == recruiter.organization_id,
+            CandidateComment.candidate_action_id == action.id,
+        )
+        .order_by(CandidateComment.created_at.desc(), CandidateComment.id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return {
+        "items": [_candidate_comment_payload(row) for row in rows],
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+@router.post("/candidate-actions/{action_id}/comments")
+def owner_create_candidate_comment(
+    action_id: int,
+    body: CandidateCommentCreate,
+    db: Session = Depends(get_db),
+    recruiter=Depends(owner_workflow_user),
+):
+    _require_permission(db, recruiter, "candidate_comments.create")
+    action = _candidate_action_query_for_user(db, recruiter, action_id).filter(CandidateAction.deleted_at == None).first()
+    if not action:
+        raise HTTPException(status_code=404, detail="Candidate action not found")
+    text = str(body.body or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Comment body is required")
+    if len(text) > 2000:
+        raise HTTPException(status_code=400, detail="Comment body must be 2000 characters or fewer")
+    row = CandidateComment(
+        organization_id=recruiter.organization_id,
+        candidate_action_id=action.id,
+        author_user_id=recruiter.id,
+        body=text,
+    )
+    db.add(row)
+    db.flush()
+    audit = create_audit_log(
+        db,
+        organization_id=recruiter.organization_id,
+        event_type="candidate_comment_added",
+        actor_user_id=recruiter.id,
+        actor_role=recruiter.role,
+        resource_type="candidate",
+        resource_id=action.id,
+        description=f"{action.candidate_name} comment added.",
+        new_values={"comment_id": row.id, "body": text[:500]},
+        metadata={"source": "owner_create_candidate_comment"},
+    )
+    create_owner_notification(
+        db,
+        organization_id=recruiter.organization_id,
+        event_type="candidate_comment_added",
+        title=candidate_event_title("candidate_comment_added"),
+        message=f"{action.candidate_name} has a new comment.",
+        recipient_user_id=action.recruiter_id,
+        actor_user_id=recruiter.id,
+        audit_log_id=audit.id,
+        candidate_action_id=action.id,
+        metadata={"source": "owner_create_candidate_comment", "comment_id": row.id},
+    )
+    db.commit()
+    db.refresh(row)
+    return {"comment": _candidate_comment_payload(row), "action": _candidate_action_payload(action, db)}
 
 
 @router.put("/candidate-actions/{action_id}/assignment")
@@ -495,7 +618,7 @@ def owner_assign_candidate_action(
     )
     db.commit()
     db.refresh(row)
-    return {"action": _candidate_action_payload(row)}
+    return {"action": _candidate_action_payload(row, db)}
 
 
 @router.put("/candidate-actions/{action_id}/score")
@@ -551,7 +674,7 @@ def owner_update_candidate_score(
     )
     db.commit()
     db.refresh(row)
-    return {"action": _candidate_action_payload(row)}
+    return {"action": _candidate_action_payload(row, db)}
 
 
 @router.delete("/candidate-actions/{action_id}")
@@ -601,7 +724,7 @@ def owner_soft_delete_candidate_action(
     )
     db.commit()
     db.refresh(row)
-    return {"action": _candidate_action_payload(row)}
+    return {"action": _candidate_action_payload(row, db)}
 
 
 @router.post("/candidate-actions/{action_id}/anonymize")
@@ -652,7 +775,7 @@ def owner_anonymize_candidate_action(
     )
     db.commit()
     db.refresh(row)
-    return {"action": _candidate_action_payload(row)}
+    return {"action": _candidate_action_payload(row, db)}
 
 
 @router.get("/audit-logs")
