@@ -74,6 +74,7 @@ IMPORTANT_EVENTS = {
     "candidate_deleted",
     "user_permission_changed",
     "new_hr_user_added",
+    "hr_user_activated",
 }
 
 DECISION_STATUS_MAP = {
@@ -118,6 +119,7 @@ EVENT_TITLES = {
     "candidate_deleted": "Candidate deleted",
     "user_permission_changed": "User permission changed",
     "new_hr_user_added": "New HR user added",
+    "hr_user_activated": "HR user activated",
 }
 
 

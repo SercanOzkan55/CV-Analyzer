@@ -103,6 +103,36 @@ def test_owner_can_create_member_and_update_role(client, db_session, recruiter_u
     assert "user_permission_changed" in events
 
 
+def test_pending_owner_member_is_adopted_on_first_login(client, db_session, recruiter_user):
+    create_response = client.post(
+        "/api/v1/owner/users",
+        json={"email": "invited.member@example.com", "role": "limited"},
+    )
+    assert create_response.status_code == 200, create_response.text
+    pending_user = create_response.json()["user"]
+    assert pending_user["supabase_id"].startswith("pending-owner-")
+
+    client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
+        "user_id": "real-supabase-invited-member",
+        "email": "invited.member@example.com",
+    }
+
+    permissions_response = client.get("/api/v1/owner/permissions")
+    assert permissions_response.status_code == 200, permissions_response.text
+    payload = permissions_response.json()
+    assert payload["role"] == "limited"
+    assert payload["organization_id"] == recruiter_user["organization_id"]
+
+    db_session.expire_all()
+    rows = db_session.query(User).filter_by(email="invited.member@example.com").all()
+    assert len(rows) == 1
+    assert rows[0].supabase_id == "real-supabase-invited-member"
+    assert rows[0].role == "limited"
+    assert rows[0].organization_id == recruiter_user["organization_id"]
+    assert db_session.query(AuditLog).filter_by(event_type="hr_user_activated").count() == 1
+    assert db_session.query(Notification).filter_by(type="hr_user_activated").count() == 1
+
+
 def test_owner_can_override_role_permission(client, db_session, recruiter_user):
     response = client.put(
         "/api/v1/owner/role-permissions/hr/audit.view",
