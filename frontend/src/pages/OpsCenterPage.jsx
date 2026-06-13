@@ -55,7 +55,8 @@ export default function OpsCenterPage() {
   useEffect(() => {
     document.title = 'Operations Center - CV Analyzer'
     try {
-      const stored = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || ''
+      localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY)
+      const stored = sessionStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || ''
       if (stored) setAdminToken(stored)
     } catch {
       // noop
@@ -74,7 +75,8 @@ export default function OpsCenterPage() {
       await billingAdminMe(token, adminToken.trim())
       setVerified(true)
       try {
-        localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, adminToken.trim())
+        localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY)
+        sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, adminToken.trim())
       } catch {
         // noop
       }
@@ -166,7 +168,10 @@ export default function OpsCenterPage() {
             <input
               type="password"
               value={adminToken}
-              onChange={(e) => setAdminToken(e.target.value)}
+              onChange={(e) => {
+                setAdminToken(e.target.value)
+                setVerified(false)
+              }}
               placeholder="Billing admin token"
             />
             <button className="btn-primary" onClick={verifyAccess} disabled={loading}>
