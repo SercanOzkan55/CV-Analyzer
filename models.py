@@ -174,6 +174,20 @@ class FailedTask(Base):
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
+class AsyncTaskOwner(Base):
+    """Durable ownership mapping for async task result polling."""
+
+    __tablename__ = "async_task_owners"
+
+    id = Column(Integer, primary_key=True)
+    task_id = Column(String, nullable=False, unique=True, index=True)
+    task_type = Column(String, nullable=False, default="analysis", index=True)
+    user_id = Column(Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    expires_at = Column(DateTime, nullable=True, index=True)
+
+
 class CVVersion(Base):
     __tablename__ = "cv_versions"
 
