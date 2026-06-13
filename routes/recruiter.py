@@ -268,6 +268,7 @@ def _serialize_action(action: CandidateAction) -> dict:
     }
 
 router = APIRouter(prefix="/api/v1/recruiter")
+_BATCH_TASK_OWNERS: dict[str, dict[str, int]] = {}
 
 _ALLOWED_CANDIDATE_STAGES = {
     "pending",
@@ -450,24 +451,41 @@ def recruiter_required(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
         raise HTTPException(status_code=403, detail="Recruiter role required")
 
     if db_user.role in ("admin", "recruiter") and not db_user.organization_id:
+        allow_auto_org = os.getenv("RECRUITER_AUTO_PROVISION_ORG", "0").lower() in ("1", "true", "yes")
+        if not allow_auto_org:
+            raise HTTPException(
+                status_code=403,
+                detail="Recruiter account is not assigned to an organization",
+            )
         try:
-            _user_email = db_user.email or ""
-            raw_domain = _user_email.split("@", 1)[1].lower() if "@" in _user_email else ""
-            domain = f"auto-{raw_domain}" if raw_domain in _GENERIC_DOMAINS else (raw_domain or "auto.local")
+            domain = f"personal-recruiter-{db_user.id}.cvanalyzer.local"
             org = db.query(Organization).filter(Organization.domain == domain).first()
             if not org:
-                org = Organization(name=f"Auto Org ({domain})", domain=domain)
+                org = Organization(name=f"Personal Recruiter Workspace {db_user.id}", domain=domain)
                 db.add(org)
                 db.flush()
             db_user.organization_id = org.id
             db.flush()
             db.commit()
-            logger.info("recruiter_required: provisioned org_id=%s for user_id=%s email=%s", org.id, db_user.id, _user_email)
+            logger.info("recruiter_required: provisioned personal org_id=%s for user_id=%s", org.id, db_user.id)
         except Exception as exc:
             db.rollback()
             logger.error("recruiter_required: org auto-provision failed: %s", exc)
+            raise HTTPException(status_code=403, detail="Recruiter organization setup failed")
 
     return db_user
+
+
+def _record_batch_task_owner(task_id: str, organization_id: int, recruiter_id: int) -> None:
+    if task_id:
+        _BATCH_TASK_OWNERS[str(task_id)] = {
+            "organization_id": int(organization_id),
+            "recruiter_id": int(recruiter_id),
+        }
+
+
+def _get_batch_task_owner(task_id: str) -> dict[str, int] | None:
+    return _BATCH_TASK_OWNERS.get(str(task_id))
 
 
 @router.get("/candidates")
@@ -1166,6 +1184,7 @@ async def recruiter_batch_upload(
             "batch_upload: queued task_id=%s org_id=%s job_id=%d cv_count=%d",
             task.id, org_id, job.id, len(cv_list)
         )
+        _record_batch_task_owner(str(task.id), int(org_id), int(recruiter.id))
         
         return {
             "task_id": task.id,

@@ -5,12 +5,17 @@ It intentionally pulls transitional shared symbols from the already-loading
 main module; later passes can move those shared helpers into services.
 """
 
+import ipaddress
+import socket
+import urllib.parse
+
 from fastapi import APIRouter
 from core.runtime_bridge import main_module as _main_module
 from core.route_dependencies import *  # noqa: F403
 
 
 router = APIRouter(tags=["analysis"])
+_ANALYSIS_TASK_OWNERS: dict[str, dict[str, int | None]] = {}
 
 
 _SUPPORTED_CV_UPLOAD_TYPES = {
@@ -449,6 +454,60 @@ def analyze(
 class AnalyzeAsyncRequest(BaseModel):
     cv_text: str
     job_description: str = ""
+    lang: str = "en"
+
+
+def _record_analysis_task_owner(task_id: str, db_user) -> None:
+    if task_id:
+        _ANALYSIS_TASK_OWNERS[str(task_id)] = {
+            "user_id": int(getattr(db_user, "id", 0) or 0),
+            "organization_id": getattr(db_user, "organization_id", None),
+        }
+
+
+def _require_analysis_task_owner(task_id: str, db_user) -> None:
+    owner = _ANALYSIS_TASK_OWNERS.get(str(task_id))
+    if not owner:
+        raise HTTPException(status_code=404, detail="Analysis job not found")
+    if int(owner.get("user_id") or 0) != int(getattr(db_user, "id", 0) or 0):
+        raise HTTPException(status_code=403, detail="Analysis job access denied")
+
+
+def _validate_job_import_url(raw_url: str) -> str:
+    url = str(raw_url or "").strip()
+    if len(url) > 2048:
+        raise HTTPException(status_code=400, detail="Import URL is too long")
+
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise HTTPException(status_code=400, detail="Only http(s) import URLs are allowed")
+    if parsed.username or parsed.password:
+        raise HTTPException(status_code=400, detail="Import URL credentials are not allowed")
+
+    host = parsed.hostname.lower().strip(".")
+    allowed_hosts = {
+        item.strip().lower()
+        for item in os.getenv("JOB_IMPORT_ALLOWED_HOSTS", "").split(",")
+        if item.strip()
+    }
+    if allowed_hosts and host not in allowed_hosts:
+        raise HTTPException(status_code=403, detail="Import URL host is not allowed")
+
+    try:
+        infos = socket.getaddrinfo(host, parsed.port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM)
+    except socket.gaierror:
+        raise HTTPException(status_code=400, detail="Import URL host could not be resolved")
+
+    for info in infos:
+        address = info[4][0]
+        try:
+            ip = ipaddress.ip_address(address)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Import URL resolved to an invalid address")
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified:
+            raise HTTPException(status_code=403, detail="Import URL host is not allowed")
+
+    return url
 
 
 @router.post("/api/v1/analyze-async")
@@ -571,6 +630,7 @@ def analyze_async(
         return {"job_id": "local-sync", "status": "completed", "result": result}
 
     task = analyze_text_task.delay(body.cv_text, body.job_description, body.lang)
+    _record_analysis_task_owner(str(task.id), db_user)
     return {"job_id": task.id, "status": "queued"}
 
 
@@ -844,6 +904,7 @@ async def analyze_pdf(
     # Keep scoring faithful to the uploaded CV. Auto-fix remains available
     # from /api/v1/cv/auto-fix when the user explicitly requests it.
     task = analyze_pdf_task.delay(text, job_description, lang)
+    _record_analysis_task_owner(str(task.id), db_user)
 
     # If the task ran synchronously (LocalTask), the wrapper returns a
     # DummyResult with `.status` and `.result` attributes — return the
@@ -965,7 +1026,7 @@ async def analyze_pdf(
 
 
 @router.get("/api/v1/analysis/{job_id}")
-def get_analysis_result(job_id: str, user=Depends(verify_supabase_jwt)):
+def get_analysis_result(job_id: str, user=Depends(verify_supabase_jwt), db=Depends(get_db)):
     """Poll the status/result of an async analysis job.
 
     For LocalTask fallback, the original analyze-async endpoint will already
@@ -973,6 +1034,8 @@ def get_analysis_result(job_id: str, user=Depends(verify_supabase_jwt)):
     Celery/Redis are enabled.
     """
     _ensure_not_expired(user)
+    db_user = get_or_create_user(db, user.get("user_id"), user.get("email"))
+    _require_analysis_task_owner(job_id, db_user)
 
     if celery_app is None:
         raise HTTPException(status_code=503, detail="Async processing disabled")
@@ -1221,7 +1284,10 @@ def import_jobs(
     db_user = get_or_create_user(db, supabase_id, email)
 
     try:
-        response = requests.get(url, timeout=10)
+        safe_url = _validate_job_import_url(url)
+        response = requests.get(safe_url, timeout=10, allow_redirects=False)
+        if 300 <= response.status_code < 400:
+            raise HTTPException(status_code=400, detail="Import URL redirects are not allowed")
         response.raise_for_status()
         jobs_data = response.json()  # Assume list of {"title": str, "description": str}
     except Exception as e:

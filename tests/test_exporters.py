@@ -1,5 +1,6 @@
 import pytest
 from datetime import datetime, timedelta
+from urllib.parse import parse_qs, urlparse
 from utils.csv_exporter import (
     generate_csv_download,
     get_temp_download as get_csv_temp_download,
@@ -12,6 +13,12 @@ from utils.json_exporter import (
     cleanup_expired_downloads as cleanup_json,
     _temp_downloads as json_store
 )
+
+def _download_parts(url: str) -> tuple[str, str]:
+    parsed = urlparse(url)
+    download_id = parsed.path.split("/")[-1]
+    token = parse_qs(parsed.query).get("token", [""])[0]
+    return download_id, token
 
 @pytest.fixture(autouse=True)
 def clear_stores():
@@ -39,7 +46,8 @@ def test_csv_exporter():
     url = generate_csv_download(results, 101)
     assert url.startswith("/api/v1/downloads/csv_")
     
-    download_id = url.split("/")[-1]
+    download_id, token = _download_parts(url)
+    assert token
     assert download_id in csv_store
     
     # 2. Test retrieval (active)
@@ -59,7 +67,8 @@ def test_csv_exporter():
     
     # 5. Test cleanup
     url2 = generate_csv_download(results, 101)
-    id2 = url2.split("/")[-1]
+    id2, token2 = _download_parts(url2)
+    assert token2
     csv_store[id2]["expires_at"] = datetime.utcnow() - timedelta(minutes=1)
     
     deleted = cleanup_csv()
@@ -80,7 +89,8 @@ def test_json_exporter():
     url = generate_json_download(results, 102)
     assert url.startswith("/api/v1/downloads/json_")
     
-    download_id = url.split("/")[-1]
+    download_id, token = _download_parts(url)
+    assert token
     assert download_id in json_store
     
     # 2. Test retrieval (active)
@@ -100,7 +110,8 @@ def test_json_exporter():
     
     # 5. Test cleanup
     url2 = generate_json_download(results, 102)
-    id2 = url2.split("/")[-1]
+    id2, token2 = _download_parts(url2)
+    assert token2
     json_store[id2]["expires_at"] = datetime.utcnow() - timedelta(minutes=1)
     
     deleted = cleanup_json()

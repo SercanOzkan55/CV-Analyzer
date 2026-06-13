@@ -15,7 +15,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from auth import verify_supabase_jwt
-from database import get_db
+from database import SessionLocal, get_db
 from models import Candidate, CandidateAction, Organization, User
 from routes.recruiter import (
     recruiter_required,
@@ -26,6 +26,7 @@ from routes.recruiter import (
     _do_send_email,
     _log_event,
     _get_limiter,
+    _get_batch_task_owner,
 )
 
 logger = logging.getLogger("app.recruiter.extended")
@@ -383,6 +384,31 @@ async def websocket_batch_upload_progress(websocket: WebSocket, task_id: str):
     - Client disconnects
     - Error occurs
     """
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=1008)
+        return
+
+    db = SessionLocal()
+    try:
+        try:
+            user_payload = verify_supabase_jwt(f"Bearer {token}")
+        except Exception:
+            await websocket.close(code=1008)
+            return
+
+        db_user = db.query(User).filter(User.supabase_id == user_payload.get("user_id")).first()
+        owner = _get_batch_task_owner(task_id)
+        if (
+            not db_user
+            or not owner
+            or int(owner.get("organization_id") or 0) != int(db_user.organization_id or 0)
+        ):
+            await websocket.close(code=1008)
+            return
+    finally:
+        db.close()
+
     await websocket.accept()
     logger.info("websocket: batch_upload progress connected task_id=%s", task_id)
     
