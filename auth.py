@@ -10,7 +10,6 @@ _MAX_TOKEN_LENGTH = 8192
 _ALLOWED_HS_ALGS = {"HS256", "HS384", "HS512"}
 _ALLOWED_ASYM_ALGS = {"RS256", "RS384", "RS512", "ES256", "ES384", "ES512"}
 _JWT_DECODE_OPTIONS = {
-    "verify_aud": False,
     "verify_exp": True,
     "require_exp": True,
     "require_sub": True,
@@ -48,6 +47,34 @@ if not SUPABASE_JWT_SECRET:
     SUPABASE_JWT_SECRET = _read_secret_file(os.getenv("SUPABASE_JWT_SECRET_FILE"))
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
+
+
+def _expected_jwt_audience() -> str | None:
+    value = os.getenv("SUPABASE_JWT_AUDIENCE", "authenticated").strip()
+    return value or None
+
+
+def _expected_jwt_issuer() -> str | None:
+    explicit = os.getenv("SUPABASE_JWT_ISSUER", "").strip()
+    if explicit:
+        return explicit
+    if SUPABASE_URL:
+        return SUPABASE_URL.rstrip("/") + "/auth/v1"
+    return None
+
+
+def _jwt_decode_kwargs() -> dict:
+    audience = _expected_jwt_audience()
+    issuer = _expected_jwt_issuer()
+    options = dict(_JWT_DECODE_OPTIONS)
+    options["verify_aud"] = bool(audience)
+    options["verify_iss"] = bool(issuer)
+    kwargs = {"options": options}
+    if audience:
+        kwargs["audience"] = audience
+    if issuer:
+        kwargs["issuer"] = issuer
+    return kwargs
 
 
 def _fetch_jwks(supabase_url: str):
@@ -159,7 +186,7 @@ def verify_supabase_jwt(authorization: str = Header(None)):
                 token,
                 SUPABASE_JWT_SECRET,
                 algorithms=[alg],
-                options=_JWT_DECODE_OPTIONS,
+                **_jwt_decode_kwargs(),
             )
         except Exception:
             _jwt_fail()
@@ -181,7 +208,8 @@ def verify_supabase_jwt(authorization: str = Header(None)):
                 key_obj = k
                 break
         if not key_obj:
-            key_obj = jwks["keys"][0]
+            _jwt_fail()
+            raise HTTPException(status_code=401, detail="Invalid token key")
 
         # Convert JWK to PEM using jwcrypto if available
         try:
@@ -191,12 +219,13 @@ def verify_supabase_jwt(authorization: str = Header(None)):
             jwk_key = jwk_mod.JWK(**key_obj)
             pem = jwk_key.export_to_pem(public_key=True, password=None)
             payload = jwt.decode(
-                token, pem, algorithms=[alg], options=_JWT_DECODE_OPTIONS
+                token, pem, algorithms=[alg], **_jwt_decode_kwargs()
             )
         except Exception:
+            _jwt_fail()
             raise HTTPException(
-                status_code=500,
-                detail="Server missing jwcrypto dependency to verify Supabase JWT (pip install jwcrypto)",
+                status_code=401,
+                detail="Invalid or expired token",
             )
 
     user_id = payload.get("sub")
