@@ -733,6 +733,55 @@ def _build_contact_sales_mailto_url(
     return f"mailto:{encoded_email}?subject={encoded_subject}&body={encoded_body}"
 
 
+def _billing_redirect_allowed_origins() -> set[str]:
+    raw_values = [
+        os.getenv("BILLING_REDIRECT_ALLOWED_ORIGINS", ""),
+        os.getenv("CORS_ORIGINS", ""),
+        os.getenv("FRONTEND_URL", ""),
+        os.getenv("APP_URL", ""),
+        os.getenv("OWNER_APP_URL", ""),
+        os.getenv("STRIPE_CHECKOUT_SUCCESS_URL", ""),
+        os.getenv("STRIPE_CHECKOUT_CANCEL_URL", ""),
+        os.getenv("STRIPE_BILLING_PORTAL_RETURN_URL", ""),
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+    origins: set[str] = set()
+    for raw in raw_values:
+        for item in str(raw or "").split(","):
+            value = item.strip()
+            if not value or value == "*":
+                continue
+            parsed = urllib.parse.urlparse(value)
+            if parsed.scheme in {"http", "https"} and parsed.netloc:
+                origins.add(f"{parsed.scheme.lower()}://{parsed.netloc.lower()}")
+    return origins
+
+
+def _validate_billing_redirect_url(url: str | None, default_url: str, field_name: str) -> str:
+    candidate = str(url or default_url or "").strip()
+    parsed = urllib.parse.urlparse(candidate)
+    if (
+        not candidate
+        or parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.username
+        or parsed.password
+    ):
+        raise HTTPException(status_code=400, detail=f"Invalid {field_name}")
+
+    host = str(parsed.hostname or "").lower()
+    is_local = host in {"localhost", "127.0.0.1", "::1"}
+    if _ENV_MODE in ("production", "prod") and parsed.scheme != "https" and not is_local:
+        raise HTTPException(status_code=400, detail=f"Invalid {field_name}")
+
+    origin = f"{parsed.scheme.lower()}://{parsed.netloc.lower()}"
+    if origin not in _billing_redirect_allowed_origins():
+        raise HTTPException(status_code=400, detail=f"Untrusted {field_name}")
+
+    return candidate
+
+
 @router.post("/api/v1/billing/checkout-session")
 def create_checkout_session(
     body: CreateCheckoutSessionRequest,
@@ -745,6 +794,17 @@ def create_checkout_session(
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
     owner_type, owner = _get_billing_owner(db, db_user)
+
+    success_url = _validate_billing_redirect_url(
+        body.success_url,
+        os.getenv("STRIPE_CHECKOUT_SUCCESS_URL", "http://localhost:5173/billing/success"),
+        "success_url",
+    )
+    cancel_url = _validate_billing_redirect_url(
+        body.cancel_url,
+        os.getenv("STRIPE_CHECKOUT_CANCEL_URL", "http://localhost:5173/billing/cancel"),
+        "cancel_url",
+    )
 
     # Development shortcut for local UI testing without external Stripe calls.
     if _main_module().MOCK_SERVICES_ON:
@@ -796,15 +856,6 @@ def create_checkout_session(
     price_id, desired_plan = _resolve_checkout_price_and_plan(
         body.plan_type,
         body.price_id,
-    )
-
-    success_url = (
-        body.success_url
-        or os.getenv("STRIPE_CHECKOUT_SUCCESS_URL", "http://localhost:5173/billing/success")
-    )
-    cancel_url = (
-        body.cancel_url
-        or os.getenv("STRIPE_CHECKOUT_CANCEL_URL", "http://localhost:5173/billing/cancel")
     )
 
     customer_id = _ensure_stripe_customer(db, owner_type, owner, email, supabase_id)
@@ -898,12 +949,15 @@ def create_billing_portal_session(
 ):
     _ensure_not_expired(user)
 
+    return_url = _validate_billing_redirect_url(
+        body.return_url,
+        os.getenv("STRIPE_BILLING_PORTAL_RETURN_URL", "http://localhost:5173/dashboard"),
+        "return_url",
+    )
+
     if _main_module().MOCK_SERVICES_ON:
-        mock_return_url = body.return_url or os.getenv(
-            "STRIPE_BILLING_PORTAL_RETURN_URL", "http://localhost:5173/dashboard"
-        )
         return {
-            "url": mock_return_url,
+            "url": return_url,
             "mode": "mock",
         }
 
@@ -913,9 +967,6 @@ def create_billing_portal_session(
     owner_type, owner = _get_billing_owner(db, db_user)
 
     customer_id = _ensure_stripe_customer(db, owner_type, owner, email, supabase_id)
-    return_url = body.return_url or os.getenv(
-        "STRIPE_BILLING_PORTAL_RETURN_URL", "http://localhost:5173/dashboard"
-    )
 
     session = _stripe_api_post(
         "/v1/billing_portal/sessions",
