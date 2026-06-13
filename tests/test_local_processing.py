@@ -378,12 +378,34 @@ def test_download_csv_success(client, recruiter_user, test_job, sample_pdf_file)
     download_id = download_url.split("/")[-1]
 
     # Download CSV
-    response = client.get(f"/api/v1/downloads/{download_id}")
+    response = client.get(f"/api/v1/downloads/{download_id}", headers={"X-API-Key": api_key})
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/csv")
     assert "attachment" in response.headers.get("content-disposition", "")
     assert b"name" in response.content  # CSV headers
+
+
+def test_download_requires_owner_api_key(client, recruiter_user, test_job, sample_pdf_file):
+    """Test local-processing downloads require the owning API key."""
+    response = client.post(
+        "/api/v1/recruiter/subscriptions/generate-key",
+        headers={"Authorization": f"Bearer {recruiter_user['token']}"},
+    )
+    api_key = response.json()["api_key"]
+
+    response = client.post(
+        "/api/v1/recruiter/process-local",
+        headers={"X-API-Key": api_key},
+        data={"job_id": test_job.id},
+        files={"files": ("cv.pdf", sample_pdf_file, "application/pdf")},
+    )
+    download_url = response.json()["downloads"]["csv"]
+    download_id = download_url.split("/")[-1]
+
+    response = client.get(f"/api/v1/downloads/{download_id}")
+
+    assert response.status_code == 401
 
 
 def test_download_json_success(client, recruiter_user, test_job, sample_pdf_file):
@@ -407,7 +429,7 @@ def test_download_json_success(client, recruiter_user, test_job, sample_pdf_file
     download_id = download_url.split("/")[-1]
 
     # Download JSON
-    response = client.get(f"/api/v1/downloads/{download_id}")
+    response = client.get(f"/api/v1/downloads/{download_id}", headers={"X-API-Key": api_key})
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("application/json")

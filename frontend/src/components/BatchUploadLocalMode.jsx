@@ -1,11 +1,27 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import api from '../api'
 import {
   validateFileUploads,
   formatErrorMessage,
 } from '../utils/recruiterErrorHandling'
 import './BatchUploadLocalMode.css'
+
+const API_BASE = import.meta.env.VITE_API_BASE || ''
+
+async function postLocalProcessing(path, formData, apiKey) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: {
+      'X-API-Key': apiKey,
+    },
+    body: formData,
+  })
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error.detail || `Request failed: ${response.status}`)
+  }
+  return response.json()
+}
 
 /**
  * Local mode batch upload - zero data retention.
@@ -126,21 +142,16 @@ export const BatchUploadLocalMode = ({
       formData.append('zip_file', files[0])
 
       try {
-        const response = await api.post(
-          '/recruiter/process-linkedin-export',
+        const data = await postLocalProcessing(
+          '/api/v1/recruiter/process-linkedin-export',
           formData,
-          {
-            headers: {
-              'X-API-Key': apiKey,
-              'Content-Type': 'multipart/form-data',
-            },
-          }
+          apiKey
         )
 
-        setResults(response.data)
+        setResults(data)
 
         if (onSuccess) {
-          onSuccess(response.data)
+          onSuccess(data)
         }
       } catch (error) {
         console.error('LinkedIn processing error:', error)
@@ -177,21 +188,16 @@ export const BatchUploadLocalMode = ({
       })
 
       try {
-        const response = await api.post(
-          '/recruiter/process-local',
+        const data = await postLocalProcessing(
+          '/api/v1/recruiter/process-local',
           formData,
-          {
-            headers: {
-              'X-API-Key': apiKey,
-              'Content-Type': 'multipart/form-data',
-            },
-          }
+          apiKey
         )
 
-        setResults(response.data)
+        setResults(data)
 
         if (onSuccess) {
-          onSuccess(response.data)
+          onSuccess(data)
         }
       } catch (error) {
         console.error('Processing error:', error)
@@ -210,13 +216,29 @@ export const BatchUploadLocalMode = ({
     setProcessing(false)
   }
 
-  const downloadFile = (url, filename) => {
-    const link = document.createElement('a')
-    link.href = url
-    link.download = filename
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+  const downloadFile = async (url, filename) => {
+    try {
+      const downloadUrl = String(url || '').startsWith('http') ? url : `${API_BASE}${url}`
+      const response = await fetch(downloadUrl, {
+        headers: {
+          'X-API-Key': apiKey,
+        },
+      })
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status}`)
+      }
+      const blob = await response.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(objectUrl)
+    } catch (error) {
+      setError(error.message || 'Download failed')
+    }
   }
 
   const resetForm = () => {
