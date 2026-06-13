@@ -218,14 +218,14 @@ def recruiter_required(authorization: str = Header(None)):
     FastAPI dependency to verify recruiter authentication.
     Returns recruiter user info dict.
     """
-    from database import get_db
+    from database import SessionLocal
     from models import User, Organization
 
     # Verify JWT token
     user_info = verify_supabase_jwt(authorization)
 
     # Get database session
-    db = next(get_db())
+    db = SessionLocal()
 
     try:
         # Get user from database
