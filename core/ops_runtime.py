@@ -6,6 +6,7 @@ backward-compatible attribute access via ``getattr(main, ...)``.
 from __future__ import annotations
 
 import gc as _gc
+import ipaddress
 import json
 import logging
 import os
@@ -336,14 +337,42 @@ def _extract_client_ip(request) -> str | None:
         return None
     trusted_proxy_count = int(os.getenv("TRUSTED_PROXY_COUNT", "0") or "0")
     xff = getattr(request, "headers", {}).get("X-Forwarded-For") if hasattr(request, "headers") else None
-    if trusted_proxy_count > 0 and xff:
-        parts = [p.strip() for p in xff.split(",") if p.strip()]
-        if parts:
-            return parts[0]
     client = getattr(request, "client", None)
     if client and getattr(client, "host", None):
+        if trusted_proxy_count > 0 and xff and _is_trusted_proxy_peer(client.host):
+            parts = [p.strip() for p in xff.split(",") if p.strip()]
+            if parts:
+                index = max(0, len(parts) - trusted_proxy_count)
+                return parts[index]
         return client.host
     return None
+
+
+def _is_trusted_proxy_peer(peer_host: str | None) -> bool:
+    if not peer_host:
+        return False
+    try:
+        peer_ip = ipaddress.ip_address(str(peer_host))
+    except ValueError:
+        return False
+
+    raw = os.getenv("TRUSTED_PROXY_IPS", "").strip()
+    if not raw:
+        return peer_ip.is_loopback
+
+    for item in raw.split(","):
+        value = item.strip()
+        if not value:
+            continue
+        try:
+            if "/" in value:
+                if peer_ip in ipaddress.ip_network(value, strict=False):
+                    return True
+            elif peer_ip == ipaddress.ip_address(value):
+                return True
+        except ValueError:
+            continue
+    return False
 
 
 # ── Runtime: Request sampling (1%) ───────────────────────────────────────
