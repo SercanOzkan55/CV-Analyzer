@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback } from 'react'
  * @param {string} baseUrl - API base URL (e.g., ws://localhost:8001)
  * @returns {Object} Progress state and handlers
  */
-export const useWebSocketProgress = (taskId, baseUrl = null) => {
+export const useWebSocketProgress = (taskId, baseUrl = null, authToken = null) => {
   const [progress, setProgress] = useState(null)
   const [status, setStatus] = useState('PENDING')
   const [error, setError] = useState(null)
@@ -22,7 +22,8 @@ export const useWebSocketProgress = (taskId, baseUrl = null) => {
     }
 
     try {
-      const wsUrl = `${url}/api/v1/recruiter/ws/batch-upload/${taskId}`
+      const params = authToken ? `?token=${encodeURIComponent(authToken)}` : ''
+      const wsUrl = `${url}/api/v1/recruiter/ws/batch-upload/${taskId}${params}`
       console.log(`[WebSocket] Connecting to ${wsUrl}`)
 
       const websocket = new WebSocket(wsUrl)
@@ -77,7 +78,7 @@ export const useWebSocketProgress = (taskId, baseUrl = null) => {
       console.error('[WebSocket] Connection error:', e)
       setError(e.message)
     }
-  }, [taskId, url])
+  }, [taskId, url, authToken])
 
   const disconnect = useCallback(() => {
     if (ws) {

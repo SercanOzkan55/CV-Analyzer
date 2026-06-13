@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import useWebSocketProgress from '../hooks/useWebSocketProgress'
+import { useAuth } from '../context/AuthContext'
 import './BatchUploadProgress.css'
 
 /**
@@ -8,8 +9,9 @@ import './BatchUploadProgress.css'
  * Shows file processing, percentage, and current status
  */
 export const BatchUploadProgress = ({ taskId, onComplete = null }) => {
+  const { token } = useAuth()
   const { progress, status, error, isConnected, disconnect } =
-    useWebSocketProgress(taskId)
+    useWebSocketProgress(taskId, null, token)
   const [showDetails, setShowDetails] = useState(false)
 
   // Call onComplete when task finishes

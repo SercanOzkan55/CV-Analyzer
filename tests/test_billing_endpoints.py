@@ -12,6 +12,7 @@ def _billing_env(monkeypatch):
     monkeypatch.setattr(main_module, "redis_rate", None)
     monkeypatch.setattr(main_module, "CLAMAV_ENABLED", False)
     monkeypatch.setenv("DEV_ALLOW_SELF_PREMIUM", "1")
+    monkeypatch.setenv("BILLING_REDIRECT_ALLOWED_ORIGINS", "http://localhost:5173")
 
 
 # ── Checkout Session ──
@@ -47,6 +48,16 @@ class TestCheckoutSession:
         data = resp.json()
         assert data["plan_type"] == "enterprise"
 
+    def test_rejects_untrusted_success_url(self, client):
+        resp = client.post(
+            "/api/v1/billing/checkout-session",
+            json={
+                "plan_type": "pro",
+                "success_url": "https://example.com/billing/success",
+            },
+        )
+        assert resp.status_code == 400
+
 
 # ── Portal Session ──
 
@@ -65,11 +76,18 @@ class TestPortalSession:
     def test_custom_return_url(self, client):
         resp = client.post(
             "/api/v1/billing/portal-session",
-            json={"return_url": "https://example.com/dash"},
+            json={"return_url": "http://localhost:5173/dashboard"},
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["url"] == "https://example.com/dash"
+        assert data["url"] == "http://localhost:5173/dashboard"
+
+    def test_rejects_untrusted_return_url(self, client):
+        resp = client.post(
+            "/api/v1/billing/portal-session",
+            json={"return_url": "https://example.com/dash"},
+        )
+        assert resp.status_code == 400
 
 
 # ── Contact Sales ──
