@@ -15,7 +15,12 @@ from utils.download_security import sign_download_id
 _temp_downloads = {}
 
 
-def generate_csv_download(results: List[Dict[str, Any]], job_id: int) -> str:
+def generate_csv_download(
+    results: List[Dict[str, Any]],
+    job_id: int,
+    owner_organization_id: int | None = None,
+    owner_subscription_id: int | None = None,
+) -> str:
     """
     Generate CSV content and return download URL.
 
@@ -62,7 +67,9 @@ def generate_csv_download(results: List[Dict[str, Any]], job_id: int) -> str:
         'content': csv_content,
         'content_type': 'text/csv',
         'filename': f'cv_rankings_job_{job_id}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
-        'expires_at': expires_at
+        'expires_at': expires_at,
+        'owner_organization_id': owner_organization_id,
+        'owner_subscription_id': owner_subscription_id,
     }
 
     return f"/api/v1/downloads/{download_id}?token={sign_download_id(download_id)}"

@@ -271,6 +271,6 @@ Completed in branch `codex/security-audit-fixes`:
 
 Residual notes:
 
-- Task ownership for async jobs is currently process-local; a multi-worker production deployment should persist this in Redis or the database.
-- Temporary downloads are signed but not yet tied to a persisted user/org owner. HMAC tokens reduce public-link risk, but DB/Redis-backed ownership would be stronger.
-- `npx tsc --noEmit` is still not part of validation because TypeScript is not configured as a project dependency.
+- Async analysis task ownership is now persisted in the database via `async_task_owners`, with a process-local fallback only for compatibility with existing in-flight jobs.
+- Temporary local-processing downloads are now tied to the owning organization/subscription and require the matching `X-API-Key` in addition to the HMAC download token.
+- TypeScript is now a frontend dev dependency with `npm run typecheck`, and React 18 type packages are installed.

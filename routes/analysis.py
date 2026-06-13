@@ -12,6 +12,7 @@ import urllib.parse
 from fastapi import APIRouter
 from core.runtime_bridge import main_module as _main_module
 from core.route_dependencies import *  # noqa: F403
+from models import AsyncTaskOwner
 
 
 router = APIRouter(tags=["analysis"])
@@ -457,17 +458,54 @@ class AnalyzeAsyncRequest(BaseModel):
     lang: str = "en"
 
 
-def _record_analysis_task_owner(task_id: str, db_user) -> None:
+def _record_analysis_task_owner(task_id: str, db_user, db) -> None:
     if task_id:
         _ANALYSIS_TASK_OWNERS[str(task_id)] = {
             "user_id": int(getattr(db_user, "id", 0) or 0),
             "organization_id": getattr(db_user, "organization_id", None),
         }
+        try:
+            existing = db.query(AsyncTaskOwner).filter(AsyncTaskOwner.task_id == str(task_id)).first()
+            if existing:
+                existing.user_id = int(getattr(db_user, "id", 0) or 0)
+                existing.organization_id = getattr(db_user, "organization_id", None)
+                existing.task_type = "analysis"
+                existing.expires_at = datetime.utcnow() + timedelta(hours=24)
+            else:
+                db.add(
+                    AsyncTaskOwner(
+                        task_id=str(task_id),
+                        task_type="analysis",
+                        user_id=int(getattr(db_user, "id", 0) or 0),
+                        organization_id=getattr(db_user, "organization_id", None),
+                        expires_at=datetime.utcnow() + timedelta(hours=24),
+                    )
+                )
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("analysis task owner persistence failed task_id=%s", task_id)
 
 
-def _require_analysis_task_owner(task_id: str, db_user) -> None:
-    owner = _ANALYSIS_TASK_OWNERS.get(str(task_id))
-    if not owner:
+def _require_analysis_task_owner(task_id: str, db_user, db) -> None:
+    owner = None
+    try:
+        owner_row = db.query(AsyncTaskOwner).filter(AsyncTaskOwner.task_id == str(task_id)).first()
+        if owner_row:
+            if owner_row.expires_at and owner_row.expires_at < datetime.utcnow():
+                raise HTTPException(status_code=404, detail="Analysis job not found")
+            owner = {
+                "user_id": int(owner_row.user_id or 0),
+                "organization_id": owner_row.organization_id,
+            }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("analysis task owner lookup failed task_id=%s", task_id)
+
+    if owner is None:
+        owner = _ANALYSIS_TASK_OWNERS.get(str(task_id))
+    if owner is None:
         raise HTTPException(status_code=404, detail="Analysis job not found")
     if int(owner.get("user_id") or 0) != int(getattr(db_user, "id", 0) or 0):
         raise HTTPException(status_code=403, detail="Analysis job access denied")
@@ -630,7 +668,7 @@ def analyze_async(
         return {"job_id": "local-sync", "status": "completed", "result": result}
 
     task = analyze_text_task.delay(body.cv_text, body.job_description, body.lang)
-    _record_analysis_task_owner(str(task.id), db_user)
+    _record_analysis_task_owner(str(task.id), db_user, db)
     return {"job_id": task.id, "status": "queued"}
 
 
@@ -904,7 +942,7 @@ async def analyze_pdf(
     # Keep scoring faithful to the uploaded CV. Auto-fix remains available
     # from /api/v1/cv/auto-fix when the user explicitly requests it.
     task = analyze_pdf_task.delay(text, job_description, lang)
-    _record_analysis_task_owner(str(task.id), db_user)
+    _record_analysis_task_owner(str(task.id), db_user, db)
 
     # If the task ran synchronously (LocalTask), the wrapper returns a
     # DummyResult with `.status` and `.result` attributes — return the
@@ -1035,7 +1073,7 @@ def get_analysis_result(job_id: str, user=Depends(verify_supabase_jwt), db=Depen
     """
     _ensure_not_expired(user)
     db_user = get_or_create_user(db, user.get("user_id"), user.get("email"))
-    _require_analysis_task_owner(job_id, db_user)
+    _require_analysis_task_owner(job_id, db_user, db)
 
     if celery_app is None:
         raise HTTPException(status_code=503, detail="Async processing disabled")
