@@ -9,6 +9,8 @@ import uuid
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
 
+from utils.download_security import sign_download_id
+
 # In-memory storage for temporary downloads (in production, use Redis/S3)
 _temp_downloads = {}
 
@@ -63,7 +65,7 @@ def generate_csv_download(results: List[Dict[str, Any]], job_id: int) -> str:
         'expires_at': expires_at
     }
 
-    return f"/api/v1/downloads/{download_id}"
+    return f"/api/v1/downloads/{download_id}?token={sign_download_id(download_id)}"
 
 
 def get_temp_download(download_id: str) -> Dict[str, Any]:
