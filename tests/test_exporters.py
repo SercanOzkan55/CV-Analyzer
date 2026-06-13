@@ -43,12 +43,14 @@ def test_csv_exporter():
     ]
     
     # 1. Test generation
-    url = generate_csv_download(results, 101)
+    url = generate_csv_download(results, 101, owner_organization_id=7, owner_subscription_id=11)
     assert url.startswith("/api/v1/downloads/csv_")
     
     download_id, token = _download_parts(url)
     assert token
     assert download_id in csv_store
+    assert csv_store[download_id]["owner_organization_id"] == 7
+    assert csv_store[download_id]["owner_subscription_id"] == 11
     
     # 2. Test retrieval (active)
     download = get_csv_temp_download(download_id)
@@ -86,12 +88,14 @@ def test_json_exporter():
     ]
     
     # 1. Test generation
-    url = generate_json_download(results, 102)
+    url = generate_json_download(results, 102, owner_organization_id=8, owner_subscription_id=12)
     assert url.startswith("/api/v1/downloads/json_")
     
     download_id, token = _download_parts(url)
     assert token
     assert download_id in json_store
+    assert json_store[download_id]["owner_organization_id"] == 8
+    assert json_store[download_id]["owner_subscription_id"] == 12
     
     # 2. Test retrieval (active)
     download = get_json_temp_download(download_id)

@@ -233,8 +233,18 @@ async def process_cvs_local_mode(
     db.commit()
 
     # Generate download links (temporary, expire in 1 hour)
-    json_url = generate_json_download(results, job_id)
-    csv_url = generate_csv_download(results, job_id)
+    json_url = generate_json_download(
+        results,
+        job_id,
+        owner_organization_id=subscription.organization_id,
+        owner_subscription_id=subscription.id,
+    )
+    csv_url = generate_csv_download(
+        results,
+        job_id,
+        owner_organization_id=subscription.organization_id,
+        owner_subscription_id=subscription.id,
+    )
 
     return {
         "results": results,
@@ -332,8 +342,18 @@ async def process_linkedin_export_zip(
     db.commit()
 
     # Generate download links
-    json_url = generate_json_download(results, job_id)
-    csv_url = generate_csv_download(results, job_id)
+    json_url = generate_json_download(
+        results,
+        job_id,
+        owner_organization_id=subscription.organization_id,
+        owner_subscription_id=subscription.id,
+    )
+    csv_url = generate_csv_download(
+        results,
+        job_id,
+        owner_organization_id=subscription.organization_id,
+        owner_subscription_id=subscription.id,
+    )
 
     return {
         "results": results,
@@ -432,8 +452,18 @@ async def process_linkedin_export_large(
         db.commit()
 
         # Generate download links
-        json_url = generate_json_download(results, job_id)
-        csv_url = generate_csv_download(results, job_id)
+        json_url = generate_json_download(
+            results,
+            job_id,
+            owner_organization_id=subscription.organization_id,
+            owner_subscription_id=subscription.id,
+        )
+        csv_url = generate_csv_download(
+            results,
+            job_id,
+            owner_organization_id=subscription.organization_id,
+            owner_subscription_id=subscription.id,
+        )
 
         return {
             "status": "success",

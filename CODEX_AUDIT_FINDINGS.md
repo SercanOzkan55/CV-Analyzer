@@ -251,3 +251,26 @@ Validation limitations:
 8. Upgrade vulnerable frontend dependencies.
 9. Add `typescript` as a dev dependency or remove `npx tsc --noEmit` from required validation.
 10. Restore local backend test tooling so security tests can run consistently.
+
+## Remediation Status
+
+Updated: 2026-06-13
+
+Completed in branch `codex/security-audit-fixes`:
+
+- P1 recruiter tenant isolation: disabled domain-based auto-provision by default and made the opt-in fallback create a personal org per recruiter.
+- P1 SSRF in job import: added URL scheme, credentials, host allowlist, DNS/IP range, and redirect checks before outbound fetch.
+- P1/P2 async task access: recorded analysis task owners and rejected polling by other users.
+- P2 recruiter batch WebSocket: added JWT token verification and organization ownership checks before accepting progress streams.
+- P2 temporary downloads: added HMAC-signed short-lived download URLs and protected cleanup with admin access checks.
+- P2 billing redirects: added allowlist validation for checkout success/cancel and portal return URLs.
+- P2 admin token storage: moved billing admin token persistence from `localStorage` to `sessionStorage` and clears the legacy key.
+- P2 JWT validation: enabled audience validation, issuer validation when configured via `SUPABASE_URL`/`SUPABASE_JWT_ISSUER`, and normalized invalid asymmetric token failures to 401.
+- P2 frontend dependency vulnerabilities: upgraded React Router, `ws`, PostCSS, Vite, Vite React plugin, and Tailwind Vite tooling; `npm audit` now reports 0 vulnerabilities.
+- P3 proxy IP extraction: only trusts `X-Forwarded-For` when the immediate peer is trusted via `TRUSTED_PROXY_IPS` or loopback dev proxy.
+
+Residual notes:
+
+- Async analysis task ownership is now persisted in the database via `async_task_owners`, with a process-local fallback only for compatibility with existing in-flight jobs.
+- Temporary local-processing downloads are now tied to the owning organization/subscription and require the matching `X-API-Key` in addition to the HMAC download token.
+- TypeScript is now a frontend dev dependency with `npm run typecheck`, and React 18 type packages are installed.
