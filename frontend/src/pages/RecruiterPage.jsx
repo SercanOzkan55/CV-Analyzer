@@ -1162,7 +1162,7 @@ export default function RecruiterPage() {
               className="recruiter-stat-card"
               variants={fadeUp}
               custom={i}
-              whileHover={{ y: -2 }}
+              whileHover={{ y: -5, rotateX: -2, rotateY: 1.5, transition: { duration: 0.18, ease: 'easeOut' } }}
             >
               <div className="recruiter-stat-icon" style={{ color: stat.color }}>{stat.icon}</div>
               <div className="recruiter-stat-info">
