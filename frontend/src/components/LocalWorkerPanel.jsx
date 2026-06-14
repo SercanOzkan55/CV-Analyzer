@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { Download, KeyRound, ShieldCheck } from 'lucide-react'
 import {
   anonymizeOwnerCandidateAction,
   assignOwnerCandidateAction,
@@ -441,13 +442,29 @@ export default function LocalWorkerPanel({ organizationId }) {
   return (
     <div className="card product-card worker-panel">
       <div className="worker-panel-header">
-        <div>
+        <div className="worker-panel-title">
           <span className="product-page-kicker">Local Worker</span>
           <h2>Local Worker Management</h2>
           <p className="text-muted">Generate scoped worker keys for secure local CV processing.</p>
+          <div className="worker-panel-trust-row" aria-label="Local Worker security details">
+            <span><ShieldCheck size={14} /> Local processing</span>
+            <span><KeyRound size={14} /> Scoped keys</span>
+          </div>
         </div>
-        <button type="button" className="btn-outline" onClick={handleDownloadPackage} disabled={loading || !token}>
-          Download worker app (.exe)
+        <button
+          type="button"
+          className="worker-download-card"
+          onClick={handleDownloadPackage}
+          disabled={loading || !token}
+        >
+          <span className="worker-download-icon" aria-hidden="true">
+            <Download size={22} />
+          </span>
+          <span className="worker-download-copy">
+            <strong>Download Local Worker</strong>
+            <small>Windows installer for offline CV processing</small>
+          </span>
+          <span className="worker-download-meta">.exe</span>
         </button>
       </div>
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bell, X, Check, Trash2 } from 'lucide-react'
+import { AlertTriangle, Bell, BellRing, Check, CheckCircle2, Info, Sparkles, Trash2, X } from 'lucide-react'
 import { useLanguage } from '../i18n/LanguageContext'
 
 const NOTIF_KEY = 'cv_analyzer_notifications'
@@ -13,6 +13,33 @@ function getNotifications() {
 
 function saveNotifications(items) {
   localStorage.setItem(NOTIF_KEY, JSON.stringify(items))
+}
+
+function getNotificationMeta(type) {
+  switch (String(type || 'info').toLowerCase()) {
+    case 'success':
+      return { icon: CheckCircle2, tone: 'success', label: 'Completed' }
+    case 'warning':
+    case 'warn':
+      return { icon: AlertTriangle, tone: 'warning', label: 'Needs attention' }
+    case 'error':
+    case 'danger':
+      return { icon: AlertTriangle, tone: 'danger', label: 'Action needed' }
+    default:
+      return { icon: Info, tone: 'info', label: 'Update' }
+  }
+}
+
+function formatNotificationTime(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
 }
 
 // Generate default "welcome" notification on first use
@@ -92,12 +119,13 @@ export default function NotificationCenter() {
     <div className="notif-center" ref={ref}>
       <motion.button
         className="notif-bell"
-        onClick={() => setOpen(true)}
+        type="button"
+        onClick={() => setOpen((value) => !value)}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         aria-label={t('notifications.title')}
       >
-        <Bell size={18} />
+        {unreadCount > 0 ? <BellRing size={18} /> : <Bell size={18} />}
         {unreadCount > 0 && (
           <motion.span
             className="notif-badge"
@@ -131,19 +159,22 @@ export default function NotificationCenter() {
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           >
               <div className="notif-header">
-                <span className="notif-header-title">{t('notifications.title')}</span>
+                <div className="notif-header-copy">
+                  <span className="notif-header-title">{t('notifications.title')}</span>
+                  <small>{unreadCount > 0 ? `${unreadCount} unread update` : 'All caught up'}</small>
+                </div>
                 <div className="notif-header-actions">
                   {unreadCount > 0 && (
-                    <button className="notif-action" onClick={markAllRead} title={t('notifications.mark_all_read')}>
+                    <button type="button" className="notif-action" onClick={markAllRead} title={t('notifications.mark_all_read')}>
                       <Check size={14} />
                     </button>
                   )}
                   {notifications.length > 0 && (
-                    <button className="notif-action" onClick={clearAll} title={t('notifications.clear_all')}>
+                    <button type="button" className="notif-action" onClick={clearAll} title={t('notifications.clear_all')}>
                       <Trash2 size={14} />
                     </button>
                   )}
-                  <button className="notif-action" onClick={() => setOpen(false)} title="Close">
+                  <button type="button" className="notif-action" onClick={() => setOpen(false)} title="Close">
                     <X size={16} />
                   </button>
                 </div>
@@ -151,27 +182,50 @@ export default function NotificationCenter() {
 
             <div className="notif-list">
               {notifications.length === 0 ? (
-                <div className="notif-empty">{t('notifications.empty')}</div>
+                <div className="notif-empty">
+                  <Sparkles size={22} />
+                  <strong>{t('notifications.empty')}</strong>
+                  <span>New analysis, billing, and workflow updates will land here.</span>
+                </div>
               ) : (
-                notifications.map((n) => (
-                  <div
-                    key={n.id}
-                    className={`notif-item ${n.read ? '' : 'unread'}`}
-                    onClick={() => markRead(n.id)}
-                  >
-                    <div className="notif-item-dot" />
-                    <div className="notif-item-body">
-                      <span className="notif-item-title">{n.title}</span>
-                      <span className="notif-item-msg">{n.message}</span>
-                    </div>
-                    <button
-                      className="notif-item-remove"
-                      onClick={(e) => { e.stopPropagation(); removeNotification(n.id) }}
+                notifications.map((n) => {
+                  const meta = getNotificationMeta(n.type)
+                  const Icon = meta.icon
+                  const time = formatNotificationTime(n.createdAt)
+
+                  return (
+                    <div
+                      key={n.id}
+                      className={`notif-item notif-item-${meta.tone} ${n.read ? '' : 'unread'}`}
+                      onClick={() => markRead(n.id)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') markRead(n.id)
+                      }}
                     >
-                      <X size={12} />
-                    </button>
-                  </div>
-                ))
+                      <div className="notif-item-icon">
+                        <Icon size={15} />
+                      </div>
+                      <div className="notif-item-body">
+                        <span className="notif-item-kicker">
+                          <span>{meta.label}</span>
+                          {time && <time dateTime={n.createdAt}>{time}</time>}
+                        </span>
+                        <span className="notif-item-title">{n.title}</span>
+                        <span className="notif-item-msg">{n.message}</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="notif-item-remove"
+                        aria-label="Remove notification"
+                        onClick={(e) => { e.stopPropagation(); removeNotification(n.id) }}
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  )
+                })
               )}
             </div>
           </motion.div>

@@ -28,7 +28,6 @@ import {
   recruiterCreateTemplate, recruiterListTemplates, recruiterDeleteTemplate,
   recruiterPreviewTemplate, recruiterSendEmail,
   recruiterUpdateActionStage,
-  recruiterScanCV,
   recruiterSendEmailBulk,
   recruiterExportRankings,
   recruiterExportCandidates,
@@ -1249,7 +1248,7 @@ export default function RecruiterPage() {
           variants={fadeUp} initial="hidden" animate="visible" custom={0.5}
           onClick={() => setScanModal(true)}
           style={{
-            display: 'flex', alignItems: 'center', gap: 16,
+            display: 'none', alignItems: 'center', gap: 16,
             padding: '18px 22px', borderRadius: 14,
             border: '2px solid var(--status-accent-border)',
             background: 'var(--status-accent-bg)',
