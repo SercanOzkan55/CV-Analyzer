@@ -217,7 +217,7 @@ Recommended fix:
 
 ## Validation Notes
 
-Commands run:
+Initial audit commands run:
 
 ```powershell
 C:\Users\ASUS\Desktop\cv-analyzer\tools\node-v24.14.0-win-x64\npm.cmd run test
@@ -227,17 +227,32 @@ C:\Users\ASUS\Desktop\cv-analyzer\tools\node-v24.14.0-win-x64\npm.cmd audit --om
 C:\Users\ASUS\Desktop\cv-analyzer\tools\node-v24.14.0-win-x64\npm.cmd audit --cache C:\Users\ASUS\Desktop\cv-analyzer\.npm-cache
 ```
 
-Results:
-- Frontend tests passed: 6 test files, 51 tests.
-- Frontend production build passed.
-- Python `compileall` passed.
-- `npm audit` found vulnerabilities listed above.
+Current remediation validation commands:
 
-Validation limitations:
-- `npx tsc --noEmit` did not run because `typescript` is not listed in frontend dependencies and `npx` tried to fetch it.
-- Backend pytest did not run because the active Python installation does not have `pytest`.
-- Python dependency audit did not run because `pip_audit` is not installed in the active Python installation.
-- Browser QA was attempted, but Vite dev server failed under sandbox with `Access is denied` while loading config. Escalated dev server attempt did not open port 5173.
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip_audit -r requirements.txt --strict --progress-spinner off
+.\.venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\python.exe -m pytest tests/test_security.py tests/test_security_advanced.py tests/test_auth_jwt.py tests/test_analysis_task_ownership.py tests/test_local_processing.py tests/test_exporters.py tests/test_security_dependency_check.py -q --tb=short
+.\.venv\Scripts\python.exe -m compileall -q auth.py main.py routes services core security utils models.py database.py migrations tests
+C:\Users\ASUS\Desktop\cv-analyzer\tools\node-v24.14.0-win-x64\npm.cmd run test
+C:\Users\ASUS\Desktop\cv-analyzer\tools\node-v24.14.0-win-x64\npm.cmd run typecheck
+C:\Users\ASUS\Desktop\cv-analyzer\tools\node-v24.14.0-win-x64\npm.cmd run build
+C:\Users\ASUS\Desktop\cv-analyzer\tools\node-v24.14.0-win-x64\npm.cmd audit --cache C:\Users\ASUS\Desktop\cv-analyzer\.npm-cache
+```
+
+Current results:
+- Python dependency audit passed: `No known vulnerabilities found`.
+- Python dependency resolver check passed: `No broken requirements found`.
+- Backend targeted security/regression pytest passed: 32 passed, 1 skipped. The skipped test is the in-test `pip-audit` subprocess when the local sandbox cannot reach the vulnerability service; the same audit was run directly with network approval and passed.
+- Frontend tests passed: 6 test files, 51 tests. The `Test error` console output is from the intentional ErrorBoundary test case.
+- Frontend TypeScript validation passed via `npm run typecheck`.
+- Frontend production build passed.
+- Frontend `npm audit` passed: 0 vulnerabilities.
+- Python `compileall` passed.
+
+Remaining validation limitation:
+- Browser/UI QA is intentionally deferred to the next UI-focused pass.
 
 ## Suggested Fix Order
 
@@ -268,9 +283,11 @@ Completed in branch `codex/security-audit-fixes`:
 - P2 JWT validation: enabled audience validation, issuer validation when configured via `SUPABASE_URL`/`SUPABASE_JWT_ISSUER`, and normalized invalid asymmetric token failures to 401.
 - P2 frontend dependency vulnerabilities: upgraded React Router, `ws`, PostCSS, Vite, Vite React plugin, and Tailwind Vite tooling; `npm audit` now reports 0 vulnerabilities.
 - P3 proxy IP extraction: only trusts `X-Forwarded-For` when the immediate peer is trusted via `TRUSTED_PROXY_IPS` or loopback dev proxy.
+- Python dependency vulnerabilities: upgraded vulnerable pins in `requirements.txt`, including `urllib3`, `cryptography`, `ecdsa`, `idna`, `jwcrypto`, `pytest`, `lxml`, `Mako`, `Pillow`, `Pygments`, `python-dotenv`, `python-multipart`, `requests`, and `starlette`. `prometheus-fastapi-instrumentator` was upgraded to keep Starlette 1.x compatibility.
 
-Residual notes:
+Current status before UI pass:
 
 - Async analysis task ownership is now persisted in the database via `async_task_owners`, with a process-local fallback only for compatibility with existing in-flight jobs.
 - Temporary local-processing downloads are now tied to the owning organization/subscription and require the matching `X-API-Key` in addition to the HMAC download token.
 - TypeScript is now a frontend dev dependency with `npm run typecheck`, and React 18 type packages are installed.
+- No open code remediation remains from this audit file. Next recommended work is staging smoke testing and the separate UI audit/polish pass.

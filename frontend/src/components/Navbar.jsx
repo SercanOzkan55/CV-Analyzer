@@ -174,8 +174,8 @@ export default function Navbar() {
 
           {isLanding ? (
             <>
-              <Link to="/login" className="nav-link">{t('nav.login')}</Link>
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <Link to="/login" className="nav-link nav-auth-link">{t('nav.login')}</Link>
+              <motion.div className="nav-register-wrap" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                 <Link to="/register" className="btn-primary btn-sm">{t('nav.register')}</Link>
               </motion.div>
             </>

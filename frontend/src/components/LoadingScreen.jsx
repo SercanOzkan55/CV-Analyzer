@@ -14,7 +14,18 @@ export default function LoadingScreen({ text = 'CV Analyzer' }) {
       role="status"
       aria-live="polite"
     >
+      <div className="ls-depth-field" aria-hidden="true">
+        <span className="ls-depth-line ls-depth-line-a" />
+        <span className="ls-depth-line ls-depth-line-b" />
+        <span className="ls-depth-line ls-depth-line-c" />
+      </div>
+
       <div className="ls-content">
+        <div className="ls-status-copy">
+          <span className="ls-kicker">Workspace gateway</span>
+          <strong>{text}</strong>
+        </div>
+
         <div className="ls-ring-wrapper" aria-hidden="true">
           <svg className="ls-ring" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle cx="40" cy="40" r="34" stroke="var(--color-border)" strokeWidth="3" />
@@ -53,7 +64,7 @@ export default function LoadingScreen({ text = 'CV Analyzer' }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: shouldReduceMotion ? 0 : 0.12, duration: shouldReduceMotion ? 0 : 0.3 }}
         >
-          {text}
+          Preparing secure session
         </motion.span>
 
         <div className="ls-dots" aria-hidden="true">
