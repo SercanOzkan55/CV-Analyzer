@@ -1,9 +1,18 @@
 import React, { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
+import { Bug, Inbox, Lightbulb, MessageSquareText, MonitorSmartphone, Send, Sparkles } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/LanguageContext'
 import { useToast } from '../components/Toast'
 import { fetchFeedback, submitFeedback } from '../api'
+
+const CATEGORY_OPTIONS = [
+  { value: 'bug', icon: Bug, labelKey: 'feedback.category_bug', fallback: 'Bug' },
+  { value: 'feature', icon: Lightbulb, labelKey: 'feedback.category_feature', fallback: 'Feature' },
+  { value: 'ux', icon: MonitorSmartphone, labelKey: 'feedback.category_ux', fallback: 'UX' },
+  { value: 'other', icon: MessageSquareText, labelKey: 'feedback.category_other', fallback: 'Other' },
+]
 
 export default function FeedbackPage() {
   const { token, role } = useAuth()
@@ -73,33 +82,79 @@ export default function FeedbackPage() {
     }
   }
 
+  const inboxTitle = role === 'recruiter'
+    ? t('feedback.inbox_title_recruiter')
+    : t('feedback.inbox_title_user')
+
   return (
     <div className="app-layout">
       <Navbar />
-      <main className="main-content" id="main-content">
-        <h1>{t('feedback.page_title')}</h1>
-        <p className="text-muted" style={{ marginBottom: '1rem' }}>{t('feedback.page_subtitle')}</p>
+      <main className="main-content feedback-page" id="main-content">
+        <motion.section
+          className="feedback-hero"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.36 }}
+        >
+          <div className="feedback-hero-icon" aria-hidden="true">
+            <MessageSquareText size={26} />
+          </div>
+          <div className="feedback-hero-copy">
+            <span className="product-page-kicker">Support channel</span>
+            <h1>{t('feedback.page_title')}</h1>
+            <p>{t('feedback.page_subtitle')}</p>
+          </div>
+          <div className="feedback-hero-metrics" aria-hidden="true">
+            <span><strong>24h</strong> Triage</span>
+            <span><strong>{items.length}</strong> Open notes</span>
+            <span><strong>AI</strong> Routed</span>
+          </div>
+        </motion.section>
 
-        <div className="settings-grid">
-          <div className="card" style={{ gridColumn: '1 / -1' }}>
-            <h2>{t('feedback.form_title')}</h2>
-            <form onSubmit={handleSubmit}>
-              <div className="settings-field">
-                <label>{t('feedback.category_label')}</label>
-                <select value={category} onChange={(e) => setCategory(e.target.value)}>
-                  <option value="bug">{t('feedback.category_bug')}</option>
-                  <option value="feature">{t('feedback.category_feature')}</option>
-                  <option value="ux">{t('feedback.category_ux')}</option>
-                  <option value="other">{t('feedback.category_other')}</option>
-                </select>
+        <div className="feedback-layout">
+          <motion.section
+            className="card feedback-form-card"
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08, duration: 0.36 }}
+          >
+            <div className="feedback-card-header">
+              <div>
+                <span className="product-page-kicker">Ticket details</span>
+                <h2>{t('feedback.form_title')}</h2>
               </div>
+              <Sparkles size={20} aria-hidden="true" />
+            </div>
 
-              <div className="settings-field">
-                <label>{t('feedback.message_label')}</label>
+            <form onSubmit={handleSubmit} className="feedback-form">
+              <fieldset className="feedback-category-field">
+                <legend>{t('feedback.category_label')}</legend>
+                <div className="feedback-category-grid">
+                  {CATEGORY_OPTIONS.map((option) => {
+                    const Icon = option.icon
+                    const active = category === option.value
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={`feedback-category-option ${active ? 'is-active' : ''}`}
+                        onClick={() => setCategory(option.value)}
+                      >
+                        <Icon size={17} />
+                        <span>{t(option.labelKey) || option.fallback}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </fieldset>
+
+              <div className="settings-field feedback-message-field">
+                <label htmlFor="feedback-message">{t('feedback.message_label')}</label>
                 <textarea
+                  id="feedback-message"
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  rows={5}
+                  rows={7}
                   minLength={5}
                   maxLength={3000}
                   placeholder={t('feedback.message_placeholder')}
@@ -107,41 +162,64 @@ export default function FeedbackPage() {
                 />
               </div>
 
-              <button type="submit" className="btn-primary" disabled={submitting}>
-                {submitting ? t('common.loading') : t('feedback.submit_button')}
-              </button>
+              <div className="feedback-form-footer">
+                <span>{message.length}/3000</span>
+                <motion.button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={submitting}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Send size={16} />
+                  {submitting ? t('common.loading') : t('feedback.submit_button')}
+                </motion.button>
+              </div>
             </form>
-          </div>
+          </motion.section>
 
-          <div className="card" style={{ gridColumn: '1 / -1' }}>
-            <h2>{role === 'recruiter' ? t('feedback.inbox_title_recruiter') : t('feedback.inbox_title_user')}</h2>
+          <motion.aside
+            className="card feedback-inbox-card"
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.14, duration: 0.36 }}
+          >
+            <div className="feedback-card-header">
+              <div>
+                <span className="product-page-kicker">History</span>
+                <h2>{inboxTitle}</h2>
+              </div>
+              <Inbox size={20} aria-hidden="true" />
+            </div>
+
             {loadingItems ? (
               <p className="text-muted">{t('common.loading')}</p>
             ) : items.length === 0 ? (
-              <p className="text-muted">{t('feedback.no_items')}</p>
+              <div className="feedback-empty-state">
+                <Sparkles size={24} />
+                <strong>{t('feedback.no_items')}</strong>
+                <span>Send a note and your latest tickets will appear here.</span>
+              </div>
             ) : (
-              <div style={{ display: 'grid', gap: '0.6rem' }}>
+              <div className="feedback-item-list">
                 {items.map((item, idx) => (
-                  <div
-                    key={`${item.timestamp || 'na'}-${idx}`}
-                    style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: '0.75rem' }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <strong style={{ textTransform: 'capitalize' }}>{item.category || 'other'}</strong>
-                      <span className="text-muted" style={{ fontSize: '0.85rem' }}>{item.timestamp || '-'}</span>
+                  <article key={`${item.timestamp || 'na'}-${idx}`} className="feedback-item">
+                    <div className="feedback-item-topline">
+                      <strong>{item.category || 'other'}</strong>
+                      <time dateTime={item.timestamp || undefined}>{item.timestamp || '-'}</time>
                     </div>
                     {item.submitter && (
-                      <div className="text-muted" style={{ fontSize: '0.85rem' }}>{item.submitter}</div>
+                      <span className="feedback-item-submitter">{item.submitter}</span>
                     )}
-                    <div style={{ marginTop: '0.35rem', whiteSpace: 'pre-wrap' }}>{item.message}</div>
-                    <div className="text-muted" style={{ marginTop: '0.35rem', fontSize: '0.85rem' }}>
+                    <p>{item.message}</p>
+                    <small>
                       {t('feedback.meta_page')}: {item.page || '-'} | {t('feedback.meta_lang')}: {item.lang || '-'}
-                    </div>
-                  </div>
+                    </small>
+                  </article>
                 ))}
               </div>
             )}
-          </div>
+          </motion.aside>
         </div>
       </main>
     </div>
