@@ -1,10 +1,10 @@
 import React, { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { motion, useInView } from 'framer-motion'
+import { motion, useInView, useReducedMotion, useScroll, useSpring, useTransform } from 'framer-motion'
 import {
   Brain, FileCheck, Target, Globe2, LayoutGrid, Users,
   Upload, FileText, CheckCircle2, ArrowRight,
-  Star, Shield, Clock,
+  Shield, Sparkles, Zap,
 } from 'lucide-react'
 import { useLanguage } from '../i18n/LanguageContext'
 import Navbar from '../components/Navbar'
@@ -29,7 +29,7 @@ const scaleIn = {
 }
 
 // ─── Feature accent colors ───────────────────────────────────────
-const FEATURE_COLORS = ['#20c7b2', '#d9b15f', '#35c779', '#68b7ff', '#ff7a90', '#8ee7d8']
+const FEATURE_COLORS = ['#5b6cff', '#d4a94f', '#0e7490', '#b65d52', '#7c3aed', '#2563eb']
 const FEATURE_ICONS  = [Brain, FileCheck, Target, Globe2, LayoutGrid, Users]
 const STEP_ICONS     = [Upload, FileText, CheckCircle2]
 const STEP_TIMES     = ['< 1 min', '2 min', 'Instant']
@@ -131,7 +131,7 @@ function DemoCard({ t }) {
                 <div className="bar-track">
                   <motion.div
                     className="bar-fill"
-                    style={{ background: '#22c55e' }}
+                    style={{ background: 'var(--gradient-accent)' }}
                     initial={{ width: 0 }}
                     animate={isInView ? { width: '94%' } : {}}
                     transition={{ delay: 0.6, duration: 1.2, ease: 'easeOut' }}
@@ -147,9 +147,125 @@ function DemoCard({ t }) {
   )
 }
 
+function KineticHeroStage({ t, scrollYProgress }) {
+  const prefersReducedMotion = useReducedMotion()
+  const rotateX = useSpring(0, { stiffness: 170, damping: 22, mass: 0.7 })
+  const rotateY = useSpring(0, { stiffness: 170, damping: 22, mass: 0.7 })
+  const stageY = useTransform(scrollYProgress, [0, 0.18], [0, -72])
+  const stageScale = useTransform(scrollYProgress, [0, 0.18], [1, 0.94])
+  const rearY = useTransform(scrollYProgress, [0, 0.18], [0, 44])
+  const frontY = useTransform(scrollYProgress, [0, 0.18], [0, -34])
+
+  const handlePointerMove = (event) => {
+    if (prefersReducedMotion) return
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const x = (event.clientX - bounds.left) / bounds.width - 0.5
+    const y = (event.clientY - bounds.top) / bounds.height - 0.5
+    rotateX.set(y * -18)
+    rotateY.set(x * 22)
+  }
+
+  const resetTilt = () => {
+    rotateX.set(0)
+    rotateY.set(0)
+  }
+
+  return (
+    <motion.div
+      className="hero-kinetic-stage"
+      style={prefersReducedMotion ? undefined : { y: stageY, scale: stageScale }}
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <motion.div
+        className="hero-kinetic-rig"
+        onPointerMove={handlePointerMove}
+        onPointerLeave={resetTilt}
+        onPointerCancel={resetTilt}
+        drag={prefersReducedMotion ? false : true}
+        dragConstraints={{ top: -18, right: 18, bottom: 18, left: -18 }}
+        dragElastic={0.12}
+        whileDrag={prefersReducedMotion ? undefined : { scale: 0.985 }}
+        style={{ rotateX, rotateY }}
+      >
+        <motion.div
+          className="hero-depth-plane hero-depth-plane-back"
+          aria-hidden="true"
+          style={prefersReducedMotion ? undefined : { y: rearY }}
+        >
+          <div className="hero-plane-grid" />
+          <div className="hero-plane-scan" />
+        </motion.div>
+
+        <motion.div
+          className="hero-depth-plane hero-depth-plane-mid"
+          aria-hidden="true"
+          style={prefersReducedMotion ? undefined : { y: frontY }}
+        >
+          <div className="hero-metric-tile hero-metric-tile-a">
+            <span>ATS</span>
+            <strong>94%</strong>
+          </div>
+          <div className="hero-metric-tile hero-metric-tile-b">
+            <span>Match</span>
+            <strong>82%</strong>
+          </div>
+          <div className="hero-flow-line hero-flow-line-a" />
+          <div className="hero-flow-line hero-flow-line-b" />
+        </motion.div>
+
+        <div className="hero-demo-frame">
+          <DemoCard t={t} />
+        </div>
+
+        <motion.div
+          className="hero-kinetic-float hero-kinetic-float-left"
+          aria-hidden="true"
+          animate={prefersReducedMotion ? undefined : { y: [0, -10, 0] }}
+          transition={{ duration: 4.2, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          <div className="hero-kinetic-panel hero-kinetic-panel-left">
+            <div className="hero-panel-icon"><Target size={16} /></div>
+            <span>Role fit</span>
+            <strong>High</strong>
+          </div>
+        </motion.div>
+
+        <motion.div
+          className="hero-kinetic-float hero-kinetic-float-right"
+          aria-hidden="true"
+          animate={prefersReducedMotion ? undefined : { y: [0, 12, 0] }}
+          transition={{ duration: 4.8, repeat: Infinity, ease: 'easeInOut', delay: 0.4 }}
+        >
+          <div className="hero-kinetic-panel hero-kinetic-panel-right">
+            <div className="hero-panel-icon"><Sparkles size={16} /></div>
+            <span>Signals</span>
+            <strong>12 found</strong>
+          </div>
+        </motion.div>
+
+        <motion.div
+          className="hero-kinetic-float hero-kinetic-float-bottom"
+          aria-hidden="true"
+          animate={prefersReducedMotion ? undefined : { x: [-6, 8, -6] }}
+          transition={{ duration: 5.2, repeat: Infinity, ease: 'easeInOut', delay: 0.8 }}
+        >
+          <div className="hero-kinetic-panel hero-kinetic-panel-bottom">
+            <div className="hero-panel-icon"><Zap size={16} /></div>
+            <span>Rewrite</span>
+            <strong>Ready</strong>
+          </div>
+        </motion.div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 // ─── Main LandingPage ────────────────────────────────────────────
 export default function LandingPage() {
   const { t, pricing } = useLanguage()
+  const { scrollYProgress } = useScroll()
 
   useEffect(() => {
     document.title = 'CV Analyzer — AI-Powered Resume Analysis'
@@ -185,7 +301,7 @@ export default function LandingPage() {
       <Navbar />
 
       {/* ── Hero ─────────────────────────────────────────── */}
-      <section className="hero" id="main-content">
+      <section className="hero hero-kinetic-section" id="main-content">
         <div className="hero-grid">
           {/* Left: Content */}
           <motion.div
@@ -242,7 +358,7 @@ export default function LandingPage() {
             animate="visible"
             variants={scaleIn}
           >
-            <DemoCard t={t} />
+            <KineticHeroStage t={t} scrollYProgress={scrollYProgress} />
           </motion.div>
         </div>
       </section>
@@ -294,25 +410,41 @@ export default function LandingPage() {
             const Icon = FEATURE_ICONS[i]
             const color = FEATURE_COLORS[i]
             return (
-              <motion.div
+              <motion.article
                 key={i}
-                className={`feature-card lp-feature-card${i < 2 ? ' feature-card-lg' : ''}`}
+                className={`feature-card lp-feature-card lp-flip-card${i < 2 ? ' feature-card-lg' : ''}`}
                 style={{ '--feature-color': color }}
                 variants={fadeUp}
                 whileHover={{ y: -2, transition: { duration: 0.15 } }}
+                tabIndex={0}
+                aria-label={`${f.title}: ${f.desc}`}
               >
-                <div
-                  className="feature-icon lp-feature-icon"
-                  style={{
-                    background: `${color}15`,
-                    border: `1px solid ${color}25`,
-                  }}
-                >
-                  <Icon size={22} style={{ color }} strokeWidth={1.8} />
+                <div className="lp-flip-card-inner">
+                  <div className="lp-flip-card-face lp-flip-card-front">
+                    <div
+                      className="feature-icon lp-feature-icon"
+                      style={{
+                        background: `${color}15`,
+                        border: `1px solid ${color}25`,
+                      }}
+                    >
+                      <Icon size={22} style={{ color }} strokeWidth={1.8} />
+                    </div>
+                    <h3>{f.title}</h3>
+                    <p>{f.desc}</p>
+                  </div>
+
+                  <div className="lp-flip-card-face lp-flip-card-back">
+                    <span className="lp-flip-kicker">Signal layer {String(i + 1).padStart(2, '0')}</span>
+                    <h3>{f.title}</h3>
+                    <p>{f.desc}</p>
+                    <div className="lp-flip-meta">
+                      <span>Inspect depth</span>
+                      <ArrowRight size={15} />
+                    </div>
+                  </div>
                 </div>
-                <h3>{f.title}</h3>
-                <p>{f.desc}</p>
-              </motion.div>
+              </motion.article>
             )
           })}
         </motion.div>
