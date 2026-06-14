@@ -12,8 +12,8 @@ export default function AnimatedBackground() {
     let tick = 0
 
     function resize() {
-      canvas.width = window.innerWidth
-      canvas.height = window.innerHeight
+      canvas.width = document.documentElement.clientWidth || window.innerWidth
+      canvas.height = document.documentElement.clientHeight || window.innerHeight
     }
     resize()
     window.addEventListener('resize', resize)

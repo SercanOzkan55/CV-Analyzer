@@ -47,7 +47,7 @@ function DBStatCard({ icon: Icon, iconColor, value, label, progress, children })
     <motion.div
       className="db-stat-card"
       variants={itemVariants}
-      whileHover={{ y: -2, transition: { duration: 0.15, ease: 'easeOut' } }}
+      whileHover={{ y: -5, rotateX: -2, rotateY: 1.5, transition: { duration: 0.18, ease: 'easeOut' } }}
     >
       <div className="db-stat-icon-wrap" style={{ '--icon-color': iconColor }}>
         <Icon size={20} strokeWidth={1.8} style={{ color: iconColor }} />
@@ -118,7 +118,7 @@ function AnalysisCard({ item }) {
 // ─── Quick Action Card ──────────────────────────────────────────
 function QuickActionCard({ icon: Icon, iconColor, title, desc, to }) {
   return (
-    <motion.div variants={scaleVariants} whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}>
+    <motion.div variants={scaleVariants} whileHover={{ scale: 1.02, rotateY: 1.8, transition: { duration: 0.2 } }}>
       <Link to={to} className="db-action-card" style={{ '--action-color': iconColor }}>
         <div className="db-action-icon">
           <Icon size={18} strokeWidth={1.8} style={{ color: iconColor }} />
@@ -652,7 +652,7 @@ export default function DashboardPage() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.45, delay: 0.25 }}
-              whileHover={{ y: -3, transition: { duration: 0.2 } }}
+              whileHover={{ y: -5, rotateX: -2, rotateY: 1.5, transition: { duration: 0.2 } }}
             >
               <div className="db-premium-inner">
                 <motion.span

@@ -28,7 +28,6 @@ import {
   recruiterCreateTemplate, recruiterListTemplates, recruiterDeleteTemplate,
   recruiterPreviewTemplate, recruiterSendEmail,
   recruiterUpdateActionStage,
-  recruiterScanCV,
   recruiterSendEmailBulk,
   recruiterExportRankings,
   recruiterExportCandidates,
@@ -71,6 +70,112 @@ function SortHeader({ sortKey, sortConfig, onSort, children }) {
         </span>
       </button>
     </th>
+  )
+}
+
+const TEMPLATE_VARIABLES = [
+  '{candidate_name}',
+  '{candidate_email}',
+  '{position}',
+  '{company}',
+  '{score}',
+  '{top_skills}',
+]
+
+const TEMPLATE_SAMPLE_VALUES = {
+  candidate_name: 'Aylin Demir',
+  candidate_email: 'aylin@example.com',
+  position: 'Frontend Developer',
+  company: 'CV Analyzer',
+  score: '82%',
+  top_skills: 'React, TypeScript, SQL',
+}
+
+function renderTemplatePreviewText(value, fallback) {
+  const text = String(value || '').trim() || fallback
+  return text.replace(/\{([a-zA-Z0-9_]+)\}/g, (match, key) => TEMPLATE_SAMPLE_VALUES[key] || match)
+}
+
+function TemplateVariableChips({ onInsert }) {
+  return (
+    <div className="template-variable-row" aria-label="Template variables">
+      {TEMPLATE_VARIABLES.map((variable) => (
+        <button
+          key={variable}
+          type="button"
+          className="template-variable-chip"
+          onClick={() => onInsert(variable)}
+        >
+          {variable}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function UploadDropzone({
+  icon: Icon = Upload,
+  title,
+  description,
+  accept,
+  multiple = false,
+  disabled = false,
+  selectedSummary,
+  onChange,
+}) {
+  return (
+    <label className={`recruiter-upload-dropzone ${disabled ? 'is-disabled' : ''}`}>
+      <input
+        type="file"
+        accept={accept}
+        multiple={multiple}
+        onChange={onChange}
+        disabled={disabled}
+        className="recruiter-upload-input"
+      />
+      <span className="recruiter-upload-icon" aria-hidden="true">
+        <Icon size={19} />
+      </span>
+      <span className="recruiter-upload-copy">
+        <strong>{title}</strong>
+        <small>{description}</small>
+        <em>{selectedSummary}</em>
+      </span>
+      <span className="recruiter-upload-cta">Choose</span>
+    </label>
+  )
+}
+
+function EmailTemplateLivePreview({ form }) {
+  const subject = renderTemplatePreviewText(
+    form.subject,
+    'Aylin Demir - Frontend Developer sonucu'
+  )
+  const body = renderTemplatePreviewText(
+    form.body,
+    'Merhaba {candidate_name},\n\n{position} pozisyonu icin degerlendirme skorunuz {score}. One cikan yetenekleriniz: {top_skills}.\n\nSevgiler,\n{company}'
+  )
+
+  return (
+    <aside className="template-preview-panel" aria-label="Email template live preview">
+      <div className="template-preview-top">
+        <span className={`template-type-pill template-type-${form.template_type || 'custom'}`}>
+          {form.template_type || 'custom'}
+        </span>
+        <span>Live preview</span>
+      </div>
+      <div className="template-preview-envelope">
+        <div>
+          <small>To</small>
+          <strong>{TEMPLATE_SAMPLE_VALUES.candidate_email}</strong>
+        </div>
+        <div>
+          <small>Subject</small>
+          <strong>{subject}</strong>
+        </div>
+        <p>{body}</p>
+      </div>
+    </aside>
   )
 }
 
@@ -930,6 +1035,15 @@ export default function RecruiterPage() {
   }
 
   // ── Delete email template ───────────────────────────────────────────────────
+  function appendTemplateVariable(variable) {
+    setTplForm((current) => ({
+      ...current,
+      body: current.body.trim()
+        ? `${current.body.trimEnd()} ${variable}`
+        : variable,
+    }))
+  }
+
   async function handleDeleteTemplate(id) {
     const result = await safeApiCall(
       () => recruiterDeleteTemplate(token, id),
@@ -1162,7 +1276,7 @@ export default function RecruiterPage() {
               className="recruiter-stat-card"
               variants={fadeUp}
               custom={i}
-              whileHover={{ y: -2 }}
+              whileHover={{ y: -5, rotateX: -2, rotateY: 1.5, transition: { duration: 0.18, ease: 'easeOut' } }}
             >
               <div className="recruiter-stat-icon" style={{ color: stat.color }}>{stat.icon}</div>
               <div className="recruiter-stat-info">
@@ -1249,7 +1363,7 @@ export default function RecruiterPage() {
           variants={fadeUp} initial="hidden" animate="visible" custom={0.5}
           onClick={() => setScanModal(true)}
           style={{
-            display: 'flex', alignItems: 'center', gap: 16,
+            display: 'none', alignItems: 'center', gap: 16,
             padding: '18px 22px', borderRadius: 14,
             border: '2px solid var(--status-accent-border)',
             background: 'var(--status-accent-bg)',
@@ -1279,19 +1393,23 @@ export default function RecruiterPage() {
           animate="visible"
           custom={1}
         >
-          <div className="admin-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Upload size={18} className="admin-card-icon" />
-              <h2>{t('recruiter.batch_title')}</h2>
+          <div className="admin-card-header recruiter-batch-header">
+            <div className="recruiter-batch-heading">
+              <span className="admin-card-icon">
+                <Upload size={18} />
+              </span>
+              <div>
+                <h2>{t('recruiter.batch_title')}</h2>
+                <p>Paste the job description or upload it as a file, then rank candidate PDFs in one clean flow.</p>
+              </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
+            <div className="recruiter-batch-tools">
               <motion.button
                 type="button"
                 className="btn-outline btn-sm"
                 onClick={() => setBatchUploadOpen(true)}
                 whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.96 }}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', padding: '6px 12px' }}
               >
                 <Sparkles size={13} /> SaaS Cloud Upload
               </motion.button>
@@ -1331,15 +1449,26 @@ export default function RecruiterPage() {
               )}
             </div>
             <div className="recruiter-form-row">
-              <div className="recruiter-form-group recruiter-file-group">
-                <label>{t('recruiter.jd_file_label')}</label>
-                <input type="file" accept=".txt,.pdf,text/plain,application/pdf" onChange={handleJdFileChange} className="admin-input" disabled={!!jdText.trim()} style={jdText.trim() ? { opacity: 0.4 } : {}} />
-              </div>
-              <div className="recruiter-form-group recruiter-file-group">
-                <label>{t('recruiter.cv_upload_label')}</label>
-                <input type="file" multiple accept="application/pdf,.pdf" onChange={handleCvFilesChange} className="admin-input" />
-              </div>
+              <UploadDropzone
+                icon={FileText}
+                title={t('recruiter.jd_file_label')}
+                description="TXT or PDF job description. Disabled while pasted text is active."
+                accept=".txt,.pdf,text/plain,application/pdf"
+                onChange={handleJdFileChange}
+                disabled={!!jdText.trim()}
+                selectedSummary={jdText.trim() ? 'Text mode active' : (jdFile?.name || 'No JD file selected')}
+              />
+              <UploadDropzone
+                icon={Upload}
+                title={t('recruiter.cv_upload_label')}
+                description="Upload candidate CVs as PDFs for ranking."
+                accept="application/pdf,.pdf"
+                multiple
+                onChange={handleCvFilesChange}
+                selectedSummary={cvFiles.length ? `${cvFiles.length} PDF selected` : 'No CV files selected'}
+              />
             </div>
+            <div className="recruiter-rank-action">
             <motion.button
               className="btn-primary recruiter-rank-btn"
               type="submit"
@@ -1350,6 +1479,8 @@ export default function RecruiterPage() {
               {batchLoading ? <span className="spin-icon">⏳</span> : <Trophy size={16} />}
               {batchLoading ? t('recruiter.ranking_in_progress') : t('recruiter.run_batch_ranking')}
             </motion.button>
+              <small>Scores, search and candidate actions will appear below after ranking finishes.</small>
+            </div>
             {batchLoading && batchProgress.total > 0 && (
               <div style={{ marginTop: 16, padding: '12px', backgroundColor: 'var(--status-accent-bg)', borderRadius: 8, border: '1px solid var(--status-accent-border)' }}>
                 <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 8, color: 'var(--text-secondary)' }}>
@@ -2182,12 +2313,13 @@ export default function RecruiterPage() {
           <motion.div key="templates" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.3 }}>
 
             {/* Create Template Form */}
-            <motion.div className="admin-card" variants={fadeUp} initial="hidden" animate="visible" custom={2}>
+            <motion.div className="admin-card recruiter-template-builder-card" variants={fadeUp} initial="hidden" animate="visible" custom={2}>
               <div className="admin-card-header">
                 <Plus size={18} className="admin-card-icon" />
                 <h2>Create Email Template</h2>
               </div>
-              <form onSubmit={handleCreateTemplate} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
+              <div className="template-builder-layout">
+              <form onSubmit={handleCreateTemplate} className="template-editor-panel">
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                   <input className="admin-input" placeholder="Template name" value={tplForm.name} onChange={e => setTplForm(f => ({ ...f, name: e.target.value }))} style={{ flex: 1, minWidth: 180 }} />
                   <select className="admin-input" value={tplForm.template_type} onChange={e => setTplForm(f => ({ ...f, template_type: e.target.value }))} style={{ width: 140 }}>
@@ -2198,14 +2330,17 @@ export default function RecruiterPage() {
                 </div>
                 <input className="admin-input" placeholder="Email subject — use {candidate_name}, {position}, etc." value={tplForm.subject} onChange={e => setTplForm(f => ({ ...f, subject: e.target.value }))} />
                 <textarea className="recruiter-textarea" placeholder={'Email body — variables: {candidate_name}, {candidate_email}, {position}, {company}, {score}, {top_skills}'} value={tplForm.body} onChange={e => setTplForm(f => ({ ...f, body: e.target.value }))} rows={6} />
-                <motion.button className="btn-primary btn-sm" type="submit" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} style={{ alignSelf: 'flex-start' }}>
+                <TemplateVariableChips onInsert={appendTemplateVariable} />
+                <motion.button className="btn-primary btn-sm template-create-btn" type="submit" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Plus size={14} /> Create Template
                 </motion.button>
               </form>
+              <EmailTemplateLivePreview form={tplForm} />
+              </div>
             </motion.div>
 
             {/* Template List */}
-            <motion.div className="admin-card" variants={fadeUp} initial="hidden" animate="visible" custom={3}>
+            <motion.div className="admin-card recruiter-template-list-card" variants={fadeUp} initial="hidden" animate="visible" custom={3}>
               <div className="admin-card-header">
                 <Mail size={18} className="admin-card-icon" />
                 <h2>Templates ({templates.length})</h2>
@@ -2213,16 +2348,23 @@ export default function RecruiterPage() {
               {tplLoading ? (
                 <p style={{ padding: 16, color: 'var(--color-text-secondary)' }}>Loading...</p>
               ) : templates.length === 0 ? (
-                <div className="empty-state" style={{ padding: '32px 0' }}>
-                  <div className="empty-icon">&#128231;</div>
+                <div className="template-empty-state">
+                  <span className="template-empty-icon" aria-hidden="true">
+                    <Mail size={22} />
+                  </span>
                   <h3>No templates yet</h3>
-                  <p>Create your first email template above</p>
+                  <p>Create an accept, reject or custom email template with reusable candidate variables.</p>
+                  <div className="template-empty-hints">
+                    <span><Check size={13} /> Live preview</span>
+                    <span><Sparkles size={13} /> Smart variables</span>
+                  </div>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
                   {templates.map(tpl => (
                     <motion.div
                       key={tpl.id}
+                      className="template-list-item"
                       style={{
                         padding: '14px 18px', borderRadius: 10,
                         border: '1px solid var(--color-border)', background: 'var(--color-surface)',

@@ -15,6 +15,7 @@ import PageTransition from "./components/PageTransition"
 import CookieConsent from "./components/CookieConsent"
 import BackToTop from "./components/BackToTop"
 import FeedbackButton from "./components/FeedbackButton"
+import AmbientPointerField from "./components/AmbientPointerField"
 
 
 // ---------- LAZY PAGES ----------
@@ -159,6 +160,7 @@ export default function App() {
               <RecruiterSessionProvider>
                 <BrowserRouter>
                   <DevContextGuard />
+                  <AmbientPointerField />
                   <a href="#main-content" className="skip-link">Skip to main content</a>
                   <Suspense fallback={<LoadingScreen />}>
                     <AnimatedRoutes />

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { motion, useReducedMotion } from 'framer-motion'
+import { ArrowRight, FileCheck2, LockKeyhole, ShieldCheck, Sparkles, Zap } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/LanguageContext'
 import { useToast } from '../components/Toast'
@@ -10,6 +12,7 @@ export default function LoginPage() {
   const { t } = useLanguage()
   const { addToast } = useToast()
   const navigate = useNavigate()
+  const shouldReduceMotion = useReducedMotion()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -46,10 +49,75 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="auth-layout">
+    <div className="auth-layout auth-layout-kinetic">
       <Navbar />
-      <main className="auth-page" id="main-content">
-        <div className="auth-card">
+      <main className="auth-page auth-page-kinetic" id="main-content">
+        <div className="auth-depth-field" aria-hidden="true">
+          <span className="auth-depth-line auth-depth-line-a" />
+          <span className="auth-depth-line auth-depth-line-b" />
+          <span className="auth-depth-line auth-depth-line-c" />
+        </div>
+
+        <motion.section
+          className="auth-experience-panel"
+          aria-hidden="true"
+          initial={{ opacity: 0, x: shouldReduceMotion ? 0 : -24 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: shouldReduceMotion ? 0 : 0.55, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <div className="auth-panel-badge">
+            <ShieldCheck size={15} />
+            Secure workspace
+          </div>
+          <h2>CV Analyzer</h2>
+          <p>Resume intelligence, match signals, and recruiter workflows in one polished cockpit.</p>
+
+          <div className="auth-signal-stage">
+            <motion.div
+              className="auth-signal-card auth-signal-card-main"
+              animate={shouldReduceMotion ? undefined : { y: [0, -8, 0], rotateX: [0, 2, 0] }}
+              transition={{ duration: 4.8, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              <div className="auth-signal-head">
+                <span><FileCheck2 size={14} /> ATS Scan</span>
+                <strong>94%</strong>
+              </div>
+              <div className="auth-signal-bars">
+                <span style={{ width: '88%' }} />
+                <span style={{ width: '62%' }} />
+                <span style={{ width: '74%' }} />
+              </div>
+            </motion.div>
+
+            <motion.div
+              className="auth-signal-chip auth-signal-chip-left"
+              animate={shouldReduceMotion ? undefined : { y: [0, 10, 0] }}
+              transition={{ duration: 5.2, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }}
+            >
+              <Sparkles size={14} />
+              12 signals
+            </motion.div>
+
+            <motion.div
+              className="auth-signal-chip auth-signal-chip-right"
+              animate={shouldReduceMotion ? undefined : { y: [0, -10, 0] }}
+              transition={{ duration: 4.6, repeat: Infinity, ease: 'easeInOut', delay: 0.7 }}
+            >
+              <Zap size={14} />
+              Ready
+            </motion.div>
+          </div>
+        </motion.section>
+
+        <motion.div
+          className="auth-card auth-card-kinetic"
+          initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 22, rotateX: shouldReduceMotion ? 0 : 3 }}
+          animate={{ opacity: 1, y: 0, rotateX: 0 }}
+          transition={{ duration: shouldReduceMotion ? 0 : 0.55, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
+        >
+          <div className="auth-card-mark" aria-hidden="true">
+            <LockKeyhole size={18} />
+          </div>
           <h1>{t('auth.login_title')}</h1>
           <p className="auth-subtitle">{t('auth.login_subtitle')}</p>
 
@@ -78,7 +146,12 @@ export default function LoginPage() {
             {error && <p className="error">{error}</p>}
 
             <button type="submit" className="btn-primary btn-full" disabled={loading}>
-              {loading ? t('common.loading') : t('auth.sign_in')}
+              {loading ? t('common.loading') : (
+                <>
+                  {t('auth.sign_in')}
+                  <ArrowRight size={15} />
+                </>
+              )}
             </button>
           </form>
 
@@ -87,7 +160,7 @@ export default function LoginPage() {
               <>{t('auth.no_account')} <Link to="/register" className="link-btn">{t('nav.register')}</Link></>
             )}
           </p>
-        </div>
+        </motion.div>
       </main>
     </div>
   )
