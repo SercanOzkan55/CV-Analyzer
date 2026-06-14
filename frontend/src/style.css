@@ -12582,6 +12582,36 @@ textarea,
     0 0 92px color-mix(in srgb, var(--color-warning) 13%, transparent);
 }
 
+[data-theme="light"] .ambient-pointer-field {
+  mix-blend-mode: normal;
+}
+
+[data-theme="light"] .ambient-spark {
+  background:
+    radial-gradient(circle, rgba(255,255,255,0.98) 0 12%, rgba(88,100,216,0.95) 13% 32%, transparent 34%),
+    radial-gradient(circle, rgba(88,100,216,0.5) 0 52%, transparent 74%);
+  box-shadow:
+    0 0 0 1px rgba(88,100,216,0.14),
+    0 0 18px rgba(88,100,216,0.42),
+    0 0 44px rgba(88,100,216,0.22),
+    0 10px 22px -18px rgba(31,42,68,0.46);
+}
+
+[data-theme="light"] .ambient-spark::after {
+  background: linear-gradient(90deg, transparent, rgba(88,100,216,0.74), rgba(255,255,255,0.78), transparent);
+}
+
+[data-theme="light"] .ambient-spark-warm {
+  background:
+    radial-gradient(circle, rgba(255,255,255,0.98) 0 12%, rgba(181,138,52,0.95) 13% 32%, transparent 34%),
+    radial-gradient(circle, rgba(181,138,52,0.5) 0 52%, transparent 74%);
+  box-shadow:
+    0 0 0 1px rgba(181,138,52,0.14),
+    0 0 18px rgba(181,138,52,0.44),
+    0 0 44px rgba(181,138,52,0.24),
+    0 10px 22px -18px rgba(31,42,68,0.42);
+}
+
 @keyframes ambientSparkDrift {
   0% {
     opacity: 0;
