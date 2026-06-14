@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useReducedMotion } from 'framer-motion'
 
-const MAX_SPARKS = 18
+const MAX_SPARKS = 34
 
 export default function AmbientPointerField() {
   const prefersReducedMotion = useReducedMotion()
@@ -53,7 +53,7 @@ export default function AmbientPointerField() {
       const distance = previous
         ? Math.hypot(event.clientX - previous.x, event.clientY - previous.y)
         : 0
-      const cadence = isDragging ? 38 : distance > 28 ? 46 : 92
+      const cadence = isDragging ? 28 : distance > 26 ? 28 : 58
 
       lastPointRef.current = { x: event.clientX, y: event.clientY }
 
@@ -61,8 +61,14 @@ export default function AmbientPointerField() {
       if (!isDragging && distance < 4) return
       lastSpawnRef.current = now
 
-      const movementIntensity = Math.min(0.95, Math.max(0.48, distance / 44))
-      spawnSpark(event.clientX, event.clientY, isDragging ? 1.15 : movementIntensity)
+      const movementIntensity = Math.min(1.28, Math.max(0.72, distance / 34))
+      spawnSpark(event.clientX, event.clientY, isDragging ? 1.25 : movementIntensity)
+
+      if (!isDragging && distance > 22) {
+        const echoX = previous ? event.clientX - (event.clientX - previous.x) * 0.34 : event.clientX
+        const echoY = previous ? event.clientY - (event.clientY - previous.y) * 0.34 : event.clientY
+        spawnSpark(echoX, echoY, movementIntensity * 0.72)
+      }
     }
 
     window.addEventListener('pointerdown', handlePointerDown, { passive: true })
