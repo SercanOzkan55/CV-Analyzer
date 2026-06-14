@@ -12500,12 +12500,13 @@ textarea,
   border-radius: 999px;
   background:
     radial-gradient(circle, rgba(255,255,255,0.95) 0 18%, transparent 19%),
-    radial-gradient(circle, color-mix(in srgb, var(--color-accent) 74%, white 26%) 0 44%, transparent 68%);
+    radial-gradient(circle, color-mix(in srgb, var(--color-accent) 82%, white 18%) 0 48%, transparent 72%);
   box-shadow:
-    0 0 18px color-mix(in srgb, var(--color-accent) 55%, transparent),
-    0 0 42px color-mix(in srgb, var(--color-accent) 22%, transparent);
+    0 0 22px color-mix(in srgb, var(--color-accent) 68%, transparent),
+    0 0 56px color-mix(in srgb, var(--color-accent) 34%, transparent),
+    0 0 92px color-mix(in srgb, var(--color-accent) 14%, transparent);
   opacity: 0;
-  animation: ambientSparkDrift 780ms cubic-bezier(0.18, 0.82, 0.26, 1) forwards;
+  animation: ambientSparkDrift 920ms cubic-bezier(0.18, 0.82, 0.26, 1) forwards;
 }
 
 .ambient-spark::after {
@@ -12514,16 +12515,17 @@ textarea,
   inset: 46% -80%;
   height: 2px;
   transform: rotate(35deg);
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.95), transparent);
 }
 
 .ambient-spark-warm {
   background:
     radial-gradient(circle, rgba(255,255,255,0.95) 0 18%, transparent 19%),
-    radial-gradient(circle, color-mix(in srgb, var(--color-warning) 66%, white 34%) 0 44%, transparent 68%);
+    radial-gradient(circle, color-mix(in srgb, var(--color-warning) 74%, white 26%) 0 48%, transparent 72%);
   box-shadow:
-    0 0 18px color-mix(in srgb, var(--color-warning) 48%, transparent),
-    0 0 42px color-mix(in srgb, var(--color-warning) 18%, transparent);
+    0 0 22px color-mix(in srgb, var(--color-warning) 62%, transparent),
+    0 0 56px color-mix(in srgb, var(--color-warning) 30%, transparent),
+    0 0 92px color-mix(in srgb, var(--color-warning) 13%, transparent);
 }
 
 @keyframes ambientSparkDrift {
@@ -12531,8 +12533,11 @@ textarea,
     opacity: 0;
     transform: translate(-50%, -50%) scale(0.45) rotate(0deg);
   }
-  16% {
-    opacity: 0.9;
+  14% {
+    opacity: 1;
+  }
+  52% {
+    opacity: 0.78;
   }
   100% {
     opacity: 0;
