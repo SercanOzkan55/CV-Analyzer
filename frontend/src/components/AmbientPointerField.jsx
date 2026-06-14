@@ -8,6 +8,7 @@ export default function AmbientPointerField() {
   const [sparks, setSparks] = useState([])
   const draggingRef = useRef(false)
   const lastSpawnRef = useRef(0)
+  const lastPointRef = useRef(null)
   const idRef = useRef(0)
   const cleanupTimersRef = useRef([])
 
@@ -48,16 +49,20 @@ export default function AmbientPointerField() {
     function handlePointerMove(event) {
       const now = window.performance.now()
       const isDragging = draggingRef.current || event.buttons > 0
-      const cadence = isDragging ? 38 : 130
+      const previous = lastPointRef.current
+      const distance = previous
+        ? Math.hypot(event.clientX - previous.x, event.clientY - previous.y)
+        : 0
+      const cadence = isDragging ? 38 : distance > 28 ? 46 : 92
+
+      lastPointRef.current = { x: event.clientX, y: event.clientY }
 
       if (now - lastSpawnRef.current < cadence) return
+      if (!isDragging && distance < 4) return
       lastSpawnRef.current = now
 
-      if (isDragging) {
-        spawnSpark(event.clientX, event.clientY, 1.15)
-      } else if (event.target === document.body || event.target === document.documentElement) {
-        spawnSpark(event.clientX, event.clientY, 0.45)
-      }
+      const movementIntensity = Math.min(0.95, Math.max(0.48, distance / 44))
+      spawnSpark(event.clientX, event.clientY, isDragging ? 1.15 : movementIntensity)
     }
 
     window.addEventListener('pointerdown', handlePointerDown, { passive: true })
