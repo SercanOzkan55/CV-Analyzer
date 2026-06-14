@@ -11,6 +11,7 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import AnimatedBackground from '../components/AnimatedBackground'
 import TestimonialCarousel from '../components/TestimonialCarousel'
+import CircularProgress from '../components/CircularProgress'
 import { SectionTitle } from '../components/ui'
 import useAnimatedCounter from '../hooks/useAnimatedCounter'
 
@@ -84,12 +85,23 @@ function DemoCard({ t }) {
         <div className="demo-header">{t('landing.demo_title')}</div>
         <div className="demo-body">
           <div className="demo-score-section">
-            <div className="demo-circle lp-demo-circle">
-              <span className="demo-num" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                {score}
+            <CircularProgress
+              value={score}
+              size={104}
+              strokeWidth={8}
+              color="var(--color-success)"
+              trackColor="var(--landing-progress-track, color-mix(in srgb, var(--color-success) 14%, var(--color-border)))"
+              glow="color-mix(in srgb, var(--color-success) 28%, transparent)"
+              className="demo-ring lp-demo-circle"
+              label={`Match score ${score}%`}
+            >
+              <span className="demo-score-value">
+                <span className="demo-num" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                  {score}
+                </span>
+                <span className="demo-pct">%</span>
               </span>
-              <span className="demo-pct">%</span>
-            </div>
+            </CircularProgress>
             <span className="demo-label">{t('landing.demo_interpretation')}</span>
           </div>
           <div className="demo-details">
