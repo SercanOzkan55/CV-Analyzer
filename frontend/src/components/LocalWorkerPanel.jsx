@@ -30,6 +30,33 @@ import {
 } from '../api'
 import { useAuth } from '../context/AuthContext'
 
+function WorkerSetupStep({ step, icon: Icon, title, children }) {
+  return (
+    <div className="worker-setup-step">
+      <span className="worker-setup-number">{step}</span>
+      <span className="worker-setup-icon" aria-hidden="true">
+        <Icon size={17} />
+      </span>
+      <span>
+        <strong>{title}</strong>
+        <small>{children}</small>
+      </span>
+    </div>
+  )
+}
+
+function WorkerEmptyState({ title, children }) {
+  return (
+    <div className="worker-empty-state">
+      <span className="worker-empty-icon" aria-hidden="true">
+        <ShieldCheck size={18} />
+      </span>
+      <h3>{title}</h3>
+      <p>{children}</p>
+    </div>
+  )
+}
+
 export default function LocalWorkerPanel({ organizationId }) {
   const { token } = useAuth()
   const [keys, setKeys] = useState([])
@@ -444,11 +471,13 @@ export default function LocalWorkerPanel({ organizationId }) {
       <div className="worker-panel-header">
         <div className="worker-panel-title">
           <span className="product-page-kicker">Local Worker</span>
-          <h2>Local Worker Management</h2>
-          <p className="text-muted">Generate scoped worker keys for secure local CV processing.</p>
+          <h2>Local Worker for Windows</h2>
+          <p className="text-muted">Secure offline CV processing agent. Connect it with a scoped worker key.</p>
           <div className="worker-panel-trust-row" aria-label="Local Worker security details">
             <span><ShieldCheck size={14} /> Local processing</span>
             <span><KeyRound size={14} /> Scoped keys</span>
+            <span><Download size={14} /> Windows 10+</span>
+            <span><ShieldCheck size={14} /> Signed installer</span>
           </div>
         </div>
         <button
@@ -461,11 +490,24 @@ export default function LocalWorkerPanel({ organizationId }) {
             <Download size={22} />
           </span>
           <span className="worker-download-copy">
-            <strong>Download Local Worker</strong>
-            <small>Windows installer for offline CV processing</small>
+            <strong>Download Windows Worker</strong>
+            <small>Install the local processing agent, then pair it with a scoped key.</small>
+            <em>Download .exe</em>
           </span>
           <span className="worker-download-meta">.exe</span>
         </button>
+      </div>
+
+      <div className="worker-setup-steps" aria-label="Local Worker setup steps">
+        <WorkerSetupStep step="1" icon={Download} title="Download worker">
+          Install the Windows app on the machine that will process CV files.
+        </WorkerSetupStep>
+        <WorkerSetupStep step="2" icon={KeyRound} title="Generate scoped key">
+          Limit the key by job and quota before sharing it with the device.
+        </WorkerSetupStep>
+        <WorkerSetupStep step="3" icon={ShieldCheck} title="Connect device">
+          Paste the key into the worker app and keep sensitive files local.
+        </WorkerSetupStep>
       </div>
 
       <div className={`worker-quota-summary ${isQuotaBlocked ? 'is-exhausted' : ''}`}>
@@ -891,10 +933,9 @@ export default function LocalWorkerPanel({ organizationId }) {
           {loading && keys.length === 0 ? (
             <p className="text-muted">Loading keys...</p>
           ) : keys.length === 0 ? (
-            <div className="empty-state compact">
-              <h3>No worker keys yet</h3>
-              <p>Create a key to connect a local worker.</p>
-            </div>
+            <WorkerEmptyState title="No worker keys yet">
+              Generate a scoped key to connect your first local worker device.
+            </WorkerEmptyState>
           ) : (
             <div className="table-wrapper">
               <table className="data-table worker-table">
@@ -979,7 +1020,9 @@ export default function LocalWorkerPanel({ organizationId }) {
       <div className="worker-list worker-session-list">
         <h3>Connected Devices</h3>
         {sessions.length === 0 ? (
-          <p className="text-muted">No worker sessions have connected yet.</p>
+          <WorkerEmptyState title="No connected devices">
+            Worker sessions will appear here after the Windows app pairs successfully.
+          </WorkerEmptyState>
         ) : (
           <div className="table-wrapper">
             <table className="data-table worker-table">
