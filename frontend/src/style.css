@@ -13213,24 +13213,10 @@ textarea,
   transition: transform var(--motion-base) var(--transition-smooth), border-color var(--motion-base) var(--transition-smooth), box-shadow var(--motion-base) var(--transition-smooth);
 }
 
-.worker-download-card::after {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 -48%;
-  width: 34%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent);
-  transform: skewX(-18deg);
-  transition: transform 0.7s var(--transition-smooth);
-}
-
 .worker-download-card:hover {
   transform: translateY(-3px);
   border-color: color-mix(in srgb, var(--color-accent) 48%, var(--color-border));
   box-shadow: var(--shadow-accent);
-}
-
-.worker-download-card:hover::after {
-  transform: translateX(430%) skewX(-18deg);
 }
 
 .worker-download-card:disabled {
