@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Bug, Inbox, Lightbulb, MessageSquareText, MonitorSmartphone, Send, Sparkles } from 'lucide-react'
 import Navbar from '../components/Navbar'
+import { addNotification } from '../components/NotificationCenter'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/LanguageContext'
 import { useToast } from '../components/Toast'
@@ -13,6 +14,8 @@ const CATEGORY_OPTIONS = [
   { value: 'ux', icon: MonitorSmartphone, labelKey: 'feedback.category_ux', fallback: 'UX' },
   { value: 'other', icon: MessageSquareText, labelKey: 'feedback.category_other', fallback: 'Other' },
 ]
+
+const FEEDBACK_INBOX_LIMIT = 5
 
 export default function FeedbackPage() {
   const { token, role } = useAuth()
@@ -36,7 +39,7 @@ export default function FeedbackPage() {
       if (!token) return
       try {
         setLoadingItems(true)
-        const data = await fetchFeedback(token, { limit: 30 })
+        const data = await fetchFeedback(token, { limit: FEEDBACK_INBOX_LIMIT })
         if (!ignore) {
           setItems(Array.isArray(data?.items) ? data.items : [])
         }
@@ -64,16 +67,30 @@ export default function FeedbackPage() {
 
     try {
       setSubmitting(true)
-      await submitFeedback(token, {
+      const result = await submitFeedback(token, {
         category,
         message: trimmed,
         page: '/feedback',
         lang,
       })
       setMessage('')
-      addToast(t('feedback.submit_success'), 'success')
+      addNotification({
+        title: t('feedback.page_title') || 'Complaint',
+        message: `${t('feedback.category_label') || 'Category'}: ${category} - ${trimmed.slice(0, 120)}`,
+        type: category === 'bug' ? 'warning' : 'info',
+      })
+      if (result?.emailed === false) {
+        addToast(
+          lang === 'tr'
+            ? 'Sikayet kaydedildi, ancak mail gonderimi ayarli degil.'
+            : 'Complaint saved, but email delivery is not configured.',
+          'warning',
+        )
+      } else {
+        addToast(t('feedback.submit_success'), 'success')
+      }
 
-      const refreshed = await fetchFeedback(token, { limit: 30 })
+      const refreshed = await fetchFeedback(token, { limit: FEEDBACK_INBOX_LIMIT })
       setItems(Array.isArray(refreshed?.items) ? refreshed.items : [])
     } catch (err) {
       addToast(err?.message || t('toast.error_generic'), 'error')
@@ -82,7 +99,8 @@ export default function FeedbackPage() {
     }
   }
 
-  const inboxTitle = role === 'recruiter'
+  const canReviewFeedback = ['admin', 'owner', 'recruiter'].includes(String(role || '').toLowerCase())
+  const inboxTitle = canReviewFeedback
     ? t('feedback.inbox_title_recruiter')
     : t('feedback.inbox_title_user')
 
