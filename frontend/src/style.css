@@ -12646,16 +12646,43 @@ textarea,
 }
 
 .skip-link,
-.navbar,
 .page-wrapper,
 .auth-layout > *,
 .app-layout > main,
 .main-content,
-.landing section,
-.feedback-floating-btn,
-.back-to-top {
+.landing section {
   position: relative;
   z-index: 2;
+}
+
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 12000;
+}
+
+.nav-dropdown-menu {
+  z-index: 12020;
+}
+
+.notif-overlay {
+  z-index: 12030;
+}
+
+.notif-popover {
+  z-index: 12040;
+}
+
+.feedback-floating-btn {
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  z-index: 11900;
+}
+
+.back-to-top {
+  position: fixed;
+  z-index: 11800;
 }
 
 .notif-bell {
@@ -13219,6 +13246,10 @@ textarea,
   box-shadow: var(--shadow-accent);
 }
 
+.worker-download-card:active {
+  transform: translateY(-1px) scale(0.995);
+}
+
 .worker-download-card:disabled {
   opacity: 0.58;
   cursor: not-allowed;
@@ -13234,6 +13265,19 @@ textarea,
   border-radius: var(--radius-md);
   color: var(--color-primary-contrast);
   background: var(--gradient-accent);
+  box-shadow: var(--shadow-accent);
+  transition: transform var(--motion-base) var(--transition-smooth), box-shadow var(--motion-base) var(--transition-smooth);
+}
+
+.worker-download-card:hover .worker-download-icon {
+  transform: translateY(-1px) scale(1.04);
+  box-shadow:
+    var(--shadow-accent),
+    0 0 0 5px color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+.worker-download-card:disabled .worker-download-icon {
+  transform: none;
   box-shadow: var(--shadow-accent);
 }
 
