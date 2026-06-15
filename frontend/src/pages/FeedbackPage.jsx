@@ -15,6 +15,8 @@ const CATEGORY_OPTIONS = [
   { value: 'other', icon: MessageSquareText, labelKey: 'feedback.category_other', fallback: 'Other' },
 ]
 
+const FEEDBACK_INBOX_LIMIT = 5
+
 export default function FeedbackPage() {
   const { token, role } = useAuth()
   const { t, lang } = useLanguage()
@@ -37,7 +39,7 @@ export default function FeedbackPage() {
       if (!token) return
       try {
         setLoadingItems(true)
-        const data = await fetchFeedback(token, { limit: 30 })
+        const data = await fetchFeedback(token, { limit: FEEDBACK_INBOX_LIMIT })
         if (!ignore) {
           setItems(Array.isArray(data?.items) ? data.items : [])
         }
@@ -65,7 +67,7 @@ export default function FeedbackPage() {
 
     try {
       setSubmitting(true)
-      await submitFeedback(token, {
+      const result = await submitFeedback(token, {
         category,
         message: trimmed,
         page: '/feedback',
@@ -77,9 +79,18 @@ export default function FeedbackPage() {
         message: `${t('feedback.category_label') || 'Category'}: ${category} - ${trimmed.slice(0, 120)}`,
         type: category === 'bug' ? 'warning' : 'info',
       })
-      addToast(t('feedback.submit_success'), 'success')
+      if (result?.emailed === false) {
+        addToast(
+          lang === 'tr'
+            ? 'Sikayet kaydedildi, ancak mail gonderimi ayarli degil.'
+            : 'Complaint saved, but email delivery is not configured.',
+          'warning',
+        )
+      } else {
+        addToast(t('feedback.submit_success'), 'success')
+      }
 
-      const refreshed = await fetchFeedback(token, { limit: 30 })
+      const refreshed = await fetchFeedback(token, { limit: FEEDBACK_INBOX_LIMIT })
       setItems(Array.isArray(refreshed?.items) ? refreshed.items : [])
     } catch (err) {
       addToast(err?.message || t('toast.error_generic'), 'error')
