@@ -9,6 +9,7 @@ from fastapi import APIRouter
 from core.runtime_bridge import main_module as _main_module
 from core.route_dependencies import *  # noqa: F403
 from services.ai_feature_service import ensure_ai_rewrite_allowed
+from services.owner_workflow_service import create_owner_notification
 
 
 router = APIRouter(tags=["ai-tools"])
@@ -687,6 +688,34 @@ def submit_feedback(
     emailed = _send_feedback_email(payload)
 
     try:
+        organization_id = getattr(db_user, "organization_id", None)
+        if organization_id:
+            submitter = email or "Unknown user"
+            preview = message.replace("\n", " ").strip()
+            if len(preview) > 160:
+                preview = preview[:157].rstrip() + "..."
+            create_owner_notification(
+                db,
+                organization_id=organization_id,
+                event_type="feedback_submitted",
+                title="New complaint submitted",
+                message=f"{category.title()} complaint from {submitter}: {preview}",
+                actor_user_id=getattr(db_user, "id", None),
+                metadata={
+                    "category": category,
+                    "page": payload.get("page"),
+                    "lang": payload.get("lang"),
+                    "score": score,
+                    "email": email,
+                    "feedback_timestamp": payload.get("timestamp"),
+                },
+            )
+            db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("feedback owner notification failed")
+
+    try:
         audit_log(
             "user_feedback",
             user_id=payload.get("user_id"),
@@ -714,7 +743,7 @@ def list_feedback(
     db_user = get_or_create_user(db, supabase_id, email)
     role = (getattr(db_user, "role", "individual") or "individual").lower()
 
-    include_all = role == "recruiter"
+    include_all = role in {"admin", "owner", "recruiter"}
     items = _read_feedback_records(
         limit=limit,
         supabase_id=str(supabase_id) if supabase_id else None,
