@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Bug, Inbox, Lightbulb, MessageSquareText, MonitorSmartphone, Send, Sparkles } from 'lucide-react'
 import Navbar from '../components/Navbar'
+import { addNotification } from '../components/NotificationCenter'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/LanguageContext'
 import { useToast } from '../components/Toast'
@@ -71,6 +72,11 @@ export default function FeedbackPage() {
         lang,
       })
       setMessage('')
+      addNotification({
+        title: t('feedback.page_title') || 'Complaint',
+        message: `${t('feedback.category_label') || 'Category'}: ${category} - ${trimmed.slice(0, 120)}`,
+        type: category === 'bug' ? 'warning' : 'info',
+      })
       addToast(t('feedback.submit_success'), 'success')
 
       const refreshed = await fetchFeedback(token, { limit: 30 })
@@ -82,7 +88,8 @@ export default function FeedbackPage() {
     }
   }
 
-  const inboxTitle = role === 'recruiter'
+  const canReviewFeedback = ['admin', 'owner', 'recruiter'].includes(String(role || '').toLowerCase())
+  const inboxTitle = canReviewFeedback
     ? t('feedback.inbox_title_recruiter')
     : t('feedback.inbox_title_user')
 
