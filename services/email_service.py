@@ -11,7 +11,6 @@ import smtplib
 import time
 import threading as _threading
 from datetime import datetime, timedelta
-from email.message import EmailMessage
 
 from fastapi import HTTPException
 
@@ -21,6 +20,7 @@ from security.redaction import redact_for_log
 from sqlalchemy import or_
 
 logger = logging.getLogger("app.email")
+DEFAULT_SUPPORT_EMAIL = "sikayet.cvanalizor@gmail.com"
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -78,44 +78,21 @@ def _read_feedback_records(
     return records
 
 
-def _send_feedback_email(record: dict) -> bool:
-    """Send feedback notification mail if SMTP env vars are configured."""
-    smtp_host = str(os.getenv("SMTP_HOST", "")).strip()
-    try:
-        smtp_port = int(str(os.getenv("SMTP_PORT", "587") or "587"))
-    except Exception:
-        smtp_port = 587
-    smtp_user = str(os.getenv("SMTP_USER", "")).strip()
-    smtp_pass = str(os.getenv("SMTP_PASS", "")).strip()
-    smtp_from = str(
-        os.getenv("FEEDBACK_EMAIL_FROM")
-        or os.getenv("SMTP_FROM")
-        or smtp_user
-        or ""
-    ).strip()
-    smtp_to = str(
+def _feedback_email_recipients() -> list[str]:
+    raw = str(
         os.getenv("FEEDBACK_EMAIL_TO")
         or os.getenv("SUPPORT_EMAIL")
-        or "sikayet.cvanalizor@gmail.com"
+        or DEFAULT_SUPPORT_EMAIL
         or ""
     ).strip()
+    return [
+        item.strip()
+        for item in raw.replace(";", ",").split(",")
+        if item.strip() and "@" in item
+    ]
 
-    if not smtp_host or not smtp_from or not smtp_to:
-        return False
 
-    use_ssl = _env_bool("SMTP_USE_SSL", default=False)
-    use_tls = _env_bool("SMTP_USE_TLS", default=True)
-
-    msg = EmailMessage()
-    msg["From"] = smtp_from
-    msg["To"] = smtp_to
-    sender_email = str(record.get("email") or "").strip()
-    if sender_email and "@" in sender_email:
-        msg["Reply-To"] = sender_email
-    msg["Subject"] = (
-        f"[CV Analyzer][Feedback] {record.get('category', 'other')} - {record.get('email', 'unknown')}"
-    )
-
+def _feedback_email_body(record: dict) -> str:
     body = [
         "New feedback submitted:",
         "",
@@ -134,20 +111,39 @@ def _send_feedback_email(record: dict) -> bool:
         "Context:",
         json.dumps(record.get("context") or {}, ensure_ascii=False, indent=2),
     ]
-    msg.set_content("\n".join(body))
+    return "\n".join(body)
+
+
+def _send_feedback_email(record: dict) -> bool:
+    """Send feedback notification mail through the configured transactional email backend."""
+    recipients = _feedback_email_recipients()
+    if not recipients:
+        logger.warning("feedback email skipped: no recipient configured")
+        return False
+
+    if not os.getenv("SENDGRID_API_KEY") and not os.getenv("SMTP_HOST"):
+        logger.warning(
+            "feedback email skipped: no email backend configured for to=%s",
+            redact_for_log(",".join(recipients), key="to_email"),
+        )
+        return False
 
     try:
-        if use_ssl:
-            server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10)
-        else:
-            server = smtplib.SMTP(smtp_host, smtp_port, timeout=10)
-        with server:
-            if not use_ssl and use_tls:
-                server.starttls()
-            if smtp_user and smtp_pass:
-                server.login(smtp_user, smtp_pass)
-            server.send_message(msg)
-        return True
+        subject = (
+            f"[CV Analyzer][Feedback] {record.get('category', 'other')} - {record.get('email', 'unknown')}"
+        )
+        body = _feedback_email_body(record)
+        reply_to = str(record.get("email") or "").strip()
+        sent_results = [
+            _do_send_email(
+                recipient,
+                subject,
+                body,
+                recruiter_email=reply_to if "@" in reply_to else "",
+            )
+            for recipient in recipients
+        ]
+        return bool(sent_results) and all(sent_results)
     except Exception:
         logger.exception("feedback email send failed")
         return False
@@ -160,7 +156,12 @@ def _do_send_email(to_email: str, subject: str, body: str, recruiter_email: str 
     from email.utils import formataddr
 
     _logger = logging.getLogger("app.recruiter.email")
-    default_from = (os.environ.get("REMINDER_EMAIL_FROM") or "sikayet.cvanalizor@gmail.com").strip()
+    default_from = (
+        os.environ.get("REMINDER_EMAIL_FROM")
+        or os.environ.get("FEEDBACK_EMAIL_FROM")
+        or os.environ.get("SMTP_FROM")
+        or DEFAULT_SUPPORT_EMAIL
+    ).strip()
 
     max_attempts = 3
     backoff = 2.0
@@ -229,8 +230,15 @@ def _do_send_email(to_email: str, subject: str, body: str, recruiter_email: str 
                     if recruiter_email:
                         msg["Reply-To"] = recruiter_email
 
-                    with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
-                        server.starttls()
+                    use_ssl = _env_bool("SMTP_USE_SSL", default=False)
+                    use_tls = _env_bool("SMTP_USE_TLS", default=True)
+                    if use_ssl:
+                        server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30)
+                    else:
+                        server = smtplib.SMTP(smtp_host, smtp_port, timeout=30)
+                    with server:
+                        if not use_ssl and use_tls:
+                            server.starttls()
                         if smtp_user:
                             server.login(smtp_user, smtp_pass)
                         server.sendmail(platform_from, [to_email], msg.as_string())
