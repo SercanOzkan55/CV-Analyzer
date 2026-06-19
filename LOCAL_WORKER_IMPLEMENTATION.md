@@ -119,8 +119,8 @@ The legacy/developer ZIP remains available as a fallback through
 `GET /api/worker/download-package` and contains:
 
 - `worker.py`
-- `qt_gui.py`
-- `gui.py`
+- `qml_gui.py`
+- `qml/`
 - `workspace.py`
 - `credentials.py`
 - `install_windows.cmd`

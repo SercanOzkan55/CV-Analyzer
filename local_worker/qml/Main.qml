@@ -3374,7 +3374,7 @@ ApplicationWindow {
                                         AppButton {
                                             Layout.fillWidth: true
                                             text: "Show app status"
-                                            onClicked: backend.openClassicUi()
+                                            onClicked: backend.showAppStatus()
                                         }
                                     }
                                 }

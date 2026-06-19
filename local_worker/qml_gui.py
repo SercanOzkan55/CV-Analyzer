@@ -1458,8 +1458,8 @@ class LocalWorkerBackend(QObject):
         self.toast.emit(f"CSV exported: {path.name}", "success")
 
     @Slot()
-    def openClassicUi(self):
-        self.toast.emit("Classic QtWidgets UI is deprecated. All maintained tools are now in this QML app.", "info")
+    def showAppStatus(self):
+        self.toast.emit("QML desktop app is active. Local analysis, reports, templates, and sync are maintained here.", "info")
 
     def _on_progress_max(self, value: int):
         self._progress_maximum = max(1, value)
