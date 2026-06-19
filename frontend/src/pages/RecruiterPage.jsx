@@ -806,7 +806,11 @@ export default function RecruiterPage() {
       const data = await recruiterListJobs(token)
       const list = Array.isArray(data) ? data : data?.jobs || []
       setJobs(list)
-      if (!selectedJob && list.length > 0) setSelectedJob(list[0])
+      setSelectedJob(prev => {
+        if (!list.length) return null
+        if (!prev?.id) return list[0]
+        return list.find(job => job.id === prev.id) || list[0]
+      })
     } catch { /* ignore */ }
   }, [token])
 

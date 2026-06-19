@@ -28,12 +28,60 @@ const scaleIn = {
   hidden: { opacity: 0, scale: 0.92 },
   visible: { opacity: 1, scale: 1, transition: { duration: 0.55, ease: [0.25, 0.1, 0.25, 1] } },
 }
+const scrollSection = {
+  hidden: { opacity: 0, y: 34, scale: 0.992, filter: 'blur(10px)' },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: 'blur(0px)',
+    transition: { duration: 0.72, ease: [0.22, 1, 0.36, 1] },
+  },
+}
+const scrollStagger = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.09, delayChildren: 0.08 } },
+}
+const scrollItem = {
+  hidden: { opacity: 0, y: 26, scale: 0.985, filter: 'blur(8px)' },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: 'blur(0px)',
+    transition: { duration: 0.58, ease: [0.22, 1, 0.36, 1] },
+  },
+}
+const scrollScaleItem = {
+  hidden: { opacity: 0, y: 18, scale: 0.965, filter: 'blur(8px)' },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: 'blur(0px)',
+    transition: { duration: 0.62, ease: [0.22, 1, 0.36, 1] },
+  },
+}
+const scrollViewport = { once: true, amount: 0.18, margin: '0px 0px -72px 0px' }
+const gridViewport = { once: true, amount: 0.14, margin: '0px 0px -64px 0px' }
 
 // ─── Feature accent colors ───────────────────────────────────────
 const FEATURE_COLORS = ['#5b6cff', '#d4a94f', '#0e7490', '#b65d52', '#7c3aed', '#2563eb']
 const FEATURE_ICONS  = [Brain, FileCheck, Target, Globe2, LayoutGrid, Users]
 const STEP_ICONS     = [Upload, FileText, CheckCircle2]
 const STEP_TIMES     = ['< 1 min', '2 min', 'Instant']
+const HERO_HOLOGRAM_PARTICLES = [
+  { x: 8, y: 20, size: 3, drift: -10, delay: -0.2 },
+  { x: 14, y: 64, size: 4, drift: 12, delay: -1.4 },
+  { x: 24, y: 12, size: 2, drift: -8, delay: -2.3 },
+  { x: 34, y: 78, size: 3, drift: 10, delay: -0.8 },
+  { x: 48, y: 24, size: 2, drift: -12, delay: -1.8 },
+  { x: 56, y: 70, size: 4, drift: 14, delay: -2.7 },
+  { x: 68, y: 16, size: 3, drift: -10, delay: -0.5 },
+  { x: 74, y: 52, size: 2, drift: 9, delay: -1.2 },
+  { x: 84, y: 30, size: 3, drift: -12, delay: -2.1 },
+  { x: 90, y: 72, size: 2, drift: 10, delay: -0.9 },
+]
 
 // ─── Animated Stat (triggers on in-view) ────────────────────────
 function ProofStat({ value, suffix, label }) {
@@ -82,6 +130,24 @@ function DemoCard({ t }) {
         whileHover={{ y: -2 }}
         transition={{ duration: 0.3 }}
       >
+        <div className="lp-demo-hologram" aria-hidden="true">
+          <div className="lp-holo-aura" />
+          <div className="lp-holo-sphere" />
+          <div className="lp-holo-floor" />
+          {HERO_HOLOGRAM_PARTICLES.map((particle, index) => (
+            <span
+              key={`hero-particle-${index}`}
+              className="lp-holo-particle"
+              style={{
+                '--x': `${particle.x}%`,
+                '--y': `${particle.y}%`,
+                '--particle-size': `${particle.size}px`,
+                '--particle-drift': `${particle.drift}px`,
+                '--particle-delay': `${particle.delay}s`,
+              }}
+            />
+          ))}
+        </div>
         <div className="demo-header">{t('landing.demo_title')}</div>
         <div className="demo-body">
           <div className="demo-score-section">
@@ -277,7 +343,14 @@ function KineticHeroStage({ t, scrollYProgress }) {
 // ─── Main LandingPage ────────────────────────────────────────────
 export default function LandingPage() {
   const { t, pricing } = useLanguage()
+  const prefersReducedMotion = useReducedMotion()
   const { scrollYProgress } = useScroll()
+  const revealSectionProps = prefersReducedMotion
+    ? { initial: false }
+    : { initial: 'hidden', whileInView: 'visible', viewport: scrollViewport, variants: scrollSection }
+  const revealGridProps = prefersReducedMotion
+    ? { initial: false }
+    : { initial: 'hidden', whileInView: 'visible', viewport: gridViewport, variants: scrollStagger }
 
   useEffect(() => {
     document.title = 'CV Analyzer — AI-Powered Resume Analysis'
@@ -378,10 +451,10 @@ export default function LandingPage() {
       {/* ── Social Proof Strip ────────────────────────────── */}
       <motion.div
         className="lp-proof-strip"
-        initial={{ opacity: 0, y: 16 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.5 }}
+        initial={prefersReducedMotion ? false : 'hidden'}
+        whileInView={prefersReducedMotion ? undefined : 'visible'}
+        viewport={scrollViewport}
+        variants={scrollScaleItem}
       >
         <ProofStat value={10000} suffix="+" label={t('landing.stat_cvs') || 'CVs Analyzed'} />
         <div className="lp-proof-divider" />
@@ -409,14 +482,11 @@ export default function LandingPage() {
       </motion.div>
 
       {/* ── Features ─────────────────────────────────────── */}
-      <section id="features" className="section">
+      <motion.section id="features" className="section" {...revealSectionProps}>
         <SectionTitle title={t('landing.features_title')} subtitle={t('landing.features_subtitle')} />
         <motion.div
           className="features-grid"
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.1 }}
-          variants={stagger}
+          {...revealGridProps}
         >
           {features.map((f, i) => {
             const Icon = FEATURE_ICONS[i]
@@ -426,7 +496,7 @@ export default function LandingPage() {
                 key={i}
                 className={`feature-card lp-feature-card lp-flip-card${i < 2 ? ' feature-card-lg' : ''}`}
                 style={{ '--feature-color': color }}
-                variants={fadeUp}
+                variants={scrollItem}
                 whileHover={{ y: -2, transition: { duration: 0.15 } }}
                 tabIndex={0}
                 aria-label={`${f.title}: ${f.desc}`}
@@ -460,22 +530,19 @@ export default function LandingPage() {
             )
           })}
         </motion.div>
-      </section>
+      </motion.section>
 
       {/* ── How It Works ─────────────────────────────────── */}
-      <section className="section section-alt">
+      <motion.section className="section section-alt" {...revealSectionProps}>
         <SectionTitle title={t('landing.how_title')} subtitle={t('landing.how_subtitle')} />
         <motion.div
           className="lp-steps-grid"
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.2 }}
-          variants={stagger}
+          {...revealGridProps}
         >
           {steps.map((s, i) => {
             const Icon = STEP_ICONS[i]
             return (
-              <motion.div key={i} className="lp-step-card" variants={fadeUp}>
+              <motion.div key={i} className="lp-step-card" variants={scrollItem}>
                 {/* Connector line (not for last) */}
                 {i < steps.length - 1 && <div className="lp-step-connector" />}
 
@@ -496,24 +563,21 @@ export default function LandingPage() {
             )
           })}
         </motion.div>
-      </section>
+      </motion.section>
 
       {/* ── Testimonials ─────────────────────────────────── */}
-      <section id="testimonials" className="section section-alt" style={{ padding: 0 }}>
+      <motion.section id="testimonials" className="section section-alt" style={{ padding: 0 }} {...revealSectionProps}>
         <TestimonialCarousel t={t} />
-      </section>
+      </motion.section>
 
       {/* ── Pricing ──────────────────────────────────────── */}
-      <section id="pricing" className="section">
+      <motion.section id="pricing" className="section" {...revealSectionProps}>
         <SectionTitle title={t('landing.pricing_title')} subtitle={t('landing.pricing_subtitle')} />
         <motion.div
           className="pricing-grid"
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.1 }}
-          variants={stagger}
+          {...revealGridProps}
         >
-          <motion.div className="pricing-card" variants={fadeUp} whileHover={{ y: -2 }}>
+          <motion.div className="pricing-card" variants={scrollItem} whileHover={{ y: -2 }}>
             <h3>{t('pricing.free_name')}</h3>
             <div className="pricing-price">{pricing.free}<span>/{t(pricing.periodKey)}</span></div>
             <ul>
@@ -525,7 +589,7 @@ export default function LandingPage() {
             <Link to="/register" className="btn-outline btn-full">{t('pricing.free_cta')}</Link>
           </motion.div>
 
-          <motion.div className="pricing-card popular lp-pricing-popular" variants={scaleIn} whileHover={{ y: -2 }}>
+          <motion.div className="pricing-card popular lp-pricing-popular" variants={scrollScaleItem} whileHover={{ y: -2 }}>
             <div className="popular-badge">{t('pricing.popular')}</div>
             <div className="lp-pricing-header">
               <h3>{t('pricing.pro_name')}</h3>
@@ -541,7 +605,7 @@ export default function LandingPage() {
             <Link to="/register" className="btn-primary btn-full">{t('pricing.pro_cta')}</Link>
           </motion.div>
 
-          <motion.div className="pricing-card" variants={fadeUp} whileHover={{ y: -2 }}>
+          <motion.div className="pricing-card" variants={scrollItem} whileHover={{ y: -2 }}>
             <h3>{t('pricing.enterprise_name')}</h3>
             <div className="pricing-price">{pricing.enterprise}<span>/{t(pricing.periodKey)}</span></div>
             <ul>
@@ -554,29 +618,26 @@ export default function LandingPage() {
             <a href="mailto:sales@cvanalyzer.app" className="btn-outline btn-full">{t('pricing.enterprise_cta')}</a>
           </motion.div>
         </motion.div>
-      </section>
+      </motion.section>
 
       {/* ── FAQ ──────────────────────────────────────────── */}
-      <section id="faq" className="section section-alt">
+      <motion.section id="faq" className="section section-alt" {...revealSectionProps}>
         <SectionTitle title={t('landing.faq_title')} />
         <motion.div
           className="faq-list"
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.1 }}
-          variants={stagger}
+          {...revealGridProps}
         >
           {faqs.map((faq, i) => (
-            <motion.details key={i} className="faq-item" variants={fadeUp}>
+            <motion.details key={i} className="faq-item" variants={scrollItem}>
               <summary>{faq.q}</summary>
               <p>{faq.a}</p>
             </motion.details>
           ))}
         </motion.div>
-      </section>
+      </motion.section>
 
       {/* ── CTA Strip ────────────────────────────────────── */}
-      <section className="lp-cta-strip">
+      <motion.section className="lp-cta-strip" {...revealSectionProps}>
         <div className="lp-cta-orb lp-cta-orb-1" />
         <div className="lp-cta-orb lp-cta-orb-2" />
         <div className="lp-cta-inner">
@@ -627,7 +688,7 @@ export default function LandingPage() {
             Free to start | No credit card | Instant results
           </p>
         </div>
-      </section>
+      </motion.section>
 
       <Footer />
     </div>

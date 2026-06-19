@@ -20,6 +20,14 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+async function jsonOrThrow(res, fallbackMessage = 'Request failed') {
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || `${fallbackMessage}: ${res.status}`)
+  }
+  return data
+}
+
 async function pollAnalysis(token, jobId, { timeoutMs = 60000, intervalMs = 1000 } = {}) {
   const headers = {}
   const auth = authHeaderFrom(token)
@@ -1538,13 +1546,13 @@ export async function downloadRecruiterReport(token, jobId) {
 export const recruiterCreateJob = async (token, payload) => {
   const res = await fetch(`${BASE}/api/v1/recruiter/jobs`, {
     method: 'POST',
-    headers: { 
+    headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(payload)
   });
-  return res.json();
+  return jsonOrThrow(res, 'Create job failed');
 }
 
 export const recruiterDashboardRank = async (token, payload) => {
@@ -1554,7 +1562,7 @@ export const recruiterDashboardRank = async (token, payload) => {
     body: JSON.stringify(payload)
   });
   if (res.ok) notifyBillableUsage();
-  return res.json();
+  return jsonOrThrow(res, 'Dashboard rank failed');
 }
 
 export const recruiterDashboardPreview = async (token, payload) => {
@@ -1564,7 +1572,7 @@ export const recruiterDashboardPreview = async (token, payload) => {
     body: JSON.stringify(payload)
   });
   if (res.ok) notifyBillableUsage();
-  return res.json();
+  return jsonOrThrow(res, 'Dashboard preview failed');
 }
 
 export const recruiterDashboardAction = async (token, payload) => {
@@ -1586,14 +1594,14 @@ export const recruiterCreateTemplate = async (token, payload) => {
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
-  return res.json();
+  return jsonOrThrow(res, 'Create template failed');
 }
 
 export const recruiterListTemplates = async (token) => {
   const res = await fetch(`${BASE}/api/v1/recruiter/templates`, {
     headers: { 'Authorization': `Bearer ${token}` }
   });
-  return res.json();
+  return jsonOrThrow(res, 'List templates failed');
 }
 
 export const recruiterDeleteTemplate = async (token, templateId) => {
@@ -1601,7 +1609,7 @@ export const recruiterDeleteTemplate = async (token, templateId) => {
     method: 'DELETE',
     headers: { 'Authorization': `Bearer ${token}` }
   });
-  return res.json();
+  return jsonOrThrow(res, 'Delete template failed');
 }
 
 export const recruiterPreviewTemplate = async (token, payload) => {
@@ -1610,7 +1618,7 @@ export const recruiterPreviewTemplate = async (token, payload) => {
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
-  return res.json();
+  return jsonOrThrow(res, 'Preview template failed');
 }
 
 export const recruiterSendEmail = async (token, payload) => {
@@ -1619,7 +1627,7 @@ export const recruiterSendEmail = async (token, payload) => {
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
-  return res.json();
+  return jsonOrThrow(res, 'Send email failed');
 }
 
 export const recruiterSendEmailBulk = async (token, payload) => {
@@ -1628,7 +1636,7 @@ export const recruiterSendEmailBulk = async (token, payload) => {
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
-  return res.json();
+  return jsonOrThrow(res, 'Send bulk email failed');
 }
 
 export const recruiterExportRankings = async (token, jobId, format = 'csv') => {
@@ -1645,4 +1653,21 @@ export const recruiterExportCandidates = async (token, format = 'csv') => {
   });
   if (!res.ok) throw new Error(`Export failed: ${res.statusText}`);
   return res.blob();
+}
+
+export async function agentChat(token, payload) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+
+  const res = await fetch(`${BASE}/api/v1/agents/chat`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Agent chat failed: ${res.status}`)
+  }
+  return res.json()
 }

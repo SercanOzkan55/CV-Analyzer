@@ -167,12 +167,8 @@ def _ensure_candidate_for_action(db: Session, action: CandidateAction) -> Candid
             organization_id=action.organization_id,
             name=action.candidate_name,
             email=action.candidate_email,
-            cv_text=action.cv_text,
         )
         db.add(candidate)
-        db.flush()
-    elif action.cv_text and candidate.cv_text != action.cv_text:
-        candidate.cv_text = action.cv_text
         db.flush()
     return candidate
 
@@ -354,7 +350,7 @@ python -m venv .venv
 Then open the local visual app:
 
 ```powershell
-.\\.venv\\Scripts\\python.exe qt_gui.py
+.\\.venv\\Scripts\\python.exe qml_gui.py
 ```
 
 ## Optional server worker mode
@@ -598,8 +594,7 @@ def download_worker_package(
     """
     package_files = [
         ("worker.py", _LOCAL_WORKER_DIR / "worker.py"),
-        ("qt_gui.py", _LOCAL_WORKER_DIR / "qt_gui.py"),
-        ("gui.py", _LOCAL_WORKER_DIR / "gui.py"),
+        ("qml_gui.py", _LOCAL_WORKER_DIR / "qml_gui.py"),
         ("workspace.py", _LOCAL_WORKER_DIR / "workspace.py"),
         ("credentials.py", _LOCAL_WORKER_DIR / "credentials.py"),
         ("requirements.txt", _LOCAL_WORKER_DIR / "requirements.txt"),
@@ -612,6 +607,9 @@ def download_worker_package(
         ("VERSION", _LOCAL_WORKER_DIR / "VERSION"),
     ]
     missing = [name for name, path in package_files if not path.exists()]
+    qml_dir = _LOCAL_WORKER_DIR / "qml"
+    if not qml_dir.exists():
+        missing.append("qml/")
     if missing:
         raise HTTPException(status_code=500, detail="Local worker package files are missing")
 
@@ -620,6 +618,9 @@ def download_worker_package(
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for arcname, path in package_files:
             archive.write(path, arcname=arcname)
+        for path in qml_dir.rglob("*"):
+            if path.is_file():
+                archive.write(path, arcname=str(Path("qml") / path.relative_to(qml_dir)))
         archive.writestr("README.md", _worker_package_readme(api_base_url))
         archive.writestr("run-worker.ps1", _worker_run_script(api_base_url))
         archive.writestr(".env.example", _worker_env_example(api_base_url))
@@ -769,7 +770,8 @@ def worker_auth(request: Request, req: WorkerAuthRequest, db: Session = Depends(
         expires_in=expires_in,
         company_id=wk.organization_id,
         allowed_jobs=allowed_jobs,
-        quota_remaining=quota_remaining
+        quota_remaining=quota_remaining,
+        permissions=_safe_permissions(wk.permissions),
     )
 
 @router.get("/worker/jobs")
@@ -1360,7 +1362,6 @@ def worker_offline_sync(
                 organization_id=wk.organization_id,
                 name=item.candidate_name,
                 email=item.candidate_email,
-                cv_text=item.cv_text,
             )
             db.add(candidate)
             db.flush()
@@ -1385,7 +1386,6 @@ def worker_offline_sync(
                 recruiter_id=job.created_by,
                 candidate_name=item.candidate_name,
                 candidate_email=item.candidate_email,
-                cv_text=item.cv_text,
                 final_score=item.score,
                 ats_score=item.score,
                 action=stage,

@@ -211,9 +211,9 @@ If the final ATS score of the auto-fixed text is lower than the original score, 
 
 ---
 
-## 4. PySide6 Desktop Client & OCR Fallback Pipeline
+## 4. QML Desktop Client & OCR Fallback Pipeline
 
-The desktop client (`local_worker/qt_gui.py` and `local_worker/worker.py`) processes directories of resume files locally.
+The desktop client (`local_worker/qml_gui.py` and `local_worker/worker.py`) processes directories of resume files locally.
 
 ```mermaid
 flowchart TD
@@ -556,7 +556,8 @@ cv-analyzer/
 │   └── storage_service.py        # Storage abstraction (AWS S3 vs Local disk storage)
 │
 ├── local_worker/
-│   ├── qt_gui.py                 # PyQt/PySide6 desktop client interface
+│   ├── qml_gui.py                # Maintained Qt Quick/QML desktop client
+│   ├── qml/                      # QML screens and reusable desktop components
 │   ├── worker.py                 # Local folder scanner, SQLite queue, and OCR fallback pipeline
 │   └── workspace.py              # Configures local working environments
 │
@@ -641,7 +642,7 @@ Mock mode disables external cloud integrations (such as Stripe, OpenAI, and Supa
     *   **macOS:** Install via Homebrew: `brew install tesseract`
 3.  Launch the desktop client:
     ```bash
-    python local_worker/qt_gui.py
+    python local_worker/qml_gui.py
     ```
 
 ---

@@ -370,23 +370,12 @@ def _cover_letter_cache_set(payload: dict, value: str) -> None:
 
 
 def _generate(prompt: str, max_tokens: int = 512) -> str:
-    provider = _select_provider()
-    if provider == "mock":
+    from services.ai_client_factory import get_ai_client_and_model
+    client, model = get_ai_client_and_model()
+    if not client:
         return _mock_generate(prompt, max_tokens=max_tokens)
 
-    api_key = str(os.getenv("OPENAI_API_KEY", "")).strip()
-    if not api_key:
-        return _mock_generate(prompt, max_tokens=max_tokens)
-
-    try:
-        from openai import OpenAI
-    except Exception:
-        return _mock_generate(prompt, max_tokens=max_tokens)
-
-    model = str(os.getenv("REWRITE_MODEL", "gpt-4o-mini")).strip() or "gpt-4o-mini"
-    base_url = os.getenv("OPENAI_API_BASE")
     timeout_seconds = float(os.getenv("REWRITE_TIMEOUT_SECONDS", "25") or "25")
-    client = OpenAI(api_key=api_key, base_url=base_url)
 
     try:
         response = client.chat.completions.create(
@@ -402,12 +391,9 @@ def _generate(prompt: str, max_tokens: int = 512) -> str:
 
 
 def ai_rewrite_available() -> bool:
-    provider = _select_provider()
-    if provider == "mock":
-        return False
-    if provider in {"openai", "openai-compatible"}:
-        return bool(str(os.getenv("OPENAI_API_KEY", "")).strip())
-    return False
+    from services.ai_client_factory import get_ai_client_and_model
+    client, _ = get_ai_client_and_model()
+    return client is not None
 
 
 def ai_rewrite_cv(
@@ -819,21 +805,13 @@ def ai_review_cv_payload(payload: dict, job_description: str = "", lang: str = "
         raise ValueError("payload must be a dictionary")
 
     source_payload = dict(payload)
-    if _select_provider() == "mock":
+    from services.ai_client_factory import get_ai_client_and_model
+    client, default_model = get_ai_client_and_model()
+    if not client:
         return source_payload
 
-    api_key = str(os.getenv("OPENAI_API_KEY", "")).strip()
-    if not api_key:
-        return source_payload
-
-    try:
-        from openai import OpenAI
-    except Exception:
-        return source_payload
-
-    model = str(os.getenv("AI_FINAL_REVIEW_MODEL", "gpt-4o-mini")).strip() or "gpt-4o-mini"
+    model = str(os.getenv("AI_FINAL_REVIEW_MODEL", "")).strip() or default_model
     timeout_seconds = float(os.getenv("AI_FINAL_REVIEW_TIMEOUT_SECONDS", "20") or "20")
-    client = OpenAI(api_key=api_key)
 
     safe_payload = json.dumps(source_payload, ensure_ascii=False)
     safe_payload = safe_payload[: MAX_INPUT_CHARS * 2]
@@ -883,22 +861,13 @@ def suggest_summaries(
     summary = _guard_text(summary, MAX_INPUT_CHARS, "summary")
     job_description = (job_description or "").strip()
 
-    provider = _select_provider()
-    if provider == "mock":
+    from services.ai_client_factory import get_ai_client_and_model
+    client, default_model = get_ai_client_and_model()
+    if not client:
         return _mock_suggest_summaries(summary, job_description, lang, count)
 
-    api_key = str(os.getenv("OPENAI_API_KEY", "")).strip()
-    if not api_key:
-        return _mock_suggest_summaries(summary, job_description, lang, count)
-
-    try:
-        from openai import OpenAI
-    except Exception:
-        return _mock_suggest_summaries(summary, job_description, lang, count)
-
-    model = str(os.getenv("AI_SUGGEST_MODEL", "gpt-4o-mini")).strip() or "gpt-4o-mini"
+    model = str(os.getenv("AI_SUGGEST_MODEL", "")).strip() or default_model
     timeout_seconds = float(os.getenv("AI_SUGGEST_TIMEOUT_SECONDS", "15") or "15")
-    client = OpenAI(api_key=api_key)
 
     lang_map = {"en": "English", "tr": "Turkish", "de": "German", "fr": "French", "es": "Spanish", "ar": "Arabic"}
     lang_name = lang_map.get(lang, "English")
@@ -979,8 +948,7 @@ def generate_interview_questions(
         normalized_mode = "senior"
     count = max(3, min(count, 10))
 
-    provider = _select_provider()
-    if provider == "mock" or not str(os.getenv("OPENAI_API_KEY", "")).strip():
+    if not ai_rewrite_available():
         return _mock_interview_questions(cv_text, job_description, lang, normalized_mode, count)
 
     lang_map = {"en": "English", "tr": "Turkish", "de": "German", "fr": "French", "es": "Spanish", "ar": "Arabic"}
@@ -1097,8 +1065,7 @@ def evaluate_interview_answer(
     cv_text = (cv_text or "").strip()
     job_description = (job_description or "").strip()
 
-    provider = _select_provider()
-    if provider == "mock" or not str(os.getenv("OPENAI_API_KEY", "")).strip():
+    if not ai_rewrite_available():
         return _mock_evaluate_answer(question, answer, lang)
 
     lang_map = {"en": "English", "tr": "Turkish", "de": "German", "fr": "French", "es": "Spanish", "ar": "Arabic"}

@@ -460,23 +460,21 @@ def _compact_for_one_page(cv_data: dict) -> dict:
 # OpenAI helpers
 # ---------------------------------------------------------------------------
 
-_OPENAI_KEY = os.getenv("OPENAI_API_KEY")
-
-def _get_openai_client():
-    if MOCK_SERVICES_ON or not _OPENAI_KEY:
-        return None
+def _get_openai_client_and_model():
+    if MOCK_SERVICES_ON:
+        return None, None
     try:
-        from openai import OpenAI
-        return OpenAI(api_key=_OPENAI_KEY)
+        from services.ai_client_factory import get_ai_client_and_model
+        return get_ai_client_and_model()
     except Exception:
-        return None
+        return None, None
 
 
 def _enhance_cv_with_ai(cv_data: dict, job_description: str, lang: str = "en") -> dict:
     """Use OpenAI to enhance CV content: rewrite bullets with metrics,
     tailor summary to job description, optimize keyword placement."""
 
-    client = _get_openai_client()
+    client, model = _get_openai_client_and_model()
     if not client:
         return _mock_enhance(cv_data, job_description, lang)
 
@@ -561,7 +559,7 @@ Return ONLY valid JSON, no markdown fences."""
         for attempt in range(1, _AI_MAX_RETRIES + 1):
             try:
                 resp = client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model=model,
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.4,
                     max_tokens=3000,

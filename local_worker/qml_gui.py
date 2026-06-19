@@ -16,6 +16,7 @@ try:
         QModelIndex,
         QObject,
         Property,
+        QCoreApplication,
         QThread,
         QUrl,
         Qt,
@@ -123,6 +124,31 @@ def list_to_text(value) -> str:
     if isinstance(value, list):
         return ", ".join(str(item) for item in value if str(item).strip())
     return str(value or "")
+
+
+def csv_safe(value):
+    if not isinstance(value, str):
+        return value
+    if value and (value[0] in "=+-@" or value[0] in "\t\r\n"):
+        return "'" + value
+    return value
+
+
+def permission_summary(permissions: dict | None) -> str:
+    if not isinstance(permissions, dict) or not permissions:
+        return "Default access: claim CVs and submit local results."
+    claim = bool(permissions.get("claim", True))
+    submit = bool(permissions.get("submit_results", True))
+    labels = [
+        f"Claim CVs: {'allowed' if claim else 'blocked'}",
+        f"Submit results: {'allowed' if submit else 'blocked'}",
+    ]
+    extra = [
+        f"{key}: {'allowed' if value else 'blocked'}"
+        for key, value in sorted(permissions.items())
+        if key not in {"claim", "submit_results"}
+    ]
+    return " | ".join(labels + extra[:4])
 
 
 def average_score(rows: list[dict]) -> float:
@@ -317,14 +343,13 @@ class AnalysisWorker(QObject):
             )
             writer.writeheader()
             for row in rows:
-                writer.writerow(
-                    {
-                        **row,
-                        "matched_skills": list_to_text(row.get("matched_skills")),
-                        "missing_skills": list_to_text(row.get("missing_skills")),
-                        "risk_flags": list_to_text(row.get("risk_flags")),
-                    }
-                )
+                csv_row = {
+                    **row,
+                    "matched_skills": list_to_text(row.get("matched_skills")),
+                    "missing_skills": list_to_text(row.get("missing_skills")),
+                    "risk_flags": list_to_text(row.get("risk_flags")),
+                }
+                writer.writerow({key: csv_safe(value) for key, value in csv_row.items()})
 
 
 class ResultListModel(QAbstractListModel):
@@ -511,6 +536,7 @@ class WebsiteSyncWorker(QObject):
                     "company_id": str(worker.company_id or ""),
                     "quota_remaining": int(worker.quota_remaining or 0),
                     "allowed_jobs": jobs,
+                    "permissions": worker.permissions,
                 })
                 return
 
@@ -522,6 +548,7 @@ class WebsiteSyncWorker(QObject):
                     "company_id": str(worker.company_id or ""),
                     "quota_remaining": int(worker.quota_remaining or 0),
                     "allowed_jobs": jobs,
+                    "permissions": worker.permissions,
                 })
                 return
 
@@ -549,7 +576,6 @@ class WebsiteSyncWorker(QObject):
                     "missing_skills": row.get("missing_skills") or [],
                     "risk_flags": row.get("risk_flags") or [],
                     "explanation": row.get("explanation", ""),
-                    "cv_text": row.get("cv_text"),
                     "candidate_name": candidate_name_from_row(row),
                     "candidate_email": row.get("email") or None,
                     "worker_version": row.get("worker_version", "1.0.0"),
@@ -577,6 +603,7 @@ class WebsiteSyncWorker(QObject):
                 "quota_remaining": int(worker.quota_remaining or 0),
                 "allowed_jobs": jobs,
                 "job_id": target_job_id,
+                "permissions": worker.permissions,
             })
         except Exception as exc:
             self.failed.emit(str(exc))
@@ -629,6 +656,8 @@ class LocalWorkerBackend(QObject):
         self._sync_company_id = ""
         self._sync_quota_remaining = 0
         self._sync_allowed_jobs: list[int] = []
+        self._sync_permissions: dict = {}
+        self._sync_permission_summary = "Test connection to inspect this worker key's local access scope."
         self._sync_last_synced_count = 0
         self._mail_templates = load_mail_templates()
         self._template_mode = "accept"
@@ -768,6 +797,8 @@ class LocalWorkerBackend(QObject):
         self._sync_api_url = value
         self._sync_connected = False
         self._sync_status = "Website sync changed"
+        self._sync_permissions = {}
+        self._sync_permission_summary = "Test connection to inspect this worker key's local access scope."
         self.syncChanged.emit()
 
     @Property(str, notify=syncChanged)
@@ -779,6 +810,8 @@ class LocalWorkerBackend(QObject):
         self._sync_api_key = value
         self._sync_connected = False
         self._sync_status = "Worker key changed"
+        self._sync_permissions = {}
+        self._sync_permission_summary = "Test connection to inspect this worker key's local access scope."
         self.syncChanged.emit()
 
     @Property(str, notify=syncChanged)
@@ -817,6 +850,10 @@ class LocalWorkerBackend(QObject):
     @Property(str, notify=syncChanged)
     def syncAllowedJobs(self):
         return ", ".join(str(job) for job in self._sync_allowed_jobs) if self._sync_allowed_jobs else "-"
+
+    @Property(str, notify=syncChanged)
+    def syncPermissionSummary(self):
+        return self._sync_permission_summary
 
     @Property(int, notify=syncChanged)
     def syncPendingCount(self):
@@ -1298,6 +1335,8 @@ class LocalWorkerBackend(QObject):
         self._sync_company_id = str(payload.get("company_id") or "")
         self._sync_quota_remaining = int(payload.get("quota_remaining") or 0)
         self._sync_allowed_jobs = [int(job) for job in (payload.get("allowed_jobs") or [])]
+        self._sync_permissions = payload.get("permissions") or {}
+        self._sync_permission_summary = permission_summary(self._sync_permissions)
         if len(self._sync_allowed_jobs) == 1 and not self._sync_job_id:
             self._sync_job_id = str(self._sync_allowed_jobs[0])
 
@@ -1419,13 +1458,8 @@ class LocalWorkerBackend(QObject):
         self.toast.emit(f"CSV exported: {path.name}", "success")
 
     @Slot()
-    def openClassicUi(self):
-        try:
-            python_exe = Path(sys.executable)
-            classic = Path(__file__).resolve().parent / "qt_gui.py"
-            os.spawnv(os.P_NOWAIT, str(python_exe), [str(python_exe), str(classic)])
-        except Exception as exc:
-            self.toast.emit(f"Could not open classic UI: {exc}", "error")
+    def showAppStatus(self):
+        self.toast.emit("QML desktop app is active. Local analysis, reports, templates, and sync are maintained here.", "info")
 
     def _on_progress_max(self, value: int):
         self._progress_maximum = max(1, value)
@@ -1463,6 +1497,9 @@ class LocalWorkerBackend(QObject):
 
 def main() -> int:
     os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
+    QCoreApplication.setOrganizationName("CV Analyzer")
+    QCoreApplication.setOrganizationDomain("cvanalyzer.local")
+    QCoreApplication.setApplicationName("CV Analyzer Local Worker")
     QQuickStyle.setStyle("Basic")
     app = QGuiApplication(sys.argv)
     icon_path = resource_path("assets/cv_analyzer_worker.ico")

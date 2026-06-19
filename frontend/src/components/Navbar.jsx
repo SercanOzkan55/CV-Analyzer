@@ -103,7 +103,9 @@ export default function Navbar() {
                 </button>
                 <div className="nav-dropdown-menu">
                   <NavLink to="/career-studio" active={location.pathname === '/career-studio'}>Career Studio</NavLink>
+                  <NavLink to="/agents" active={location.pathname === '/agents'}>AI Agent Hub</NavLink>
                   <NavLink to="/cv-builder" active={location.pathname === '/cv-builder'}>{t('nav.cv_builder')}</NavLink>
+
                   <NavLink to="/template-marketplace" active={location.pathname === '/template-marketplace'}>Templates</NavLink>
                   <NavLink to="/cover-letter" active={location.pathname === '/cover-letter'}>{t('nav.cover_letter')}</NavLink>
                   <NavLink to="/interview-simulator" active={location.pathname === '/interview-simulator'}>{t('nav.interview')}</NavLink>

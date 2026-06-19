@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 
 /**
  * Hook for real-time WebSocket batch upload progress tracking
@@ -11,7 +11,7 @@ export const useWebSocketProgress = (taskId, baseUrl = null, authToken = null) =
   const [status, setStatus] = useState('PENDING')
   const [error, setError] = useState(null)
   const [isConnected, setIsConnected] = useState(false)
-  const [ws, setWs] = useState(null)
+  const wsRef = useRef(null)
 
   const url = baseUrl || window.location.origin.replace('http', 'ws')
 
@@ -22,11 +22,15 @@ export const useWebSocketProgress = (taskId, baseUrl = null, authToken = null) =
     }
 
     try {
+      if (wsRef.current && wsRef.current.readyState <= WebSocket.OPEN) {
+        wsRef.current.close()
+      }
       const params = authToken ? `?token=${encodeURIComponent(authToken)}` : ''
       const wsUrl = `${url}/api/v1/recruiter/ws/batch-upload/${taskId}${params}`
       console.log(`[WebSocket] Connecting to ${wsUrl}`)
 
       const websocket = new WebSocket(wsUrl)
+      wsRef.current = websocket
 
       websocket.onopen = () => {
         console.log('[WebSocket] Connected')
@@ -70,10 +74,11 @@ export const useWebSocketProgress = (taskId, baseUrl = null, authToken = null) =
 
       websocket.onclose = () => {
         console.log('[WebSocket] Disconnected')
+        if (wsRef.current === websocket) {
+          wsRef.current = null
+        }
         setIsConnected(false)
       }
-
-      setWs(websocket)
     } catch (e) {
       console.error('[WebSocket] Connection error:', e)
       setError(e.message)
@@ -81,11 +86,11 @@ export const useWebSocketProgress = (taskId, baseUrl = null, authToken = null) =
   }, [taskId, url, authToken])
 
   const disconnect = useCallback(() => {
-    if (ws) {
-      ws.close()
-      setWs(null)
+    if (wsRef.current) {
+      wsRef.current.close()
+      wsRef.current = null
     }
-  }, [ws])
+  }, [])
 
   useEffect(() => {
     connect()
