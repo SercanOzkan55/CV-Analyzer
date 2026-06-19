@@ -772,7 +772,8 @@ def worker_auth(request: Request, req: WorkerAuthRequest, db: Session = Depends(
         expires_in=expires_in,
         company_id=wk.organization_id,
         allowed_jobs=allowed_jobs,
-        quota_remaining=quota_remaining
+        quota_remaining=quota_remaining,
+        permissions=_safe_permissions(wk.permissions),
     )
 
 @router.get("/worker/jobs")

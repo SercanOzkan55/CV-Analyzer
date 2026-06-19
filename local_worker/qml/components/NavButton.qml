@@ -21,8 +21,8 @@ Button {
     hoverEnabled: true
     onClicked: navClicked()
 
-    scale: hovered ? 1.004 : 1
-    Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+    scale: down ? 0.985 : (hovered ? 1.02 : 1)
+    Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
 
     contentItem: Row {
         spacing: 12
@@ -114,20 +114,8 @@ Button {
         radius: 12
         color: control.active ? control.activeBg : (control.hovered ? control.hoverBg : "transparent")
         border.width: control.active ? 1 : 0
-        border.color: control.active ? control.activeColor : "transparent"
-        Behavior on color { ColorAnimation { duration: 140 } }
-        Behavior on border.color { ColorAnimation { duration: 140 } }
-
-        Rectangle {
-            x: 0
-            y: 10
-            width: 3
-            height: parent.height - 20
-            radius: 2
-            visible: control.active
-            color: control.activeColor
-            Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-            Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-        }
+        border.color: control.active ? Qt.rgba(control.activeColor.r, control.activeColor.g, control.activeColor.b, 0.45) : "transparent"
+        Behavior on color { ColorAnimation { duration: 180 } }
+        Behavior on border.color { ColorAnimation { duration: 180 } }
     }
 }

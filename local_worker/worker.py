@@ -1418,6 +1418,7 @@ class LocalWorker:
         self.company_id = None
         self.allowed_jobs = []
         self.quota_remaining = 0
+        self.permissions = {}
         self.session = requests.Session()
         self.session.verify = self.verify_ssl
 
@@ -1464,6 +1465,7 @@ class LocalWorker:
         self.company_id = data["company_id"]
         self.allowed_jobs = data["allowed_jobs"]
         self.quota_remaining = data["quota_remaining"]
+        self.permissions = data.get("permissions") or {}
         self.session.headers.update({"Authorization": f"Bearer {self.access_token}"})
         _log_progress("login", company_id=self.company_id, quota_remaining=self.quota_remaining)
         print(f"Login successful. Company={self.company_id} Quota remaining={self.quota_remaining}")
