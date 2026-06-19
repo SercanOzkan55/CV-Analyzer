@@ -595,8 +595,6 @@ def download_worker_package(
     package_files = [
         ("worker.py", _LOCAL_WORKER_DIR / "worker.py"),
         ("qml_gui.py", _LOCAL_WORKER_DIR / "qml_gui.py"),
-        ("qt_gui.py", _LOCAL_WORKER_DIR / "qt_gui.py"),
-        ("gui.py", _LOCAL_WORKER_DIR / "gui.py"),
         ("workspace.py", _LOCAL_WORKER_DIR / "workspace.py"),
         ("credentials.py", _LOCAL_WORKER_DIR / "credentials.py"),
         ("requirements.txt", _LOCAL_WORKER_DIR / "requirements.txt"),

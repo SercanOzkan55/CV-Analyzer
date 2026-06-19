@@ -234,8 +234,7 @@ jobs:
         run: |
           python -m py_compile \
             local_worker/worker.py \
-            local_worker/gui.py \
-            local_worker/qt_gui.py \
+            local_worker/qml_gui.py \
             local_worker/workspace.py \
             local_worker/credentials.py
 
@@ -248,8 +247,7 @@ jobs:
 
           files = [
               "worker.py",
-              "gui.py",
-              "qt_gui.py",
+              "qml_gui.py",
               "workspace.py",
               "credentials.py",
               "requirements.txt",
@@ -268,7 +266,10 @@ jobs:
                   assert path.exists(), f"Missing package file: {path}"
                   archive.write(path, arcname=name)
           with zipfile.ZipFile(io.BytesIO(buffer.getvalue())) as archive:
-              assert archive.namelist() == files
+              names = archive.namelist()
+              assert names == files
+              assert "qt_gui.py" not in names
+              assert "gui.py" not in names
           print("local worker package ok")
           PY
 

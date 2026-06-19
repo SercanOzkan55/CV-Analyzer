@@ -1459,12 +1459,7 @@ class LocalWorkerBackend(QObject):
 
     @Slot()
     def openClassicUi(self):
-        try:
-            python_exe = Path(sys.executable)
-            classic = Path(__file__).resolve().parent / "qt_gui.py"
-            os.spawnv(os.P_NOWAIT, str(python_exe), [str(python_exe), str(classic)])
-        except Exception as exc:
-            self.toast.emit(f"Could not open classic UI: {exc}", "error")
+        self.toast.emit("Classic QtWidgets UI is deprecated. All maintained tools are now in this QML app.", "info")
 
     def _on_progress_max(self, value: int):
         self._progress_maximum = max(1, value)

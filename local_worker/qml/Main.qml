@@ -104,7 +104,7 @@ ApplicationWindow {
         if (pageIndex === 4) return "Connect worker key, test Website access, and sync approved local results."
         if (pageIndex === 5) return "Preview current run output and export local files."
         if (pageIndex === 6) return "Edit local accept/reject message templates and preview variables."
-        return "Tune local behavior and keep the classic tools one click away."
+        return "Tune local behavior, sync permissions, and desktop preferences."
     }
 
     component FieldLabel: Text {
@@ -3338,7 +3338,7 @@ ApplicationWindow {
                                     }
                                     Text {
                                         Layout.fillWidth: true
-                                        text: "The QML interface runs as a native desktop shell. CV parsing, scoring, report creation, and template preview run locally on this computer. Website sync is explicit and only happens from the Website Sync screen."
+                                        text: "The maintained QML interface runs as a native desktop shell. CV parsing, scoring, report creation, and template preview run locally on this computer. Website sync is explicit and only happens from the Website Sync screen."
                                         color: root.themeText2
                                         font.pixelSize: 13
                                         wrapMode: Text.WordWrap
@@ -3373,7 +3373,7 @@ ApplicationWindow {
                                         }
                                         AppButton {
                                             Layout.fillWidth: true
-                                            text: "Open classic tools"
+                                            text: "Show app status"
                                             onClicked: backend.openClassicUi()
                                         }
                                     }
