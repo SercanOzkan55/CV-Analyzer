@@ -52,6 +52,8 @@ const SharedAnalysisPage = lazy(() => import("./pages/SharedAnalysisPage"))
 const CoverLetterPage = lazy(() => import("./pages/CoverLetterPage"))
 const InterviewSimulatorPage = lazy(() => import("./pages/InterviewSimulatorPage"))
 const JobTrackerPage = lazy(() => import("./pages/JobTrackerPage"))
+const AIAgentHubPage = lazy(() => import("./pages/AIAgentHubPage"))
+
 
 
 // ---------- CONFIG ----------
@@ -129,6 +131,8 @@ function AnimatedRoutes() {
         <Route path="/cover-letter" element={<PrivateRoute><PageTransition><CoverLetterPage /></PageTransition></PrivateRoute>} />
         <Route path="/interview-simulator" element={<PrivateRoute><PageTransition><InterviewSimulatorPage /></PageTransition></PrivateRoute>} />
         <Route path="/job-tracker" element={<PrivateRoute><PageTransition><JobTrackerPage /></PageTransition></PrivateRoute>} />
+        <Route path="/agents" element={<PrivateRoute><PageTransition><AIAgentHubPage /></PageTransition></PrivateRoute>} />
+
         <Route path="/admin/billing" element={<AdminBillingRoute><PageTransition><AdminBillingPage /></PageTransition></AdminBillingRoute>} />
         <Route path="/admin/ops" element={<AdminBillingRoute><PageTransition><OpsCenterPage /></PageTransition></AdminBillingRoute>} />
         <Route path="/data-center" element={<PrivateRoute><PageTransition><DataCenterPage /></PageTransition></PrivateRoute>} />

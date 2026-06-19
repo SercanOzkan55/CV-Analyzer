@@ -3,6 +3,7 @@ import csv
 import difflib
 import glob
 import hashlib
+import html
 import json
 import os
 import re
@@ -25,7 +26,7 @@ WORKER_VERSION = "1.2.0"
 ENGINE_VERSION = "rule_based_mvp_v1"
 PROGRESS_LOG = Path(os.environ.get("CV_WORKER_PROGRESS_LOG", "worker_progress.jsonl"))
 MAX_FILE_BYTES = int(os.environ.get("CV_WORKER_MAX_FILE_BYTES", str(25 * 1024 * 1024)))
-OPENAI_MODEL = os.environ.get("CV_WORKER_OPENAI_MODEL", "gpt-5.2")
+OPENAI_MODEL = os.environ.get("CV_WORKER_OPENAI_MODEL", "gpt-4o-mini")
 SKILL_SYNONYMS = {
     "javascript": ["js", "ecmascript"],
     "typescript": ["ts"],
@@ -46,6 +47,16 @@ SKILL_SYNONYMS = {
     "mobile": ["flutter", "react native", "android", "ios", "swift", "kotlin", "objective-c"],
     "devops": ["docker", "kubernetes", "jenkins", "ci/cd", "terraform", "ansible", "aws", "gcp", "azure"],
 }
+
+
+def csv_safe(value):
+    if isinstance(value, (list, tuple, set)):
+        value = ", ".join(str(item) for item in value if str(item).strip())
+    if not isinstance(value, str):
+        return value
+    if value and (value[0] in "=+-@" or value[0] in "\t\r\n"):
+        return "'" + value
+    return value
 
 STOPWORDS = {
     # English
@@ -411,6 +422,13 @@ def _extract_response_text(payload: dict) -> str:
     return "\n".join(parts).strip()
 
 
+def _extract_chat_completion_text(payload: dict) -> str:
+    try:
+        return str(payload["choices"][0]["message"]["content"] or "").strip()
+    except Exception:
+        return ""
+
+
 def maybe_apply_ai_review(cv_text: str, config: dict, score: dict, ai_mode: str) -> dict:
     if ai_mode != "customer_openai_key" or not _is_uncertain_score(score, config):
         return score
@@ -432,26 +450,35 @@ def maybe_apply_ai_review(cv_text: str, config: dict, score: dict, ai_mode: str)
     }
     try:
         resp = requests.post(
-            "https://api.openai.com/v1/responses",
+            "https://api.openai.com/v1/chat/completions",
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
             },
             json={
                 "model": OPENAI_MODEL,
-                "instructions": (
-                    "You are reviewing a local CV screening result. Do not invent facts. "
-                    "Return concise JSON with keys: decision, confidence, explanation, risk_flags."
-                ),
-                "input": json.dumps(prompt, ensure_ascii=False),
-                "store": False,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are reviewing a local CV screening result. Do not invent facts. "
+                            "Return concise JSON with keys: decision, confidence, explanation, risk_flags."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": json.dumps(prompt, ensure_ascii=False),
+                    },
+                ],
+                "temperature": 0.2,
+                "response_format": {"type": "json_object"},
             },
             timeout=45,
             verify=VERIFY_SSL,
         )
         if resp.status_code >= 400:
             return {**score, "ai_review_status": f"failed_{resp.status_code}"}
-        text = _extract_response_text(resp.json())
+        text = _extract_chat_completion_text(resp.json())
         return {
             **score,
             "ai_review_status": "completed",
@@ -461,15 +488,24 @@ def maybe_apply_ai_review(cv_text: str, config: dict, score: dict, ai_mode: str)
     except Exception as exc:
         return {**score, "ai_review_status": f"failed_{type(exc).__name__}"}
 def _generate_html_report(ranked_rows: list[dict], config: dict, html_path: Path):
-    rows_json = json.dumps(ranked_rows, ensure_ascii=False)
-    config_json = json.dumps(config, ensure_ascii=False)
+    def _script_safe_json(value: object) -> str:
+        return (
+            json.dumps(value, ensure_ascii=False)
+            .replace("&", "\\u0026")
+            .replace("<", "\\u003c")
+            .replace(">", "\\u003e")
+        )
+
+    rows_json = _script_safe_json(ranked_rows)
+    config_json = _script_safe_json(config)
+    title = html.escape(str(config.get("title") or "Yerel Değerlendirme"), quote=True)
     
     html_content = f"""<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CV Değerlendirme Sonuçları - {config.get('title', 'Yerel Değerlendirme')}</title>
+  <title>CV Değerlendirme Sonuçları - {title}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -1164,6 +1200,22 @@ def _generate_html_report(ranked_rows: list[dict], config: dict, html_path: Path
       }}
     }}
 
+    function escapeHtml(value) {{
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({{
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }}[ch]));
+    }}
+
+    function safeDecisionClass(decision) {{
+      return ['recommended_accept', 'recommended_review', 'recommended_reject'].includes(decision)
+        ? decision
+        : 'recommended_review';
+    }}
+
     function renderCandidates(list) {{
       const grid = document.getElementById('candidateGrid');
       grid.innerHTML = '';
@@ -1179,12 +1231,17 @@ def _generate_html_report(ranked_rows: list[dict], config: dict, html_path: Path
         card.onclick = () => openModal(c);
         
         const fileName = getFileName(c.file);
+        const safeFileName = escapeHtml(fileName);
+        const safeDecision = safeDecisionClass(c.decision);
+        const safeScore = Number.isFinite(Number(c.score)) ? Number(c.score) : 0;
+        const safeRank = Number.isFinite(Number(c.rank)) ? Number(c.rank) : (index + 1);
+        const safeSummary = escapeHtml(c.summary || c.explanation || '');
         
         let matchedBadges = '';
         if (c.matched_skills && c.matched_skills.length > 0) {{
-          matchedBadges = c.matched_skills.slice(0, 4).map(s => '<span class="skill-badge matched">' + s + '</span>').join('');
+          matchedBadges = c.matched_skills.slice(0, 4).map(s => '<span class="skill-badge matched">' + escapeHtml(s) + '</span>').join('');
           if (c.matched_skills.length > 4) {{
-            matchedBadges += '<span class="skill-badge">+' + (c.matched_skills.length - 4) + '</span>';
+            matchedBadges += '<span class="skill-badge">+' + escapeHtml(c.matched_skills.length - 4) + '</span>';
           }}
         }} else {{
           matchedBadges = '<span class="skill-badge" style="opacity:0.5;">Yok</span>';
@@ -1192,7 +1249,7 @@ def _generate_html_report(ranked_rows: list[dict], config: dict, html_path: Path
         
         let riskBadges = '';
         if (c.risk_flags && c.risk_flags.length > 0) {{
-          riskBadges = c.risk_flags.map(r => '<span class="risk-badge">' + r + '</span>').join('');
+          riskBadges = c.risk_flags.map(r => '<span class="risk-badge">' + escapeHtml(r) + '</span>').join('');
         }}
         
         let riskSection = '';
@@ -1207,12 +1264,12 @@ def _generate_html_report(ranked_rows: list[dict], config: dict, html_path: Path
         card.innerHTML = `
           <div class="candidate-header">
             <div class="candidate-info-top">
-              <span class="candidate-rank">SIRA #${{c.rank || (index + 1)}}</span>
-              <h2 class="candidate-name" title="${{fileName}}">${{fileName}}</h2>
+              <span class="candidate-rank">SIRA #${{safeRank}}</span>
+              <h2 class="candidate-name" title="${{safeFileName}}">${{safeFileName}}</h2>
             </div>
-            <div class="score-badge ${{c.decision}}">${{c.score}}</div>
+            <div class="score-badge ${{safeDecision}}">${{safeScore}}</div>
           </div>
-          <div class="decision-pill ${{c.decision}}">${{translateDecision(c.decision)}}</div>
+          <div class="decision-pill ${{safeDecision}}">${{escapeHtml(translateDecision(c.decision))}}</div>
           
           <div class="card-section">
             <span class="section-label">Eşleşen Yetenekler</span>
@@ -1223,7 +1280,7 @@ def _generate_html_report(ranked_rows: list[dict], config: dict, html_path: Path
           
           <div class="card-section">
             <span class="section-label">Özet</span>
-            <p class="summary-text">${{c.summary || c.explanation || ''}}</p>
+            <p class="summary-text">${{safeSummary}}</p>
           </div>
         `;
         
@@ -1269,11 +1326,11 @@ def _generate_html_report(ranked_rows: list[dict], config: dict, html_path: Path
       document.getElementById('modalSubtitle').textContent = candidate.file;
       
       const scoreBadge = document.getElementById('modalScoreBadge');
-      scoreBadge.className = 'score-badge ' + candidate.decision;
+      scoreBadge.className = 'score-badge ' + safeDecisionClass(candidate.decision);
       scoreBadge.textContent = candidate.score;
       
       const decisionPill = document.getElementById('modalDecisionPill');
-      decisionPill.className = 'decision-pill ' + candidate.decision;
+      decisionPill.className = 'decision-pill ' + safeDecisionClass(candidate.decision);
       decisionPill.textContent = translateDecision(candidate.decision);
       
       const breakdown = candidate.score_breakdown || {{}};
@@ -1610,7 +1667,6 @@ class LocalWorker:
                 "engine_version": ENGINE_VERSION,
                 "processed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 "sync_status": "pending",
-                "cv_text": text,
                 **result,
             }
             row = enrich_row_with_owner_workflow(row, config, actor_name=self.device_name or "Local Worker")
@@ -1648,13 +1704,14 @@ class LocalWorker:
             )
             writer.writeheader()
             for row in ranked_rows:
-                writer.writerow({
+                csv_row = {
                     **row,
                     "matched_skills": ", ".join(row.get("matched_skills") or []),
                     "missing_skills": ", ".join(row.get("missing_skills") or []),
                     "risk_flags": ", ".join(row.get("risk_flags") or []),
                     "score_breakdown": json.dumps(row.get("score_breakdown") or {}, ensure_ascii=False),
-                })
+                }
+                writer.writerow({key: csv_safe(value) for key, value in csv_row.items()})
         if failed_files:
             failed_path.write_text("\n".join(failed_files), encoding="utf-8")
         elif failed_path.exists():

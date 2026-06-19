@@ -13,7 +13,7 @@ from pathlib import Path
 
 try:
     from PySide6.QtCore import QAbstractAnimation, QEasingCurve, QPoint, QPropertyAnimation, QObject, Qt, QThread, QTimer, Signal, QByteArray, QSize, QRectF, Property, QSequentialAnimationGroup
-    from PySide6.QtGui import QAction, QIcon, QPainter, QPixmap, QColor, QPen, QPalette
+    from PySide6.QtGui import QAction, QIcon, QPainter, QPixmap, QColor, QPen, QPalette, QBrush, QLinearGradient, QPainterPath
     from PySide6.QtSvg import QSvgRenderer
     from PySide6.QtWidgets import (
         QApplication,
@@ -30,6 +30,7 @@ try:
         QLabel,
         QLineEdit,
         QMainWindow,
+        QMenu,
         QMessageBox,
         QPlainTextEdit,
         QProgressBar,
@@ -46,6 +47,9 @@ try:
         QTextEdit,
         QVBoxLayout,
         QWidget,
+        QListWidget,
+        QListWidgetItem,
+        QSlider,
     )
 except ImportError:
     from ctypes import windll
@@ -153,7 +157,7 @@ def svg_to_pixmap(svg_str: str, width: int, height: int) -> QPixmap:
 def get_theme_logo_svg(theme_name: str, colors: dict) -> str:
     primary = colors.get('primary', '#3B82F6')
     logo_text = colors.get('logo_text', '#FFFFFF')
-    if theme_name == 'forest_executive':
+    if theme_name == 'slate_pro':
         return f"""
         <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="{logo_text}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2L2 22h20L12 2z"></path>
@@ -161,13 +165,13 @@ def get_theme_logo_svg(theme_name: str, colors: dict) -> str:
             <path d="M12 10l-3 5h6l-3-5z"></path>
         </svg>
         """
-    elif theme_name == 'warm_stone':
+    elif theme_name == 'light_cloud':
         return f"""
         <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="{logo_text}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M2.7 10.3a2.4 2.4 0 0 0 0 3.4l7.6 7.6a2.4 2.4 0 0 0 3.4 0l7.6-7.6a2.4 2.4 0 0 0 0-3.4L13.7 2.7a2.4 2.4 0 0 0-3.4 0z"></path>
         </svg>
         """
-    elif theme_name == 'electric_indigo':
+    elif theme_name == 'graphite_pro':
         return f"""
         <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="{logo_text}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2" y="2" width="20" height="20" rx="4" fill="{colors.get('sidebar_active', '#162038')}" stroke="{primary}"></rect>
@@ -212,6 +216,8 @@ def get_sidebar_icon_svg(key: str, color: str) -> str:
         return f"<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='{color}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='4' y='4' width='16' height='16' rx='2' ry='2'></rect><rect x='9' y='9' width='6' height='6'></rect><line x1='9' y1='1' x2='9' y2='4'></line><line x1='15' y1='1' x2='15' y2='4'></line><line x1='9' y1='20' x2='9' y2='23'></line><line x1='15' y1='20' x2='15' y2='23'></line><line x1='20' y1='9' x2='23' y2='9'></line><line x1='20' y1='15' x2='23' y2='15'></line><line x1='1' y1='9' x2='4' y2='9'></line><line x1='1' y1='15' x2='4' y2='15'></line></svg>"
     elif key == "reports":
         return f"<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='{color}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6z'></path><polyline points='14 2 14 8 20 8'></polyline><line x1='16' y1='13' x2='8' y2='13'></line><line x1='16' y1='17' x2='8' y2='17'></line><polyline points='10 9 9 9 8 9'></polyline></svg>"
+    elif key == "settings":
+        return f"<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='{color}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'></circle><path d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z'></path></svg>"
     return ""
 
 
@@ -261,338 +267,365 @@ def get_shield_svg(color: str) -> str:
     """
 
 
+def get_eye_svg(color: str) -> str:
+    return f"""
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
+    </svg>
+    """
+
+
+def get_eye_off_svg(color: str) -> str:
+    return f"""
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+        <line x1="1" y1="1" x2="23" y2="23"></line>
+    </svg>
+    """
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Theme Engine
 # ──────────────────────────────────────────────────────────────────────────────
 
 THEMES: dict[str, dict] = {
-    "warm_stone": {
-        "display_name": "Warm Stone",
-        "description": "Sophisticated neutrals with warm accents and soft depth",
-        "tags": ["warm", "elegant", "soft", "professional", "timeless"],
-        "palette_swatches": ["#F7F4EF", "#E8DFD3", "#6DC1B5", "#8A6F58", "#B8B85A", "#2C1A25"],
+    "graphite_pro": {
+        "display_name": "Graphite Pro",
+        "description": "Neutral premium dark — graphite, black, and slate surfaces with cool blue accent",
+        "tags": ["dark", "neutral", "premium", "enterprise", "modern"],
+        "palette_swatches": ["#0B1017", "#0F172A", "#38BDF8", "#334155", "#F8FAFC", "#CBD5E1"],
         "colors": {
-            "app_bg": "#2C1A25",
-            "sidebar_bg": "#2C1A25",
-            "sidebar_bg_image": "",
-            "sidebar_bg_repeat": "repeat",
-            "sidebar_bg_position": "center",
-            "sidebar_hover": "#3D2A34",
-            "sidebar_active": "#4E3A45",
-            "sidebar_text": "#C4A99A",
-            "sidebar_text_active": "#F7F4EF",
-            "sidebar_section": "#8B7D6B",
-            "sidebar_indicator": "#8A6F58",
-            "main_bg": "#F7F4EF",
-            "main_panel_radius": "16",
-            "card_bg": "#FFFFFF",
-            "card_border": "#E8DFD3",
-            "card_radius": "12",
-            "text_primary": "#2C1A25",
-            "text_secondary": "#8B7D6B",
-            "text_muted": "#A89888",
-            "border": "#E8DFD3",
-            "primary": "#8A6F58",
-            "primary_hover": "#7A5F48",
-            "primary_pressed": "#6A4F38",
-            "primary_text": "#FFFFFF",
-            "secondary_bg": "#FFFFFF",
-            "secondary_border": "#E8DFD3",
-            "secondary_text": "#2C1A25",
-            "secondary_hover_bg": "#F7F4EF",
-            "success": "#6DC1B5",
-            "warning": "#B8B85A",
-            "danger": "#C4364A",
-            "info": "#6DC1B5",
-            "input_bg": "#FFFFFF",
-            "input_border": "#E8DFD3",
-            "input_focus": "#8A6F58",
-            "input_text": "#2C1A25",
-            "input_placeholder": "#A89888",
-            "input_selection_bg": "#E8DFD3",
-            "input_selection_text": "#2C1A25",
-            "table_bg": "#FFFFFF",
-            "table_alt": "#FAF8F5",
-            "table_header_bg": "#F7F4EF",
-            "table_header_text": "#8B7D6B",
-            "table_border": "#E8DFD3",
-            "table_item_border": "#F3EDE6",
-            "table_selected_bg": "#F0E8DF",
-            "table_selected_text": "#2C1A25",
-            "table_text": "#4A3D35",
-            "scrollbar_bg": "transparent",
-            "scrollbar_handle": "#D4C8BC",
-            "scrollbar_handle_hover": "#B8A898",
-            "progress_bg": "#E8DFD3",
-            "progress_chunk": "#8A6F58",
-            "status_pill_bg": "#F0FDF4",
-            "status_pill_border": "#BBF7D0",
-            "status_pill_text": "#16A34A",
-            "chip_bg": "#F3EDE6",
-            "chip_border": "#E8DFD3",
-            "chip_text": "#8B7D6B",
-            "chip_hover_bg": "#E8DFD3",
-            "badge_purple_bg": "#F3E8FF", "badge_purple_text": "#7C3AED",
-            "badge_green_bg": "#DCFCE7", "badge_green_text": "#16A34A",
-            "badge_blue_bg": "#DBEAFE", "badge_blue_text": "#2563EB",
-            "badge_red_bg": "#FEE2E2", "badge_red_text": "#DC2626",
-            "logo_bg": "#4E3A45",
-            "logo_text": "#F7F4EF",
-            "step_badge_bg": "#8A6F58",
-            "email_header_bg": "#F7F4EF",
-            "email_body_bg": "#FFFFFF",
-        },
-    },
-    "midnight_glass": {
-        "display_name": "Midnight Glass",
-        "description": "Deep graphite with glassmorphism and subtle glow",
-        "tags": ["premium", "glass", "sleek", "focus", "modern"],
-        "palette_swatches": ["#080D12", "#191B21", "#1F2430", "#7C5CFF", "#A789FA", "#E2E8F0"],
-        "colors": {
-            "app_bg": "#080D12",
-            "sidebar_bg": "#0B1018",
+            "app_bg": "#0B1017",
+            "sidebar_bg": "#0F172A",
             "sidebar_bg_image": "",
             "sidebar_bg_repeat": "no-repeat",
-            "sidebar_bg_position": "bottom left",
-            "sidebar_hover": "#141921",
-            "sidebar_active": "#1C2230",
-            "sidebar_text": "#7C8DB5",
-            "sidebar_text_active": "#E2E8F0",
-            "sidebar_section": "#4A5568",
-            "sidebar_indicator": "#7C5CFF",
-            "main_bg": "#0E1117",
+            "sidebar_bg_position": "center",
+            "sidebar_hover": "rgba(56,189,248,0.08)",
+            "sidebar_active": "rgba(56,189,248,0.14)",
+            "sidebar_text": "#94A3B8",
+            "sidebar_text_active": "#F8FAFC",
+            "sidebar_section": "#475569",
+            "sidebar_indicator": "#38BDF8",
+            "main_bg": "#0B1017",
             "main_panel_radius": "16",
-            "card_bg": "#161B24",
-            "card_border": "#1E2533",
+            "card_bg": "#111827",
+            "card_border": "#243244",
             "card_radius": "12",
-            "text_primary": "#E2E8F0",
-            "text_secondary": "#94A3B8",
-            "text_muted": "#64748B",
-            "border": "#1E2533",
-            "primary": "#7C5CFF",
-            "primary_hover": "#9B7EFF",
-            "primary_pressed": "#6A4AEE",
-            "primary_text": "#FFFFFF",
-            "secondary_bg": "#161B24",
-            "secondary_border": "#1E2533",
-            "secondary_text": "#E2E8F0",
-            "secondary_hover_bg": "#1C2230",
+            "text_primary": "#F8FAFC",
+            "text_secondary": "#CBD5E1",
+            "text_muted": "#94A3B8",
+            "border": "#243244",
+            "primary": "#38BDF8",
+            "primary_hover": "#7DD3FC",
+            "primary_pressed": "#0284C7",
+            "primary_text": "#0B1017",
+            "secondary_bg": "#1F2937",
+            "secondary_border": "#243244",
+            "secondary_text": "#F8FAFC",
+            "secondary_hover_bg": "#162033",
             "success": "#22C55E",
             "warning": "#F59E0B",
             "danger": "#EF4444",
             "info": "#3B82F6",
-            "input_bg": "#161B24",
-            "input_border": "#1E2533",
-            "input_focus": "#7C5CFF",
-            "input_text": "#E2E8F0",
-            "input_placeholder": "#64748B",
-            "input_selection_bg": "#7C5CFF",
-            "input_selection_text": "#FFFFFF",
-            "table_bg": "#111720",
-            "table_alt": "#151C26",
-            "table_header_bg": "#161B24",
-            "table_header_text": "#94A3B8",
-            "table_border": "#1E2533",
-            "table_item_border": "#1A202E",
-            "table_selected_bg": "#252D45",
-            "table_selected_text": "#E2E8F0",
+            "input_bg": "#0B1220",
+            "input_border": "#243244",
+            "input_focus": "#38BDF8",
+            "input_text": "#F8FAFC",
+            "input_placeholder": "#94A3B8",
+            "input_selection_bg": "rgba(56,189,248,0.25)",
+            "input_selection_text": "#0B1017",
+            "table_bg": "#0B1220",
+            "table_alt": "#111827",
+            "table_header_bg": "#1F2937",
+            "table_header_text": "#CBD5E1",
+            "table_border": "#243244",
+            "table_item_border": "rgba(36,50,68,0.5)",
+            "table_selected_bg": "rgba(56,189,248,0.15)",
+            "table_selected_text": "#F8FAFC",
             "table_text": "#CBD5E1",
             "scrollbar_bg": "transparent",
-            "scrollbar_handle": "#2A3344",
-            "scrollbar_handle_hover": "#3A4A5E",
-            "progress_bg": "#1E2533",
-            "progress_chunk": "#7C5CFF",
-            "status_pill_bg": "#162016",
-            "status_pill_border": "#22C55E",
+            "scrollbar_handle": "#334155",
+            "scrollbar_handle_hover": "#475569",
+            "progress_bg": "#1F2937",
+            "progress_chunk": "#38BDF8",
+            "status_pill_bg": "rgba(34,197,94,0.12)",
+            "status_pill_border": "rgba(34,197,94,0.30)",
             "status_pill_text": "#22C55E",
-            "chip_bg": "#161B24",
-            "chip_border": "#1E2533",
-            "chip_text": "#94A3B8",
-            "chip_hover_bg": "#1E2533",
-            "badge_purple_bg": "#2D1F5E", "badge_purple_text": "#A789FA",
-            "badge_green_bg": "#14332A", "badge_green_text": "#22C55E",
-            "badge_blue_bg": "#1A2744", "badge_blue_text": "#60A5FA",
-            "badge_red_bg": "#3B1A1A", "badge_red_text": "#F87171",
-            "logo_bg": "#1C2230",
-            "logo_text": "#A789FA",
-            "step_badge_bg": "#7C5CFF",
-            "email_header_bg": "#161B24",
-            "email_body_bg": "#111720",
+            "chip_bg": "#1F2937",
+            "chip_border": "#243244",
+            "chip_text": "#CBD5E1",
+            "chip_hover_bg": "#162033",
+            "badge_purple_bg": "rgba(168,85,247,0.15)", "badge_purple_text": "#C084FC",
+            "badge_green_bg": "rgba(34,197,94,0.12)", "badge_green_text": "#4ADE80",
+            "badge_blue_bg": "rgba(56,189,248,0.12)", "badge_blue_text": "#38BDF8",
+            "badge_red_bg": "rgba(239,68,68,0.12)", "badge_red_text": "#F87171",
+            "logo_bg": "rgba(56,189,248,0.20)",
+            "logo_text": "#38BDF8",
+            "step_badge_bg": "#38BDF8",
+            "email_header_bg": "#1F2937",
+            "email_body_bg": "#0B1220",
         },
     },
-    "electric_indigo": {
-        "display_name": "Electric Indigo",
-        "description": "Modern dark interface with indigo energy and data focus",
-        "tags": ["dynamic", "techy", "data-driven", "sharp", "futuristic"],
-        "palette_swatches": ["#0A0F1F", "#121A2D", "#1E2A47", "#3B82F6", "#22D3EE", "#E91FFF"],
+    "light_cloud": {
+        "display_name": "Light Cloud",
+        "description": "Site light mode — clean white surfaces with indigo accents",
+        "tags": ["light", "clean", "professional", "website", "minimal"],
+        "palette_swatches": ["#f6f8fb", "#ffffff", "#4f46e5", "#7c3aed", "#0f172a", "#334155"],
         "colors": {
-            "app_bg": "#0A0F1F",
-            "sidebar_bg": "#070C18",
-            "sidebar_bg_image": "",
-            "sidebar_bg_repeat": "repeat",
-            "sidebar_bg_position": "center",
-            "sidebar_hover": "#0F1628",
-            "sidebar_active": "#162038",
-            "sidebar_text": "#7C8DB5",
-            "sidebar_text_active": "#E2E8F0",
-            "sidebar_section": "#4A5580",
-            "sidebar_indicator": "#3B82F6",
-            "main_bg": "#0F1629",
-            "main_panel_radius": "16",
-            "card_bg": "#141D36",
-            "card_border": "#1E2A47",
-            "card_radius": "12",
-            "text_primary": "#E2E8F0",
-            "text_secondary": "#7C8DB5",
-            "text_muted": "#5A6A8A",
-            "border": "#1E2A47",
-            "primary": "#3B82F6",
-            "primary_hover": "#60A5FA",
-            "primary_pressed": "#2563EB",
-            "primary_text": "#FFFFFF",
-            "secondary_bg": "#141D36",
-            "secondary_border": "#1E2A47",
-            "secondary_text": "#E2E8F0",
-            "secondary_hover_bg": "#1A2540",
-            "success": "#22D3EE",
-            "warning": "#FBBF24",
-            "danger": "#F43F5E",
-            "info": "#3B82F6",
-            "input_bg": "#141D36",
-            "input_border": "#1E2A47",
-            "input_focus": "#3B82F6",
-            "input_text": "#E2E8F0",
-            "input_placeholder": "#5A6A8A",
-            "input_selection_bg": "#3B82F6",
-            "input_selection_text": "#FFFFFF",
-            "table_bg": "#111A30",
-            "table_alt": "#151F38",
-            "table_header_bg": "#141D36",
-            "table_header_text": "#7C8DB5",
-            "table_border": "#1E2A47",
-            "table_item_border": "#1A2440",
-            "table_selected_bg": "#1E3A6E",
-            "table_selected_text": "#E2E8F0",
-            "table_text": "#B0C4DE",
-            "scrollbar_bg": "transparent",
-            "scrollbar_handle": "#1E2A47",
-            "scrollbar_handle_hover": "#2A3A5A",
-            "progress_bg": "#1E2A47",
-            "progress_chunk": "#3B82F6",
-            "status_pill_bg": "#0C2D3E",
-            "status_pill_border": "#22D3EE",
-            "status_pill_text": "#22D3EE",
-            "chip_bg": "#141D36",
-            "chip_border": "#1E2A47",
-            "chip_text": "#7C8DB5",
-            "chip_hover_bg": "#1E2A47",
-            "badge_purple_bg": "#2D1F5E", "badge_purple_text": "#A78BFA",
-            "badge_green_bg": "#0C2D3E", "badge_green_text": "#22D3EE",
-            "badge_blue_bg": "#1A2744", "badge_blue_text": "#60A5FA",
-            "badge_red_bg": "#3B1A2A", "badge_red_text": "#FB7185",
-            "logo_bg": "#162038",
-            "logo_text": "#60A5FA",
-            "step_badge_bg": "#3B82F6",
-            "email_header_bg": "#141D36",
-            "email_body_bg": "#111A30",
-        },
-    },
-    "forest_executive": {
-        "display_name": "Forest Executive",
-        "description": "Executive dark green palette with trust and clarity",
-        "tags": ["executive", "trust", "grounded", "balanced", "enterprise"],
-        "palette_swatches": ["#0E1A14", "#1F3B2E", "#3E7D5A", "#88CF9F", "#E6A5EA", "#E2E8F0"],
-        "colors": {
-            "app_bg": "#0E1A14",
-            "sidebar_bg": "#0A1410",
+            "app_bg": "#eef3f8",
+            "sidebar_bg": "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #f0f4ff, stop:0.6 #eef0fb, stop:1 #e8ecf8)",
             "sidebar_bg_image": "",
             "sidebar_bg_repeat": "no-repeat",
-            "sidebar_bg_position": "bottom left",
-            "sidebar_hover": "#142820",
-            "sidebar_active": "#1C3A2C",
-            "sidebar_text": "#7DA68E",
-            "sidebar_text_active": "#E2E8F0",
-            "sidebar_section": "#4A6A58",
-            "sidebar_indicator": "#3E7D5A",
-            "main_bg": "#0F1F17",
+            "sidebar_bg_position": "center",
+            "sidebar_hover": "rgba(79,70,229,0.08)",
+            "sidebar_active": "rgba(79,70,229,0.14)",
+            "sidebar_text": "#64748b",
+            "sidebar_text_active": "#0f172a",
+            "sidebar_section": "#94a3b8",
+            "sidebar_indicator": "#4f46e5",
+            "main_bg": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f6f8fb, stop:1 #eef3f8)",
             "main_panel_radius": "16",
-            "card_bg": "#162B20",
-            "card_border": "#1F3B2E",
+            "card_bg": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #fafbff)",
+            "card_border": "rgba(15,23,42,0.09)",
             "card_radius": "12",
-            "text_primary": "#E2E8F0",
-            "text_secondary": "#7DA68E",
-            "text_muted": "#5A8A6E",
-            "border": "#1F3B2E",
-            "primary": "#3E7D5A",
-            "primary_hover": "#4E9D6A",
-            "primary_pressed": "#2E6D4A",
-            "primary_text": "#FFFFFF",
-            "secondary_bg": "#162B20",
-            "secondary_border": "#1F3B2E",
-            "secondary_text": "#E2E8F0",
-            "secondary_hover_bg": "#1C3828",
-            "success": "#88CF9F",
-            "warning": "#E6A5EA",
-            "danger": "#F87171",
-            "info": "#3E7D5A",
-            "input_bg": "#162B20",
-            "input_border": "#1F3B2E",
-            "input_focus": "#3E7D5A",
-            "input_text": "#E2E8F0",
-            "input_placeholder": "#5A8A6E",
-            "input_selection_bg": "#3E7D5A",
-            "input_selection_text": "#FFFFFF",
-            "table_bg": "#122218",
-            "table_alt": "#162B20",
-            "table_header_bg": "#162B20",
-            "table_header_text": "#7DA68E",
-            "table_border": "#1F3B2E",
-            "table_item_border": "#1A3226",
-            "table_selected_bg": "#1E4A35",
-            "table_selected_text": "#E2E8F0",
-            "table_text": "#B0D0BE",
+            "text_primary": "#0f172a",
+            "text_secondary": "#334155",
+            "text_muted": "#64748b",
+            "border": "rgba(15,23,42,0.10)",
+            "primary": "#4f46e5",
+            "primary_hover": "#4338ca",
+            "primary_pressed": "#3730a3",
+            "primary_text": "#ffffff",
+            "secondary_bg": "#ffffff",
+            "secondary_border": "rgba(15,23,42,0.10)",
+            "secondary_text": "#0f172a",
+            "secondary_hover_bg": "#f1f5f9",
+            "success": "#059669",
+            "warning": "#d97706",
+            "danger": "#dc2626",
+            "info": "#0284c7",
+            "input_bg": "#f8fafc",
+            "input_border": "rgba(15,23,42,0.12)",
+            "input_focus": "#4f46e5",
+            "input_text": "#0f172a",
+            "input_placeholder": "#94a3b8",
+            "input_selection_bg": "rgba(79,70,229,0.12)",
+            "input_selection_text": "#0f172a",
+            "table_bg": "#ffffff",
+            "table_alt": "#f8fafc",
+            "table_header_bg": "#f1f5f9",
+            "table_header_text": "#64748b",
+            "table_border": "rgba(15,23,42,0.08)",
+            "table_item_border": "rgba(15,23,42,0.05)",
+            "table_selected_bg": "rgba(79,70,229,0.08)",
+            "table_selected_text": "#0f172a",
+            "table_text": "#334155",
             "scrollbar_bg": "transparent",
-            "scrollbar_handle": "#1F3B2E",
-            "scrollbar_handle_hover": "#2A5040",
-            "progress_bg": "#1F3B2E",
-            "progress_chunk": "#3E7D5A",
-            "status_pill_bg": "#162B20",
-            "status_pill_border": "#88CF9F",
-            "status_pill_text": "#88CF9F",
-            "chip_bg": "#162B20",
-            "chip_border": "#1F3B2E",
-            "chip_text": "#7DA68E",
-            "chip_hover_bg": "#1F3B2E",
-            "badge_purple_bg": "#2D1F4E", "badge_purple_text": "#E6A5EA",
-            "badge_green_bg": "#143024", "badge_green_text": "#88CF9F",
-            "badge_blue_bg": "#162B35", "badge_blue_text": "#60A5FA",
-            "badge_red_bg": "#3B1A1A", "badge_red_text": "#F87171",
-            "logo_bg": "#1C3A2C",
-            "logo_text": "#88CF9F",
-            "step_badge_bg": "#3E7D5A",
-            "email_header_bg": "#162B20",
-            "email_body_bg": "#122218",
+            "scrollbar_handle": "#cbd5e1",
+            "scrollbar_handle_hover": "#94a3b8",
+            "progress_bg": "#e2e8f0",
+            "progress_chunk": "#4f46e5",
+            "status_pill_bg": "rgba(5,150,105,0.08)",
+            "status_pill_border": "rgba(5,150,105,0.25)",
+            "status_pill_text": "#059669",
+            "chip_bg": "#f1f5f9",
+            "chip_border": "rgba(15,23,42,0.08)",
+            "chip_text": "#64748b",
+            "chip_hover_bg": "#e2e8f0",
+            "badge_purple_bg": "rgba(124,58,237,0.08)", "badge_purple_text": "#7c3aed",
+            "badge_green_bg": "rgba(5,150,105,0.08)", "badge_green_text": "#059669",
+            "badge_blue_bg": "rgba(79,70,229,0.08)", "badge_blue_text": "#4f46e5",
+            "badge_red_bg": "rgba(220,38,38,0.08)", "badge_red_text": "#dc2626",
+            "logo_bg": "rgba(79,70,229,0.12)",
+            "logo_text": "#4f46e5",
+            "step_badge_bg": "#4f46e5",
+            "email_header_bg": "#f1f5f9",
+            "email_body_bg": "#ffffff",
+        },
+    },
+    "midnight_purple": {
+        "display_name": "Midnight Purple",
+        "description": "Deep obsidian with violet-pink gradient glow and premium depth",
+        "tags": ["dark", "purple", "glow", "premium", "gradient"],
+        "palette_swatches": ["#08040f", "#120920", "#7c3aed", "#a855f7", "#ec4899", "#f0e6ff"],
+        "colors": {
+            "app_bg": "#08040f",
+            "sidebar_bg": "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #0d0618, stop:0.5 #090413, stop:1 #06030e)",
+            "sidebar_bg_image": "",
+            "sidebar_bg_repeat": "no-repeat",
+            "sidebar_bg_position": "center",
+            "sidebar_hover": "rgba(168,85,247,0.10)",
+            "sidebar_active": "rgba(168,85,247,0.18)",
+            "sidebar_text": "#7c6a9e",
+            "sidebar_text_active": "#f0e6ff",
+            "sidebar_section": "#5a4a7a",
+            "sidebar_indicator": "#a855f7",
+            "main_bg": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #0f0820, stop:1 #08040f)",
+            "main_panel_radius": "16",
+            "card_bg": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #180d2e, stop:1 #0f0820)",
+            "card_border": "rgba(168,85,247,0.12)",
+            "card_radius": "12",
+            "text_primary": "#f0e6ff",
+            "text_secondary": "#b49dd4",
+            "text_muted": "#7c6a9e",
+            "border": "rgba(168,85,247,0.10)",
+            "primary": "#a855f7",
+            "primary_hover": "#c084fc",
+            "primary_pressed": "#7c3aed",
+            "primary_text": "#ffffff",
+            "secondary_bg": "#180d2e",
+            "secondary_border": "rgba(168,85,247,0.12)",
+            "secondary_text": "#f0e6ff",
+            "secondary_hover_bg": "#1f1040",
+            "success": "#10b981",
+            "warning": "#f59e0b",
+            "danger": "#ef4444",
+            "info": "#ec4899",
+            "input_bg": "#0f0820",
+            "input_border": "rgba(168,85,247,0.18)",
+            "input_focus": "#a855f7",
+            "input_text": "#f0e6ff",
+            "input_placeholder": "#7c6a9e",
+            "input_selection_bg": "rgba(168,85,247,0.25)",
+            "input_selection_text": "#ffffff",
+            "table_bg": "#0d0720",
+            "table_alt": "#120920",
+            "table_header_bg": "#180d2e",
+            "table_header_text": "#b49dd4",
+            "table_border": "rgba(168,85,247,0.10)",
+            "table_item_border": "rgba(168,85,247,0.06)",
+            "table_selected_bg": "rgba(168,85,247,0.18)",
+            "table_selected_text": "#f0e6ff",
+            "table_text": "#d4bff7",
+            "scrollbar_bg": "transparent",
+            "scrollbar_handle": "#2a1050",
+            "scrollbar_handle_hover": "#3d1870",
+            "progress_bg": "#1a0a30",
+            "progress_chunk": "#a855f7",
+            "status_pill_bg": "rgba(16,185,129,0.10)",
+            "status_pill_border": "rgba(16,185,129,0.28)",
+            "status_pill_text": "#10b981",
+            "chip_bg": "#180d2e",
+            "chip_border": "rgba(168,85,247,0.12)",
+            "chip_text": "#b49dd4",
+            "chip_hover_bg": "#1f1040",
+            "badge_purple_bg": "rgba(168,85,247,0.14)", "badge_purple_text": "#c084fc",
+            "badge_green_bg": "rgba(16,185,129,0.10)", "badge_green_text": "#34d399",
+            "badge_blue_bg": "rgba(236,72,153,0.10)", "badge_blue_text": "#f472b6",
+            "badge_red_bg": "rgba(239,68,68,0.10)", "badge_red_text": "#f87171",
+            "logo_bg": "rgba(168,85,247,0.22)",
+            "logo_text": "#c084fc",
+            "step_badge_bg": "#a855f7",
+            "email_header_bg": "#180d2e",
+            "email_body_bg": "#0d0720",
+        },
+    },
+    "slate_pro": {
+        "display_name": "Slate Pro",
+        "description": "Premium slate dark mode — clean, calm, enterprise-grade",
+        "tags": ["slate", "professional", "premium", "website", "calm"],
+        "palette_swatches": ["#0B1017", "#0F172A", "#111827", "#38BDF8", "#22C55E", "#F8FAFC"],
+        "colors": {
+            "app_bg": "#0B1017",
+            "sidebar_bg": "#0F172A",
+            "sidebar_bg_image": "",
+            "sidebar_bg_repeat": "no-repeat",
+            "sidebar_bg_position": "center",
+            "sidebar_hover": "rgba(56,189,248,0.08)",
+            "sidebar_active": "rgba(56,189,248,0.15)",
+            "sidebar_text": "#94A3B8",
+            "sidebar_text_active": "#F8FAFC",
+            "sidebar_section": "#475569",
+            "sidebar_indicator": "#38BDF8",
+            "main_bg": "#0B1017",
+            "main_panel_radius": "16",
+            "card_bg": "#111827",
+            "card_border": "#243244",
+            "card_radius": "14",
+            "text_primary": "#F8FAFC",
+            "text_secondary": "#CBD5E1",
+            "text_muted": "#94A3B8",
+            "border": "#243244",
+            "primary": "#38BDF8",
+            "primary_hover": "#7DD3FC",
+            "primary_pressed": "#0284c7",
+            "primary_text": "#0B1017",
+            "secondary_bg": "#1F2937",
+            "secondary_border": "#243244",
+            "secondary_text": "#CBD5E1",
+            "secondary_hover_bg": "#374151",
+            "success": "#22C55E",
+            "warning": "#F59E0B",
+            "danger": "#EF4444",
+            "info": "#3B82F6",
+            "input_bg": "#0B1220",
+            "input_border": "#243244",
+            "input_focus": "#38BDF8",
+            "input_text": "#F8FAFC",
+            "input_placeholder": "#94A3B8",
+            "input_selection_bg": "rgba(56,189,248,0.25)",
+            "input_selection_text": "#ffffff",
+            "table_bg": "#111827",
+            "table_alt": "#1F2937",
+            "table_header_bg": "#1F2937",
+            "table_header_text": "#CBD5E1",
+            "table_border": "#243244",
+            "table_item_border": "#243244",
+            "table_selected_bg": "rgba(56,189,248,0.15)",
+            "table_selected_text": "#F8FAFC",
+            "table_text": "#CBD5E1",
+            "scrollbar_bg": "transparent",
+            "scrollbar_handle": "#334155",
+            "scrollbar_handle_hover": "#475569",
+            "progress_bg": "#1F2937",
+            "progress_chunk": "#38BDF8",
+            "status_pill_bg": "rgba(34,197,94,0.1)",
+            "status_pill_border": "rgba(34,197,94,0.25)",
+            "status_pill_text": "#22C55E",
+            "chip_bg": "#1F2937",
+            "chip_border": "#243244",
+            "chip_text": "#CBD5E1",
+            "chip_hover_bg": "#374151",
+            "badge_purple_bg": "rgba(139,92,246,0.1)", "badge_purple_text": "#A78BFA",
+            "badge_green_bg": "rgba(34,197,94,0.1)", "badge_green_text": "#22C55E",
+            "badge_blue_bg": "rgba(59,130,246,0.1)", "badge_blue_text": "#3B82F6",
+            "badge_red_bg": "rgba(239,68,68,0.1)", "badge_red_text": "#EF4444",
+            "logo_bg": "rgba(56,189,248,0.15)",
+            "logo_text": "#38BDF8",
+            "step_badge_bg": "#38BDF8",
+            "email_header_bg": "#1F2937",
+            "email_body_bg": "#111827",
         },
     },
 }
 
-DEFAULT_THEME = "warm_stone"
+DEFAULT_THEME = "graphite_pro"
+_ACTIVE_THEME_CACHE: str | None = None
 
 
 def load_active_theme() -> str:
+    global _ACTIVE_THEME_CACHE
+    if _ACTIVE_THEME_CACHE in THEMES:
+        return _ACTIVE_THEME_CACHE
     path = app_data_dir() / "theme.json"
     if path.exists():
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             name = data.get("active", DEFAULT_THEME)
             if name in THEMES:
+                _ACTIVE_THEME_CACHE = name
                 return name
         except Exception:
             pass
+    _ACTIVE_THEME_CACHE = DEFAULT_THEME
     return DEFAULT_THEME
 
 
 def save_active_theme(name: str):
+    global _ACTIVE_THEME_CACHE
+    if name in THEMES:
+        _ACTIVE_THEME_CACHE = name
     path = app_data_dir() / "theme.json"
     path.write_text(json.dumps({"active": name}, indent=2), encoding="utf-8")
 
@@ -691,44 +724,32 @@ def generate_qss(theme_name: str | None = None) -> str:
             color: {c['text_secondary']};
         }}
         /* ── SIDEBAR ── */
-        QFrame#Sidebar, QFrame#Sidebar QWidget {{
-            color: {c['sidebar_text']};
-        }}
         QFrame#Sidebar {{
             background-color: {c['sidebar_bg']};
-            background-image: url('{c.get("sidebar_bg_image", "")}');
-            background-repeat: {c.get("sidebar_bg_repeat", "no-repeat")};
-            background-position: {c.get("sidebar_bg_position", "bottom left")};
             border: none;
             border-right: 1px solid {c['border']};
         }}
-        QLabel#LogoMark {{
-            min-width: 42px; min-height: 42px; max-width: 42px; max-height: 42px;
-            border-radius: 10px;
+        QLabel#SidebarLogoMark {{
+            min-width: 36px; min-height: 36px; max-width: 36px; max-height: 36px;
+            border-radius: 8px;
             background: {c['logo_bg']};
             color: {c['logo_text']};
-            font-size: 20px; font-weight: 900;
+            font-size: 18px; font-weight: 900;
             qproperty-alignment: AlignCenter;
         }}
         QLabel#SidebarBrand {{
-            color: {c['sidebar_text_active']};
-            font-size: 11.5pt; font-weight: 800;
+            color: {c['text_primary']};
+            font-size: 13pt; font-weight: 800;
         }}
-        QLabel#SidebarSub {{
-            color: {c['sidebar_text']};
-            font-size: 9pt;
-        }}
-        QLabel#SidebarSection {{
-            color: {c['sidebar_section']};
-            font-size: 8pt; font-weight: 700; letter-spacing: 1.2px; padding-top: 4px;
-        }}
-        QPushButton#SidebarNav, QPushButton#SidebarPassive {{
+        QPushButton#SidebarNav {{
             background: transparent; border: none;
             border-radius: 8px;
             color: {c['sidebar_text']};
-            padding: 9px 12px 9px 30px; text-align: left;
-            margin: 2px 14px 2px 18px;
+            padding: 8px 16px;
             font-size: 9.5pt; font-weight: 600;
+            qproperty-iconSize: 18px;
+            text-align: left;
+            margin: 2px 0;
         }}
         QPushButton#SidebarNav:hover {{
             background: {c['sidebar_hover']};
@@ -739,9 +760,93 @@ def generate_qss(theme_name: str | None = None) -> str:
             color: {c['sidebar_text_active']};
             font-weight: 700;
         }}
-        QPushButton#SidebarPassive:disabled {{
-            color: {c['sidebar_text']};
-            background: transparent;
+        QFrame#SidebarStatusCard {{
+            background: {c['card_bg']};
+            border: 1px solid {c['border']};
+            border-radius: 12px;
+        }}
+        QLabel#SidebarStatusLabel {{
+            color: {c['text_primary']};
+            font-weight: 700; font-size: 9pt;
+        }}
+        QLabel#SidebarStatusSubLabel {{
+            color: {c['text_muted']};
+            font-weight: 600; font-size: 8.5pt;
+        }}
+
+        /* ── PAGE HEADER ── */
+        QFrame#PageHeader {{
+            background: {c['main_bg']};
+            border-bottom: 1px solid {c['border']};
+            min-height: 72px; max-height: 72px;
+        }}
+        QLabel#PageHeaderTitle {{
+            color: {c['text_primary']};
+            font-size: 16pt; font-weight: 800;
+        }}
+        QLabel#PageHeaderDesc {{
+            color: {c['text_muted']};
+            font-size: 9.5pt;
+        }}
+        /* ── ANALYZE HERO ── */
+        QFrame#AnalyzeHero {{
+            background: {c['card_bg']};
+            border: 1px solid {c['card_border']};
+            border-radius: 18px;
+        }}
+        QLabel#HeroEyebrow {{
+            color: {c['primary']};
+            font-size: 8.5pt;
+            font-weight: 900;
+            letter-spacing: 1.4px;
+        }}
+        QLabel#HeroTitle {{
+            color: {c['text_primary']};
+            font-size: 20pt;
+            font-weight: 900;
+        }}
+        QLabel#HeroSubtitle {{
+            color: {c['text_secondary']};
+            font-size: 10pt;
+            line-height: 1.35;
+        }}
+        QLabel#HeroChip {{
+            padding: 6px 10px;
+            border: 1px solid {c['chip_border']};
+            border-radius: 12px;
+            background: {c['chip_bg']};
+            color: {c['chip_text']};
+            font-size: 8.5pt;
+            font-weight: 800;
+        }}
+        QFrame#HeroSidePanel {{
+            min-width: 310px;
+            max-width: 360px;
+            background: {c['input_bg']};
+            border: 1px solid {c['input_border']};
+            border-radius: 14px;
+        }}
+        QLabel#HeroSideTitle {{
+            color: {c['text_primary']};
+            font-size: 10pt;
+            font-weight: 900;
+        }}
+        QLabel#HeroStepNumber {{
+            min-width: 26px; min-height: 26px; max-width: 26px; max-height: 26px;
+            border-radius: 13px;
+            background: {c['status_pill_bg']};
+            border: 1px solid {c['status_pill_border']};
+            color: {c['status_pill_text']};
+            font-weight: 900;
+        }}
+        QLabel#HeroStepTitle {{
+            color: {c['text_primary']};
+            font-size: 9pt;
+            font-weight: 850;
+        }}
+        QLabel#HeroStepSub {{
+            color: {c['text_muted']};
+            font-size: 8.3pt;
         }}
         /* ── CARDS ── */
         QGroupBox {{
@@ -762,9 +867,9 @@ def generate_qss(theme_name: str | None = None) -> str:
         }}
         QFrame#FooterBar {{
             background: {c['card_bg']};
-            border: 1.5px solid {c['card_border']};
-            border-top: 3px solid {c['primary']};
-            border-radius: 12px;
+            border: 1px solid {c['card_border']};
+            border-top: 2px solid {c['primary']};
+            border-radius: 14px;
         }}
         QFrame#MetricCard {{
             min-height: 110px;
@@ -908,7 +1013,7 @@ def generate_qss(theme_name: str | None = None) -> str:
             background: {c['secondary_bg']};
             color: {c['secondary_text']};
             border: 1px solid {c['secondary_border']};
-            border-radius: 8px; padding: 10px 18px;
+            border-radius: 20px; padding: 10px 18px;
             font-size: 10pt; font-weight: 700;
         }}
         QPushButton:hover {{
@@ -956,7 +1061,7 @@ def generate_qss(theme_name: str | None = None) -> str:
             border: none;
             color: palette(button-text);
         }}
-        AnimatedButton#PrimaryButton, AnimatedButton#SecondaryButton, AnimatedButton#SuccessButton, AnimatedButton#DangerButton, AnimatedButton#SidebarNav {{
+        AnimatedButton#PrimaryButton, AnimatedButton#SecondaryButton, AnimatedButton#SuccessButton, AnimatedButton#DangerButton, AnimatedButton#SidebarNav, AnimatedButton#NavbarNav {{
             background: transparent;
             border: none;
             color: palette(button-text);
@@ -965,7 +1070,8 @@ def generate_qss(theme_name: str | None = None) -> str:
         AnimatedButton#SecondaryButton:hover, AnimatedButton#SecondaryButton:pressed, AnimatedButton#SecondaryButton:disabled,
         AnimatedButton#SuccessButton:hover, AnimatedButton#SuccessButton:pressed, AnimatedButton#SuccessButton:disabled,
         AnimatedButton#DangerButton:hover, AnimatedButton#DangerButton:pressed, AnimatedButton#DangerButton:disabled,
-        AnimatedButton#SidebarNav:hover, AnimatedButton#SidebarNav:pressed, AnimatedButton#SidebarNav:checked, AnimatedButton#SidebarNav:disabled {{
+        AnimatedButton#SidebarNav:hover, AnimatedButton#SidebarNav:pressed, AnimatedButton#SidebarNav:checked, AnimatedButton#SidebarNav:disabled,
+        AnimatedButton#NavbarNav:hover, AnimatedButton#NavbarNav:pressed, AnimatedButton#NavbarNav:checked, AnimatedButton#NavbarNav:disabled {{
             background: transparent;
             border: none;
             color: palette(button-text);
@@ -1165,6 +1271,72 @@ def generate_qss(theme_name: str | None = None) -> str:
             border: none;
             color: palette(button-text);
         }}
+        QPushButton#WarningButton {{
+            background: transparent;
+            border: none;
+            color: palette(button-text);
+        }}
+        /* ── DETAIL DRAWER ── */
+        QFrame#DetailDrawer {{
+            background: {c['card_bg']};
+            border-left: 1px solid {c['border']};
+        }}
+        /* ── SETTINGS SUB NAV ── */
+        QFrame#SettingsSubNavContainer {{
+            background: transparent;
+            border-bottom: 1px solid {c['border']};
+            margin-bottom: 8px;
+        }}
+        QPushButton#SettingsSubNavBtn {{
+            background: transparent;
+            border: none;
+            color: {c['text_muted']};
+            padding: 8px 16px;
+            border-bottom: 2px solid transparent;
+            font-weight: 700;
+            font-size: 9.5pt;
+        }}
+        QPushButton#SettingsSubNavBtn:hover {{
+            color: {c['text_secondary']};
+        }}
+        QPushButton#SettingsSubNavBtn:checked {{
+            color: {c['primary']};
+            border-bottom: 2px solid {c['primary']};
+            font-weight: 800;
+        }}
+        /* ── HISTORY RUN CARD ── */
+        QFrame#HistoryRunCard {{
+            background: {c['card_bg']};
+            border: 1px solid {c['card_border']};
+            border-radius: {c['card_radius']}px;
+        }}
+        QFrame#HistoryRunCard:hover {{
+            border: 1px solid {c['primary']};
+            background: {c['secondary_hover_bg']};
+        }}
+        /* ── SLIDER STYLING ── */
+        QSlider::groove:horizontal {{
+            border: 1px solid {c['border']};
+            height: 6px;
+            background: {c['input_bg']};
+            border-radius: 3px;
+        }}
+        QSlider::sub-page:horizontal {{
+            background: {c['primary']};
+            border-radius: 3px;
+        }}
+        QSlider::handle:horizontal {{
+            background: {c['text_primary']};
+            border: 1px solid {c['border']};
+            width: 14px;
+            height: 14px;
+            margin: -4px 0;
+            border-radius: 7px;
+        }}
+        QSlider::handle:horizontal:hover {{
+            background: {c['primary_hover']};
+            border: 1px solid {c['primary']};
+        }}
     """
 
 
@@ -1176,7 +1348,7 @@ class ThemeEngine:
         self.default_theme = default_theme if default_theme in self.themes else next(iter(self.themes))
 
     def theme_names(self) -> list[str]:
-        preferred = ["midnight_glass", "warm_stone", "electric_indigo", "forest_executive"]
+        preferred = ["graphite_pro", "light_cloud", "midnight_purple", "slate_pro"]
         ordered = [name for name in preferred if name in self.themes]
         ordered.extend(name for name in self.themes if name not in ordered)
         return ordered
@@ -1265,11 +1437,23 @@ def get_button_colors(object_name: str, theme_colors: dict, is_checked: bool = F
         pressed_bg = theme_colors.get('sidebar_active', '#4E3A45')
         pressed_fg = theme_colors.get('sidebar_text_active', '#F7F4EF')
 
-        # Contrast check sidebar nav buttons
-        fg = get_contrast_text_color(bg if bg != "transparent" else theme_colors.get('sidebar_bg', '#2C1A25'), theme_dark, fg)
-        hover_fg = get_contrast_text_color(hover_bg, theme_dark, hover_fg)
-        pressed_fg = get_contrast_text_color(pressed_bg, theme_dark, pressed_fg)
         return bg, fg, border, hover_bg, hover_fg, pressed_bg, pressed_fg, 8
+
+    elif object_name == "NavbarNav":
+        if is_checked:
+            bg = theme_colors.get('sidebar_active', '#4E3A45')
+            fg = theme_colors.get('sidebar_text_active', '#F7F4EF')
+            border = "transparent"
+        else:
+            bg = "transparent"
+            fg = theme_colors.get('sidebar_text', '#C4A99A')
+            border = "transparent"
+        hover_bg = theme_colors.get('sidebar_hover', '#3D2A34')
+        hover_fg = theme_colors.get('sidebar_text_active', '#F7F4EF')
+        pressed_bg = theme_colors.get('sidebar_active', '#4E3A45')
+        pressed_fg = theme_colors.get('sidebar_text_active', '#F7F4EF')
+
+        return bg, fg, border, hover_bg, hover_fg, pressed_bg, pressed_fg, 12
 
     elif object_name == "PrimaryButton":
         bg = theme_colors.get('primary', '#8A6F58')
@@ -1280,19 +1464,19 @@ def get_button_colors(object_name: str, theme_colors: dict, is_checked: bool = F
         fg = get_contrast_text_color(bg, theme_dark, theme_light)
         hover_fg = get_contrast_text_color(hover_bg, theme_dark, theme_light)
         pressed_fg = get_contrast_text_color(pressed_bg, theme_dark, theme_light)
-        return bg, fg, border, hover_bg, hover_fg, pressed_bg, pressed_fg, 8
+        return bg, fg, border, hover_bg, hover_fg, pressed_bg, pressed_fg, 20
 
     elif object_name == "SecondaryButton":
         bg = theme_colors.get('secondary_bg', '#FFFFFF')
         hover_bg = theme_colors.get('secondary_hover_bg', '#F7F4EF')
         pressed_bg = theme_colors.get('primary_pressed', '#6A4F38')
-        border = theme_colors.get('secondary_border', '#E8DFD3')
+        border = theme_colors.get('secondary_border', '#dfd2c0')
 
         normal_fg = theme_colors.get('secondary_text', '#2C1A25')
         fg = get_contrast_text_color(bg, normal_fg, theme_light)
         hover_fg = get_contrast_text_color(hover_bg, normal_fg, theme_light)
         pressed_fg = get_contrast_text_color(pressed_bg, normal_fg, theme_light)
-        return bg, fg, border, hover_bg, hover_fg, pressed_bg, pressed_fg, 8
+        return bg, fg, border, hover_bg, hover_fg, pressed_bg, pressed_fg, 20
 
     elif object_name == "SuccessButton":
         bg = theme_colors.get('success', '#6DC1B5')
@@ -1301,7 +1485,16 @@ def get_button_colors(object_name: str, theme_colors: dict, is_checked: bool = F
         border = "transparent"
 
         fg = get_contrast_text_color(bg, theme_dark, theme_light)
-        return bg, fg, border, hover_bg, fg, pressed_bg, fg, 8
+        return bg, fg, border, hover_bg, fg, pressed_bg, fg, 20
+
+    elif object_name == "WarningButton":
+        bg = theme_colors.get('warning', '#F59E0B')
+        hover_bg = theme_colors.get('warning', '#F59E0B')
+        pressed_bg = theme_colors.get('warning', '#F59E0B')
+        border = "transparent"
+
+        fg = get_contrast_text_color(bg, theme_dark, theme_light)
+        return bg, fg, border, hover_bg, fg, pressed_bg, fg, 20
 
     elif object_name == "DangerButton":
         bg = theme_colors.get('danger', '#C4364A')
@@ -1310,7 +1503,7 @@ def get_button_colors(object_name: str, theme_colors: dict, is_checked: bool = F
         border = "transparent"
 
         fg = get_contrast_text_color(bg, theme_dark, theme_light)
-        return bg, fg, border, hover_bg, fg, pressed_bg, fg, 8
+        return bg, fg, border, hover_bg, fg, pressed_bg, fg, 20
 
     else:
         bg = "transparent"
@@ -1385,11 +1578,12 @@ class AnimatedButton(QPushButton):
             self.hover_anim.setEndValue(1.0)
             self.hover_anim.start()
 
-            if self.objectName() == "SidebarNav":
-                self.slide_anim.stop()
-                self.slide_anim.setStartValue(self._slide_offset)
-                self.slide_anim.setEndValue(4.0)
-                self.slide_anim.start()
+            if self.objectName() in ("SidebarNav", "NavbarNav"):
+                if self.objectName() == "SidebarNav":
+                    self.slide_anim.stop()
+                    self.slide_anim.setStartValue(self._slide_offset)
+                    self.slide_anim.setEndValue(4.0)
+                    self.slide_anim.start()
 
                 # Change SVG color dynamically
                 colors = get_theme_colors()
@@ -1414,11 +1608,12 @@ class AnimatedButton(QPushButton):
             self.hover_anim.setEndValue(0.0)
             self.hover_anim.start()
 
-            if self.objectName() == "SidebarNav":
-                self.slide_anim.stop()
-                self.slide_anim.setStartValue(self._slide_offset)
-                self.slide_anim.setEndValue(0.0)
-                self.slide_anim.start()
+            if self.objectName() in ("SidebarNav", "NavbarNav"):
+                if self.objectName() == "SidebarNav":
+                    self.slide_anim.stop()
+                    self.slide_anim.setStartValue(self._slide_offset)
+                    self.slide_anim.setEndValue(0.0)
+                    self.slide_anim.start()
 
                 # Restore SVG color
                 colors = get_theme_colors()
@@ -1566,6 +1761,7 @@ class AnimatedButton(QPushButton):
 
         self.style().drawControl(QStyle.CE_PushButtonLabel, option, painter, self)
         painter.restore()
+        painter.end()
 
 
 class PercentSpinBox(QSpinBox):
@@ -1766,6 +1962,7 @@ class AnimatedBadge(QWidget):
         rect = QRectF(cx - icon_size / 2.0, cy - icon_size / 2.0, icon_size, icon_size)
         renderer.render(painter, rect)
         painter.restore()
+        painter.end()
 
 
 class AnimatedThemeCard(QFrame):
@@ -1842,7 +2039,8 @@ class AnimatedThemeCard(QFrame):
         painter.translate(-cx, -cy)
 
         is_selected = self.property("selected") == "true"
-        colors = THEMES[self.theme_name]["colors"]
+        theme_data = THEMES.get(self.theme_name, THEMES[DEFAULT_THEME])
+        colors = theme_data["colors"]
 
         bg_color = QColor(colors.get('card_bg', '#ffffff'))
         border_color = QColor(colors.get('card_border', '#e0e0e0'))
@@ -1868,6 +2066,7 @@ class AnimatedThemeCard(QFrame):
 
         painter.drawRoundedRect(self.rect().adjusted(3, 3, -3, -3), 16, 16)
         painter.restore()
+        painter.end()
 
 
 class HoverDepthFrame(QFrame):
@@ -1877,10 +2076,10 @@ class HoverDepthFrame(QFrame):
         super().__init__(parent)
         self.setAttribute(Qt.WA_Hover, True)
         self.shadow = QGraphicsDropShadowEffect(self)
-        self.shadow.setBlurRadius(18)
-        self.shadow.setOffset(0, 4)
+        self.shadow.setBlurRadius(14)
+        self.shadow.setOffset(0, 3)
         self.setGraphicsEffect(self.shadow)
-        self._set_shadow_color(34)
+        self._set_shadow_color(22)
 
         self.blur_anim = QPropertyAnimation(self.shadow, b"blurRadius")
         self.blur_anim.setDuration(180)
@@ -1911,15 +2110,194 @@ class HoverDepthFrame(QFrame):
 
     def enterEvent(self, event):
         if MOTION_ENABLED:
-            self._set_shadow_color(72)
-            self._animate_shadow(30, 9)
+            self._set_shadow_color(46)
+            self._animate_shadow(22, 6)
         super().enterEvent(event)
 
     def leaveEvent(self, event):
         if MOTION_ENABLED:
-            self._set_shadow_color(34)
-            self._animate_shadow(18, 4)
+            self._set_shadow_color(22)
+            self._animate_shadow(14, 3)
         super().leaveEvent(event)
+
+
+class SkeletonBlock(QWidget):
+    def __init__(self, parent=None, min_width=100, min_height=20):
+        super().__init__(parent)
+        self.setMinimumSize(min_width, min_height)
+        self._gradient_position = 0.0
+
+        if MOTION_ENABLED:
+            self._timer = QTimer(self)
+            self._timer.timeout.connect(self._update_shimmer)
+            self._timer.start(30)
+
+    def _update_shimmer(self):
+        self._gradient_position += 0.03
+        if self._gradient_position > 1.0:
+            self._gradient_position = -1.0
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        rect = self.rect()
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(rect), 6.0, 6.0)
+
+        gradient = QLinearGradient(rect.left(), 0, rect.right(), 0)
+
+        try:
+            window = self.window()
+            if hasattr(window, "active_theme_name"):
+                theme_colors = window.theme_engine.colors(window.active_theme_name)
+                bg_color = QColor(theme_colors.get('input_bg', '#0B1220'))
+                glow_color = QColor(theme_colors.get('card_border', '#243244'))
+            else:
+                bg_color = QColor("#0B1220")
+                glow_color = QColor("#243244")
+        except:
+            bg_color = QColor("#0B1220")
+            glow_color = QColor("#243244")
+
+        pos = self._gradient_position
+        p0 = max(0.0, min(1.0, pos - 0.2))
+        p1 = max(0.0, min(1.0, pos))
+        p2 = max(0.0, min(1.0, pos + 0.2))
+
+        gradient.setColorAt(0.0, bg_color)
+        if p0 > 0.0:
+            gradient.setColorAt(p0, bg_color)
+        gradient.setColorAt(p1, glow_color)
+        if p2 < 1.0:
+            gradient.setColorAt(p2, bg_color)
+        gradient.setColorAt(1.0, bg_color)
+
+        painter.fillPath(path, QBrush(gradient))
+        painter.end()
+
+
+class ToastNotification(QFrame):
+    def __init__(self, message: str, type_name: str = "success", parent=None):
+        super().__init__(parent)
+        self.setObjectName("ToastNotification")
+        self.setWindowFlags(Qt.SubWindow | Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(10)
+
+        icon_char = "OK"
+        color = "#22C55E"
+        if type_name == "error":
+            icon_char = "X"
+            color = "#EF4444"
+        elif type_name == "warning":
+            icon_char = "!"
+            color = "#F59E0B"
+        elif type_name == "info":
+            icon_char = "i"
+            color = "#3B82F6"
+
+        icon_lbl = QLabel(icon_char)
+        icon_lbl.setStyleSheet(f"color: {color}; font-weight: bold; font-size: 12pt; background: transparent; border: none;")
+
+        msg_lbl = QLabel(message)
+        msg_lbl.setStyleSheet("color: #F8FAFC; font-weight: 600; font-size: 9.5pt; background: transparent; border: none;")
+        msg_lbl.setWordWrap(True)
+
+        layout.addWidget(icon_lbl)
+        layout.addWidget(msg_lbl, 1)
+
+        # Style Toast
+        self.setStyleSheet(f"""
+            QFrame#ToastNotification {{
+                background: #0F172A;
+                border: 1px solid #243244;
+                border-radius: 10px;
+            }}
+        """)
+
+        self.opacity_effect = QGraphicsOpacityEffect(self)
+        self.setGraphicsEffect(self.opacity_effect)
+        self.opacity_effect.setOpacity(0.0)
+
+        self.anim = QPropertyAnimation(self.opacity_effect, b"opacity")
+        self.anim.setDuration(200)
+
+        self.timer = QTimer(self)
+        self.timer.setSingleShot(True)
+        self.timer.timeout.connect(self.dismiss)
+
+    def show_toast(self):
+        self.show()
+        self.anim.setStartValue(0.0)
+        self.anim.setEndValue(1.0)
+        self.anim.start()
+        self.timer.start(3000)
+
+    def dismiss(self):
+        self.anim.stop()
+        self.anim.setStartValue(self.opacity_effect.opacity())
+        self.anim.setEndValue(0.0)
+        self.anim.finished.connect(self.close)
+        self.anim.start()
+
+
+class HistoryRunCard(QFrame):
+    def __init__(self, run_data: dict, on_load_callback, on_report_callback, parent=None):
+        super().__init__(parent)
+        self.setObjectName("HistoryRunCard")
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(10)
+
+        header = QHBoxLayout()
+        job_lbl = QLabel(str(run_data['job_name']))
+        job_lbl.setStyleSheet("font-size: 11pt; font-weight: 800; background: transparent; border: none;")
+
+        date_lbl = QLabel(run_data['created_at'])
+        date_lbl.setStyleSheet("font-size: 9pt; color: #94A3B8; background: transparent; border: none;")
+
+        header.addWidget(job_lbl)
+        header.addStretch(1)
+        header.addWidget(date_lbl)
+        layout.addLayout(header)
+
+        info = QHBoxLayout()
+        info.setSpacing(16)
+
+        files_lbl = QLabel(f"📄 {run_data['total_files']} files")
+        files_lbl.setStyleSheet("font-size: 9.5pt; color: #CBD5E1; background: transparent; border: none;")
+        info.addWidget(files_lbl)
+
+        path_lbl = QLabel(f"📂 {Path(run_data['output_folder']).name}")
+        path_lbl.setStyleSheet("font-size: 9pt; color: #94A3B8; background: transparent; border: none;")
+        info.addWidget(path_lbl)
+
+        info.addStretch(1)
+        layout.addLayout(info)
+
+        actions = QHBoxLayout()
+        load_btn = AnimatedButton("Load Run Results")
+        load_btn.setObjectName("PrimaryButton")
+        load_btn.setFixedWidth(160)
+        load_btn.setCursor(Qt.PointingHandCursor)
+        load_btn.clicked.connect(lambda: on_load_callback(run_data['id']))
+
+        report_btn = AnimatedButton("Open Folder")
+        report_btn.setObjectName("SecondaryButton")
+        report_btn.setFixedWidth(120)
+        report_btn.setCursor(Qt.PointingHandCursor)
+        report_btn.clicked.connect(lambda: on_report_callback(run_data['output_folder']))
+
+        actions.addWidget(load_btn)
+        actions.addWidget(report_btn)
+        actions.addStretch(1)
+        layout.addLayout(actions)
 
 
 class AnalysisWorker(QObject):
@@ -2163,69 +2541,29 @@ class MainWindow(QMainWindow):
         root = QWidget()
         root.setObjectName("Root")
         root_layout = QHBoxLayout(root)
-        root_layout.setContentsMargins(0, 12, 12, 12)
-        root_layout.setSpacing(12)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
 
+        # Left Sidebar Navigation
         sidebar = self._build_sidebar()
         root_layout.addWidget(sidebar)
 
+        # Right Content Area
+        content_container = QWidget()
+        content_layout = QVBoxLayout(content_container)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(0)
+
+        # Page Header (Inside Content Area)
+        self.header = self._build_page_header()
+        content_layout.addWidget(self.header)
+
+        # Main Panel
         main_panel = QWidget()
         main_panel.setObjectName("MainPanel")
-        root_layout.addWidget(main_panel, 1)
-
-        outer = QVBoxLayout(main_panel)
-        outer.setContentsMargins(28, 20, 28, 22)
-        outer.setSpacing(20)
-
-        header = QHBoxLayout()
-        header.setSpacing(16)
-        header_icon = QLabel("✦")
-        header_icon.setObjectName("HeaderIcon")
-        header.addWidget(header_icon)
-        title_box = QVBoxLayout()
-        title = QLabel("CV Analyzer Local Worker")
-        title.setObjectName("Title")
-        subtitle = QLabel("Private desktop ranking for large CV folders. No site-side job required.")
-        subtitle.setObjectName("Subtitle")
-        title_box.addWidget(title)
-        title_box.addWidget(subtitle)
-        header.addLayout(title_box, 1)
-        self.status_label = QLabel("Ready")
-        self.status_label.setObjectName("StatusPill")
-        header.addWidget(self.status_label)
-
-        # Pulsing opacity effect for Status Pill in the header (breathing pulse)
-        self.status_opacity = QGraphicsOpacityEffect()
-        self.status_label.setGraphicsEffect(self.status_opacity)
-
-        anim_fade_in = QPropertyAnimation(self.status_opacity, b"opacity")
-        anim_fade_in.setDuration(1200)
-        anim_fade_in.setStartValue(0.4)
-        anim_fade_in.setEndValue(1.0)
-        anim_fade_in.setEasingCurve(QEasingCurve.InOutQuad)
-
-        anim_fade_out = QPropertyAnimation(self.status_opacity, b"opacity")
-        anim_fade_out.setDuration(1200)
-        anim_fade_out.setStartValue(1.0)
-        anim_fade_out.setEndValue(0.4)
-        anim_fade_out.setEasingCurve(QEasingCurve.InOutQuad)
-
-        self.status_group = QSequentialAnimationGroup()
-        self.status_group.addAnimation(anim_fade_in)
-        self.status_group.addAnimation(anim_fade_out)
-        self.status_group.setLoopCount(-1)
-        self.status_group.start()
-        self.sync_label = QLabel("Website sync required")
-        self.sync_label.setObjectName("SyncMeta")
-        header.addWidget(self.sync_label)
-        self.quota_label = QLabel("Quota: connect")
-        self.quota_label.setObjectName("SyncMeta")
-        header.addWidget(self.quota_label)
-        sync_button = AnimatedButton("↻  Sync now")
-        sync_button.setObjectName("PrimaryButton")
-        sync_button.setMinimumWidth(136)
-        header.addWidget(sync_button)
-        outer.addLayout(header)
+        main_layout = QVBoxLayout(main_panel)
+        main_layout.setContentsMargins(24, 16, 24, 24)
+        main_layout.setSpacing(0)
 
         self.tabs = QTabWidget()
         self.tabs.tabBar().hide()
@@ -2241,8 +2579,11 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._build_templates_tab(), "Templates")   # 9
         self.tabs.currentChanged.connect(self._animate_tab_change)
         self.tabs.currentChanged.connect(self._update_nav_state)
-        sync_button.clicked.connect(lambda: self.tabs.setCurrentIndex(3))
-        outer.addWidget(self.tabs, 1)
+
+        main_layout.addWidget(self.tabs, 1)
+        content_layout.addWidget(main_panel, 1)
+        root_layout.addWidget(content_container, 1)
+
         self.setCentralWidget(root)
 
         open_output = QAction("Open output folder", self)
@@ -2253,135 +2594,134 @@ class MainWindow(QMainWindow):
     def _build_sidebar(self) -> QWidget:
         sidebar = QFrame()
         sidebar.setObjectName("Sidebar")
-        sidebar.setFixedWidth(250)
-        layout = QVBoxLayout(sidebar)
-        layout.setContentsMargins(0, 20, 0, 18)
-        layout.setSpacing(14)
+        sidebar.setFixedWidth(240)
 
-        brand = QHBoxLayout()
-        brand.setContentsMargins(14, 0, 14, 0)
+        layout = QVBoxLayout(sidebar)
+        layout.setContentsMargins(16, 20, 16, 20)
+        layout.setSpacing(6)
+
+        # Logo Section
+        logo_layout = QHBoxLayout()
+        logo_layout.setSpacing(10)
+        logo_layout.setContentsMargins(4, 0, 4, 16)
+
         self.logo = QLabel()
-        self.logo.setObjectName("LogoMark")
-        self.logo.setFixedSize(42, 42)
-        brand_text = QVBoxLayout()
+        self.logo.setObjectName("SidebarLogoMark")
+        self.logo.setFixedSize(36, 36)
+        logo_layout.addWidget(self.logo)
+
         brand_title = QLabel("CV Analyzer")
         brand_title.setObjectName("SidebarBrand")
-        brand_sub = QLabel("Local Worker")
-        brand_sub.setObjectName("SidebarSub")
-        brand_text.addWidget(brand_title)
-        brand_text.addWidget(brand_sub)
-        brand.addWidget(self.logo)
-        brand.addLayout(brand_text, 1)
-        layout.addLayout(brand)
-        layout.addSpacing(12)
+        logo_layout.addWidget(brand_title)
+        logo_layout.addStretch(1)
+        layout.addLayout(logo_layout)
 
-        main_section = QLabel("MAIN")
-        main_section.setObjectName("SidebarSection")
-        main_section.setContentsMargins(14, 0, 14, 0)
-        layout.addWidget(main_section)
-        layout.addWidget(self._nav_button("Analyze", 0, icon_key="analyze"))
-        layout.addWidget(self._nav_button("Results", 1, icon_key="results"))
-        layout.addWidget(self._passive_nav_button("Dashboard", icon_key="dashboard"))
-        layout.addWidget(self._nav_button("History", 2, icon_key="history"))
-        layout.addSpacing(10)
+        # Nav Buttons
+        self.nav_buttons = []
 
-        settings_section = QLabel("SETTINGS")
-        settings_section.setObjectName("SidebarSection")
-        settings_section.setContentsMargins(14, 0, 14, 0)
-        layout.addWidget(settings_section)
-        layout.addWidget(self._passive_nav_button("Appearance", icon_key="appearance"))
-        layout.addWidget(self._passive_nav_button("Email Templates", icon_key="templates"))
-        layout.addWidget(self._nav_button("Website Sync", 3, has_dot=True, icon_key="sync"))
-        layout.addWidget(self._passive_nav_button("Preferences", icon_key="preferences"))
-        layout.addWidget(self._passive_nav_button("AI Models", icon_key="models"))
-        layout.addWidget(self._passive_nav_button("Reports", icon_key="reports"))
+        nav_items = [
+            ("Dashboard", 4, "dashboard"),
+            ("Analyze", 0, "analyze"),
+            ("Results", 1, "results"),
+            ("History", 2, "history"),
+            ("Templates", 9, "templates"),
+            ("Reports", 5, "reports"),
+            ("Website Sync", 3, "sync"),
+            ("Settings", 6, "settings")
+        ]
+
+        for text, index, icon in nav_items:
+            btn = self._sidebar_nav_button(text, index, icon_key=icon)
+            layout.addWidget(btn)
+            self.nav_buttons.append(btn)
 
         layout.addStretch(1)
 
-        # Enterprise Trust Card in Sidebar
-        self.sidebar_trust_card = QFrame()
-        self.sidebar_trust_card.setObjectName("SidebarTrustCard")
-        trust_layout = QVBoxLayout(self.sidebar_trust_card)
-        trust_layout.setContentsMargins(12, 12, 12, 12)
-        trust_layout.setSpacing(6)
+        # Bottom connection / server status card
+        status_card = QFrame()
+        status_card.setObjectName("SidebarStatusCard")
+        status_layout = QVBoxLayout(status_card)
+        status_layout.setContentsMargins(12, 12, 12, 12)
+        status_layout.setSpacing(6)
 
-        trust_header = QHBoxLayout()
-        trust_header.setSpacing(6)
-        self.trust_icon = QLabel()
-        self.trust_icon.setObjectName("SidebarTrustIcon")
-        trust_title = QLabel("Enterprise trust")
-        trust_title.setObjectName("SidebarTrustTitle")
-        trust_header.addWidget(self.trust_icon)
-        trust_header.addWidget(trust_title, 1)
-        trust_layout.addLayout(trust_header)
+        self.sync_label = QLabel("Website sync required")
+        self.sync_label.setObjectName("SidebarStatusLabel")
+        self.quota_label = QLabel("Quota: connect")
+        self.quota_label.setObjectName("SidebarStatusSubLabel")
 
-        trust_desc = QLabel("Local analysis. Your data never leaves this device.")
-        trust_desc.setObjectName("SidebarTrustDesc")
-        trust_desc.setWordWrap(True)
-        trust_layout.addWidget(trust_desc)
+        status_layout.addWidget(self.sync_label)
+        status_layout.addWidget(self.quota_label)
 
-        layout.addWidget(self.sidebar_trust_card)
-        layout.addSpacing(6)
+        layout.addWidget(status_card)
 
-        footer_layout = QVBoxLayout()
-        footer_layout.setContentsMargins(14, 0, 14, 0)
-        footer_layout.setSpacing(6)
-
-        version_lbl = QLabel("v1.0.0")
-        version_lbl.setObjectName("SidebarSub")
-
-        status_row = QHBoxLayout()
-        status_dot = QLabel("●")
-        status_dot.setObjectName("StatusDot")
-        status_lbl = QLabel("Ready")
-        status_lbl.setObjectName("SidebarSub")
-        status_row.addWidget(status_dot)
-        status_row.addWidget(status_lbl)
-        status_row.addStretch(1)
-
-        footer_layout.addWidget(version_lbl)
-        footer_layout.addLayout(status_row)
-        layout.addLayout(footer_layout)
         return sidebar
 
-    def _nav_button(self, text: str, index: int, has_dot: bool = False, icon_key: str = "") -> AnimatedButton:
-        button = AnimatedButton(text + ("      ●" if has_dot else ""))
+    def _build_page_header(self) -> QWidget:
+        header = QFrame()
+        header.setObjectName("PageHeader")
+        layout = QHBoxLayout(header)
+        layout.setContentsMargins(24, 0, 24, 0)
+
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(2)
+        text_layout.setContentsMargins(0, 14, 0, 14)
+
+        self.page_title = QLabel("Dashboard")
+        self.page_title.setObjectName("PageHeaderTitle")
+
+        self.page_desc = QLabel("Overview of candidate match statistics and local queue status.")
+        self.page_desc.setObjectName("PageHeaderDesc")
+
+        text_layout.addWidget(self.page_title)
+        text_layout.addWidget(self.page_desc)
+        layout.addLayout(text_layout)
+        layout.addStretch(1)
+
+        # Right action area
+        self.header_action_layout = QHBoxLayout()
+        self.header_action_layout.setSpacing(10)
+        self.header_action_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Ready status label
+        self.status_label = QLabel("Ready")
+        self.status_label.setObjectName("StatusPill")
+
+        # Opacity breathing pulse for Status Pill
+        self.status_opacity = QGraphicsOpacityEffect()
+        self.status_label.setGraphicsEffect(self.status_opacity)
+
+        self.header_action_layout.addWidget(self.status_label)
+        layout.addLayout(self.header_action_layout)
+
+        # Setup breathing animation
+        anim_fade_in = QPropertyAnimation(self.status_opacity, b"opacity")
+        anim_fade_in.setDuration(1200)
+        anim_fade_in.setStartValue(0.4)
+        anim_fade_in.setEndValue(1.0)
+        anim_fade_in.setEasingCurve(QEasingCurve.InOutQuad)
+
+        anim_fade_out = QPropertyAnimation(self.status_opacity, b"opacity")
+        anim_fade_out.setDuration(1200)
+        anim_fade_out.setStartValue(1.0)
+        anim_fade_out.setEndValue(0.4)
+        anim_fade_out.setEasingCurve(QEasingCurve.InOutQuad)
+
+        self.status_group = QSequentialAnimationGroup(self)
+        self.status_group.addAnimation(anim_fade_in)
+        self.status_group.addAnimation(anim_fade_out)
+        self.status_group.setLoopCount(-1)
+        self.status_group.start()
+
+        return header
+
+    def _sidebar_nav_button(self, text: str, index: int, icon_key: str = "") -> AnimatedButton:
+        button = AnimatedButton("  " + text)
         button.setObjectName("SidebarNav")
         button.setCheckable(True)
         button.setProperty("tab_index", index)
         button.setProperty("icon_key", icon_key)
         button.clicked.connect(lambda: self.tabs.setCurrentIndex(index))
 
-        # Load custom SVG icon
-        colors = self.theme_engine.colors(self.active_theme_name)
-        icon_color = colors.get('sidebar_text', '#94a3b8')
-        svg_data = get_sidebar_icon_svg(icon_key, icon_color)
-        if svg_data:
-            button.setIcon(QIcon(svg_to_pixmap(svg_data, 18, 18)))
-            button.setIconSize(QSize(18, 18))
-
-        self.nav_buttons.append(button)
-        return button
-
-    def _passive_nav_button(self, text: str, icon_key: str = "") -> AnimatedButton:
-        route_map = {
-            "Dashboard": 4,
-            "Reports": 5,
-            "Preferences": 6,
-            "AI Models": 7,
-            "Appearance": 8,
-            "Email Templates": 9,
-            "Templates": 9,
-        }
-        for label, index in route_map.items():
-            if label in text:
-                return self._nav_button(text, index, icon_key=icon_key)
-        button = AnimatedButton(text)
-        button.setObjectName("SidebarPassive")
-        button.setProperty("icon_key", icon_key)
-        button.setEnabled(False)
-
-        # Load custom SVG icon
         colors = self.theme_engine.colors(self.active_theme_name)
         icon_color = colors.get('sidebar_text', '#94a3b8')
         svg_data = get_sidebar_icon_svg(icon_key, icon_color)
@@ -2396,7 +2736,10 @@ class MainWindow(QMainWindow):
         for button in self.nav_buttons:
             btn_idx = button.property("tab_index")
             if btn_idx is not None:
-                is_active = (btn_idx == index)
+                if btn_idx == 6:
+                    is_active = index in (6, 7, 8)
+                else:
+                    is_active = (btn_idx == index)
                 button.setChecked(is_active)
                 icon_key = button.property("icon_key")
                 if icon_key:
@@ -2405,6 +2748,107 @@ class MainWindow(QMainWindow):
                     svg_data = get_sidebar_icon_svg(icon_key, icon_color)
                     if svg_data:
                         button.setIcon(QIcon(svg_to_pixmap(svg_data, 18, 18)))
+
+        header_text = {
+            0: ("Analyze Candidates", "Run local CV matching against your job criteria."),
+            1: ("Analysis Results", "Review matched resumes, scores, and candidate details."),
+            2: ("Analysis History", "Review and reload past local matching runs."),
+            3: ("Website Sync", "Synchronize local worker results back to the website."),
+            4: ("Dashboard Overview", "Overview of candidate match statistics and local queue status."),
+            5: ("Reports Export", "Generate and export CV analysis reports in various formats."),
+            6: ("General Settings", "Configure local worker preferences and settings."),
+            7: ("AI Models", "Select AI model providers and set custom prompts."),
+            8: ("Appearance Studio", "Customize themes and visual effects for the workspace."),
+            9: ("Email Templates", "Draft and preview templates with variable inserts.")
+        }
+        title, desc = header_text.get(index, ("Local Worker", ""))
+        if hasattr(self, "page_title"):
+            self.page_title.setText(title)
+        if hasattr(self, "page_desc"):
+            self.page_desc.setText(desc)
+
+    def _hero_chip(self, label: str) -> QLabel:
+        chip = QLabel(label)
+        chip.setObjectName("HeroChip")
+        chip.setAlignment(Qt.AlignCenter)
+        chip.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        return chip
+
+    def _hero_step(self, number: str, title: str, subtitle: str) -> QWidget:
+        row = QWidget()
+        row.setObjectName("HeroStep")
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
+
+        badge = QLabel(number)
+        badge.setObjectName("HeroStepNumber")
+        badge.setAlignment(Qt.AlignCenter)
+
+        copy = QVBoxLayout()
+        copy.setContentsMargins(0, 0, 0, 0)
+        copy.setSpacing(2)
+        title_lbl = QLabel(title)
+        title_lbl.setObjectName("HeroStepTitle")
+        sub_lbl = QLabel(subtitle)
+        sub_lbl.setObjectName("HeroStepSub")
+        sub_lbl.setWordWrap(True)
+        copy.addWidget(title_lbl)
+        copy.addWidget(sub_lbl)
+
+        layout.addWidget(badge)
+        layout.addLayout(copy, 1)
+        return row
+
+    def _build_analyze_hero(self) -> QWidget:
+        hero = HoverDepthFrame()
+        hero.setObjectName("AnalyzeHero")
+        layout = QHBoxLayout(hero)
+        layout.setContentsMargins(24, 22, 24, 22)
+        layout.setSpacing(22)
+
+        copy = QVBoxLayout()
+        copy.setContentsMargins(0, 0, 0, 0)
+        copy.setSpacing(10)
+
+        eyebrow = QLabel("LOCAL WORKER")
+        eyebrow.setObjectName("HeroEyebrow")
+        title = QLabel("Private CV matching command center")
+        title.setObjectName("HeroTitle")
+        title.setWordWrap(True)
+        subtitle = QLabel(
+            "Choose folders, define scoring rules, and run large CV batches locally before syncing only the results you approve."
+        )
+        subtitle.setObjectName("HeroSubtitle")
+        subtitle.setWordWrap(True)
+
+        chips = QHBoxLayout()
+        chips.setSpacing(8)
+        chips.addWidget(self._hero_chip("Private files"))
+        chips.addWidget(self._hero_chip("PDF / DOCX / TXT"))
+        chips.addWidget(self._hero_chip("Website sync gate"))
+        chips.addStretch(1)
+
+        copy.addWidget(eyebrow)
+        copy.addWidget(title)
+        copy.addWidget(subtitle)
+        copy.addLayout(chips)
+        layout.addLayout(copy, 1)
+
+        side = QFrame()
+        side.setObjectName("HeroSidePanel")
+        side_layout = QVBoxLayout(side)
+        side_layout.setContentsMargins(16, 14, 16, 14)
+        side_layout.setSpacing(10)
+        side_title = QLabel("Run checklist")
+        side_title.setObjectName("HeroSideTitle")
+        side_layout.addWidget(side_title)
+        side_layout.addWidget(self._hero_step("1", "Connect sync", "Verify the Worker key before analysis."))
+        side_layout.addWidget(self._hero_step("2", "Set criteria", "Add must-have skills and thresholds."))
+        side_layout.addWidget(self._hero_step("3", "Review output", "Export or sync ranked results."))
+        layout.addWidget(side, 0)
+
+        return hero
 
     def _build_analyze_tab(self) -> QWidget:
         scroll = QScrollArea()
@@ -2422,16 +2866,18 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 4, 0, 0)
         layout.setSpacing(22)
 
+        layout.addWidget(self._build_analyze_hero(), 0)
+
         metrics = QHBoxLayout()
         metrics.setSpacing(20)
         self.metric_candidates = QLabel("0")
         self.metric_avg_score = QLabel("--")
         self.metric_shortlisted = QLabel("0")
         self.metric_hard_rejects = QLabel("0")
-        metrics.addWidget(self._metric_card("Candidates", self.metric_candidates, "Ready to analyze", "👥", "PurpleBadge"))
-        metrics.addWidget(self._metric_card("Avg. Match Score", self.metric_avg_score, "Across all candidates", "↗", "GreenBadge"))
-        metrics.addWidget(self._metric_card("Shortlisted", self.metric_shortlisted, "Above review threshold", "★", "BlueBadge"))
-        metrics.addWidget(self._metric_card("Hard Rejects", self.metric_hard_rejects, "Filtered out", "✕", "RedBadge"))
+        metrics.addWidget(self._metric_card("Candidates", self.metric_candidates, "Ready to analyze", "", "PurpleBadge"))
+        metrics.addWidget(self._metric_card("Avg. Match Score", self.metric_avg_score, "Across all candidates", "", "GreenBadge"))
+        metrics.addWidget(self._metric_card("Shortlisted", self.metric_shortlisted, "Above review threshold", "", "BlueBadge"))
+        metrics.addWidget(self._metric_card("Hard Rejects", self.metric_hard_rejects, "Filtered out", "", "RedBadge"))
         layout.addLayout(metrics, 0)
 
         setup_grid = QGridLayout()
@@ -2456,25 +2902,35 @@ class MainWindow(QMainWindow):
         self.output_folder = QLineEdit(str(Path.cwd() / "local_results"))
         self.cv_folder.setPlaceholderText("Select CV folder...")
 
-        # Accept/Review thresholds with percentage labels
+        # Accept/Review thresholds with horizontal sliders and labels
         accept_box = QHBoxLayout()
-        accept_box.setSpacing(6)
-        self.accept_threshold = PercentSpinBox()
+        accept_box.setSpacing(10)
+        self.accept_threshold = QSlider(Qt.Horizontal)
         self.accept_threshold.setRange(1, 100)
         self.accept_threshold.setValue(75)
-        self.accept_threshold.setSuffix("  %")
-        self.accept_threshold.setMaximumWidth(120)
+        self.accept_threshold.setMinimumWidth(150)
+
+        self.accept_label = QLabel("75%")
+        self.accept_label.setStyleSheet("font-weight: bold; font-size: 10pt; min-width: 35px; background: transparent; border: none;")
+        self.accept_threshold.valueChanged.connect(lambda val: self.accept_label.setText(f"{val}%"))
+
         accept_box.addWidget(self.accept_threshold)
+        accept_box.addWidget(self.accept_label)
         accept_box.addStretch(1)
 
         review_box = QHBoxLayout()
-        review_box.setSpacing(6)
-        self.review_threshold = PercentSpinBox()
+        review_box.setSpacing(10)
+        self.review_threshold = QSlider(Qt.Horizontal)
         self.review_threshold.setRange(1, 100)
         self.review_threshold.setValue(52)
-        self.review_threshold.setSuffix("  %")
-        self.review_threshold.setMaximumWidth(120)
+        self.review_threshold.setMinimumWidth(150)
+
+        self.review_label = QLabel("52%")
+        self.review_label.setStyleSheet("font-weight: bold; font-size: 10pt; min-width: 35px; background: transparent; border: none;")
+        self.review_threshold.valueChanged.connect(lambda val: self.review_label.setText(f"{val}%"))
+
         review_box.addWidget(self.review_threshold)
+        review_box.addWidget(self.review_label)
         review_box.addStretch(1)
 
         self.ai_mode = QComboBox()
@@ -2519,6 +2975,26 @@ class MainWindow(QMainWindow):
         terms.addLayout(self._labeled_control("Required skills", self.required_skills))
         terms.addLayout(self._labeled_control("Nice to have", self.nice_skills))
         terms.addLayout(self._labeled_control("Hard reject criteria", self.hard_reject))
+
+        # Suggestion chips row
+        chips_row = QWidget()
+        chips_layout = QHBoxLayout(chips_row)
+        chips_layout.setContentsMargins(0, 2, 0, 2)
+        chips_layout.setSpacing(6)
+
+        suggestion_label = QLabel("Suggestions:")
+        suggestion_label.setStyleSheet("color: #64748b; font-size: 8.5pt; font-weight: bold; background: transparent; border: none;")
+        chips_layout.addWidget(suggestion_label)
+
+        suggestions = ["Python", "PyQt / PySide", "SQL", "Remote", "5+ years", "Leadership", "English"]
+        for sug in suggestions:
+            btn = AnimatedButton(sug)
+            btn.setObjectName("ChipButton")
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.clicked.connect(lambda checked=False, s=sug: self._insert_skill_suggestion(s))
+            chips_layout.addWidget(btn)
+        chips_layout.addStretch(1)
+        terms.addWidget(chips_row)
 
         # Tip box at bottom of scoring card
         bulb_svg = get_lightbulb_svg(colors.get('warning', '#d97706'))
@@ -2581,7 +3057,7 @@ class MainWindow(QMainWindow):
         temp_desc.setWordWrap(True)
         templates_layout.addWidget(temp_desc, 1)
 
-        self.btn_edit_templates = QPushButton("Edit templates    →")
+        self.btn_edit_templates = QPushButton("Edit templates")
         self.btn_edit_templates.setObjectName("SecondaryButton")
         self.btn_edit_templates.setCursor(Qt.PointingHandCursor)
         self.btn_edit_templates.clicked.connect(lambda: self.tabs.setCurrentIndex(9))
@@ -2592,14 +3068,14 @@ class MainWindow(QMainWindow):
 
         actions = QHBoxLayout()
         actions.setSpacing(16)
-        self.run_button = AnimatedButton("▷  Analyze local folder")
+        self.run_button = AnimatedButton("Analyze local folder")
         self.run_button.setObjectName("PrimaryButton")
         self.run_button.setMinimumWidth(230)
-        self.cancel_button = AnimatedButton("×  Cancel")
+        self.cancel_button = AnimatedButton("Cancel")
         self.cancel_button.setObjectName("SecondaryButton")
         self.cancel_button.setMinimumWidth(136)
         self.cancel_button.setEnabled(False)
-        self.open_output_button = AnimatedButton("📁  Open output folder")
+        self.open_output_button = AnimatedButton("Open output folder")
         self.open_output_button.setObjectName("SecondaryButton")
         self.open_output_button.setMinimumWidth(182)
         self.run_button.clicked.connect(self._start_analysis)
@@ -2673,7 +3149,7 @@ class MainWindow(QMainWindow):
 
         bottom_tips.addStretch(1)
 
-        right_tip_lbl = QLabel("Website Sync is required before local analysis and recruiter actions.  ›")
+        right_tip_lbl = QLabel("Website Sync is required before local analysis and recruiter actions.")
         right_tip_lbl.setObjectName("StepSubtitle")
         right_tip_lbl.setStyleSheet("font-size: 8.5pt;")
         bottom_tips.addWidget(right_tip_lbl)
@@ -2707,22 +3183,22 @@ class MainWindow(QMainWindow):
         bulk_layout = QHBoxLayout()
         bulk_layout.setSpacing(10)
 
-        self.btn_select_all = AnimatedButton("☑  Select All")
+        self.btn_select_all = AnimatedButton("Select all")
         self.btn_select_all.setObjectName("SecondaryButton")
         self.btn_select_all.setCursor(Qt.PointingHandCursor)
         self.btn_select_all.clicked.connect(self._select_all_candidates)
 
-        self.btn_deselect_all = AnimatedButton("☐  Deselect All")
+        self.btn_deselect_all = AnimatedButton("Deselect all")
         self.btn_deselect_all.setObjectName("SecondaryButton")
         self.btn_deselect_all.setCursor(Qt.PointingHandCursor)
         self.btn_deselect_all.clicked.connect(self._deselect_all_candidates)
 
-        self.btn_bulk_accept = AnimatedButton("✓  Accept Selected")
+        self.btn_bulk_accept = AnimatedButton("Accept selected")
         self.btn_bulk_accept.setObjectName("SuccessButton")
         self.btn_bulk_accept.setCursor(Qt.PointingHandCursor)
         self.btn_bulk_accept.clicked.connect(lambda: self._bulk_decision("accepted"))
 
-        self.btn_bulk_reject = AnimatedButton("✕  Reject Selected")
+        self.btn_bulk_reject = AnimatedButton("Reject selected")
         self.btn_bulk_reject.setObjectName("DangerButton")
         self.btn_bulk_reject.setCursor(Qt.PointingHandCursor)
         self.btn_bulk_reject.clicked.connect(lambda: self._bulk_decision("rejected"))
@@ -2735,7 +3211,7 @@ class MainWindow(QMainWindow):
         bulk_layout.addStretch(1)
         layout.addLayout(bulk_layout)
 
-        # Stacked Widget for Table vs Empty State
+        # Stacked Widget for Table vs Empty State vs Skeleton Loading
         self.results_stack = QStackedWidget()
 
         # Page 0: Empty State
@@ -2750,7 +3226,7 @@ class MainWindow(QMainWindow):
         empty_card_layout.setSpacing(18)
         empty_card_layout.setAlignment(Qt.AlignCenter)
 
-        icon_lbl = QLabel("▥")
+        icon_lbl = QLabel("CV")
         icon_lbl.setObjectName("MetricSub")
 
         title_lbl = QLabel("No candidates processed yet")
@@ -2776,12 +3252,46 @@ class MainWindow(QMainWindow):
         empty_layout.addWidget(empty_card)
         self.results_stack.addWidget(empty_page)
 
-        # Page 1: Table & Details
+        # Page 1: Table & Details Drawer
         table_page = QWidget()
-        table_layout = QVBoxLayout(table_page)
-        table_layout.setContentsMargins(0, 0, 0, 0)
-        table_layout.setSpacing(14)
+        table_page_layout = QHBoxLayout(table_page)
+        table_page_layout.setContentsMargins(0, 0, 0, 0)
+        table_page_layout.setSpacing(10)
 
+        # Left column of table page (Toolbar + Table)
+        left_column = QWidget()
+        left_layout = QVBoxLayout(left_column)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(14)
+
+        # Search, Filter and Sort Toolbar
+        toolbar_layout = QHBoxLayout()
+        toolbar_layout.setSpacing(10)
+
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Search candidates by name or email...")
+        self.search_input.textChanged.connect(self._filter_results)
+
+        self.filter_status = QComboBox()
+        self.filter_status.addItems(["All Decisions", "Accept", "Review", "Reject", "Pending"])
+        self.filter_status.currentIndexChanged.connect(self._filter_results)
+
+        self.sort_by = QComboBox()
+        self.sort_by.addItems(["Sort by: Score (High-Low)", "Sort by: Score (Low-High)", "Sort by: Name (A-Z)", "Sort by: Name (Z-A)"])
+        self.sort_by.currentIndexChanged.connect(self._filter_results)
+
+        self.btn_export = AnimatedButton("Export CSV")
+        self.btn_export.setObjectName("SecondaryButton")
+        self.btn_export.setCursor(Qt.PointingHandCursor)
+        self.btn_export.clicked.connect(self._export_results_csv)
+
+        toolbar_layout.addWidget(self.search_input, 3)
+        toolbar_layout.addWidget(self.filter_status, 1)
+        toolbar_layout.addWidget(self.sort_by, 1)
+        toolbar_layout.addWidget(self.btn_export)
+        left_layout.addLayout(toolbar_layout)
+
+        # Table Widget
         self.table = QTableWidget(0, 10)
         self.table.setHorizontalHeaderLabels(["", "File", "Email", "Score", "Decision", "Confidence", "Duplicate", "Matched", "Missing", "Status"])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents) # Checkbox
@@ -2795,21 +3305,120 @@ class MainWindow(QMainWindow):
         self.table.verticalHeader().setVisible(False)
         self.table.verticalHeader().setDefaultSectionSize(46)
         self.table.itemSelectionChanged.connect(self._show_selected_detail)
-        table_layout.addWidget(self.table, 1)
+        left_layout.addWidget(self.table, 1)
 
+        table_page_layout.addWidget(left_column, 1)
+
+        # Right column of table page (Slide-out Detail Drawer)
+        self.drawer = QFrame()
+        self.drawer.setObjectName("DetailDrawer")
+        self.drawer.setFixedWidth(0) # Initially collapsed
+
+        drawer_layout = QVBoxLayout(self.drawer)
+        drawer_layout.setContentsMargins(18, 18, 18, 18)
+        drawer_layout.setSpacing(14)
+
+        # Drawer Header
+        drawer_header = QHBoxLayout()
+        self.drawer_title = QLabel("Candidate Details")
+        self.drawer_title.setObjectName("StepTitle")
+
+        close_btn = QPushButton("X")
+        close_btn.setFixedSize(28, 28)
+        close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: none;
+                font-size: 11pt;
+                font-weight: bold;
+                color: #94A3B8;
+            }
+            QPushButton:hover {
+                color: #EF4444;
+            }
+        """)
+        close_btn.clicked.connect(lambda: self._animate_drawer(False))
+
+        drawer_header.addWidget(self.drawer_title)
+        drawer_header.addStretch(1)
+        drawer_header.addWidget(close_btn)
+        drawer_layout.addLayout(drawer_header)
+
+        # Content HTML viewer
         self.detail = QTextEdit()
         self.detail.setReadOnly(True)
-        self.detail.setMinimumHeight(140)
-        self.detail.setMaximumHeight(220)
 
-        # Opacity effect for smooth fade-in animation
         self.detail_opacity = QGraphicsOpacityEffect()
         self.detail.setGraphicsEffect(self.detail_opacity)
         self.detail_opacity.setOpacity(1.0)
+        drawer_layout.addWidget(self.detail, 1)
 
-        table_layout.addWidget(self.detail)
+        # Actions
+        drawer_buttons = QHBoxLayout()
+        drawer_buttons.setSpacing(6)
 
+        btn_accept = AnimatedButton("Accept")
+        btn_accept.setObjectName("SuccessButton")
+        btn_accept.setCursor(Qt.PointingHandCursor)
+        btn_accept.clicked.connect(lambda: self._single_decision("recommended_accept"))
+
+        btn_review = AnimatedButton("Review")
+        btn_review.setObjectName("WarningButton")
+        btn_review.setCursor(Qt.PointingHandCursor)
+        btn_review.clicked.connect(lambda: self._single_decision("recommended_review"))
+
+        btn_reject = AnimatedButton("Reject")
+        btn_reject.setObjectName("DangerButton")
+        btn_reject.setCursor(Qt.PointingHandCursor)
+        btn_reject.clicked.connect(lambda: self._single_decision("recommended_reject"))
+
+        btn_email = AnimatedButton("Email")
+        btn_email.setObjectName("SecondaryButton")
+        btn_email.setCursor(Qt.PointingHandCursor)
+        btn_email.clicked.connect(self._email_candidate_from_drawer)
+
+        drawer_buttons.addWidget(btn_accept)
+        drawer_buttons.addWidget(btn_review)
+        drawer_buttons.addWidget(btn_reject)
+        drawer_buttons.addWidget(btn_email)
+        drawer_layout.addLayout(drawer_buttons)
+
+        table_page_layout.addWidget(self.drawer)
         self.results_stack.addWidget(table_page)
+
+        # Page 2: Skeleton Loading
+        skeleton_page = QWidget()
+        skeleton_layout = QVBoxLayout(skeleton_page)
+        skeleton_layout.setContentsMargins(0, 10, 0, 10)
+        skeleton_layout.setSpacing(14)
+
+        skel_title = QLabel("Running Analysis...")
+        skel_title.setObjectName("StepTitle")
+        skeleton_layout.addWidget(skel_title)
+
+        skel_desc = QLabel("Reading and matching CV files locally against job criteria.")
+        skel_desc.setObjectName("StepSubtitle")
+        skeleton_layout.addWidget(skel_desc)
+
+        for _ in range(4):
+            row_frame = QFrame()
+            row_frame.setObjectName("ContentCard")
+            row_lay = QHBoxLayout(row_frame)
+            row_lay.setContentsMargins(16, 12, 16, 12)
+            row_lay.setSpacing(10)
+
+            row_lay.addWidget(SkeletonBlock(min_width=20, min_height=20), 0)
+            row_lay.addWidget(SkeletonBlock(min_width=180, min_height=18), 2)
+            row_lay.addWidget(SkeletonBlock(min_width=140, min_height=18), 1)
+            row_lay.addWidget(SkeletonBlock(min_width=60, min_height=18), 0)
+            row_lay.addWidget(SkeletonBlock(min_width=80, min_height=18), 0)
+
+            skeleton_layout.addWidget(row_frame)
+
+        skeleton_layout.addStretch(1)
+        self.results_stack.addWidget(skeleton_page)
+
         layout.addWidget(self.results_stack, 1)
 
         # Default to empty state page
@@ -2820,19 +3429,101 @@ class MainWindow(QMainWindow):
     def _build_history_tab(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 4, 0, 0)
+        layout.setSpacing(18)
+
+        # Top search & refresh bar
         top = QHBoxLayout()
-        self.history_combo = QComboBox()
-        refresh = QPushButton("Refresh")
-        refresh.clicked.connect(self._refresh_history)
-        load = QPushButton("Load selected run")
-        load.clicked.connect(self._load_history_run)
-        top.addWidget(self.history_combo, 1)
-        top.addWidget(refresh)
-        top.addWidget(load)
+        top.setSpacing(10)
+
+        self.history_search = QLineEdit()
+        self.history_search.setPlaceholderText("Search saved runs by job name...")
+        self.history_search.textChanged.connect(self._refresh_history)
+
+        refresh_btn = AnimatedButton("Refresh List")
+        refresh_btn.setObjectName("SecondaryButton")
+        refresh_btn.setCursor(Qt.PointingHandCursor)
+        refresh_btn.clicked.connect(self._refresh_history)
+
+        top.addWidget(self.history_search, 1)
+        top.addWidget(refresh_btn)
         layout.addLayout(top)
+
+        # Stacked widget for List vs Empty state
+        self.history_stack = QStackedWidget()
+
+        # Page 0: Empty state
+        empty_page = QWidget()
+        empty_layout = QVBoxLayout(empty_page)
+        empty_layout.setContentsMargins(0, 10, 0, 10)
+
+        empty_card = QFrame()
+        empty_card.setObjectName("ContentCard")
+        empty_card_layout = QVBoxLayout(empty_card)
+        empty_card_layout.setContentsMargins(40, 60, 40, 60)
+        empty_card_layout.setSpacing(18)
+        empty_card_layout.setAlignment(Qt.AlignCenter)
+
+        icon_lbl = QLabel("Runs")
+        icon_lbl.setStyleSheet("font-size: 32pt; background: transparent; border: none;")
+
+        title_lbl = QLabel("No saved runs yet")
+        title_lbl.setObjectName("StepTitle")
+
+        desc_lbl = QLabel("Completed local CV matching runs will appear here.")
+        desc_lbl.setObjectName("StepSubtitle")
+
+        go_btn = QPushButton("Start Analysis")
+        go_btn.setObjectName("PrimaryButton")
+        go_btn.setCursor(Qt.PointingHandCursor)
+        go_btn.setMinimumWidth(160)
+        go_btn.clicked.connect(lambda: self.tabs.setCurrentIndex(0))
+
+        empty_card_layout.addWidget(icon_lbl)
+        empty_card_layout.addWidget(title_lbl)
+        empty_card_layout.addWidget(desc_lbl)
+        empty_card_layout.addSpacing(8)
+        empty_card_layout.addWidget(go_btn)
+        empty_card.setLayout(empty_card_layout)
+
+        empty_layout.addWidget(empty_card)
+        self.history_stack.addWidget(empty_page)
+
+        # Page 1: List widget
+        list_page = QWidget()
+        list_layout = QVBoxLayout(list_page)
+        list_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.history_list = QListWidget()
+        self.history_list.setObjectName("HistoryListWidget")
+        self.history_list.setStyleSheet("""
+            QListWidget {
+                background: transparent;
+                border: none;
+            }
+            QListWidget::item {
+                background: transparent;
+                border: none;
+                padding: 0;
+                margin-bottom: 12px;
+            }
+            QListWidget::item:hover, QListWidget::item:selected {
+                background: transparent;
+                border: none;
+            }
+        """)
+        list_layout.addWidget(self.history_list)
+        self.history_stack.addWidget(list_page)
+
+        layout.addWidget(self.history_stack, 1)
+
+        # Default to empty state page
+        self.history_stack.setCurrentIndex(0)
+
+        # Compatibility placeholders
+        self.history_combo = QComboBox()
         self.history_text = QTextEdit()
-        self.history_text.setReadOnly(True)
-        layout.addWidget(self.history_text, 1)
+
         return page
 
     def _build_server_tab(self) -> QWidget:
@@ -2843,6 +3534,15 @@ class MainWindow(QMainWindow):
         self.api_url = QLineEdit(os.environ.get("CV_ANALYZER_API_URL", API_BASE_URL))
         self.api_key = QLineEdit(load_worker_api_key() or os.environ.get("CV_WORKER_API_KEY", ""))
         self.api_key.setEchoMode(QLineEdit.Password)
+
+        colors = self.theme_engine.colors(self.active_theme_name)
+        eye_color = colors.get('text_secondary', '#64748B')
+        self.api_key_action = self.api_key.addAction(
+            QIcon(svg_to_pixmap(get_eye_svg(eye_color), 16, 16)),
+            QLineEdit.TrailingPosition
+        )
+        self.api_key_action.triggered.connect(self._toggle_api_key_visibility)
+
         self.api_url.textChanged.connect(self._mark_sync_required)
         self.api_key.textChanged.connect(self._mark_sync_required)
         form.addRow("API URL", self.api_url)
@@ -2883,23 +3583,64 @@ class MainWindow(QMainWindow):
         top.addWidget(self._summary_card("Estimated finish", self.dashboard_eta, "Calculated while analysis is running"))
         layout.addLayout(top)
 
+        # Bottom section: 2 columns
+        bottom_layout = QHBoxLayout()
+        bottom_layout.setSpacing(18)
+
+        # Left Column: Recent Runs Card
+        recent_card = QFrame()
+        recent_card.setObjectName("ContentCard")
+        recent_layout = QVBoxLayout(recent_card)
+        recent_layout.setContentsMargins(24, 22, 24, 24)
+        recent_layout.setSpacing(12)
+
+        recent_title = QLabel("Recent Saved Runs")
+        recent_title.setObjectName("StepTitle")
+        recent_layout.addWidget(recent_title)
+
+        self.dashboard_runs_list = QListWidget()
+        self.dashboard_runs_list.setObjectName("DashboardRunsList")
+        self.dashboard_runs_list.setStyleSheet("QListWidget { background: transparent; border: none; } QListWidget::item { padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }")
+        recent_layout.addWidget(self.dashboard_runs_list, 1)
+        bottom_layout.addWidget(recent_card, 1)
+
+        # Right Column: Security Card
         trust = QFrame()
         trust.setObjectName("ContentCard")
         trust_layout = QVBoxLayout(trust)
         trust_layout.setContentsMargins(24, 22, 24, 24)
         trust_layout.setSpacing(10)
-        trust_layout.addLayout(self._step_header("✓", "Enterprise trust controls", "Local analysis is designed for large employer folders."))
+        trust_layout.addLayout(self._step_header("OK", "Local-First Security", "All processes run locally on this computer."))
+
         for text in (
-            "CV files stay on this computer unless you explicitly sync results.",
-            "Website API keys are stored in the OS credential store when available.",
-            "Only scores, decisions, explanations, and optional sync payloads are sent back.",
-            "Duplicate files are detected locally to avoid noisy ranking output.",
+            "Local-first analysis: CV files stay on this device",
+            "Secure storage: API keys stored in OS credentials",
+            "Minimal transmission: only scores and decisions are sent when synced",
+            "Local deduplication: duplicate files are filtered on-device",
         ):
-            label = QLabel("•  " + text)
-            label.setObjectName("TrustLine")
-            trust_layout.addWidget(label)
-        layout.addWidget(trust)
-        layout.addStretch(1)
+            row = QWidget()
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(0, 4, 0, 4)
+            row_layout.setSpacing(10)
+
+            check = QLabel("OK")
+            check.setStyleSheet("color: #22C55E; font-weight: bold; font-size: 11pt; background: transparent; border: none;")
+            lbl = QLabel(text)
+            lbl.setObjectName("TrustLine")
+            lbl.setWordWrap(True)
+
+            row_layout.addWidget(check)
+            row_layout.addWidget(lbl, 1)
+            trust_layout.addWidget(row)
+
+        trust_layout.addStretch(1)
+        bottom_layout.addWidget(trust, 1)
+
+        layout.addLayout(bottom_layout, 1)
+
+        # Populate runs
+        QTimer.singleShot(100, self._refresh_dashboard_runs)
+
         return page
 
     def _build_reports_tab(self) -> QWidget:
@@ -2926,6 +3667,10 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setSpacing(18)
 
+        # Settings sub-navigation
+        sub_nav = self._build_settings_sub_nav(6)
+        layout.addWidget(sub_nav)
+
         prefs_card, prefs_layout = self._create_card("System Preferences", "Configure local worker runtime settings.")
 
         theme_row = QWidget()
@@ -2944,13 +3689,9 @@ class MainWindow(QMainWindow):
         motion = QLabel("Enabled, respects CV_WORKER_DISABLE_MOTION=1")
         motion.setObjectName("TrustLine")
 
-        form = QFormLayout()
-        form.setSpacing(12)
-        form.addRow("Theme", theme_row)
-        form.addRow("Max file guard", max_size)
-        form.addRow("Motion", motion)
-
-        prefs_layout.addLayout(form)
+        prefs_layout.addWidget(self._settings_row("Application Theme", "Configure your visual experience interface theme pack.", theme_row))
+        prefs_layout.addWidget(self._settings_row("Max File Limit", "Set the maximum allowed file size limit for parsing local resumes.", max_size))
+        prefs_layout.addWidget(self._settings_row("Micro-Animations", "Enable premium dynamic motion, active lines, and layout transitions.", motion))
         layout.addWidget(prefs_card)
 
         layout.addWidget(self._info_block("Operational defaults", [
@@ -2967,6 +3708,10 @@ class MainWindow(QMainWindow):
         root = QVBoxLayout(page)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
+
+        # Settings sub-navigation
+        sub_nav = self._build_settings_sub_nav(8)
+        root.addWidget(sub_nav)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -3000,10 +3745,10 @@ class MainWindow(QMainWindow):
         grid.setHorizontalSpacing(18)
         grid.setVerticalSpacing(18)
 
-        grid.addWidget(self._theme_card("midnight_glass", 1), 0, 0)
-        grid.addWidget(self._theme_card("warm_stone", 2), 0, 1)
-        grid.addWidget(self._theme_card("electric_indigo", 3), 1, 0)
-        grid.addWidget(self._theme_card("forest_executive", 4), 1, 1)
+        grid.addWidget(self._theme_card("graphite_pro", 1), 0, 0)
+        grid.addWidget(self._theme_card("light_cloud", 2), 0, 1)
+        grid.addWidget(self._theme_card("midnight_purple", 3), 1, 0)
+        grid.addWidget(self._theme_card("slate_pro", 4), 1, 1)
         layout.addLayout(grid, 1)
 
         # Bottom Bar (matching mockup buttons and placements)
@@ -3080,7 +3825,7 @@ class MainWindow(QMainWindow):
         bottom_layout.addStretch(1)
 
         # White checkmark in a circular background matching theme accent
-        check = QLabel("✓")
+        check = QLabel("OK")
         check.setFixedSize(22, 22)
         check.setAlignment(Qt.AlignCenter)
         check.setStyleSheet(
@@ -3466,7 +4211,7 @@ class MainWindow(QMainWindow):
         metrics_row.setSpacing(6)
         metrics_data = [
             ("Candidates", "151", "+12%", colors['success']),
-            ("Avg Score", "78%", "★ High", colors['primary']),
+            ("Avg Score", "78%", "High", colors['primary']),
             ("Shortlisted", "42", "Action", colors['info']),
         ]
         for title, value, badge_text, badge_color in metrics_data:
@@ -3637,19 +4382,49 @@ class MainWindow(QMainWindow):
 
         main_layout = QHBoxLayout(content)
         main_layout.setContentsMargins(20, 14, 20, 14)
-        main_layout.setSpacing(20)
+        main_layout.setSpacing(16)
 
-        # Left Column: Template Editor Card
+        # Panel 1: Template List (Left)
+        tpl_list_card, tpl_list_layout = self._create_card("Templates", "Actions")
+        tpl_list_card.setFixedWidth(180)
+
+        self.tpl_list = QListWidget()
+        self.tpl_list.setObjectName("SettingsList")
+        self.tpl_list.setStyleSheet("""
+            QListWidget {
+                background: transparent;
+                border: none;
+            }
+            QListWidget::item {
+                background: transparent;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 8px;
+                padding: 10px;
+                margin-bottom: 8px;
+                color: #CBD5E1;
+            }
+            QListWidget::item:hover {
+                background: rgba(255, 255, 255, 0.04);
+            }
+            QListWidget::item:selected {
+                background: rgba(56, 189, 248, 0.15);
+                border: 1px solid #38BDF8;
+                color: #F8FAFC;
+                font-weight: bold;
+            }
+        """)
+        self.tpl_list.addItem("Accept Action")
+        self.tpl_list.addItem("Reject Action")
+        self.tpl_list.setCurrentRow(0)
+        self.tpl_list.currentRowChanged.connect(self._on_template_type_changed)
+        tpl_list_layout.addWidget(self.tpl_list, 1)
+        main_layout.addWidget(tpl_list_card)
+
+        # Panel 2: Template Editor Card (Center)
         editor_card, editor_layout = self._create_card(
-            "Email Template Editor",
-            "Customize templates sent during recruiter decision actions."
+            "Template Editor",
+            "Customize templates sent during recruiter actions."
         )
-
-        # Dropdown to select Accept / Reject Template
-        self.tpl_selector = QComboBox()
-        self.tpl_selector.addItems(["Accept Notification", "Reject Notification"])
-        self.tpl_selector.currentIndexChanged.connect(self._on_template_type_changed)
-        editor_layout.addLayout(self._labeled_control("Select Template Action", self.tpl_selector))
 
         # Subject field
         self.tpl_subject_edit = QLineEdit()
@@ -3659,7 +4434,7 @@ class MainWindow(QMainWindow):
         # Body field
         self.tpl_body_edit = QPlainTextEdit()
         self.tpl_body_edit.textChanged.connect(self._update_email_preview)
-        self.tpl_body_edit.setMinimumHeight(140)
+        self.tpl_body_edit.setMinimumHeight(180)
         editor_layout.addLayout(self._labeled_control("Message Body", self.tpl_body_edit))
 
         # Variables chips layout
@@ -3683,7 +4458,7 @@ class MainWindow(QMainWindow):
         editor_layout.addWidget(var_box)
 
         # Save Button
-        btn_save = AnimatedButton("💾 Save Template Presets")
+        btn_save = AnimatedButton("Save Template")
         btn_save.setObjectName("PrimaryButton")
         btn_save.setCursor(Qt.PointingHandCursor)
         btn_save.clicked.connect(self._save_templates_from_editor)
@@ -3691,7 +4466,7 @@ class MainWindow(QMainWindow):
 
         main_layout.addWidget(editor_card, 1)
 
-        # Right Column: Live Preview mock client Card
+        # Panel 3: Live Preview mock client Card (Right)
         preview_card, preview_layout = self._create_card(
             "Live Email Preview",
             "Simulation showing how the candidate will receive this email."
@@ -3714,7 +4489,7 @@ class MainWindow(QMainWindow):
         self.mock_from = QLabel("recruiting@company.local")
         self.mock_from.setStyleSheet("color: #0f172a; font-weight: 600;")
 
-        self.mock_to = QLabel("sercan.ozkan@example.com (Sercan Özkan)")
+        self.mock_to = QLabel("candidate@example.com")
         self.mock_to.setStyleSheet("color: #64748b;")
 
         self.mock_subject_lbl = QLabel("")
@@ -3735,7 +4510,7 @@ class MainWindow(QMainWindow):
         self.mock_body_text = QTextEdit()
         self.mock_body_text.setReadOnly(True)
         self.mock_body_text.setObjectName("MockEmailBodyText")
-        self.mock_body_text.setMinimumHeight(140)
+        self.mock_body_text.setMinimumHeight(180)
         body_layout.addWidget(self.mock_body_text)
         client_layout.addWidget(body_box, 1)
 
@@ -3777,12 +4552,30 @@ class MainWindow(QMainWindow):
         self.tpl_body_edit.insertPlainText(var_name)
         self.tpl_body_edit.setFocus()
 
+    def _insert_skill_suggestion(self, text: str):
+        focus_widget = self.focusWidget()
+        target = self.required_skills
+        if focus_widget == self.nice_skills:
+            target = self.nice_skills
+        elif focus_widget == self.hard_reject:
+            target = self.hard_reject
+
+        current = target.toPlainText().strip()
+        if current:
+            if current.endswith(','):
+                target.setPlainText(current + " " + text)
+            else:
+                target.setPlainText(current + ", " + text)
+        else:
+            target.setPlainText(text)
+        target.setFocus()
+
     def _update_email_preview(self):
         subject = self.tpl_subject_edit.text()
         body = self.tpl_body_edit.toPlainText()
 
         replacements = {
-            "{name}": "Sercan Özkan",
+            "{name}": "Sercan Ozkan",
             "{email}": "sercan.ozkan@example.com",
             "{role}": "Software Engineer",
             "{score}": "85",
@@ -3800,15 +4593,20 @@ class MainWindow(QMainWindow):
         self.mock_body_text.setPlainText(preview_body)
 
     def _save_templates_from_editor(self):
-        current_index = self.tpl_selector.currentIndex()
+        current_index = self.tpl_list.currentRow()
         self._sync_inputs_to_memory(current_index)
         save_mail_templates(self.mail_templates)
-        QMessageBox.information(self, "Saved", "Email templates saved successfully.")
+        self.show_toast("Templates saved successfully.", "success")
 
     def _build_ai_models_tab(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setSpacing(18)
+
+        # Settings sub-navigation
+        sub_nav = self._build_settings_sub_nav(7)
+        layout.addWidget(sub_nav)
+
         layout.addWidget(self._info_block("AI review modes", [
             "none: fastest and cheapest; uses deterministic rule-based scoring.",
             "customer_openai_key: reserved for local customer-owned review in a later package.",
@@ -3884,6 +4682,41 @@ class MainWindow(QMainWindow):
         layout.addWidget(widget)
         return panel
 
+    def _settings_row(self, label: str, description: str, control: QWidget) -> QWidget:
+        row = QWidget()
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 8, 0, 8)
+        row_layout.setSpacing(16)
+
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(2)
+
+        lbl = QLabel(label)
+        lbl.setStyleSheet("font-weight: bold; font-size: 10pt; background: transparent; border: none;")
+
+        desc = QLabel(description)
+        desc.setStyleSheet("font-size: 9pt; color: palette(text-muted); background: transparent; border: none;")
+        desc.setWordWrap(True)
+
+        text_layout.addWidget(lbl)
+        text_layout.addWidget(desc)
+
+        row_layout.addLayout(text_layout, 1)
+        row_layout.addWidget(control)
+
+        container = QWidget()
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(0)
+        container_layout.addWidget(row)
+
+        divider = QFrame()
+        divider.setFrameShape(QFrame.HLine)
+        divider.setStyleSheet("background: palette(border-subtle); max-height: 1px; border: none;")
+        container_layout.addWidget(divider)
+
+        return container
+
     def _info_block(self, title: str, lines: list[str]) -> QWidget:
         panel = HoverDepthFrame()
         panel.setObjectName("ContentCard")
@@ -3894,7 +4727,7 @@ class MainWindow(QMainWindow):
         heading.setObjectName("StepTitle")
         layout.addWidget(heading)
         for line in lines:
-            label = QLabel("•  " + line)
+            label = QLabel("- " + line)
             label.setObjectName("TrustLine")
             label.setWordWrap(True)
             layout.addWidget(label)
@@ -4007,6 +4840,12 @@ class MainWindow(QMainWindow):
         fade.setStartValue(0.0)
         fade.setEndValue(1.0)
         fade.setEasingCurve(QEasingCurve.OutQuad)
+
+        def cleanup_effect():
+            if widget.graphicsEffect() == effect:
+                widget.setGraphicsEffect(None)
+        fade.finished.connect(cleanup_effect)
+
         self._run_animation(fade)
         self._slide_widget(widget, offset=8, duration=220)
 
@@ -4094,7 +4933,13 @@ class MainWindow(QMainWindow):
 
         if hasattr(self, "logo"):
             logo_svg = get_theme_logo_svg(self.active_theme_name, colors)
-            self.logo.setPixmap(svg_to_pixmap(logo_svg, 42, 42))
+            self.logo.setPixmap(svg_to_pixmap(logo_svg, 36, 36))
+
+        if hasattr(self, "gear_button"):
+            gear_color = colors.get('sidebar_text', '#94a3b8')
+            svg_data = get_sidebar_icon_svg("settings", gear_color)
+            if svg_data:
+                self.gear_button.setIcon(QIcon(svg_to_pixmap(svg_data, 18, 18)))
 
         if hasattr(self, "trust_icon"):
             trust_svg = get_trust_icon_svg(colors.get('sidebar_indicator', colors.get('primary', '#3B82F6')))
@@ -4119,6 +4964,13 @@ class MainWindow(QMainWindow):
         if hasattr(self, "temp_icon"):
             mail_svg = get_mail_icon_svg(colors.get('primary', '#3B82F6'))
             self.temp_icon.setPixmap(svg_to_pixmap(mail_svg, 22, 22))
+
+        if hasattr(self, "api_key_action"):
+            eye_color = colors.get('text_secondary', '#64748B')
+            if self.api_key.echoMode() == QLineEdit.Password:
+                self.api_key_action.setIcon(QIcon(svg_to_pixmap(get_eye_svg(eye_color), 16, 16)))
+            else:
+                self.api_key_action.setIcon(QIcon(svg_to_pixmap(get_eye_off_svg(eye_color), 16, 16)))
 
         if hasattr(self, "bottom_left_tip_icon"):
             bulb_svg = get_lightbulb_svg(colors.get('primary', '#3B82F6'))
@@ -4693,7 +5545,7 @@ class MainWindow(QMainWindow):
                 self.server_quota_label.setText(f"Remaining CV scans: {self.server_quota_remaining}")
         if hasattr(self, "footer_ready_label"):
             if connected and (self.server_quota_remaining is None or self.server_quota_remaining > 0):
-                self.footer_ready_label.setText("✓  Ready to analyze")
+                self.footer_ready_label.setText("Ready to analyze")
             elif connected:
                 self.footer_ready_label.setText("Quota exhausted")
             else:
@@ -4763,6 +5615,7 @@ class MainWindow(QMainWindow):
         self.status_label.setText("Starting...")
         self._start_status_pulse()
         self.tabs.setCurrentIndex(1)
+        self.results_stack.setCurrentIndex(2)
 
         self.thread = QThread()
         self.worker = AnalysisWorker(folder, output, config, self.ai_mode.currentText(), config["title"])
@@ -4879,7 +5732,10 @@ class MainWindow(QMainWindow):
         if total > 0:
             self.results_stack.setCurrentIndex(1)
         else:
-            self.results_stack.setCurrentIndex(0)
+            if hasattr(self, "thread") and self.thread and self.thread.isRunning():
+                self.results_stack.setCurrentIndex(2)
+            else:
+                self.results_stack.setCurrentIndex(0)
 
         self._refresh_live_panels()
 
@@ -4958,9 +5814,9 @@ class MainWindow(QMainWindow):
             missing_html = f"<span style='color: {text_secondary}; font-style: italic; font-size: 8.5pt;'>None</span>"
 
         if risks:
-            risks_html = "".join([f"<div style='color: {danger}; font-weight: 600; font-size: 8.5pt; margin-bottom: 3px;'>⚠ {r}</div>" for r in risks])
+            risks_html = "".join([f"<div style='color: {danger}; font-weight: 600; font-size: 8.5pt; margin-bottom: 3px;'>Warning: {r}</div>" for r in risks])
         else:
-            risks_html = f"<div style='color: {success}; font-weight: 600; font-size: 8.5pt;'>✓ No risk flags.</div>"
+            risks_html = f"<div style='color: {success}; font-weight: 600; font-size: 8.5pt;'>No risk flags.</div>"
 
         # Format Explanation
         formatted_exp = explanation.strip().replace("\n", "<br>")
@@ -5027,26 +5883,35 @@ class MainWindow(QMainWindow):
         self.detail_anim.start()
 
     def _refresh_history(self):
-        self.history_combo.clear()
+        self.history_list.clear()
+        search_text = self.history_search.text().lower().strip()
         runs = self.store.list_runs(limit=100)
-        for run in runs:
-            self.history_combo.addItem(
-                f"#{run['id']} - {run['job_name']} - {run['created_at']} ({run['total_files']} files)",
-                run["id"],
+
+        filtered_runs = []
+        for r in runs:
+            if search_text and search_text not in r['job_name'].lower():
+                continue
+            filtered_runs.append(r)
+
+        if not filtered_runs:
+            self.history_stack.setCurrentIndex(0)
+            return
+
+        self.history_stack.setCurrentIndex(1)
+        for run in filtered_runs:
+            item = QListWidgetItem(self.history_list)
+            item.setSizeHint(QSize(0, 136))
+
+            card = HistoryRunCard(
+                run,
+                on_load_callback=self._load_history_run_id,
+                on_report_callback=self._open_run_folder
             )
-        self.history_text.setPlainText(f"{len(runs)} saved local run(s).")
+            self.history_list.addItem(item)
+            self.history_list.setItemWidget(item, card)
 
     def _load_history_run(self):
-        run_id = self.history_combo.currentData()
-        if not run_id:
-            return
-        self.current_run_id = run_id
-        rows = self.store.get_run_results(run_id)
-        self.rows = []
-        self.table.setRowCount(0)
-        for row in rows:
-            self._add_result_row(row)
-        self.tabs.setCurrentIndex(1)
+        pass
 
     def _on_run_created(self, run_id: int):
         self.current_run_id = run_id
@@ -5209,11 +6074,16 @@ class MainWindow(QMainWindow):
                     token = auth_resp.json()["access_token"]
                     headers = {"Authorization": f"Bearer {token}"}
 
-                    # Individual send loop
-                    sent = 0
-                    for data in self.email_data:
-                        sent += 1
-                    self.done.emit(True, f"Sent email notifications to {sent} candidate(s) via Server API.")
+                    # The QWidget client does not have enough template/action context
+                    # to call the website email endpoint safely. Do not report a fake
+                    # success; decisions are saved locally and can be synced from the
+                    # website/QML flow.
+                    _ = headers
+                    self.done.emit(
+                        False,
+                        "Email was not sent. The QWidget client can save decisions, "
+                        "but email delivery must be triggered from the website or QML sync flow."
+                    )
                 except Exception as exc:
                     self.done.emit(False, str(exc))
 
@@ -5275,6 +6145,270 @@ class MainWindow(QMainWindow):
         path = Path(self.output_folder.text().strip() or ".")
         path.mkdir(parents=True, exist_ok=True)
         os.startfile(str(path))
+
+    def _animate_drawer(self, show: bool):
+        if not hasattr(self, "_drawer_anim"):
+            self._drawer_anim = QPropertyAnimation(self.drawer, b"maximumWidth")
+            self._drawer_anim.setDuration(250)
+            self._drawer_anim.setEasingCurve(QEasingCurve.OutCubic)
+
+        self._drawer_anim.stop()
+        start_width = self.drawer.width()
+        end_width = 420 if show else 0
+
+        self._drawer_anim.setStartValue(start_width)
+        self._drawer_anim.setEndValue(end_width)
+        self._drawer_anim.start()
+
+    def _filter_results(self):
+        search_text = self.search_input.text().lower().strip()
+        status_filter = self.filter_status.currentText().lower()
+        sort_by_val = self.sort_by.currentIndex()
+
+        filtered_rows = []
+        for idx, row in enumerate(self.rows):
+            file_name = Path(row.get('file', '')).name.lower()
+            email = row.get('email', '').lower()
+            if search_text and search_text not in file_name and search_text not in email:
+                continue
+
+            decision = row.get('decision', 'pending')
+            if status_filter == "all decisions":
+                pass
+            elif status_filter == "accept" and decision != "recommended_accept":
+                continue
+            elif status_filter == "review" and decision != "recommended_review":
+                continue
+            elif status_filter == "reject" and decision != "recommended_reject":
+                continue
+            elif status_filter == "pending" and decision not in ("pending", ""):
+                continue
+
+            filtered_rows.append((idx, row))
+
+        if sort_by_val == 0:
+            filtered_rows.sort(key=lambda x: -float(x[1].get('score') or 0))
+        elif sort_by_val == 1:
+            filtered_rows.sort(key=lambda x: float(x[1].get('score') or 0))
+        elif sort_by_val == 2:
+            filtered_rows.sort(key=lambda x: Path(x[1].get('file', '')).name.lower())
+        elif sort_by_val == 3:
+            filtered_rows.sort(key=lambda x: Path(x[1].get('file', '')).name.lower(), reverse=True)
+
+        self.table.setRowCount(0)
+        self.table.blockSignals(True)
+        for idx, row in filtered_rows:
+            self._add_result_row_with_index(row, idx)
+        self.table.blockSignals(False)
+
+    def _add_result_row_with_index(self, row: dict, row_idx: int):
+        index = self.table.rowCount()
+        self.table.insertRow(index)
+
+        chk_item = QTableWidgetItem()
+        chk_item.setCheckState(Qt.Unchecked)
+        chk_item.setData(Qt.UserRole + 1, row_idx)
+        self.table.setItem(index, 0, chk_item)
+
+        values = [
+            Path(row.get("file", "")).name,
+            row.get("email", ""),
+            str(row.get("score", 0)),
+            decision_label(row.get("decision", "")),
+            row.get("confidence", ""),
+            "yes" if row.get("is_duplicate") else "no",
+            ", ".join(row.get("matched_skills") or [])[:120],
+            ", ".join(row.get("missing_skills") or [])[:120],
+            row.get("sync_status", ""),
+        ]
+        for col, value in enumerate(values):
+            target_col = col + 1
+            if target_col == 3:
+                item = NumericTableWidgetItem(value)
+                item.setData(Qt.UserRole, float(row.get("score") or 0))
+            else:
+                item = QTableWidgetItem(value)
+            item.setData(Qt.UserRole + 1, row_idx)
+            self.table.setItem(index, target_col, item)
+
+    def _export_results_csv(self):
+        if not self.rows:
+            QMessageBox.warning(self, "No data", "There are no results to export.")
+            return
+        from PySide6.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getSaveFileName(self, "Export Results as CSV", "", "CSV Files (*.csv)")
+        if path:
+            try:
+                import csv
+                with open(path, "w", newline="", encoding="utf-8-sig") as f:
+                    writer = csv.writer(f)
+                    writer.writerow(["Candidate", "Email", "Score", "Decision", "Confidence", "Duplicate", "Matched Skills", "Missing Skills"])
+                    for r in self.rows:
+                        writer.writerow([
+                            Path(r.get("file", "")).name,
+                            r.get("email", ""),
+                            r.get("score", 0),
+                            r.get("decision", "pending"),
+                            r.get("confidence", "medium"),
+                            "Yes" if r.get("is_duplicate", False) else "No",
+                            ", ".join(r.get("matched_skills", [])),
+                            ", ".join(r.get("missing_skills", []))
+                        ])
+                self.show_toast("Results exported successfully!", "success")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Could not export CSV: {e}")
+
+    def _single_decision(self, decision_type: str):
+        items = self.table.selectedItems()
+        if not items:
+            return
+        row_index = items[0].data(Qt.UserRole + 1)
+        if row_index is None or row_index >= len(self.rows):
+            return
+        row_dict = self.rows[row_index]
+        run_id = self.current_run_id
+        if not run_id:
+            return
+
+        self.store.update_result_decision_by_file(run_id, row_dict.get("file", ""), decision_type)
+        row_dict["decision"] = decision_type
+
+        table_row = -1
+        for r in range(self.table.rowCount()):
+            item = self.table.item(r, 0)
+            if item and item.data(Qt.UserRole + 1) == row_index:
+                table_row = r
+                break
+
+        if table_row != -1:
+            decision_item = self.table.item(table_row, 4)
+            if decision_item:
+                decision_item.setText(decision_label(decision_type))
+
+        self._update_metrics()
+        self._show_selected_detail()
+        self.show_toast(f"Marked as {decision_label(decision_type)}", "success")
+
+    def _email_candidate_from_drawer(self):
+        items = self.table.selectedItems()
+        if not items:
+            return
+        row_index = items[0].data(Qt.UserRole + 1)
+        if row_index is None or row_index >= len(self.rows):
+            return
+        row_dict = self.rows[row_index]
+
+        candidate_email = row_dict.get("email", "")
+        candidate_name = Path(row_dict.get("file", "")).stem
+
+        if candidate_email:
+            self.mock_to.setText(f"{candidate_email} ({candidate_name})")
+        else:
+            self.mock_to.setText(f"no-email@example.com ({candidate_name})")
+
+        self.tabs.setCurrentIndex(9)
+        self.show_toast(f"Email preview loaded for {candidate_name}", "info")
+
+    def _build_settings_sub_nav(self, active_index: int) -> QWidget:
+        container = QFrame()
+        container.setObjectName("SettingsSubNavContainer")
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 10)
+        layout.setSpacing(8)
+
+        tabs_info = [
+            ("Preferences", 6),
+            ("AI Models", 7),
+            ("Appearance", 8)
+        ]
+
+        for label, idx in tabs_info:
+            btn = QPushButton(label)
+            btn.setObjectName("SettingsSubNavBtn")
+            btn.setCheckable(True)
+            btn.setChecked(idx == active_index)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.clicked.connect(lambda checked=False, target_idx=idx: self.tabs.setCurrentIndex(target_idx))
+            layout.addWidget(btn)
+
+        layout.addStretch(1)
+        return container
+
+    def show_toast(self, message: str, type_name: str = "success"):
+        if hasattr(self, "_active_toast") and self._active_toast:
+            try:
+                self._active_toast.close()
+            except:
+                pass
+
+        toast = ToastNotification(message, type_name, self)
+        self._active_toast = toast
+
+        margin = 24
+        toast.adjustSize()
+        x = self.width() - toast.width() - margin
+        y = self.height() - toast.height() - margin
+        toast.move(x, y)
+        toast.show_toast()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "_active_toast") and self._active_toast and self._active_toast.isVisible():
+            margin = 24
+            x = self.width() - self._active_toast.width() - margin
+            y = self.height() - self._active_toast.height() - margin
+            self._active_toast.move(x, y)
+
+    def _toggle_api_key_visibility(self):
+        if self.api_key.echoMode() == QLineEdit.Password:
+            self.api_key.setEchoMode(QLineEdit.Normal)
+            colors = self.theme_engine.colors(self.active_theme_name)
+            eye_off_color = colors.get('text_secondary', '#64748B')
+            self.api_key_action.setIcon(QIcon(svg_to_pixmap(get_eye_off_svg(eye_off_color), 16, 16)))
+        else:
+            self.api_key.setEchoMode(QLineEdit.Password)
+            colors = self.theme_engine.colors(self.active_theme_name)
+            eye_color = colors.get('text_secondary', '#64748B')
+            self.api_key_action.setIcon(QIcon(svg_to_pixmap(get_eye_svg(eye_color), 16, 16)))
+
+    def _load_history_run_id(self, run_id: int):
+        self.current_run_id = run_id
+        rows = self.store.get_run_results(run_id)
+        self.rows = []
+        self.table.setRowCount(0)
+        for row in rows:
+            self._add_result_row(row)
+        self.tabs.setCurrentIndex(1)
+        self.show_toast(f"Loaded run #{run_id} results", "success")
+
+    def _open_run_folder(self, path_str: str):
+        try:
+            path = Path(path_str)
+            path.mkdir(parents=True, exist_ok=True)
+            os.startfile(str(path))
+            self.show_toast("Output folder opened", "success")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Could not open folder: {e}")
+
+    def _refresh_dashboard_runs(self):
+        if not hasattr(self, "dashboard_runs_list"):
+            return
+        self.dashboard_runs_list.clear()
+        runs = self.store.list_runs(limit=5)
+        if not runs:
+            item = QListWidgetItem("No saved runs yet.")
+            item.setFlags(Qt.NoItemFlags)
+            self.dashboard_runs_list.addItem(item)
+            return
+
+        for run in runs:
+            text = f" Run #{run['id']} - {run['job_name']}\n {run['created_at']} ({run['total_files']} files)"
+            item = QListWidgetItem(text)
+            colors = self.theme_engine.colors(self.active_theme_name)
+            svg_data = get_sidebar_icon_svg("history", colors.get('text_secondary', '#64748B'))
+            if svg_data:
+                item.setIcon(QIcon(svg_to_pixmap(svg_data, 16, 16)))
+            self.dashboard_runs_list.addItem(item)
 
 
 def main() -> int:

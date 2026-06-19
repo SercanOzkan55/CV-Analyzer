@@ -125,6 +125,14 @@ def list_to_text(value) -> str:
     return str(value or "")
 
 
+def csv_safe(value):
+    if not isinstance(value, str):
+        return value
+    if value and (value[0] in "=+-@" or value[0] in "\t\r\n"):
+        return "'" + value
+    return value
+
+
 def average_score(rows: list[dict]) -> float:
     if not rows:
         return 0.0
@@ -317,14 +325,13 @@ class AnalysisWorker(QObject):
             )
             writer.writeheader()
             for row in rows:
-                writer.writerow(
-                    {
-                        **row,
-                        "matched_skills": list_to_text(row.get("matched_skills")),
-                        "missing_skills": list_to_text(row.get("missing_skills")),
-                        "risk_flags": list_to_text(row.get("risk_flags")),
-                    }
-                )
+                csv_row = {
+                    **row,
+                    "matched_skills": list_to_text(row.get("matched_skills")),
+                    "missing_skills": list_to_text(row.get("missing_skills")),
+                    "risk_flags": list_to_text(row.get("risk_flags")),
+                }
+                writer.writerow({key: csv_safe(value) for key, value in csv_row.items()})
 
 
 class ResultListModel(QAbstractListModel):
@@ -549,7 +556,6 @@ class WebsiteSyncWorker(QObject):
                     "missing_skills": row.get("missing_skills") or [],
                     "risk_flags": row.get("risk_flags") or [],
                     "explanation": row.get("explanation", ""),
-                    "cv_text": row.get("cv_text"),
                     "candidate_name": candidate_name_from_row(row),
                     "candidate_email": row.get("email") or None,
                     "worker_version": row.get("worker_version", "1.0.0"),

@@ -37,6 +37,17 @@ function generateId() { return Date.now().toString(36) + Math.random().toString(
 
 function copy(lang, tr, en) { return lang === 'tr' ? tr : en }
 
+function sanitizeHttpUrl(value) {
+  const trimmed = String(value || '').trim()
+  if (!trimmed) return ''
+  try {
+    const parsed = new URL(trimmed)
+    return ['http:', 'https:'].includes(parsed.protocol) ? parsed.toString() : ''
+  } catch {
+    return ''
+  }
+}
+
 function toDateTimeLocal(value) {
   if (!value) return ''
   const date = new Date(value)
@@ -83,7 +94,7 @@ function jobFromServer(row) {
     role: row.role || '',
     status: row.status || 'wishlist',
     location: row.location || '',
-    url: row.url || '',
+    url: sanitizeHttpUrl(row.url),
     salary: row.salary || '',
     priority: row.priority || 'medium',
     notes: row.notes || '',
@@ -100,7 +111,7 @@ function jobToServer(job) {
     role: job.role,
     status: job.status,
     location: job.location || '',
-    url: job.url || '',
+    url: sanitizeHttpUrl(job.url),
     salary: job.salary || '',
     priority: job.priority || 'medium',
     notes: job.notes || '',
@@ -139,7 +150,7 @@ function JobModal({ job, initialStatus, userEmail, onSave, onClose, t, lang }) {
     if (form.reminderEnabled && !form.reminderDate) return
     setSaving(true)
     try {
-      await onSave(form)
+      await onSave({ ...form, url: sanitizeHttpUrl(form.url) })
     } finally {
       setSaving(false)
     }
@@ -271,6 +282,7 @@ function JobCard({ job, onEdit, onDelete, onSendReminderTest, dragHandlers, isDr
   const { t, lang } = useLanguage()
   const daysSince = Math.floor((Date.now() - new Date(job.appliedDate).getTime()) / 86400000)
   const reminderDays = daysUntil(job.reminderDate)
+  const safeJobUrl = sanitizeHttpUrl(job.url)
 
   return (
     <motion.div className={`jt-card ${isDragging ? 'jt-card-dragging' : ''}`}
@@ -308,7 +320,7 @@ function JobCard({ job, onEdit, onDelete, onSendReminderTest, dragHandlers, isDr
       )}
       <div className="jt-card-footer">
         <span className="jt-card-date"><Clock size={11} /> {daysSince}d</span>
-        {job.url && <a href={job.url} target="_blank" rel="noopener noreferrer" className="jt-card-link"><ExternalLink size={11} /></a>}
+        {safeJobUrl && <a href={safeJobUrl} target="_blank" rel="noopener noreferrer" className="jt-card-link"><ExternalLink size={11} /></a>}
       </div>
     </motion.div>
   )

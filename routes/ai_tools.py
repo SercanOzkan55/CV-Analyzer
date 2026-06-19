@@ -10,6 +10,8 @@ from core.runtime_bridge import main_module as _main_module
 from core.route_dependencies import *  # noqa: F403
 from services.ai_feature_service import ensure_ai_rewrite_allowed
 from services.owner_workflow_service import create_owner_notification
+from typing import List, Optional
+
 
 
 router = APIRouter(tags=["ai-tools"])
@@ -82,15 +84,28 @@ def find_candidate_embeddings(
     if not job_text:
         raise HTTPException(status_code=400, detail="job_text is required")
 
+    db_user = get_or_create_user(db, user.get("user_id"), user.get("email"))
+    organization_id = getattr(db_user, "organization_id", None)
+    if organization_id is None:
+        return {"matches": []}
+
     job_vec = _main_module().get_embedding(job_text)
     if not job_vec:
         raise HTTPException(status_code=500, detail="Failed to compute job embedding")
 
-    matches = _main_module().find_similar_candidates(db, job_vec, k=max(1, min(body.top_k or 10, 50)))
+    matches = _main_module().find_similar_candidates(
+        db,
+        job_vec,
+        k=max(1, min(body.top_k or 10, 50)),
+        organization_id=organization_id,
+    )
     candidate_ids = [cid for cid, _score in matches]
     rows_map = {}
     if candidate_ids:
-        rows = db.query(Candidate).filter(Candidate.id.in_(candidate_ids)).all()
+        rows = db.query(Candidate).filter(
+            Candidate.id.in_(candidate_ids),
+            Candidate.organization_id == organization_id,
+        ).all()
         rows_map = {row.id: row for row in rows}
 
     return {
@@ -117,6 +132,10 @@ def semantic_search(
     body: SemanticSearchRequest, user=Depends(verify_supabase_jwt), db=Depends(get_db)
 ):
     _ensure_not_expired(user)
+    db_user = get_or_create_user(db, user.get("user_id"), user.get("email"))
+    organization_id = getattr(db_user, "organization_id", None)
+    if organization_id is None:
+        return {"matches": []}
 
     # Require either job_text or job_id
     if not body.job_text and not body.job_id:
@@ -125,7 +144,10 @@ def semantic_search(
     # Resolve job embedding
     job_vec = None
     if body.job_id:
-        job = db.query(Job).filter(Job.id == body.job_id).one_or_none()
+        job = db.query(Job).filter(
+            Job.id == body.job_id,
+            Job.organization_id == organization_id,
+        ).one_or_none()
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
         job_vec = job.job_embedding
@@ -141,7 +163,11 @@ def semantic_search(
         job_vec = get_embedding(body.job_text or "")
         if body.persist_job and job_vec:
             try:
-                new_job = Job(raw_text=body.job_text, job_embedding=job_vec)
+                new_job = Job(
+                    raw_text=body.job_text,
+                    job_embedding=job_vec,
+                    organization_id=organization_id,
+                )
                 db.add(new_job)
                 db.commit()
             except Exception:
@@ -154,13 +180,21 @@ def semantic_search(
         raise HTTPException(status_code=500, detail="Failed to compute job embedding")
 
     # Find top-k similar candidates (returns list of (id, score))
-    matches = find_similar_candidates(db, job_vec, k=body.k)
+    matches = find_similar_candidates(
+        db,
+        job_vec,
+        k=body.k,
+        organization_id=organization_id,
+    )
     candidate_ids = [m[0] for m in matches]
 
     # Fetch candidate rows preserving order
     candidates = []
     if candidate_ids:
-        rows = db.query(Candidate).filter(Candidate.id.in_(candidate_ids)).all()
+        rows = db.query(Candidate).filter(
+            Candidate.id.in_(candidate_ids),
+            Candidate.organization_id == organization_id,
+        ).all()
         rows_map = {r.id: r for r in rows}
         for cid, score in matches:
             r = rows_map.get(cid)
@@ -1421,3 +1455,84 @@ def get_cv_version(
     }
 
 
+class AgentChatRequest(BaseModel):
+    message: str
+    agent_type: str  # recruiter | tech_lead | coach
+    cv_context: Optional[str] = ""
+    history: Optional[List[dict]] = []  # [{"role": "user"|"assistant", "content": "..."}]
+
+
+@router.post("/api/v1/agents/chat")
+def agent_chat_endpoint(
+    body: AgentChatRequest,
+    user=Depends(verify_supabase_jwt),
+    db=Depends(get_db),
+):
+    _ensure_not_expired(user)
+
+    # Resolve system prompt based on agent type
+    system_prompts = {
+        "recruiter": (
+            "You are Selin, an expert HR Recruiter Agent. You speak in a highly professional, "
+            "evaluative, yet friendly recruiting tone. Your job is to screen candidates, ask "
+            "targeted interview questions, analyze their CV experience, and find potential red flags "
+            "or outstanding achievements.\n"
+            "Keep your answers structured, encouraging, and focused on career pathing."
+        ),
+        "tech_lead": (
+            "You are Devrim, a Senior Tech Lead and Software Architect Agent. You speak in a direct, "
+            "highly technical, pragmatic engineering tone. Your job is to evaluate coding skills, "
+            "discuss tech stacks, system design trade-offs, and ask deep technical questions.\n"
+            "Keep your answers technically accurate, analytical, and structured with bullet points or code blocks where relevant."
+        ),
+        "coach": (
+            "You are Canan, a supportive and strategic Career Coach Agent. You speak in an encouraging, "
+            "empathetic, and guiding tone. Your job is to help the candidate brainstorm career goals, "
+            "improve their resume summary, optimize keyword placement, and suggest action-oriented next steps.\n"
+            "Keep your answers inspirational, constructive, and action-focused."
+        )
+    }
+
+    agent_prompt = system_prompts.get(body.agent_type, system_prompts["coach"])
+
+    # Build messages array for OpenAI/Gemini
+    messages = [{"role": "system", "content": agent_prompt}]
+
+    # If CV context is provided, inject it as context
+    if body.cv_context:
+        messages.append({
+            "role": "system",
+            "content": f"Candidate CV Context for Reference:\n{body.cv_context[:5000]}"
+        })
+
+    # Append history
+    for msg in body.history or []:
+        role = msg.get("role")
+        content = msg.get("content")
+        if role in {"user", "assistant"} and content:
+            messages.append({"role": role, "content": content})
+
+    # Append current message
+    messages.append({"role": "user", "content": body.message})
+
+    # Query the LLM client
+    from services.ai_client_factory import get_ai_client_and_model
+    client, model = get_ai_client_and_model()
+
+    if not client:
+        # Mock mode fallback
+        return {
+            "response": f"[Mock Agent: {body.agent_type.upper()}] Hello! I read your message: '{body.message}'. "
+                        "To use real agent features, configure GEMINI_API_KEY or OPENAI_API_KEY."
+        }
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=0.7,
+            max_tokens=800,
+        )
+        return {"response": (response.choices[0].message.content or "").strip()}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Agent service error: {str(e)}")

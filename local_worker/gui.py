@@ -564,7 +564,6 @@ class LocalWorkerApp:
                     "missing_skills": r.get("missing_skills") or [],
                     "risk_flags": r.get("risk_flags") or [],
                     "explanation": r.get("explanation", ""),
-                    "cv_text": r.get("cv_text"),
                     "candidate_name": Path(r["file"]).stem,
                     "candidate_email": None,
                     "worker_version": r.get("worker_version", "1.0.0"),
@@ -875,7 +874,6 @@ class LocalWorkerApp:
                     "missing_skills": result["missing_skills"],
                     "risk_flags": result["risk_flags"],
                     "explanation": result["explanation"],
-                    "cv_text": text,
                     "analyzed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 }
             except Exception as exc:
@@ -894,7 +892,6 @@ class LocalWorkerApp:
                     "missing_skills": [],
                     "risk_flags": ["extraction_failed"],
                     "explanation": str(exc),
-                    "cv_text": "",
                     "analyzed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 }
             rows.append(row)

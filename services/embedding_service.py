@@ -240,7 +240,12 @@ def save_job_embedding(db, job_id: int, embedding: list):
         return False
 
 
-def find_similar_candidates(db, job_embedding: list, k: int = 10):
+def find_similar_candidates(
+    db,
+    job_embedding: list,
+    k: int = 10,
+    organization_id: int | None = None,
+):
     """Return top-k similar candidates for given job embedding.
 
     This uses Postgres `pgvector` cosine operator. The function executes
@@ -254,11 +259,19 @@ def find_similar_candidates(db, job_embedding: list, k: int = 10):
         # Validate all elements are numeric to prevent injection
         floats = [float(x) for x in job_embedding]
         vec_literal = "[" + ",".join(str(f) for f in floats) + "]"
+        if organization_id is None:
+            logger.warning("find_similar_candidates skipped: missing organization scope")
+            return []
         sql = text(
             "SELECT id, (cv_embedding::vector <#> :vec::vector) AS score "
-            "FROM candidates WHERE cv_embedding IS NOT NULL ORDER BY score LIMIT :k"
+            "FROM candidates "
+            "WHERE cv_embedding IS NOT NULL AND organization_id = :organization_id "
+            "ORDER BY score LIMIT :k"
         )
-        res = db.execute(sql, {"vec": vec_literal, "k": k}).fetchall()
+        res = db.execute(
+            sql,
+            {"vec": vec_literal, "k": k, "organization_id": int(organization_id)},
+        ).fetchall()
         return [(row[0], row[1]) for row in res]
     except Exception as e:
         logger.error(f"find_similar_candidates error: {e}")

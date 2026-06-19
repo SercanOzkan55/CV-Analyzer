@@ -1,20 +1,19 @@
 import os
 
-from openai import OpenAI
-
-_OPENAI_KEY = os.getenv("OPENAI_API_KEY")
-
-if not _OPENAI_KEY:
-    client = None  # Will be checked in functions
-else:
-    client = OpenAI(api_key=_OPENAI_KEY)
-
-
 def _mock_services_on() -> bool:
     return os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes")
 
+def _get_client_and_model():
+    if _mock_services_on():
+        return None, None
+    try:
+        from services.ai_client_factory import get_ai_client_and_model
+        return get_ai_client_and_model()
+    except Exception:
+        return None, None
 
 def generate_primary_name(job_text):
+    client, model = _get_client_and_model()
     # Allow mocking for testing without OpenAI API
     if _mock_services_on() or not client:
         return "Engineering Technology"  # Default mock primary name
@@ -32,7 +31,7 @@ Job Description:
 """
 
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=model,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
     )
@@ -41,6 +40,7 @@ Job Description:
 
 
 def generate_specialization_name(job_text):
+    client, model = _get_client_and_model()
     # Allow mocking for testing without OpenAI API
     if _mock_services_on() or not client:
         return "Software Development"  # Default mock specialization
@@ -58,7 +58,7 @@ Job Description:
 """
 
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=model,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
     )
