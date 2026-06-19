@@ -415,7 +415,7 @@ class WorkspaceStore:
                 """
                 SELECT id, result_json, sync_status, sync_error
                 FROM analysis_results
-                WHERE sync_status IN ('pending', 'failed')
+                WHERE sync_status IN ('pending', 'failed', 'offline_ready')
                 ORDER BY id ASC
                 LIMIT ?
                 """,

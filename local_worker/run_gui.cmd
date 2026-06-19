@@ -12,7 +12,7 @@ if not exist ".venv\Scripts\python.exe" (
   )
 )
 
-".venv\Scripts\python.exe" qt_gui.py
+".venv\Scripts\python.exe" qml_gui.py
 if %ERRORLEVEL% NEQ 0 (
   echo.
   echo Local Worker closed because of an error.
