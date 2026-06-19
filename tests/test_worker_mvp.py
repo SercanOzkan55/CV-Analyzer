@@ -160,8 +160,7 @@ def test_worker_package_download_contains_cli_without_plaintext_key(client, recr
         names = set(archive.namelist())
         assert {
             "worker.py",
-            "qt_gui.py",
-            "gui.py",
+            "qml_gui.py",
             "workspace.py",
             "credentials.py",
             "requirements.txt",
@@ -176,6 +175,9 @@ def test_worker_package_download_contains_cli_without_plaintext_key(client, recr
             ".env.example",
             "config.example.json",
         } <= names
+        assert "qt_gui.py" not in names
+        assert "gui.py" not in names
+        assert any(name.startswith("qml/") for name in names)
         readme = archive.read("README.md").decode("utf-8")
         env_example = archive.read(".env.example").decode("utf-8")
         config_example = archive.read("config.example.json").decode("utf-8")

@@ -51,7 +51,13 @@ err_trace.txt
 debug_*.txt
 debug_*.py
 *.db
+*.sqlite
+*.sqlite3
+*.zip
+*.pkl
+*.onnx
 .pytest_test.db
+*.pytest_test.db
 
 # Docs & markdown (not needed in image)
 PR_DESCRIPTION.md
@@ -65,6 +71,17 @@ Thumbs.db
 
 # Dev scratch (moved debug/test one-offs)
 _dev_scratch/
+.gemini_scratch/
+tmp_video_frames/
+dev_logs/
+.npm-cache/
+.runtime-logs/
+local_worker/dist/
+local_worker/build/
+local_worker/.venv/
+local_worker/local_worker_*.png
+local_worker_workspace.sqlite3
+mock_dev.db
 
 # Locust / load testing
 locustfile.py

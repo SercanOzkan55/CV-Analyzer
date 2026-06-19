@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Dialogs
 import QtQuick.Layouts
-import Qt.labs.settings
+import QtCore
 import "components"
 
 ApplicationWindow {
@@ -104,7 +104,7 @@ ApplicationWindow {
         if (pageIndex === 4) return "Connect worker key, test Website access, and sync approved local results."
         if (pageIndex === 5) return "Preview current run output and export local files."
         if (pageIndex === 6) return "Edit local accept/reject message templates and preview variables."
-        return "Tune local behavior and keep the classic tools one click away."
+        return "Tune local behavior, sync permissions, and desktop preferences."
     }
 
     component FieldLabel: Text {
@@ -727,10 +727,18 @@ ApplicationWindow {
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
         padding: 0
         background: Rectangle {
+            id: toastBg
             radius: 18
-            color: root.themeSurface
+            color: root.darkTheme ? Qt.rgba(18/255, 24/255, 43/255, 0.88) : Qt.rgba(255/255, 255/255, 255/255, 0.93)
             border.width: 1
             border.color: toastBox.toastType === "error" ? "#ef4444" : toastBox.toastType === "warning" ? "#f59e0b" : "#6366f1"
+            Rectangle {
+                anchors.fill: parent
+                radius: parent.radius
+                color: "transparent"
+                border.width: 1
+                border.color: root.darkTheme ? Qt.rgba(255, 255, 255, 0.08) : Qt.rgba(255, 255, 255, 0.3)
+            }
         }
         contentItem: RowLayout {
             spacing: 12
@@ -971,22 +979,49 @@ ApplicationWindow {
 
                 Item { Layout.preferredHeight: 12 }
 
-                Repeater {
-                    model: root.navItems
-                    NavButton {
-                        Layout.fillWidth: true
-                        text: modelData.title
-                        glyph: modelData.glyph
-                        active: root.pageIndex === index
-                        activeColor: root.themePrimary
-                        activeText: root.darkTheme ? "#ffffff" : root.themeText
-                        textColor: root.themeText2
-                        hoverText: root.themeText
-                        activeBg: root.darkTheme ? "#18152f" : "#eef0ff"
-                        hoverBg: root.themeSurface2
-                        activeIcon: root.themePrimary
-                        mutedIcon: root.themeText2
-                        onNavClicked: root.pageIndex = index
+                Item {
+                    id: navContainer
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: root.navItems.length * 44 + (root.navItems.length - 1) * 8
+
+                    Rectangle {
+                        id: activeIndicator
+                        x: -18
+                        width: 3
+                        height: 24
+                        radius: 2
+                        color: root.themePrimary
+                        y: root.pageIndex * (44 + 8) + 10
+
+                        Behavior on y {
+                            NumberAnimation {
+                                duration: 250
+                                easing.type: Easing.OutCubic
+                            }
+                        }
+                    }
+
+                    Column {
+                        anchors.fill: parent
+                        spacing: 8
+                        Repeater {
+                            model: root.navItems
+                            NavButton {
+                                width: navContainer.width
+                                text: modelData.title
+                                glyph: modelData.glyph
+                                active: root.pageIndex === index
+                                activeColor: root.themePrimary
+                                activeText: root.darkTheme ? "#ffffff" : root.themeText
+                                textColor: root.themeText2
+                                hoverText: root.themeText
+                                activeBg: root.darkTheme ? "#18152f" : "#eef0ff"
+                                hoverBg: root.themeSurface2
+                                activeIcon: root.themePrimary
+                                mutedIcon: root.themeText2
+                                onNavClicked: root.pageIndex = index
+                            }
+                        }
                     }
                 }
 
@@ -1129,11 +1164,8 @@ ApplicationWindow {
 
                     ColumnLayout {
                         x: root.contentX(dashboardScroll.availableWidth)
-                        y: 28 + (root.pageIndex === 0 ? 0 : 8)
+                        y: 28
                         width: root.contentWidth(dashboardScroll.availableWidth)
-                        opacity: root.pageIndex === 0 ? 1 : 0
-                        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                        Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                         spacing: 16
 
                         RowLayout {
@@ -1692,11 +1724,8 @@ ApplicationWindow {
 
                     ColumnLayout {
                         x: root.contentX(analyzeScroll.availableWidth)
-                        y: 28 + (root.pageIndex === 1 ? 0 : 8)
+                        y: 28
                         width: root.contentWidth(analyzeScroll.availableWidth)
-                        opacity: root.pageIndex === 1 ? 1 : 0
-                        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                        Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                         spacing: 18
 
                         GlassCard {
@@ -1950,29 +1979,23 @@ ApplicationWindow {
 
                     EmptyState {
                         x: root.contentX(resultsScroll.availableWidth) + Math.max(0, (root.contentWidth(resultsScroll.availableWidth) - width) / 2)
-                        y: 56 + (root.pageIndex === 2 ? 0 : 8)
+                        y: 56
                         width: Math.min(620, root.contentWidth(resultsScroll.availableWidth))
-                        Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                         height: 300
                         visible: backend.totalCandidates === 0
-                        opacity: visible ? 1 : 0
                         title: "No candidates yet"
                         detail: "Run a local folder analysis to see ranked candidates, risk flags, and decision recommendations here."
                         actionText: "Start analysis"
                         targetPage: 1
-                        Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
                     }
 
                     RowLayout {
                         x: root.contentX(resultsScroll.availableWidth)
-                        y: 28 + (root.pageIndex === 2 ? 0 : 8)
+                        y: 28
                         width: root.contentWidth(resultsScroll.availableWidth)
-                        Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                         height: resultsScroll.availableHeight - 56
                         visible: backend.totalCandidates > 0
-                        opacity: visible ? 1 : 0
                         spacing: 20
-                        Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
                         GlassCard {
                             Layout.fillWidth: true
@@ -2311,11 +2334,8 @@ ApplicationWindow {
 
                     ColumnLayout {
                         x: root.contentX(historyScroll.availableWidth)
-                        y: 28 + (root.pageIndex === 3 ? 0 : 8)
+                        y: 28
                         width: root.contentWidth(historyScroll.availableWidth)
-                        opacity: root.pageIndex === 3 ? 1 : 0
-                        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                        Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                         spacing: 18
 
                         RowLayout {
@@ -2520,11 +2540,8 @@ ApplicationWindow {
 
                     ColumnLayout {
                         x: root.contentX(syncScroll.availableWidth)
-                        y: 28 + (root.pageIndex === 4 ? 0 : 8)
+                        y: 28
                         width: root.contentWidth(syncScroll.availableWidth)
-                        opacity: root.pageIndex === 4 ? 1 : 0
-                        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                        Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                         spacing: 18
 
                         GlassCard {
@@ -2695,7 +2712,7 @@ ApplicationWindow {
 
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 92
+                                        Layout.preferredHeight: 128
                                         radius: 16
                                         color: root.themeInput
                                         border.width: 1
@@ -2718,6 +2735,15 @@ ApplicationWindow {
                                                 text: "Company: " + backend.syncCompanyId + " | Jobs: " + backend.syncAllowedJobs
                                                 color: root.themeText2
                                                 font.pixelSize: 12
+                                                elide: Text.ElideRight
+                                            }
+                                            Text {
+                                                Layout.fillWidth: true
+                                                text: "Access scope: " + backend.syncPermissionSummary
+                                                color: backend.syncConnected ? "#9ff3d0" : root.themeText2
+                                                font.pixelSize: 12
+                                                wrapMode: Text.WordWrap
+                                                maximumLineCount: 2
                                                 elide: Text.ElideRight
                                             }
                                             Text {
@@ -2849,11 +2875,8 @@ ApplicationWindow {
 
                     ColumnLayout {
                         x: root.contentX(reportsScroll.availableWidth)
-                        y: 28 + (root.pageIndex === 5 ? 0 : 8)
+                        y: 28
                         width: root.contentWidth(reportsScroll.availableWidth)
-                        opacity: root.pageIndex === 5 ? 1 : 0
-                        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                        Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                         spacing: 18
 
                         RowLayout {
@@ -2996,11 +3019,8 @@ ApplicationWindow {
 
                     RowLayout {
                         x: root.contentX(templatesScroll.availableWidth)
-                        y: 28 + (root.pageIndex === 6 ? 0 : 8)
+                        y: 28
                         width: root.contentWidth(templatesScroll.availableWidth)
-                        opacity: root.pageIndex === 6 ? 1 : 0
-                        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                        Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                         height: templatesScroll.availableHeight - 56
                         spacing: 20
 
@@ -3224,11 +3244,8 @@ ApplicationWindow {
 
                     ColumnLayout {
                         x: root.contentX(settingsScroll.availableWidth)
-                        y: 28 + (root.pageIndex === 7 ? 0 : 8)
+                        y: 28
                         width: root.contentWidth(settingsScroll.availableWidth)
-                        opacity: root.pageIndex === 7 ? 1 : 0
-                        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                        Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                         spacing: 18
 
                         RowLayout {
@@ -3321,7 +3338,7 @@ ApplicationWindow {
                                     }
                                     Text {
                                         Layout.fillWidth: true
-                                        text: "The QML interface runs as a native desktop shell. CV parsing, scoring, report creation, and template preview run locally on this computer. Website sync is explicit and only happens from the Website Sync screen."
+                                        text: "The maintained QML interface runs as a native desktop shell. CV parsing, scoring, report creation, and template preview run locally on this computer. Website sync is explicit and only happens from the Website Sync screen."
                                         color: root.themeText2
                                         font.pixelSize: 13
                                         wrapMode: Text.WordWrap
@@ -3356,8 +3373,8 @@ ApplicationWindow {
                                         }
                                         AppButton {
                                             Layout.fillWidth: true
-                                            text: "Open classic tools"
-                                            onClicked: backend.openClassicUi()
+                                            text: "Show app status"
+                                            onClicked: backend.showAppStatus()
                                         }
                                     }
                                 }

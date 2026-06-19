@@ -154,14 +154,19 @@ RATE_LIMIT_IP_MATCH_PER_MIN = int(os.getenv("RATE_LIMIT_IP_MATCH_PER_MIN", "10")
 RATE_LIMIT_IP_REWRITE_PER_MIN = int(os.getenv("RATE_LIMIT_IP_REWRITE_PER_MIN", "5"))
 RATE_LIMIT_IP_EMBED_PER_MIN = int(os.getenv("RATE_LIMIT_IP_EMBED_PER_MIN", "10"))
 
+_CORS_ORIGINS_RAW = os.getenv("CORS_ORIGINS")
 _cors_origins = [
     origin.strip()
-    for origin in os.getenv(
-        "CORS_ORIGINS",
-        "http://localhost:5173,https://yourdomain.com",
-    ).split(",")
+    for origin in (_CORS_ORIGINS_RAW or "http://localhost:5173,https://yourdomain.com").split(",")
     if origin.strip()
 ]
+_APP_ENV = (
+    os.getenv("APP_ENV")
+    or os.getenv("ENV")
+    or os.getenv("ENVIRONMENT")
+    or os.getenv("STAGE")
+    or "development"
+).lower()
 _CSRF_PROTECTION_ENABLED = os.getenv("CSRF_PROTECTION_ENABLED", "0").lower() in ("1", "true", "yes")
 _UNSAFE_CSRF_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 _CSRF_COOKIE_NAMES = ("csrf_token", "XSRF-TOKEN")
@@ -724,11 +729,19 @@ def rate_limit(limit_string):
 
 
 def register_http_runtime(app, app_logger):
+    cors_origins = list(_cors_origins)
+    if _APP_ENV in {"prod", "production"} and not _CORS_ORIGINS_RAW:
+        raise RuntimeError("CORS_ORIGINS must be configured explicitly in production")
+    if not cors_origins:
+        if _APP_ENV in {"prod", "production"}:
+            raise RuntimeError("CORS_ORIGINS must be configured explicitly in production")
+        cors_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
     app.state.limiter = limiter
     app.add_middleware(LimitUploadSizeMiddleware)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=_cors_origins or ["*"],
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

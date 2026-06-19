@@ -1,10 +1,35 @@
 import json
+import os
+import shutil
 import sqlite3
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
 
-WORKSPACE_DB = Path("local_worker_workspace.sqlite3")
+def _app_data_dir() -> Path:
+    base = os.environ.get("LOCALAPPDATA") or tempfile.gettempdir()
+    path = Path(base) / "CV Analyzer Local Worker"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _default_workspace_db() -> Path:
+    configured = os.environ.get("CV_WORKER_WORKSPACE_DB")
+    if configured:
+        return Path(configured).expanduser()
+
+    target = _app_data_dir() / "local_worker_workspace.sqlite3"
+    legacy = Path("local_worker_workspace.sqlite3")
+    if legacy.exists() and not target.exists():
+        try:
+            shutil.copy2(legacy, target)
+        except Exception:
+            return legacy
+    return target
+
+
+WORKSPACE_DB = _default_workspace_db()
 
 
 def _now() -> str:

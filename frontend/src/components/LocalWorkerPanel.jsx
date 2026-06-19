@@ -1,5 +1,17 @@
 import React, { useEffect, useState } from 'react'
-import { Download, KeyRound, ShieldCheck } from 'lucide-react'
+import {
+  Activity,
+  CheckCircle2,
+  Cpu,
+  Download,
+  HardDriveDownload,
+  KeyRound,
+  Laptop,
+  LockKeyhole,
+  PlugZap,
+  ServerCog,
+  ShieldCheck,
+} from 'lucide-react'
 import {
   anonymizeOwnerCandidateAction,
   assignOwnerCandidateAction,
@@ -53,6 +65,21 @@ function WorkerEmptyState({ title, children }) {
       </span>
       <h3>{title}</h3>
       <p>{children}</p>
+    </div>
+  )
+}
+
+function WorkerMetricCard({ icon: Icon, label, value, detail, tone = 'accent' }) {
+  return (
+    <div className={`worker-metric-card worker-metric-${tone}`}>
+      <span className="worker-metric-icon" aria-hidden="true">
+        <Icon size={18} />
+      </span>
+      <span className="worker-metric-copy">
+        <strong>{value}</strong>
+        <small>{label}</small>
+        {detail && <em>{detail}</em>}
+      </span>
     </div>
   )
 }
@@ -465,68 +492,98 @@ export default function LocalWorkerPanel({ organizationId }) {
   const permissionOptions = Object.entries(ownerRolePermissions?.permissions || ownerPermissions?.available_permissions || {})
   const permissionOverrides = ownerRolePermissions?.overrides || []
   const assignableUsers = ownerUsers.filter((member) => !member.deleted_at)
+  const activeKeys = keys.filter((key) => !key.revoked_at).length
+  const activeSessions = sessions.filter((session) => !session.revoked_at && !session.is_expired).length
+  const quotaUsedPercent = monthlyLimit ? Math.min(100, Math.round((quotaUsedReserved / monthlyLimit) * 100)) : 0
+  const quotaRemainingPercent = monthlyLimit ? Math.max(0, Math.round((quotaRemaining / monthlyLimit) * 100)) : 0
+  const latestSession = sessions
+    .filter((session) => session.last_seen_at)
+    .sort((a, b) => new Date(b.last_seen_at) - new Date(a.last_seen_at))[0]
+  const lastSeenLabel = latestSession?.last_seen_at ? new Date(latestSession.last_seen_at).toLocaleString() : 'No sessions yet'
 
   return (
-    <div className="card product-card worker-panel">
-      <div className="worker-panel-header">
-        <div className="worker-panel-title">
+    <div className="worker-panel worker-workspace">
+      <section className="worker-command-hero">
+        <div className="worker-hero-copy">
           <span className="product-page-kicker">Local Worker</span>
           <h2>Local Worker for Windows</h2>
-          <p className="text-muted">Secure offline CV processing agent. Connect it with a scoped worker key.</p>
+          <p>
+            Run CV processing on your own machine, keep sensitive files local, and control every device with scoped keys.
+          </p>
           <div className="worker-panel-trust-row" aria-label="Local Worker security details">
             <span><ShieldCheck size={14} /> Local processing</span>
-            <span><KeyRound size={14} /> Scoped keys</span>
-            <span><Download size={14} /> Windows 10+</span>
-            <span><ShieldCheck size={14} /> Signed installer</span>
+            <span><LockKeyhole size={14} /> Scoped keys</span>
+            <span><Laptop size={14} /> Windows 10+</span>
+            <span><CheckCircle2 size={14} /> Signed installer</span>
           </div>
         </div>
+
         <button
           type="button"
-          className="worker-download-card"
+          className="worker-download-card worker-download-primary"
           onClick={handleDownloadPackage}
           disabled={loading || !token}
         >
           <span className="worker-download-icon" aria-hidden="true">
-            <Download size={22} />
+            <HardDriveDownload size={24} />
           </span>
           <span className="worker-download-copy">
             <strong>Download Windows Worker</strong>
-            <small>Install the local processing agent, then pair it with a scoped key.</small>
-            <em>Download .exe</em>
+            <small>Install the local processing app and pair it with a scoped key.</small>
+            <em>{loading ? 'Preparing download...' : 'Download .exe'}</em>
           </span>
           <span className="worker-download-meta">.exe</span>
         </button>
-      </div>
+      </section>
 
-      <div className="worker-setup-steps" aria-label="Local Worker setup steps">
-        <WorkerSetupStep step="1" icon={Download} title="Download worker">
-          Install the Windows app on the machine that will process CV files.
-        </WorkerSetupStep>
-        <WorkerSetupStep step="2" icon={KeyRound} title="Generate scoped key">
-          Limit the key by job and quota before sharing it with the device.
-        </WorkerSetupStep>
-        <WorkerSetupStep step="3" icon={ShieldCheck} title="Connect device">
-          Paste the key into the worker app and keep sensitive files local.
-        </WorkerSetupStep>
-      </div>
+      <section className="worker-metric-grid" aria-label="Local Worker overview">
+        <WorkerMetricCard icon={KeyRound} value={activeKeys} label="Active keys" detail={`${keys.length} total`} />
+        <WorkerMetricCard icon={PlugZap} value={activeSessions} label="Connected devices" detail={lastSeenLabel} tone="success" />
+        <WorkerMetricCard icon={Cpu} value={`${quotaRemainingPercent}%`} label="Quota remaining" detail={`${quotaRemaining}/${monthlyLimit} CV left`} />
+        <WorkerMetricCard icon={ServerCog} value={jobs.length} label="Tracked jobs" detail="Progress-aware processing" />
+      </section>
 
-      <div className={`worker-quota-summary ${isQuotaBlocked ? 'is-exhausted' : ''}`}>
-        <div>
-          <span className="product-page-kicker">Monthly quota</span>
-          <strong>{quotaRemaining}/{monthlyLimit} CV left</strong>
-          <p className="text-muted">
-            Premium Local Worker keys can allocate up to {monthlyLimit} CVs per month.
-          </p>
+      <section className="worker-core-grid">
+        <div className={`worker-quota-summary worker-quota-card ${isQuotaBlocked ? 'is-exhausted' : ''}`}>
+          <div className="worker-card-heading">
+            <span className="product-page-kicker">Monthly quota</span>
+            <strong>{quotaRemaining}/{monthlyLimit} CV left</strong>
+            <p className="text-muted">
+              Premium Local Worker keys can allocate up to {monthlyLimit} CVs per month.
+            </p>
+          </div>
+          <div className="worker-quota-meter" aria-label={`Local Worker quota ${quotaPercent}% allocated`}>
+            <span style={{ width: `${quotaPercent}%` }} />
+          </div>
+          <div className="worker-quota-split" aria-hidden="true">
+            <span style={{ width: `${quotaUsedPercent}%` }} />
+          </div>
+          <dl>
+            <dt>Allocated</dt><dd>{quotaAllocated}</dd>
+            <dt>Used + reserved</dt><dd>{quotaUsedReserved}</dd>
+            <dt>Plan</dt><dd>{quotaSummary?.plan || 'pro'}</dd>
+          </dl>
         </div>
-        <div className="worker-quota-meter" aria-label={`Local Worker quota ${quotaPercent}% allocated`}>
-          <span style={{ width: `${quotaPercent}%` }} />
+
+        <div className="worker-setup-card">
+          <div className="worker-card-heading">
+            <span className="product-page-kicker">Setup flow</span>
+            <strong>Pair a device in three steps</strong>
+            <p className="text-muted">Download, scope, and connect without moving CV files into the cloud.</p>
+          </div>
+          <div className="worker-setup-steps" aria-label="Local Worker setup steps">
+            <WorkerSetupStep step="1" icon={Download} title="Download worker">
+              Install the Windows app on the machine that will process CV files.
+            </WorkerSetupStep>
+            <WorkerSetupStep step="2" icon={KeyRound} title="Generate scoped key">
+              Limit the key by job and quota before sharing it with the device.
+            </WorkerSetupStep>
+            <WorkerSetupStep step="3" icon={ShieldCheck} title="Connect device">
+              Paste the key into the worker app and keep sensitive files local.
+            </WorkerSetupStep>
+          </div>
         </div>
-        <dl>
-          <dt>Allocated</dt><dd>{quotaAllocated}</dd>
-          <dt>Used + reserved</dt><dd>{quotaUsedReserved}</dd>
-          <dt>Plan</dt><dd>{quotaSummary?.plan || 'pro'}</dd>
-        </dl>
-      </div>
+      </section>
 
       {createdKeyData && (
         <div className="worker-secret-box" role="status">
@@ -891,9 +948,15 @@ export default function LocalWorkerPanel({ organizationId }) {
         </div>
       )}
 
-      <div className="worker-panel-grid">
+      <div className="worker-control-grid">
         <form onSubmit={handleCreateKey} className="worker-form">
-          <h3>Create New Key</h3>
+          <div className="worker-section-heading">
+            <span className="worker-section-icon" aria-hidden="true"><KeyRound size={16} /></span>
+            <span>
+              <h3>Create New Key</h3>
+              <small>Scope access by device, job, and monthly quota.</small>
+            </span>
+          </div>
           <div className="settings-field">
             <label>Key name / device</label>
             <input value={newKeyName} onChange={(e) => setNewKeyName(e.target.value)} placeholder="Office laptop worker" required />
@@ -929,7 +992,13 @@ export default function LocalWorkerPanel({ organizationId }) {
         </form>
 
         <div className="worker-list">
-          <h3>Worker Keys</h3>
+          <div className="worker-section-heading">
+            <span className="worker-section-icon" aria-hidden="true"><LockKeyhole size={16} /></span>
+            <span>
+              <h3>Worker Keys</h3>
+              <small>{activeKeys} active key{activeKeys === 1 ? '' : 's'} available for pairing.</small>
+            </span>
+          </div>
           {loading && keys.length === 0 ? (
             <p className="text-muted">Loading keys...</p>
           ) : keys.length === 0 ? (
@@ -988,37 +1057,52 @@ export default function LocalWorkerPanel({ organizationId }) {
       </div>
 
       {jobs.length > 0 && (
-        <div className="worker-progress-grid">
-          {jobs.map((job) => {
-            const progress = progressByJob[job.id]
-            return (
-              <div key={job.id} className="worker-progress-card">
-                <div>
-                  <strong>{job.title}</strong>
-                  <span>#{job.id}</span>
+        <section className="worker-progress-section">
+          <div className="worker-section-heading">
+            <span className="worker-section-icon" aria-hidden="true"><Activity size={16} /></span>
+            <span>
+              <h3>Job Processing Progress</h3>
+              <small>Local worker throughput by active job.</small>
+            </span>
+          </div>
+          <div className="worker-progress-grid">
+            {jobs.map((job) => {
+              const progress = progressByJob[job.id]
+              return (
+                <div key={job.id} className="worker-progress-card">
+                  <div>
+                    <strong>{job.title}</strong>
+                    <span>#{job.id}</span>
+                  </div>
+                  {progress ? (
+                    <dl>
+                      <dt>Total</dt><dd>{progress.total ?? progress.total_cvs ?? 0}</dd>
+                      <dt>Claimed</dt><dd>{progress.claimed ?? 0}</dd>
+                      <dt>Processed</dt><dd>{progress.processed ?? 0}</dd>
+                      <dt>Failed</dt><dd>{progress.failed ?? 0}</dd>
+                      <dt>Accept</dt><dd>{progress.recommended_accept ?? 0}</dd>
+                      <dt>Review</dt><dd>{progress.recommended_review ?? 0}</dd>
+                      <dt>Reject</dt><dd>{progress.recommended_reject ?? 0}</dd>
+                      <dt>Quota left</dt><dd>{progress.quota_remaining ?? 0}</dd>
+                    </dl>
+                  ) : (
+                    <p className="text-muted">Progress not available yet.</p>
+                  )}
                 </div>
-                {progress ? (
-                  <dl>
-                    <dt>Total</dt><dd>{progress.total ?? progress.total_cvs ?? 0}</dd>
-                    <dt>Claimed</dt><dd>{progress.claimed ?? 0}</dd>
-                    <dt>Processed</dt><dd>{progress.processed ?? 0}</dd>
-                    <dt>Failed</dt><dd>{progress.failed ?? 0}</dd>
-                    <dt>Accept</dt><dd>{progress.recommended_accept ?? 0}</dd>
-                    <dt>Review</dt><dd>{progress.recommended_review ?? 0}</dd>
-                    <dt>Reject</dt><dd>{progress.recommended_reject ?? 0}</dd>
-                    <dt>Quota left</dt><dd>{progress.quota_remaining ?? 0}</dd>
-                  </dl>
-                ) : (
-                  <p className="text-muted">Progress not available yet.</p>
-                )}
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        </section>
       )}
 
       <div className="worker-list worker-session-list">
-        <h3>Connected Devices</h3>
+        <div className="worker-section-heading">
+          <span className="worker-section-icon" aria-hidden="true"><Laptop size={16} /></span>
+          <span>
+            <h3>Connected Devices</h3>
+            <small>{activeSessions} active session{activeSessions === 1 ? '' : 's'} currently trusted.</small>
+          </span>
+        </div>
         {sessions.length === 0 ? (
           <WorkerEmptyState title="No connected devices">
             Worker sessions will appear here after the Windows app pairs successfully.

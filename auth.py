@@ -1,5 +1,7 @@
 import logging
 import os
+import threading
+import time
 
 from fastapi import Header, HTTPException
 from jose import jwt
@@ -14,6 +16,9 @@ _JWT_DECODE_OPTIONS = {
     "require_exp": True,
     "require_sub": True,
 }
+_JWKS_CACHE_TTL_SECONDS = int(os.getenv("SUPABASE_JWKS_CACHE_TTL_SECONDS", "3600"))
+_JWKS_CACHE_LOCK = threading.Lock()
+_JWKS_CACHE: dict[str, dict] = {}
 
 
 def _jwt_fail():
@@ -78,10 +83,19 @@ def _jwt_decode_kwargs() -> dict:
 
 
 def _fetch_jwks(supabase_url: str):
-    """Fetch JWKS from Supabase (tries a couple common paths)."""
+    """Fetch JWKS from Supabase with a small in-memory TTL cache."""
+    cache_key = (supabase_url or "").rstrip("/")
+    now = time.time()
+    with _JWKS_CACHE_LOCK:
+        cached = _JWKS_CACHE.get(cache_key)
+        if cached and cached.get("expires_at", 0) > now:
+            return cached.get("jwks")
+
     try:
         import requests
     except Exception:
+        if cached:
+            return cached.get("jwks")
         return None
 
     candidates = []
@@ -93,9 +107,19 @@ def _fetch_jwks(supabase_url: str):
         try:
             r = requests.get(url, timeout=5)
             if r.status_code == 200:
-                return r.json()
+                jwks = r.json()
+                if isinstance(jwks, dict) and isinstance(jwks.get("keys"), list):
+                    with _JWKS_CACHE_LOCK:
+                        _JWKS_CACHE[cache_key] = {
+                            "jwks": jwks,
+                            "expires_at": now + max(60, _JWKS_CACHE_TTL_SECONDS),
+                        }
+                    return jwks
         except Exception:
             continue
+    if cached:
+        _logger.warning("auth:jwks_fetch_failed_using_stale_cache")
+        return cached.get("jwks")
     return None
 
 

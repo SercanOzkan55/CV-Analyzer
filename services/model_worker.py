@@ -1,6 +1,8 @@
 import json
 import logging
 import os
+import queue
+import threading
 import time
 import uuid
 from multiprocessing import Process, Queue
@@ -11,6 +13,9 @@ logger = logging.getLogger(__name__)
 _task_q = None
 _res_q = None
 _proc = None
+_res_dispatcher = None
+_pending_results: dict[str, dict] = {}
+_pending_lock = threading.Lock()
 
 MODEL_PATH = os.getenv("MODEL_PATH", "resume_model.pkl")
 ONNX_PATH = os.getenv("MODEL_ONNX_PATH", "model.onnx")
@@ -125,15 +130,23 @@ def _worker_loop(task_q: Queue, res_q: Queue, model_path: str, onnx_path: str):
 
 
 def start(model_path: str = MODEL_PATH, onnx_path: str = ONNX_PATH):
-    global _task_q, _res_q, _proc
+    global _task_q, _res_q, _proc, _res_dispatcher, _pending_results
     if _proc is not None and _proc.is_alive():
         return
     _task_q = Queue()
     _res_q = Queue()
+    with _pending_lock:
+        _pending_results = {}
     _proc = Process(
         target=_worker_loop, args=(_task_q, _res_q, model_path, onnx_path), daemon=True
     )
     _proc.start()
+    _res_dispatcher = threading.Thread(
+        target=_dispatch_results,
+        name="model-worker-result-dispatcher",
+        daemon=True,
+    )
+    _res_dispatcher.start()
     # give it a moment
     time.sleep(0.1)
     logger.info(
@@ -142,7 +155,7 @@ def start(model_path: str = MODEL_PATH, onnx_path: str = ONNX_PATH):
 
 
 def stop():
-    global _task_q, _res_q, _proc
+    global _task_q, _res_q, _proc, _res_dispatcher, _pending_results
     try:
         if _task_q is not None:
             _task_q.put(None)
@@ -150,9 +163,15 @@ def stop():
             _proc.join(timeout=2)
     except Exception:
         pass
+    with _pending_lock:
+        for pending in _pending_results.values():
+            pending["result"] = {"error": "model worker stopped"}
+            pending["event"].set()
+        _pending_results = {}
     _task_q = None
     _res_q = None
     _proc = None
+    _res_dispatcher = None
 
 
 # ── Worker safety: crash recovery ────────────────────────────────────────
@@ -202,24 +221,52 @@ def _ensure_worker_alive():
             return False
 
 
+def _dispatch_results():
+    """Route worker responses to the caller waiting for the matching request id."""
+    while True:
+        res_q = _res_q
+        if res_q is None:
+            return
+        try:
+            rid, res = res_q.get(timeout=0.1)
+        except queue.Empty:
+            continue
+        except (EOFError, OSError):
+            return
+        except Exception:
+            continue
+
+        with _pending_lock:
+            pending = _pending_results.pop(rid, None)
+        if pending:
+            pending["result"] = res
+            pending["event"].set()
+        else:
+            logger.debug(json.dumps({"event": "model_worker_unclaimed_result", "req_id": rid}))
+
+
 def predict_sync(features, timeout: float = 5.0):
     """Send features to the worker and wait for response."""
     global _task_q, _res_q, _proc
     if _proc is None or not _proc.is_alive():
         if not _ensure_worker_alive():
             raise RuntimeError("model worker not running and cannot be restarted")
+    if _task_q is None:
+        raise RuntimeError("model worker task queue unavailable")
     req_id = str(uuid.uuid4())
-    _task_q.put((req_id, features))
-    start_t = time.time()
-    while time.time() - start_t < timeout:
-        try:
-            rid, res = _res_q.get_nowait()
-        except Exception:
-            time.sleep(0.01)
-            continue
-        if rid == req_id:
-            return res
-        else:
-            # unexpected result; re-queue
-            _res_q.put((rid, res))
+    event = threading.Event()
+    pending = {"event": event, "result": None}
+    with _pending_lock:
+        _pending_results[req_id] = pending
+    try:
+        _task_q.put((req_id, features))
+    except Exception:
+        with _pending_lock:
+            _pending_results.pop(req_id, None)
+        raise
+
+    if event.wait(timeout):
+        return pending["result"]
+    with _pending_lock:
+        _pending_results.pop(req_id, None)
     raise RuntimeError("model worker timeout")

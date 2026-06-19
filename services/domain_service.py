@@ -22,12 +22,14 @@ def _clean_psycopg2_url(url):
 
 CLEAN_DB_URL = _clean_psycopg2_url(DATABASE_URL)
 
-_OPENAI_KEY = os.getenv("OPENAI_API_KEY")
-
-if not _OPENAI_KEY:
-    client = None  # Will be checked in functions
-else:
-    client = OpenAI(api_key=_OPENAI_KEY)
+def _get_client_and_model():
+    if _mock_services_on():
+        return None, None
+    try:
+        from services.ai_client_factory import get_ai_client_and_model
+        return get_ai_client_and_model()
+    except Exception:
+        return None, None
 
 DOMAIN_THRESHOLD = 0.70
 
@@ -132,6 +134,7 @@ def update_domain_centroid(cur, domain_id, embedding):
 # LLM DOMAIN CLASSIFICATION
 # ==========================================================
 def classify_domain_llm(job_text):
+    client, model = _get_client_and_model()
     # Allow mocking for testing without OpenAI API
     if _mock_services_on() or not client:
         return "Engineering & Technology"  # Default mock domain
@@ -163,7 +166,7 @@ Job Description:
 """
 
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=model,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.1,
     )

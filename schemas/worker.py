@@ -45,6 +45,7 @@ class WorkerAuthResponse(BaseModel):
     company_id: int
     allowed_jobs: List[int]
     quota_remaining: int
+    permissions: Dict[str, Any] = Field(default_factory=dict)
 
 class JobConfigResponse(BaseModel):
     job_id: int
