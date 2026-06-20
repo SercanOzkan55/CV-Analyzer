@@ -5,7 +5,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-testuser}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-testpass}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD before running docker compose}
       POSTGRES_DB: ${POSTGRES_DB:-testdb}
     ports:
       - "5432:5432"
@@ -21,12 +21,12 @@ services:
     image: redis:7-alpine
     restart: always
     environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-changeme}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD before running docker compose}
     command: >-
       redis-server
       --maxmemory 128mb
       --maxmemory-policy allkeys-lru
-      --requirepass ${REDIS_PASSWORD:-changeme}
+      --requirepass ${REDIS_PASSWORD:?Set REDIS_PASSWORD before running docker compose}
       --bind 0.0.0.0
       --timeout 300
       --tcp-keepalive 60
@@ -47,7 +47,7 @@ services:
     env_file:
       - .env
     environment:
-      REDIS_URL: redis://:${REDIS_PASSWORD:-changeme}@redis:6379/1
+      REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD before running docker compose}@redis:6379/1
     depends_on:
       db:
         condition: service_healthy

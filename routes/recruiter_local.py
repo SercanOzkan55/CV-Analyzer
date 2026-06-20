@@ -5,10 +5,13 @@ CVs are processed and results returned without saving to database.
 
 import secrets
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta
 from typing import List
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Header, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Header, UploadFile, Request
 from sqlalchemy.orm import Session
 
 from config.aws import MAX_UPLOAD_BYTES
@@ -38,13 +41,20 @@ def generate_api_key() -> str:
     return f"cv_{secrets.token_urlsafe(32)}"
 
 
-def validate_api_key(api_key: str, db: Session) -> APISubscription:
+def validate_api_key(api_key: str, db: Session, lock: bool = False) -> APISubscription:
     """Validate API key and return subscription."""
     if not api_key or not api_key.startswith("cv_"):
         raise HTTPException(status_code=401, detail="Invalid API key format")
 
-    subscription = db.query(APISubscription).filter(
-        APISubscription.api_key == api_key,
+    import hashlib
+    hashed_key = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+
+    query = db.query(APISubscription)
+    if lock:
+        query = query.with_for_update()
+
+    subscription = query.filter(
+        (APISubscription.api_key == hashed_key) | (APISubscription.api_key == api_key),
         APISubscription.is_active == True
     ).first()
 
@@ -91,19 +101,25 @@ async def generate_subscription_key(
     ).first()
 
     if existing:
+        masked_key = "cv_***"
+        if len(existing.api_key) > 8:
+            masked_key = f"cv_***{existing.api_key[-6:]}"
         return {
-            "api_key": existing.api_key,
+            "api_key": masked_key,
             "monthly_limit": existing.monthly_limit,
             "monthly_usage": existing.monthly_usage,
             "expires_at": existing.expires_at.isoformat() if existing.expires_at else None,
-            "message": "Existing active subscription found"
+            "message": "Existing active subscription found. API key is hidden for security."
         }
 
     # Create new subscription
-    api_key = generate_api_key()
+    raw_key = generate_api_key()
+    import hashlib
+    hashed_key = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+
     subscription = APISubscription(
         organization_id=org_id,
-        api_key=api_key,
+        api_key=hashed_key,
         monthly_limit=1000,  # Default 1000 CVs/month
         expires_at=datetime.utcnow() + timedelta(days=365),  # 1 year
     )
@@ -113,12 +129,77 @@ async def generate_subscription_key(
     db.refresh(subscription)
 
     return {
-        "api_key": subscription.api_key,
+        "api_key": raw_key,  # Returned only once
         "monthly_limit": subscription.monthly_limit,
         "monthly_usage": subscription.monthly_usage,
         "expires_at": subscription.expires_at.isoformat(),
-        "message": "New API key generated successfully"
+        "message": "New API key generated successfully. Please copy it now as it won't be shown again."
     }
+
+
+@router.post("/subscriptions/rotate-key")
+async def rotate_subscription_key(
+    db: Session = Depends(get_db),
+    recruiter=Depends(recruiter_required),
+):
+    """
+    Rotate the API key for the organization.
+    Deactivates the old active key and generates a new one.
+    """
+    org_id = recruiter.organization_id
+    if not org_id:
+        raise HTTPException(status_code=400, detail="No organization assigned")
+
+    # Deactivate all existing subscriptions for this org
+    db.query(APISubscription).filter(
+        APISubscription.organization_id == org_id,
+        APISubscription.is_active == True
+    ).update({"is_active": False})
+
+    # Generate new key
+    raw_key = generate_api_key()
+    import hashlib
+    hashed_key = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+
+    subscription = APISubscription(
+        organization_id=org_id,
+        api_key=hashed_key,
+        monthly_limit=1000,
+        expires_at=datetime.utcnow() + timedelta(days=365),
+    )
+    db.add(subscription)
+    db.commit()
+    db.refresh(subscription)
+
+    return {
+        "api_key": raw_key,  # Returned only once
+        "monthly_limit": subscription.monthly_limit,
+        "monthly_usage": subscription.monthly_usage,
+        "expires_at": subscription.expires_at.isoformat(),
+        "message": "New API key generated and old keys deactivated. Please copy it now as it won't be shown again."
+    }
+
+
+@router.post("/subscriptions/revoke-key")
+async def revoke_subscription_key(
+    db: Session = Depends(get_db),
+    recruiter=Depends(recruiter_required),
+):
+    """
+    Revoke all API keys for the organization.
+    """
+    org_id = recruiter.organization_id
+    if not org_id:
+        raise HTTPException(status_code=400, detail="No organization assigned")
+
+    updated = db.query(APISubscription).filter(
+        APISubscription.organization_id == org_id,
+        APISubscription.is_active == True
+    ).update({"is_active": False})
+
+    db.commit()
+    return {"message": f"Revoked {updated} API key(s)"}
+
 
 
 @router.get("/subscriptions/usage")
@@ -164,7 +245,7 @@ async def process_cvs_local_mode(
     - Files are processed in memory and discarded
     """
     # Validate API key and quota
-    subscription = validate_api_key(api_key, db)
+    subscription = validate_api_key(api_key, db, lock=True)
     if not files:
         raise HTTPException(status_code=400, detail="At least one file is required")
     check_monthly_quota(subscription, len(files))
@@ -221,9 +302,10 @@ async def process_cvs_local_mode(
             workers=None  # Auto-detect CPU cores
         )
     except Exception as e:
+        logger.exception("Large batch processing failed: %s", str(e))
         raise HTTPException(
             status_code=500,
-            detail=f"Processing failed: {str(e)}"
+            detail="Large batch processing failed due to an unexpected error"
         )
 
     # Update usage
@@ -294,7 +376,7 @@ async def process_linkedin_export_zip(
     - Results are returned immediately
     """
     # Validate API key
-    subscription = validate_api_key(api_key, db)
+    subscription = validate_api_key(api_key, db, lock=True)
 
     # Validate ZIP file
     if not zip_file.filename.lower().endswith('.zip'):
@@ -327,9 +409,10 @@ async def process_linkedin_export_zip(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logger.exception("Large batch processing failed: %s", str(e))
         raise HTTPException(
             status_code=500,
-            detail=f"Large batch processing failed: {str(e)}"
+            detail="Large batch processing failed due to an unexpected error"
         )
 
     # Update usage with actual count
@@ -405,7 +488,7 @@ async def process_linkedin_export_large(
     - Download results when `status: 'completed'`
     """
     # Validate API key
-    subscription = validate_api_key(api_key, db)
+    subscription = validate_api_key(api_key, db, lock=True)
 
     # Validate ZIP file
     if not zip_file.filename.lower().endswith('.zip'):
@@ -491,9 +574,10 @@ async def process_linkedin_export_large(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logger.exception("Large batch processing failed: %s", str(e))
         raise HTTPException(
             status_code=500,
-            detail=f"Large batch processing failed: {str(e)}"
+            detail="Large batch processing failed due to an unexpected error"
         )
 
 
@@ -528,6 +612,7 @@ async def get_processing_status(
 
 @router.post("/subscriptions/reset-usage")
 async def reset_monthly_usage(
+    request: Request,
     db: Session = Depends(get_db),
     recruiter=Depends(recruiter_required),
 ):
@@ -535,6 +620,11 @@ async def reset_monthly_usage(
     Reset monthly usage counter (admin function).
     Normally this would be automated, but manual reset for testing.
     """
+    from core.http_runtime import _admin_access_error
+    admin_error = _admin_access_error(request)
+    if admin_error:
+        return admin_error
+
     org_id = recruiter.organization_id
     if not org_id:
         raise HTTPException(status_code=400, detail="No organization assigned")

@@ -41,7 +41,16 @@ except ImportError:
 
 import worker as worker_module
 from credentials import load_worker_api_key, save_worker_api_key
-from worker import API_BASE_URL, MAX_FILE_BYTES, LocalWorker, extract_text, maybe_apply_ai_review, score_cv
+from worker import (
+    API_BASE_URL,
+    MAX_FILE_BYTES,
+    LocalWorker,
+    csv_safe,
+    extract_text,
+    iter_supported_local_files,
+    maybe_apply_ai_review,
+    score_cv,
+)
 from workspace import WorkspaceStore
 
 
@@ -126,14 +135,6 @@ def list_to_text(value) -> str:
     return str(value or "")
 
 
-def csv_safe(value):
-    if not isinstance(value, str):
-        return value
-    if value and (value[0] in "=+-@" or value[0] in "\t\r\n"):
-        return "'" + value
-    return value
-
-
 def permission_summary(permissions: dict | None) -> str:
     if not isinstance(permissions, dict) or not permissions:
         return "Default access: claim CVs and submit local results."
@@ -198,12 +199,7 @@ class AnalysisWorker(QObject):
             self.failed.emit(f"Analysis stopped. Details were written to {log_path}")
 
     def _run(self):
-        files = [
-            path
-            for path in self.folder.rglob("*")
-            if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS
-        ]
-        files.sort(key=lambda p: str(p).lower())
+        files = iter_supported_local_files(self.folder, self.output)
         if not files:
             self.done.emit("No PDF, DOCX, or TXT files found.")
             return
@@ -516,13 +512,17 @@ class WebsiteSyncWorker(QObject):
         self.pending_results = list(pending_results or [])
 
     def run(self):
-        original_url = worker_module.API_BASE_URL
         try:
             if not self.api_key:
                 raise RuntimeError("Paste a worker key before connecting.")
-            worker_module.API_BASE_URL = self.api_url or API_BASE_URL
             self.status.emit("Connecting to website worker API...")
-            worker = LocalWorker(self.api_key, "server_files", "none", os.environ.get("COMPUTERNAME", "QML Local Worker"))
+            worker = LocalWorker(
+                self.api_key,
+                "server_files",
+                "none",
+                os.environ.get("COMPUTERNAME", "QML Local Worker"),
+                api_base_url=self.api_url or API_BASE_URL,
+            )
             worker.login()
 
             self.status.emit("Fetching allowed website jobs...")
@@ -607,8 +607,6 @@ class WebsiteSyncWorker(QObject):
             })
         except Exception as exc:
             self.failed.emit(str(exc))
-        finally:
-            worker_module.API_BASE_URL = original_url
 
 
 class LocalWorkerBackend(QObject):
@@ -1213,7 +1211,7 @@ class LocalWorkerBackend(QObject):
         if not config["description"] and not config["required_skills"]:
             self.toast.emit("Add a job description or at least one required skill.", "warning")
             return
-        file_count = sum(1 for path in folder.rglob("*") if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS)
+        file_count = len(iter_supported_local_files(folder, output))
         if file_count <= 0:
             self.toast.emit("No PDF, DOCX, or TXT files found in that folder.", "warning")
             return
@@ -1445,7 +1443,7 @@ class LocalWorkerBackend(QObject):
             writer = csv.writer(fh)
             writer.writerow(["Candidate", "Email", "Score", "Decision", "Confidence", "Duplicate", "Matched Skills", "Missing Skills"])
             for row in rows:
-                writer.writerow([
+                writer.writerow([csv_safe(value) for value in [
                     Path(row.get("file", "")).name,
                     row.get("email", ""),
                     row.get("score", 0),
@@ -1454,7 +1452,7 @@ class LocalWorkerBackend(QObject):
                     "yes" if row.get("is_duplicate") else "no",
                     list_to_text(row.get("matched_skills")),
                     list_to_text(row.get("missing_skills")),
-                ])
+                ]])
         self.toast.emit(f"CSV exported: {path.name}", "success")
 
     @Slot()

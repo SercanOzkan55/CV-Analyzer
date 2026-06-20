@@ -4,6 +4,7 @@ Processes CVs in memory without saving to database.
 """
 
 import asyncio
+import os
 import zipfile
 import io
 import json
@@ -548,19 +549,58 @@ async def validate_cv_files(files: List[UploadFile]) -> List[str]:
     return errors
 
 
+async def _save_and_validate_zip(zip_file: UploadFile) -> str:
+    """Stream write UploadFile to a temporary file, check limits, and return path."""
+    import os
+    import uuid
+    from security.file_guard import validate_zip_archive
+
+    os.makedirs("test_tmp", exist_ok=True)
+    temp_path = os.path.abspath(os.path.join("test_tmp", f"upload_{uuid.uuid4().hex}.zip"))
+
+    total_bytes = 0
+    MAX_ZIP_UPLOAD_SIZE = 50_000_000  # 50MB limit for the ZIP upload file
+
+    try:
+        with open(temp_path, "wb") as f:
+            while True:
+                try:
+                    chunk = await zip_file.read(1024 * 1024)
+                    is_streaming = True
+                except TypeError:
+                    chunk = await zip_file.read()
+                    is_streaming = False
+                if not chunk:
+                    break
+                total_bytes += len(chunk)
+                if total_bytes > MAX_ZIP_UPLOAD_SIZE:
+                    raise ValueError(f"ZIP archive size exceeds limit of {MAX_ZIP_UPLOAD_SIZE // (1024*1024)}MB")
+                f.write(chunk)
+                if not is_streaming:
+                    break
+
+        # Validate ZIP contents using file guard rules
+        validate_zip_archive(temp_path)
+        return temp_path
+    except Exception:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
+        raise
+
+
 async def extract_linkedin_zip(zip_file: UploadFile) -> List[Dict[str, Any]]:
     """
     Extract CV files from LinkedIn export ZIP.
     Returns list of file-like objects with filename and content.
     """
     extracted_files = []
+    temp_path = await _save_and_validate_zip(zip_file)
 
     try:
-        # Read ZIP content
-        zip_content = await zip_file.read()
-        zip_buffer = io.BytesIO(zip_content)
-
-        with zipfile.ZipFile(zip_buffer, 'r') as zip_ref:
+        with zipfile.ZipFile(temp_path, 'r') as zip_ref:
             for file_info in zip_ref.filelist:
                 # Only process CV files
                 filename = file_info.filename.lower()
@@ -586,9 +626,15 @@ async def extract_linkedin_zip(zip_file: UploadFile) -> List[Dict[str, Any]]:
 
     except Exception as e:
         raise ValueError(f"Failed to extract LinkedIn ZIP: {str(e)}")
+    finally:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
 
     if not extracted_files:
-        raise ValueError("No valid CV files found in ZIP")
+        raise ValueError("No valid CV files found in ZIP archive")
 
     return extracted_files
 
@@ -641,15 +687,13 @@ async def extract_linkedin_zip_streaming(
     
     Memory efficient for 1000+ CVs.
     """
+    temp_path = await _save_and_validate_zip(zip_file)
     try:
-        zip_content = await zip_file.read()
-        zip_buffer = io.BytesIO(zip_content)
-
         chunk = []
         chunk_bytes = 0
         max_chunk_bytes = 500_000_000  # 500MB per chunk
 
-        with zipfile.ZipFile(zip_buffer, 'r') as zip_ref:
+        with zipfile.ZipFile(temp_path, 'r') as zip_ref:
             for file_info in zip_ref.filelist:
                 # Only process CV files
                 filename = file_info.filename.lower()
@@ -677,7 +721,6 @@ async def extract_linkedin_zip_streaming(
                         yield chunk
                         chunk = []
                         chunk_bytes = 0
-
                 except Exception as e:
                     logger.warning(f"Failed to extract file {file_info.filename}: {str(e)}")
                     continue
@@ -689,6 +732,12 @@ async def extract_linkedin_zip_streaming(
     except Exception as e:
         logger.error(f"ZIP extraction failed: {str(e)}")
         raise ValueError(f"Failed to extract LinkedIn ZIP: {str(e)}")
+    finally:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
 
 
 async def process_cv_batch_chunked(

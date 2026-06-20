@@ -35,8 +35,12 @@ def _extract_uploaded_cv_text(contents: bytes, file: UploadFile) -> tuple[str, b
     """Validate and extract CV text from PDF, TXT, or DOCX uploads."""
     if not contents:
         raise HTTPException(status_code=400, detail="Empty file")
-    if len(contents) > _main_module().MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=400, detail="File too large")
+
+    try:
+        from security.file_guard import validate_file_upload
+        validate_file_upload(contents, file.filename, file.content_type)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     ext = _upload_extension(file.filename)
     content_type = (file.content_type or "").lower()
@@ -56,15 +60,12 @@ def _extract_uploaded_cv_text(contents: bytes, file: UploadFile) -> tuple[str, b
             raise HTTPException(status_code=500, detail="Virus scanner error")
 
     if file_type == "pdf":
-        _validate_pdf_upload(contents, "application/pdf")
         text, truncated = _main_module()._extract_pdf_text(contents)
     elif file_type == "txt":
         text = contents.decode("utf-8", errors="ignore")
         truncated = len(text) > _MAX_PDF_EXTRACTED_CHARS
         text = text[:_MAX_PDF_EXTRACTED_CHARS]
     elif file_type == "docx":
-        if not contents.startswith(b"PK"):
-            raise HTTPException(status_code=400, detail="Invalid DOCX file")
         from utils.cv_processor import extract_docx_text_fast
 
         text = extract_docx_text_fast(contents)

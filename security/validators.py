@@ -1,10 +1,12 @@
 """Input validation and sanitisation utilities.
 
-Protects against prompt injection, path traversal, and malformed input.
+Protects against prompt injection, path traversal, malformed input, and ZIP bombs.
 """
 
 import logging
 import re
+import zipfile
+from io import BytesIO
 
 logger = logging.getLogger("security.validators")
 
@@ -190,3 +192,51 @@ def is_probably_cv(text: str, min_score: int = 2) -> bool:
         score -= 3
 
     return score >= min_score
+
+
+def validate_zip_safety(
+    file_content: bytes,
+    max_archive_bytes: int = 100 * 1024 * 1024,  # 100 MB
+    max_files: int = 1000,
+    max_compression_ratio: int = 10,
+) -> None:
+    """Validate ZIP file safety before extraction.
+    
+    Prevents ZIP bombs by checking:
+    - Archive size doesn't exceed max_archive_bytes
+    - File count doesn't exceed max_files
+    - Compression ratio doesn't exceed max_compression_ratio
+    
+    Raises ValueError if validation fails.
+    """
+    if len(file_content) > max_archive_bytes:
+        raise ValueError(
+            f"ZIP archive too large: {len(file_content)} bytes "
+            f"(max {max_archive_bytes} bytes)"
+        )
+    
+    try:
+        with zipfile.ZipFile(BytesIO(file_content), 'r') as zf:
+            # Check file count
+            file_list = zf.filelist
+            if len(file_list) > max_files:
+                raise ValueError(
+                    f"ZIP contains too many files: {len(file_list)} "
+                    f"(max {max_files})"
+                )
+            
+            # Check compression ratios for each file
+            for zinfo in file_list:
+                if zinfo.compress_size > 0:
+                    ratio = zinfo.file_size / zinfo.compress_size
+                    if ratio > max_compression_ratio:
+                        logger.warning(
+                            "security:zip_bomb_detected file=%s ratio=%.1f max=%d",
+                            zinfo.filename, ratio, max_compression_ratio
+                        )
+                        raise ValueError(
+                            f"Suspicious compression ratio in {zinfo.filename}: "
+                            f"{ratio:.1f}x (max {max_compression_ratio}x)"
+                        )
+    except zipfile.BadZipFile as e:
+        raise ValueError(f"Invalid ZIP file: {e}")

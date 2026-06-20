@@ -73,7 +73,7 @@ def list_fonts():
 
 
 @router.get("/health")
-def health_check():
+def health_check(request: Request = None):
     # ── Ops: Blue/green — health must fail until startup complete ──
     if not _main_module()._app_ready:
         return JSONResponse(
@@ -240,6 +240,17 @@ def health_check():
         },
     }
 
+    # Task 7 additions:
+    is_prod = os.getenv("ENV", "development").lower() in ("production", "prod")
+    has_admin = False
+    if request is not None:
+        has_admin = (_admin_access_error(request) is None)
+
+    if is_prod and not has_admin:
+        return {
+            "status": overall,
+        }
+
     return {
         "status": overall,
         "build_id": BUILD_ID,
@@ -299,9 +310,12 @@ def _check_backup_age() -> dict:
 
 # ── SRE: /health/full endpoint ───────────────────────────────────────────
 @router.get("/health/full")
-def health_full():
+def health_full(request: Request):
     """Extended health check with backup, metrics, and resource details."""
-    base = health_check()
+    admin_error = _admin_access_error(request)
+    if admin_error:
+        return admin_error
+    base = health_check(request)
 
     # Backup age
     base["backup"] = _check_backup_age()

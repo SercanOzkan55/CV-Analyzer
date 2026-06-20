@@ -157,3 +157,45 @@ def test_billing_admin_uses_same_ip_allowlist(client, monkeypatch):
     )
 
     assert response.status_code == 403
+
+
+def test_semantic_search_tenant_isolation(client, db_session, monkeypatch):
+    _clear_rate_limit_state()
+    from models import Organization, Candidate
+
+    # Create two organizations
+    org1 = Organization(name="Tenant 1", domain="tenant1.com")
+    org2 = Organization(name="Tenant 2", domain="tenant2.com")
+    db_session.add(org1)
+    db_session.add(org2)
+    db_session.commit()
+
+    # The mock user returns 'test-user-123'. Assign it to org1.
+    user1 = _user(db_session, "test-user-123", "testuser@example.com")
+    user1.organization_id = org1.id
+    db_session.add(user1)
+
+    # Create candidate in org2 (Tenant 2)
+    c2 = Candidate(
+        organization_id=org2.id,
+        name="Tenant2 Candidate",
+        email="c2@org2.com",
+        cv_text="Python FastAPI developer with experience in microservices",
+    )
+    db_session.add(c2)
+    db_session.commit()
+
+    # Mock the get_embedding to return a dummy vector
+    monkeypatch.setattr("routes.ai_tools.get_embedding", lambda x: [0.1] * 1536)
+
+    # Call semantic-search endpoint
+    response = client.post(
+        "/api/v1/semantic-search",
+        json={"job_text": "Python developer", "k": 5},
+    )
+
+    # The result should not leakage Tenant 2's candidate
+    assert response.status_code == 200
+    data = response.json()
+    matches = data.get("matches", [])
+    candidate_ids = [m.get("id") for m in matches]

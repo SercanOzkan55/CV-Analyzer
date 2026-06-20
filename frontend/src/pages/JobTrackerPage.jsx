@@ -81,10 +81,14 @@ function reminderTypeFromStatus(status) {
   return 'follow_up'
 }
 
-function loadJobs() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {} } catch { return {} }
+function loadJobs(userId) {
+  const key = userId ? `cv_analyzer_job_tracker_${userId}` : 'cv_analyzer_job_tracker'
+  try { return JSON.parse(localStorage.getItem(key)) || {} } catch { return {} }
 }
-function saveJobs(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) }
+function saveJobs(data, userId) {
+  const key = userId ? `cv_analyzer_job_tracker_${userId}` : 'cv_analyzer_job_tracker'
+  localStorage.setItem(key, JSON.stringify(data))
+}
 
 function jobFromServer(row) {
   return {
@@ -127,6 +131,7 @@ const itemVariants = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, 
 
 // ── Add/Edit Modal ──
 function JobModal({ job, initialStatus, userEmail, onSave, onClose, t, lang }) {
+  const title = job ? t('jt.edit_job') : t('jt.add_job')
   const defaultReminder = ['interview', 'offer'].includes(job?.status || initialStatus)
   const [form, setForm] = useState({
     company: job?.company || '',
@@ -161,10 +166,10 @@ function JobModal({ job, initialStatus, userEmail, onSave, onClose, t, lang }) {
   return (
     <motion.div className="jt-modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
       <motion.div className="jt-modal" initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.92, opacity: 0 }}
-        onClick={e => e.stopPropagation()}>
+        role="dialog" aria-modal="true" aria-label={title} onClick={e => e.stopPropagation()}>
         <div className="jt-modal-header">
-          <h3>{job ? t('jt.edit_job') : t('jt.add_job')}</h3>
-          <button className="jt-modal-close" onClick={onClose}><X size={18} /></button>
+          <h3>{title}</h3>
+          <button type="button" className="jt-modal-close" onClick={onClose} aria-label={t('common.close') || 'Close'}><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit} className="jt-modal-form">
           <div className="jt-form-row">
@@ -294,8 +299,8 @@ function JobCard({ job, onEdit, onDelete, onSendReminderTest, dragHandlers, isDr
         <div className="jt-card-grip" title="Drag"><GripVertical size={14} /></div>
         <span className="jt-card-priority" style={{ background: PRIORITY_COLORS[job.priority] || '#fbbf24' }} />
         <div className="jt-card-actions">
-          <button onClick={() => onEdit(job)} title={t('jt.edit_job')}><Edit3 size={13} /></button>
-          <button onClick={() => onDelete(job.id)} title={t('jt.delete')}><Trash2 size={13} /></button>
+          <button type="button" onClick={() => onEdit(job)} title={t('jt.edit_job')} aria-label={`${t('jt.edit_job')}: ${job.company} ${job.role}`}><Edit3 size={13} /></button>
+          <button type="button" onClick={() => onDelete(job.id)} title={t('jt.delete')} aria-label={`${t('jt.delete')}: ${job.company} ${job.role}`}><Trash2 size={13} /></button>
         </div>
       </div>
       <h4 className="jt-card-company">{job.company}</h4>
@@ -312,6 +317,7 @@ function JobCard({ job, onEdit, onDelete, onSendReminderTest, dragHandlers, isDr
               type="button"
               onClick={e => { e.stopPropagation(); onSendReminderTest?.(job) }}
               title={copy(lang, 'Test maili gönder', 'Send test email')}
+              aria-label={`${copy(lang, 'Test maili gönder', 'Send test email')}: ${job.company} ${job.role}`}
             >
               <Mail size={11} />
             </button>
@@ -320,7 +326,7 @@ function JobCard({ job, onEdit, onDelete, onSendReminderTest, dragHandlers, isDr
       )}
       <div className="jt-card-footer">
         <span className="jt-card-date"><Clock size={11} /> {daysSince}d</span>
-        {safeJobUrl && <a href={safeJobUrl} target="_blank" rel="noopener noreferrer" className="jt-card-link"><ExternalLink size={11} /></a>}
+        {safeJobUrl && <a href={safeJobUrl} target="_blank" rel="noopener noreferrer" className="jt-card-link" aria-label={`${copy(lang, 'İlanı aç', 'Open job posting')}: ${job.company} ${job.role}`}><ExternalLink size={11} /></a>}
       </div>
     </motion.div>
   )
@@ -331,9 +337,10 @@ export default function JobTrackerPage() {
   const { t, lang } = useLanguage()
   const { addToast } = useToast()
   const { user, token } = useAuth()
+  const userId = user?.id || ''
   const userEmail = user?.email || ''
 
-  const [jobs, setJobs] = useState(() => loadJobs())
+  const [jobs, setJobs] = useState(() => loadJobs(user?.id))
   const [modalOpen, setModalOpen] = useState(false)
   const [editingJob, setEditingJob] = useState(null)
   const [addToColumn, setAddToColumn] = useState('wishlist')
@@ -342,7 +349,14 @@ export default function JobTrackerPage() {
   const [syncingJobs, setSyncingJobs] = useState(false)
 
   useEffect(() => { document.title = `${t('jt.title')} — CV Analyzer` }, [t])
-  useEffect(() => { saveJobs(jobs) }, [jobs])
+
+  useEffect(() => {
+    setJobs(loadJobs(userId))
+  }, [userId])
+
+  useEffect(() => {
+    saveJobs(jobs, userId)
+  }, [jobs, userId])
 
   useEffect(() => {
     if (!token) return undefined
@@ -641,7 +655,7 @@ export default function JobTrackerPage() {
                       <span className="jt-column-title">{t(`jt.col_${col.id}`)}</span>
                       <span className="jt-column-count">{colJobs.length}</span>
                     </div>
-                    <button className="jt-column-add" onClick={() => openAddModal(col.id)} title={t('jt.add_job')}>
+                    <button type="button" className="jt-column-add" onClick={() => openAddModal(col.id)} title={t('jt.add_job')} aria-label={`${t('jt.add_job')}: ${t(`jt.col_${col.id}`)}`}>
                       <Plus size={15} />
                     </button>
                   </div>

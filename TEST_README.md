@@ -6,8 +6,8 @@ Three comprehensive test files have been created to validate your SaaS backend:
 
 | File | Purpose | Use When |
 |------|---------|----------|
-| **test_saas.py** | Automated test suite | Comprehensive validation (all 10 tests at once) |
-| **test_saas.sh** | Manual curl commands | Testing individual endpoints |
+| **tests/test_validate_saas.py** | Automated pytest validation suite | Validating pre-production checks locally and in CI |
+| **TEST_WINDOWS.md** | Manual PowerShell commands | Testing individual endpoints on Windows |
 | **TEST_DOCUMENTATION.md** | Detailed test guide | Understanding what each test does |
 | **TEST_WINDOWS.md** | Windows PowerShell guide | Running on Windows |
 | **validate_saas.py** | Pre-deployment checklist | Before going to production |
@@ -23,11 +23,11 @@ Three comprehensive test files have been created to validate your SaaS backend:
 cd c:\Users\ozkan\cv-analyzer
 python -m uvicorn main:app --reload
 
-# Terminal 2: Run all tests
-python test_saas.py
+# Terminal 2: Run validation tests
+python -m pytest tests/test_validate_saas.py
 ```
 
-**Expected Output:** ✅ 10/10 tests passed
+**Expected Output:** pytest exits successfully
 
 ### Option 2: Manual Testing (Windows PowerShell)
 
@@ -36,11 +36,10 @@ python test_saas.py
 # Includes pre-built PowerShell commands
 ```
 
-### Option 3: Quick Curl Tests
+### Option 3: Manual Endpoint Tests
 
 ```bash
-bash test_saas.sh
-# Add your JWT token at the top of the file
+# See TEST_WINDOWS.md for step-by-step PowerShell endpoint checks.
 ```
 
 ---
@@ -79,7 +78,7 @@ python validate_saas.py  # Validates config, files, code
 
 **Phase 2: Automated Tests (10 min)**
 ```bash
-python test_saas.py      # Full 10-test suite
+python -m pytest tests/test_validate_saas.py
 ```
 
 **Phase 3: Manual User Testing (30 min)**
@@ -220,7 +219,7 @@ GROUP BY u.id;
 Before deploying to production:
 
 - [ ] Run `python validate_saas.py` → All pass
-- [ ] Run `python test_saas.py` → All 10 pass
+- [ ] Run `python -m pytest tests/test_validate_saas.py` → Pass
 - [ ] Database checks return expected results
 - [ ] Created 2 test accounts, data isolation verified
 - [ ] Rate limiting tested (11 requests return 429)
@@ -259,8 +258,8 @@ For issues:
 ## Files Created
 
 ```
-✅ test_saas.py              - Automated Python test suite (10 tests)
-✅ test_saas.sh              - Manual curl commands for testing
+✅ tests/test_validate_saas.py - Automated pytest validation suite
+✅ tests/run_tests.py          - Lightweight API smoke-test helper
 ✅ validate_saas.py          - Pre-production validation checklist
 ✅ TEST_DOCUMENTATION.md     - Detailed test guide (comprehensive)
 ✅ TEST_WINDOWS.md           - Windows PowerShell quick start

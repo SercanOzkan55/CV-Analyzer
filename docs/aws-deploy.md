@@ -157,7 +157,7 @@ cd cv-analyzer
 # .env dosyasını oluştur
 cat > .env << 'EOF'
 ENV=production
-DATABASE_URL=postgresql://testuser:testpass@db:5432/testdb
+DATABASE_URL=postgresql://cvanalyzer_user:CHANGE_ME_STRONG_DB_PASSWORD@db:5432/cvanalyzer
 POSTGRES_USER=GÜÇLÜ_KULLANICI
 POSTGRES_PASSWORD=GÜÇLÜ_ŞİFRE
 POSTGRES_DB=cvanalyzer

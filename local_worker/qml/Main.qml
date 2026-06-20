@@ -1949,6 +1949,16 @@ ApplicationWindow {
                                         onActivated: backend.aiMode = currentText
                                     }
 
+                                    Text {
+                                        visible: backend.aiMode === "customer_openai_key"
+                                        text: "⚠ Bu mod, CV metin özetlerini (maks. 6000 karakter) ve iş detaylarını OpenAI sunucularına gönderir. Verileriniz yerel kalmaz."
+                                        color: "#e65100"
+                                        wrapMode: Text.WordWrap
+                                        font.pixelSize: 11
+                                        Layout.fillWidth: true
+                                        Layout.topMargin: 4
+                                    }
+
                                     Item { Layout.fillHeight: true }
 
                                     RowLayout {

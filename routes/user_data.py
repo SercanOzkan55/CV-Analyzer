@@ -398,10 +398,13 @@ def export_my_data(
     from models import (
         AnalysisNote,
         AnalysisShare,
+        Candidate,
         CandidateAction,
+        CandidateComment,
         Favorite,
         JobTemplate,
         UsageDaily,
+        WorkerAnalysisResult,
     )
 
     def _dt(value):
@@ -428,6 +431,14 @@ def export_my_data(
     usage_days = db.query(UsageDaily).filter(UsageDaily.user_id == db_user.id).order_by(UsageDaily.date.desc()).limit(400).all()
     reminders = db.query(Reminder).filter(Reminder.created_by == db_user.id).order_by(Reminder.event_date.desc()).all()
     actions = db.query(CandidateAction).filter(CandidateAction.recruiter_id == db_user.id).order_by(CandidateAction.created_at.desc()).limit(500).all()
+
+    candidates = []
+    comments = []
+    worker_results = []
+    if db_user.organization_id is not None:
+        candidates = db.query(Candidate).filter(Candidate.organization_id == db_user.organization_id).order_by(Candidate.created_at.desc()).limit(500).all()
+        comments = db.query(CandidateComment).filter(CandidateComment.organization_id == db_user.organization_id, CandidateComment.author_user_id == db_user.id).order_by(CandidateComment.created_at.desc()).limit(500).all()
+        worker_results = db.query(WorkerAnalysisResult).filter(WorkerAnalysisResult.organization_id == db_user.organization_id).order_by(WorkerAnalysisResult.created_at.desc()).limit(500).all()
 
     payload = {
         "exported_at": datetime.utcnow().isoformat() + "Z",
@@ -504,6 +515,49 @@ def export_my_data(
             }
             for row in actions
         ],
+        "candidates": [
+            {
+                "id": r.id,
+                "name": r.name,
+                "email": r.email,
+                "phone": r.phone,
+                "cv_text": _text_meta(r.cv_text),
+                "created_at": _dt(r.created_at),
+            }
+            for r in candidates
+        ],
+        "candidate_comments": [
+            {
+                "id": r.id,
+                "candidate_action_id": r.candidate_action_id,
+                "author_user_id": r.author_user_id,
+                "body": r.body if include_raw else None,
+                "chars": len(r.body or ""),
+                "created_at": _dt(r.created_at),
+            }
+            for r in comments
+        ],
+        "worker_analysis_results": [
+            {
+                "id": r.id,
+                "job_id": r.job_id,
+                "candidate_id": r.candidate_id,
+                "candidate_action_id": r.candidate_action_id,
+                "cv_id": r.cv_id,
+                "score": r.score,
+                "decision": r.decision,
+                "candidate_status": r.candidate_status,
+                "confidence": r.confidence,
+                "summary": r.summary if include_raw else None,
+                "matched_skills": r.matched_skills if include_raw else None,
+                "missing_skills": r.missing_skills if include_raw else None,
+                "risk_flags": r.risk_flags if include_raw else None,
+                "explanation": r.explanation if include_raw else None,
+                "source": r.source,
+                "created_at": _dt(r.created_at),
+            }
+            for r in worker_results
+        ],
     }
     _record_ops_event("data_export", "ok", user_id=db_user.id, include_raw=bool(include_raw))
     return payload
@@ -517,7 +571,14 @@ def delete_my_data(
     db=Depends(get_db),
 ):
     """Delete selected privacy-sensitive data for the current user."""
-    from models import CandidateAction, JobTemplate, UsageDaily
+    from models import (
+        Candidate,
+        CandidateAction,
+        CandidateComment,
+        JobTemplate,
+        UsageDaily,
+        WorkerAnalysisResult,
+    )
 
     if confirm != "DELETE":
         raise HTTPException(status_code=400, detail="confirm=DELETE is required")
@@ -546,12 +607,30 @@ def delete_my_data(
             deleted_candidate_actions = db.query(CandidateAction).filter(
                 CandidateAction.recruiter_id == db_user.id
             ).delete(synchronize_session=False)
+            
+            deleted_comments = db.query(CandidateComment).filter(
+                CandidateComment.author_user_id == db_user.id
+            ).delete(synchronize_session=False)
+            
+            deleted_candidates = 0
+            deleted_worker_results = 0
+            if db_user.organization_id is not None:
+                deleted_worker_results = db.query(WorkerAnalysisResult).filter(
+                    WorkerAnalysisResult.organization_id == db_user.organization_id
+                ).delete(synchronize_session=False)
+                deleted_candidates = db.query(Candidate).filter(
+                    Candidate.organization_id == db_user.organization_id
+                ).delete(synchronize_session=False)
+
             summary.update(
                 {
                     "deleted_job_templates": int(deleted_templates or 0),
                     "deleted_usage_days": int(deleted_usage_days or 0),
                     "deleted_reminders": int(deleted_reminders or 0),
                     "deleted_candidate_actions": int(deleted_candidate_actions or 0),
+                    "deleted_candidate_comments": int(deleted_comments or 0),
+                    "deleted_worker_analysis_results": int(deleted_worker_results or 0),
+                    "deleted_candidates": int(deleted_candidates or 0),
                 }
             )
 
