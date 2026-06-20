@@ -1,0 +1,26 @@
+/* ---------- Cards ---------- */
+.card {
+  background: var(--bg-card); border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); padding: var(--space-xl);
+  transition: border-color var(--motion-base) var(--transition-smooth), box-shadow var(--motion-base) var(--transition-smooth), background-color var(--motion-base) var(--transition-smooth);
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+[data-theme="dark"] .card {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+}
+[data-theme="light"] .card {
+  box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.05), 0 4px 6px -2px rgba(15, 23, 42, 0.02);
+}
+.card:hover {
+  border-color: var(--color-border-hover);
+  box-shadow: var(--shadow-md);
+}
+.card h2 { color: var(--color-text); margin-bottom: 16px; font-size: 1.3rem; font-weight: 600; letter-spacing: -0.02em; }
+.card h3 { color: var(--color-text); margin-bottom: 12px; font-size: 1.1rem; font-weight: 600; letter-spacing: -0.01em; }
+.card h4 { color: var(--color-text); margin-bottom: 8px; font-size: 0.95rem; font-weight: 500; }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.card-header h2 { margin-bottom: 0; }
+.card-danger { border-color: rgba(239, 68, 68, 0.4); }
+

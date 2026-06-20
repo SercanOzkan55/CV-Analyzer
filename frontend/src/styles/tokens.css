@@ -1,0 +1,122 @@
+/* =============================================
+   CV Analyzer - Premium Theme Tokens
+   ============================================= */
+
+/* ---------- CSS Variables (Dark) ---------- */
+:root,
+[data-theme="dark"] {
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #111111;
+  --bg-card: #141414;
+  --bg-card-hover: #1a1a1a;
+  --bg-card-solid: #111111;
+  --bg-input: #111111;
+  --color-text: #ededed;
+  --color-text-secondary: #a1a1aa;
+  --color-text-muted: #71717a;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-hover: rgba(255, 255, 255, 0.16);
+  --color-accent: #6366f1;
+  --color-accent-hover: #4f46e5;
+  --color-accent-glow: rgba(99, 102, 241, 0.12);
+  --color-accent-pink: #ec4899;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-bg: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-tertiary: var(--bg-card);
+  --color-surface: var(--bg-card);
+  --color-surface-raised: var(--bg-card-solid);
+  --color-surface-hover: var(--bg-card-hover);
+  --text-primary: var(--color-text);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-muted);
+  --gradient-accent: linear-gradient(135deg, #4f46e5, #8b5cf6);
+  --shadow-sm: 0 2px 8px -2px rgba(0,0,0,0.5);
+  --shadow-md: 0 8px 24px -4px rgba(0,0,0,0.6);
+  --shadow-lg: 0 16px 40px -8px rgba(0,0,0,0.7);
+  --shadow-glow: 0 0 0 1px rgba(99, 102, 241, 0.1);
+  --shadow-accent: 0 8px 24px -4px rgba(99, 102, 241, 0.25);
+  --focus-ring: 0 0 0 3px rgba(99, 102, 241, 0.25);
+  --color-info: #38bdf8;
+  --color-primary-contrast: #ffffff;
+  --status-success: var(--color-success);
+  --status-success-bg: color-mix(in srgb, var(--color-success) 12%, transparent);
+  --status-success-border: color-mix(in srgb, var(--color-success) 26%, transparent);
+  --status-warning: var(--color-warning);
+  --status-warning-bg: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  --status-warning-border: color-mix(in srgb, var(--color-warning) 26%, transparent);
+  --status-danger: var(--color-danger);
+  --status-danger-bg: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  --status-danger-border: color-mix(in srgb, var(--color-danger) 26%, transparent);
+  --status-info: var(--color-info);
+  --status-info-bg: color-mix(in srgb, var(--color-info) 12%, transparent);
+  --status-info-border: color-mix(in srgb, var(--color-info) 26%, transparent);
+  --status-accent: var(--color-accent);
+  --status-accent-bg: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  --status-accent-border: color-mix(in srgb, var(--color-accent) 26%, transparent);
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --glass-bg: rgba(10, 10, 10, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.05);
+  --glass-blur: blur(16px);
+  --motion-fast: 140ms;
+  --motion-base: 220ms;
+  --motion-slow: 320ms;
+  --transition-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ---------- CSS Variables (Light) ---------- */
+[data-theme="light"] {
+  --bg-primary: #f6f8fb;
+  --bg-secondary: #eef3f8;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f7f9fc;
+  --bg-card-solid: #ffffff;
+  --bg-input: #f8fafc;
+  --color-text: #0f172a;
+  --color-text-secondary: #334155;
+  --color-text-muted: #64748b;
+  --color-border: rgba(15, 23, 42, 0.11);
+  --color-border-hover: rgba(15, 23, 42, 0.22);
+  --color-accent: #4f46e5;
+  --color-accent-hover: #4338ca;
+  --color-accent-glow: rgba(79, 70, 229, 0.1);
+  --color-accent-pink: #db2777;
+  --color-success: #059669;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+  --color-info: #0284c7;
+  --color-primary-contrast: #ffffff;
+  --color-bg: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-tertiary: var(--bg-card);
+  --color-surface: var(--bg-card);
+  --color-surface-raised: var(--bg-card-solid);
+  --color-surface-hover: var(--bg-card-hover);
+  --text-primary: var(--color-text);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-muted);
+  --gradient-accent: linear-gradient(135deg, #4f46e5, #7c3aed);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 10px 24px -12px rgba(15, 23, 42, 0.22), 0 2px 8px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 24px 60px -24px rgba(15, 23, 42, 0.28), 0 8px 18px rgba(15, 23, 42, 0.08);
+  --shadow-glow: 0 0 0 1px rgba(79, 70, 229, 0.15);
+  --shadow-accent: 0 8px 24px -4px rgba(79, 70, 229, 0.2);
+  --glass-bg: rgba(255, 255, 255, 0.9);
+  --glass-border: rgba(15, 23, 42, 0.08);
+  --glass-blur: blur(20px);
+}

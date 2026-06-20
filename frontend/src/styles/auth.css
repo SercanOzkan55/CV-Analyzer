@@ -1,0 +1,39 @@
+/* ---------- Auth Pages ---------- */
+.auth-page {
+  flex: 1; display: flex; justify-content: center; align-items: center; padding: 20px;
+  position: relative;
+}
+.auth-card {
+  background: var(--bg-card); border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg); padding: 40px; width: 100%; max-width: 420px;
+  box-shadow: var(--shadow-md);
+  position: relative; z-index: 1;
+  animation: fadeSlideUp 0.3s ease-out;
+}
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.auth-card h1 {
+  text-align: center; margin-bottom: 4px; font-size: 1.5rem; font-weight: 700;
+  color: var(--color-text);
+}
+.auth-subtitle { text-align: center; color: var(--color-text-muted); margin-bottom: 28px; }
+.auth-divider { display: flex; align-items: center; gap: 12px; margin: 24px 0; color: var(--color-text-muted); font-size: 0.85rem; }
+.auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--color-border); }
+.auth-switch { text-align: center; margin-top: 24px; color: var(--color-text-muted); font-size: 0.9rem; }
+
+.auth-form .form-group { margin-bottom: 18px; }
+.auth-form label { display: block; font-size: 0.85rem; color: var(--color-text-secondary); margin-bottom: 6px; font-weight: 600; letter-spacing: 0.01em; }
+.auth-form input {
+  width: 100%; padding: 10px 14px; border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border); background: var(--bg-input); color: var(--color-text);
+  font-size: 0.9rem; outline: none; transition: all 0.15s ease-out;
+}
+.auth-form input:focus { border-color: var(--color-accent); box-shadow: var(--focus-ring); }
+.form-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.link-btn { background: none; border: none; color: var(--color-accent); cursor: pointer; font-size: 0.9rem; font-weight: 600; }
+.link-btn:hover { text-decoration: underline; }
+.success-box { text-align: center; padding: 20px 0; }
+.success-icon { font-size: 3rem; color: var(--color-success); margin-bottom: 12px; }
+

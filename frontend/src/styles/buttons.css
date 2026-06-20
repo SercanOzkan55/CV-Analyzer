@@ -1,0 +1,47 @@
+/* ---------- Buttons ---------- */
+.btn-primary {
+  background: var(--gradient-accent); color: var(--color-primary-contrast); border: 1px solid rgba(255, 255, 255, 0.12); padding: 10px 24px;
+  border-radius: 99px; font-weight: 600; cursor: pointer; font-size: 0.875rem;
+  transition: transform var(--motion-fast) var(--transition-smooth), box-shadow var(--motion-fast) var(--transition-smooth), filter var(--motion-fast) var(--transition-smooth);
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  box-shadow: var(--shadow-accent);
+  position: relative; overflow: hidden;
+  letter-spacing: 0;
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: var(--shadow-md), var(--shadow-accent); filter: saturate(1.05) brightness(1.02); }
+.btn-primary:active { transform: translateY(0); box-shadow: var(--shadow-sm); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+.btn-outline {
+  background: transparent; border: 1px solid var(--color-border); color: var(--color-text);
+  padding: 10px 24px; border-radius: 99px; cursor: pointer; font-size: 0.875rem;
+  font-weight: 500; transition: border-color var(--motion-fast) var(--transition-smooth), background-color var(--motion-fast) var(--transition-smooth), color var(--motion-fast) var(--transition-smooth), transform var(--motion-fast) var(--transition-smooth);
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.btn-outline:hover { border-color: var(--color-border-hover); background: var(--bg-card-hover); transform: translateY(-1px); }
+.btn-outline:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-ghost { background: transparent; border: none; color: var(--color-text-secondary); padding: 10px 20px; border-radius: 99px; cursor: pointer; font-size: 0.875rem; font-weight: 500; transition: color var(--motion-fast) var(--transition-smooth), background-color var(--motion-fast) var(--transition-smooth), transform var(--motion-fast) var(--transition-smooth); }
+.btn-ghost:hover { color: var(--color-text); background: var(--color-border); }
+
+.btn-danger { background: var(--color-danger); color: #fff; border: none; padding: 10px 24px; border-radius: 99px; cursor: pointer; font-weight: 600; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2); transition: transform var(--motion-fast) var(--transition-smooth), box-shadow var(--motion-fast) var(--transition-smooth), background-color var(--motion-fast) var(--transition-smooth); }
+.btn-danger:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3); background: #dc2626; }
+
+.btn-icon { background: transparent; border: 1px solid transparent; cursor: pointer; padding: 8px; font-size: 1.1rem; color: var(--color-text-secondary); transition: color var(--motion-fast) var(--transition-smooth), background-color var(--motion-fast) var(--transition-smooth), border-color var(--motion-fast) var(--transition-smooth); border-radius: 50%; }
+.btn-icon:hover { color: var(--color-text); background: var(--color-border); }
+.table-select-button { width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; }
+
+.btn-sm { padding: 6px 16px; font-size: 0.8rem; }
+.btn-lg { padding: 14px 32px; font-size: 1rem; letter-spacing: -0.01em; }
+.btn-full { width: 100%; }
+
+/* Google Button */
+.btn-google {
+  display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%;
+  padding: 12px; border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  background: var(--bg-card); color: var(--color-text); cursor: pointer; font-size: 0.95rem;
+  font-weight: 500; transition: all 0.2s var(--transition-smooth);
+}
+.btn-google:hover { border-color: var(--color-text-secondary); background: var(--bg-card-hover); }
+

@@ -1,0 +1,112 @@
+/* ---------- Page Headers ---------- */
+.page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-lg); gap: var(--space-md); }
+.page-header h1 { font-size: 1.8rem; line-height: 1.15; letter-spacing: 0; }
+
+.product-page-header {
+  align-items: center;
+  padding: clamp(20px, 3vw, 30px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 8%, transparent), transparent 46%),
+    var(--bg-card);
+  box-shadow: var(--shadow-sm);
+}
+.product-page-kicker {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin-bottom: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: var(--status-accent);
+  background: var(--status-accent-bg);
+  border: 1px solid var(--status-accent-border);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.product-page-subtitle {
+  max-width: 640px;
+  margin: 8px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+}
+.product-card {
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-card-hover) 44%, transparent), transparent 60%),
+    var(--bg-card);
+}
+.product-card:hover {
+  transform: translateY(-2px);
+}
+.product-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 1.05rem;
+}
+
+.status-pill,
+.status-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  border-radius: 999px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.status-pill {
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  font-size: 0.75rem;
+}
+.status-count {
+  font-size: 0.86rem;
+}
+.status-pill-success { color: var(--status-success); background: var(--status-success-bg); border-color: var(--status-success-border); }
+.status-pill-warning { color: var(--status-warning); background: var(--status-warning-bg); border-color: var(--status-warning-border); }
+.status-pill-danger { color: var(--status-danger); background: var(--status-danger-bg); border-color: var(--status-danger-border); }
+.status-pill-info { color: var(--status-info); background: var(--status-info-bg); border-color: var(--status-info-border); }
+.status-pill-accent { color: var(--status-accent); background: var(--status-accent-bg); border-color: var(--status-accent-border); }
+.status-count-success { color: var(--status-success); }
+.status-count-warning { color: var(--status-warning); }
+.status-count-danger { color: var(--status-danger); }
+.status-count-info { color: var(--status-info); }
+.status-count-accent { color: var(--status-accent); }
+
+.analysis-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+.analysis-tab {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  padding: 0.52rem 0.95rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: color var(--motion-fast) var(--transition-smooth), background-color var(--motion-fast) var(--transition-smooth), border-color var(--motion-fast) var(--transition-smooth), transform var(--motion-fast) var(--transition-smooth);
+}
+.analysis-tab:hover {
+  color: var(--color-text);
+  background: var(--bg-card-hover);
+  border-color: var(--color-border);
+}
+.analysis-tab.active {
+  color: var(--status-accent);
+  background: var(--status-accent-bg);
+  border-color: var(--status-accent-border);
+  box-shadow: var(--shadow-sm);
+}
+

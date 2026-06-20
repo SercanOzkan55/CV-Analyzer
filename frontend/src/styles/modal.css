@@ -1,0 +1,28 @@
+/* ---------- Modal ---------- */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(2, 6, 23, 0.68); backdrop-filter: blur(10px);
+  display: flex; justify-content: center; align-items: center; z-index: 10002; padding: 24px;
+  animation: fadeIn var(--motion-base) ease-out;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal-content {
+  background: var(--bg-card-solid); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+  width: 100%; max-width: 600px; max-height: 85vh; overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  animation: modalSlideUp var(--motion-slow) var(--transition-spring);
+}
+@keyframes modalSlideUp {
+  from { opacity: 0; transform: translateY(24px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 20px 32px; border-bottom: 1px solid var(--color-border);
+}
+.modal-header h3 { font-size: 1.2rem; font-weight: 600; letter-spacing: -0.01em; }
+.modal-close { background: var(--bg-secondary); border: 1px solid var(--color-border); color: var(--color-text); cursor: pointer; font-size: 1.2rem; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background-color var(--motion-fast) var(--transition-smooth), color var(--motion-fast) var(--transition-smooth), border-color var(--motion-fast) var(--transition-smooth); }
+.modal-close:hover { background: var(--color-text); color: var(--bg-primary); }
+.modal-body { padding: 32px; }
+.modal-detail { display: flex; flex-direction: column; gap: 20px; }
+.modal-score-row { display: flex; align-items: center; gap: 20px; }
+
