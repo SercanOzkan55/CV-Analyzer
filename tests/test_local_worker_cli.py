@@ -10,7 +10,18 @@ LOCAL_WORKER_DIR = PROJECT_ROOT / "local_worker"
 if str(LOCAL_WORKER_DIR) not in sys.path:
     sys.path.insert(0, str(LOCAL_WORKER_DIR))
 
-from worker import LocalWorker, score_cv  # noqa: E402
+import worker as worker_module  # noqa: E402
+from worker import (  # noqa: E402
+    LocalWorker,
+    LocalWorkerError,
+    _should_verify_ssl,
+    _validate_api_base_url,
+    _validate_download_url,
+    csv_safe,
+    iter_supported_local_files,
+    maybe_apply_ai_review,
+    score_cv,
+)
 from workspace import WorkspaceStore  # noqa: E402
 
 
@@ -181,6 +192,162 @@ def test_score_cv_honors_custom_scoring_weights():
 
     assert weighted_score["score"] > default_score["score"]
     assert weighted_score["score_breakdown"]["required_skills"] == 90
+
+
+def test_worker_api_url_policy_allows_http_only_for_localhost():
+    assert _validate_api_base_url("http://localhost:8001/api/worker") == "http://localhost:8001/api/worker"
+    assert _validate_api_base_url("http://127.0.0.1:8001/api/worker") == "http://127.0.0.1:8001/api/worker"
+    assert _validate_api_base_url("https://worker.example.com/api/worker") == "https://worker.example.com/api/worker"
+    assert _should_verify_ssl("http://localhost:8001/api/worker") is False
+    assert _should_verify_ssl("https://worker.example.com/api/worker") is True
+
+    with pytest.raises(ValueError, match="https://"):
+        _validate_api_base_url("http://worker.example.com/api/worker")
+    with pytest.raises(ValueError, match="absolute"):
+        _validate_api_base_url("/api/worker")
+
+
+def test_worker_download_url_must_match_api_origin(monkeypatch):
+    worker = LocalWorker(
+        api_key="test-worker-key",
+        processing_mode="server_files",
+        ai_mode="none",
+        device_name="test",
+        api_base_url="https://worker.example.com/api/worker",
+    )
+
+    class Response:
+        status_code = 200
+        content = b"cv bytes"
+        text = "OK"
+
+    captured = {}
+
+    def fake_request(method, url, **kwargs):
+        captured["method"] = method
+        captured["url"] = url
+        captured["kwargs"] = kwargs
+        return Response()
+
+    monkeypatch.setattr(worker, "_request", fake_request)
+
+    assert _validate_download_url("/api/worker/download/1", worker.api_base_url) == (
+        "https://worker.example.com/api/worker/download/1"
+    )
+    assert worker._download_item({"download_url": "/api/worker/download/1"}) == b"cv bytes"
+    assert captured["method"] == "GET"
+    assert captured["url"] == "https://worker.example.com/api/worker/download/1"
+    assert captured["kwargs"]["absolute"] is True
+
+    with pytest.raises(LocalWorkerError, match="origin"):
+        worker._download_item({"download_url": "https://worker.example.com:8443/api/worker/download/1"})
+    with pytest.raises(LocalWorkerError, match="https://"):
+        worker._download_item({"download_url": "http://worker.example.com/api/worker/download/1"})
+
+
+def test_csv_safe_blocks_formula_prefixes_and_handles_lists():
+    assert csv_safe("=cmd") == "'=cmd"
+    assert csv_safe("+SUM(A1:A2)") == "'+SUM(A1:A2)"
+    assert csv_safe("|calc") == "'|calc"
+    assert csv_safe("!danger") == "'!danger"
+    assert csv_safe(["Python", "SQL"]) == "Python, SQL"
+    assert csv_safe(42) == 42
+
+
+def test_supported_file_iterator_excludes_only_real_output_dir(tmp_path):
+    cv_dir = tmp_path / "cvs"
+    output_dir = cv_dir / "out"
+    sibling_output_prefix = cv_dir / "output2"
+    output_dir.mkdir(parents=True)
+    sibling_output_prefix.mkdir()
+    (cv_dir / "root.txt").write_text("Root candidate", encoding="utf-8")
+    (output_dir / "old-result.txt").write_text("Should be ignored", encoding="utf-8")
+    (sibling_output_prefix / "candidate.txt").write_text("Should be processed", encoding="utf-8")
+    (cv_dir / "notes.md").write_text("Unsupported", encoding="utf-8")
+
+    files = {path.relative_to(cv_dir).as_posix() for path in iter_supported_local_files(cv_dir, output_dir)}
+
+    assert files == {"root.txt", "output2/candidate.txt"}
+
+
+def test_extract_text_enforces_size_limit(monkeypatch):
+    monkeypatch.setattr(worker_module, "MAX_FILE_BYTES", 4)
+
+    with pytest.raises(LocalWorkerError, match="File exceeds max size"):
+        worker_module.extract_text(b"12345", "txt")
+
+
+def test_openai_review_keeps_tls_verification_enabled(monkeypatch):
+    captured = {}
+
+    class Response:
+        status_code = 200
+
+        def json(self):
+            return {"choices": [{"message": {"content": "{\"decision\":\"recommended_review\"}"}}]}
+
+    def fake_post(url, **kwargs):
+        captured["url"] = url
+        captured.update(kwargs)
+        return Response()
+
+    monkeypatch.setenv("CV_WORKER_OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.setattr(worker_module.requests, "post", fake_post)
+    monkeypatch.setattr(worker_module, "VERIFY_SSL", False)
+
+    result = maybe_apply_ai_review(
+        "Candidate with Python and SQL experience.",
+        {"accept_threshold": 75, "review_threshold": 50, "required_skills": ["Python"]},
+        {"score": 52, "decision": "recommended_review", "confidence": "medium"},
+        "customer_openai_key",
+    )
+
+    assert captured["url"] == "https://api.openai.com/v1/chat/completions"
+    assert captured["verify"] is True
+    assert result["ai_review_status"] == "completed"
+
+
+def test_workspace_store_purges_legacy_cv_text_payloads(tmp_path):
+    db_path = tmp_path / "workspace.sqlite3"
+    store = WorkspaceStore(db_path)
+    run_id = store.create_run(None, "Legacy run", str(tmp_path), str(tmp_path / "out"), 1)
+    legacy_payload = {
+        "file": "candidate.txt",
+        "score": 90,
+        "decision": "recommended_accept",
+        "confidence": "high",
+        "cv_text": "raw private CV text",
+        "nested": {"cv_text": "nested private text", "keep": "ok"},
+    }
+    with store._connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO analysis_results
+                (run_id, file_path, file_hash, duplicate_of, sync_status, sync_error,
+                 candidate_status, score, decision, confidence, result_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                run_id,
+                "candidate.txt",
+                "",
+                "",
+                "pending",
+                "",
+                "accepted",
+                90,
+                "recommended_accept",
+                "high",
+                json.dumps(legacy_payload, ensure_ascii=False),
+                "2026-01-01T00:00:00Z",
+            ),
+        )
+
+    migrated = WorkspaceStore(db_path)
+    result = migrated.get_run_results(run_id)[0]
+
+    assert "cv_text" not in json.dumps(result, ensure_ascii=False)
+    assert result["nested"]["keep"] == "ok"
 
 
 def test_local_worker_unicode_and_i18n():

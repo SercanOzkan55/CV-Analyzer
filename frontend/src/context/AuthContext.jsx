@@ -56,6 +56,28 @@ function checkBillingAdmin(email) {
   return !!email && configured.includes(String(email).toLowerCase())
 }
 
+const LEGACY_USER_DATA_KEYS = new Set([
+  'cv_analyzer_job_tracker',
+  'cv-analyzer:interview-session-v2',
+  'recruiter_usage_rights',
+])
+
+function isLegacyRecruiterMonthKey(key) {
+  return /^recruiter_(batch_results|candidate_actions|decisions)_\d{4}-\d{2}$/.test(key)
+}
+
+export function clearLocalUserData(userId) {
+  if (!userId || typeof localStorage === 'undefined') return
+  const keysToRemove = []
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i)
+    if (key && (key.includes(userId) || LEGACY_USER_DATA_KEYS.has(key) || isLegacyRecruiterMonthKey(key))) {
+      keysToRemove.push(key)
+    }
+  }
+  keysToRemove.forEach((key) => localStorage.removeItem(key))
+}
+
 export function AuthProvider({ children }) {
   const cachedPlan = (() => {
     try { return localStorage.getItem('cv_plan_cache') } catch { return null }
@@ -184,6 +206,7 @@ export function AuthProvider({ children }) {
   }
 
   async function signOut() {
+    const userId = user?.id
     const { error } = await supabase.auth.signOut()
     if (error) throw error
     setUser(null)
@@ -194,11 +217,15 @@ export function AuthProvider({ children }) {
     setDailyLimit(DAILY_LIMIT_FREE)
     setUsageSource('unknown')
     setRole('individual')
+    try {
+      clearLocalUserData(userId)
+    } catch (e) {
+      console.warn('Failed to clear user-scoped localStorage on signOut:', e)
+    }
   }
 
   async function deleteUser() {
-    // Calls a Supabase RPC that deletes the authenticated user inside a security definer function.
-    // Required SQL: CREATE OR REPLACE FUNCTION delete_user() RETURNS void LANGUAGE sql SECURITY DEFINER AS $$ DELETE FROM auth.users WHERE id = auth.uid(); $$;
+    const userId = user?.id
     const { error } = await supabase.rpc('delete_user')
     if (error) throw error
     setUser(null)
@@ -209,6 +236,11 @@ export function AuthProvider({ children }) {
     setDailyLimit(DAILY_LIMIT_FREE)
     setUsageSource('unknown')
     setRole('individual')
+    try {
+      clearLocalUserData(userId)
+    } catch (e) {
+      console.warn('Failed to clear user-scoped localStorage on deleteUser:', e)
+    }
   }
 
   const isBillingAdmin = checkBillingAdmin(user?.email) || role === 'admin'

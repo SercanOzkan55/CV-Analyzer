@@ -57,7 +57,7 @@ _service_stubs = [
             "get_embedding": lambda text: [0.01] * 1536,
             # Basic stub that returns candidate ids already present in DB (simple fallback for tests)
             "find_similar_candidates": (
-                lambda db, vec, k=10: [
+                lambda db, vec, k=10, organization_id=None: [
                     (row[0], 0.1)
                     for row in db.execute(
                         text("SELECT id FROM candidates LIMIT :k"), {"k": k}

@@ -1,6 +1,6 @@
 import React, { lazy, Suspense } from "react"
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom"
-import { AnimatePresence } from "framer-motion"
+import { AnimatePresence, MotionConfig } from "framer-motion"
 
 import ErrorBoundary from "./components/ErrorBoundary"
 import DevContextGuard from "./components/DevContextGuard"
@@ -162,17 +162,19 @@ export default function App() {
           <AuthProvider>
             <ToastProvider>
               <RecruiterSessionProvider>
-                <BrowserRouter>
-                  <DevContextGuard />
-                  <AmbientPointerField />
-                  <a href="#main-content" className="skip-link">Skip to main content</a>
-                  <Suspense fallback={<LoadingScreen />}>
-                    <AnimatedRoutes />
-                  </Suspense>
-                  <CookieConsent />
-                  <BackToTop />
-                  <FeedbackButton />
-                </BrowserRouter>
+                <MotionConfig reducedMotion="user">
+                  <BrowserRouter>
+                    <DevContextGuard />
+                    <AmbientPointerField />
+                    <a href="#main-content" className="skip-link">Skip to main content</a>
+                    <Suspense fallback={<LoadingScreen />}>
+                      <AnimatedRoutes />
+                    </Suspense>
+                    <CookieConsent />
+                    <BackToTop />
+                    <FeedbackButton />
+                  </BrowserRouter>
+                </MotionConfig>
               </RecruiterSessionProvider>
             </ToastProvider>
           </AuthProvider>

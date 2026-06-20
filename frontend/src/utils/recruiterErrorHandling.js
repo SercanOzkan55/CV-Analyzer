@@ -182,14 +182,34 @@ export function validateFileUploads(files, {
     }
     
     // Check file type
-    if (!allowedTypes.includes(file.type)) {
-      const ext = file.name.split('.').pop().toLowerCase()
-      if (!['pdf', 'txt', 'docx'].includes(ext)) {
-        return {
-          valid: false,
-          error: `File "${file.name}" has unsupported format. Allowed: PDF, TXT, DOCX`,
-          validFiles: [],
+    const mimeToExtensions = {
+      'application/pdf': ['pdf'],
+      'text/plain': ['txt'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['docx'],
+      'application/msword': ['doc', 'docx'],
+    }
+    const derivedAllowedExtensions = []
+    allowedTypes.forEach(t => {
+      const extensions = mimeToExtensions[t] || []
+      extensions.forEach(ext => {
+        if (!derivedAllowedExtensions.includes(ext)) {
+          derivedAllowedExtensions.push(ext)
         }
+      })
+    })
+
+    const fileExtension = file.name.split('.').pop().toLowerCase()
+    const isMimeAllowed = allowedTypes.includes(file.type)
+    const isExtensionAllowed = derivedAllowedExtensions.includes(fileExtension)
+
+    if (!isMimeAllowed && !isExtensionAllowed) {
+      const displayExts = derivedAllowedExtensions.length > 0
+        ? derivedAllowedExtensions.map(e => e.toUpperCase()).join(', ')
+        : 'PDF, TXT, DOCX'
+      return {
+        valid: false,
+        error: `File "${file.name}" has unsupported format. Allowed: ${displayExts}`,
+        validFiles: [],
       }
     }
     

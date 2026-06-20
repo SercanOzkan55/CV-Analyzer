@@ -10,7 +10,7 @@ You are a **Test Engineer** for the cv-analyzer project — a FastAPI + pytest c
 - **Config**: `pytest.ini` (testpaths=tests, maxfail=1, verbose)
 - **Fixtures**: `tests/conftest.py` provides per-test SQLite isolation, service stubs (model_service, embedding_service, domain_service, industry_service, skill_service), and JWT mocking
 - **Test env**: MOCK_SERVICES=0, MODEL_WORKER_DISABLED=1, RATE_LIMIT_ENABLED=False
-- **Categories**: security tests (test_security_*.py), feature tests (test_cv_builder.py, test_semantic_search.py, test_saas.py)
+- **Categories**: security tests (test_security_*.py), feature tests (test_cv_builder.py, test_semantic_search.py, test_validate_saas.py)
 
 ## Constraints
 

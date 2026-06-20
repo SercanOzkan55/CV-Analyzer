@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { useAuth } from './AuthContext'
 
 /**
  * @typedef {Object} RecruiterSessionContextValue
@@ -41,8 +42,14 @@ const DEFAULT_USAGE_RIGHTS = {
 /**
  * Helper to safely manage localStorage
  */
-function getStorageKey(type) {
-  return `recruiter_${type}_${new Date().toISOString().slice(0, 7)}`
+function getStorageKey(type, userId) {
+  const suffix = userId ? `_${userId}` : ''
+  return `recruiter_${type}_${new Date().toISOString().slice(0, 7)}${suffix}`
+}
+
+function getUsageRightsKey(userId) {
+  const suffix = userId ? `_${userId}` : ''
+  return `recruiter_usage_rights${suffix}`
 }
 
 function safeJsonParse(str, defaultVal = null) {
@@ -89,6 +96,15 @@ function normalizeUsageRights(current, updates = {}) {
  * RecruiterSessionProvider - Persists recruiter session data
  */
 export function RecruiterSessionProvider({ children }) {
+  let user = null
+  try {
+    const auth = useAuth()
+    user = auth?.user
+  } catch (e) {
+    // Safely ignore if rendered outside AuthProvider (e.g. in context unit tests)
+  }
+  const userId = user?.id || ''
+
   const [batchResults, setBatchResults] = useState([])
   const [candidateActions, setCandidateActions] = useState({}) // { candidateId: 'accepted'|'rejected' }
   const [decisions, setDecisions] = useState([]) // Array of { id, candidate_name, action, date, job_id }
@@ -98,40 +114,48 @@ export function RecruiterSessionProvider({ children }) {
   useEffect(() => {
     try {
       // Load batch results
-      const batchKey = getStorageKey('batch_results')
+      const batchKey = getStorageKey('batch_results', userId)
       const saved = localStorage.getItem(batchKey)
       if (saved) {
         const parsed = safeJsonParse(saved, [])
         setBatchResults(parsed)
+      } else {
+        setBatchResults([])
       }
 
       // Load candidate actions
-      const actionsKey = getStorageKey('candidate_actions')
+      const actionsKey = getStorageKey('candidate_actions', userId)
       const savedActions = localStorage.getItem(actionsKey)
       if (savedActions) {
         const parsed = safeJsonParse(savedActions, {})
         setCandidateActions(parsed)
+      } else {
+        setCandidateActions({})
       }
 
       // Load decisions
-      const decisionsKey = getStorageKey('decisions')
+      const decisionsKey = getStorageKey('decisions', userId)
       const savedDecisions = localStorage.getItem(decisionsKey)
       if (savedDecisions) {
         const parsed = safeJsonParse(savedDecisions, [])
         setDecisions(parsed)
+      } else {
+        setDecisions([])
       }
 
       // Load usage rights
-      const usageKey = 'recruiter_usage_rights'
+      const usageKey = getUsageRightsKey(userId)
       const savedUsage = localStorage.getItem(usageKey)
       if (savedUsage) {
         const parsed = safeJsonParse(savedUsage, {})
         setUsageRights(prev => normalizeUsageRights(prev, parsed))
+      } else {
+        setUsageRights(defaultUsageRights())
       }
     } catch (e) {
       console.warn('Failed to load recruiter session data:', e)
     }
-  }, [])
+  }, [userId])
 
   // Batch Results
   const saveBatchResult = useCallback((result) => {
@@ -142,7 +166,7 @@ export function RecruiterSessionProvider({ children }) {
         saved_at: new Date().toISOString()
       }]
       setBatchResults(updated)
-      const batchKey = getStorageKey('batch_results')
+      const batchKey = getStorageKey('batch_results', userId)
       const serialized = safeJsonStringify(updated)
       if (serialized) {
         localStorage.setItem(batchKey, serialized)
@@ -150,7 +174,7 @@ export function RecruiterSessionProvider({ children }) {
     } catch (e) {
       console.error('Failed to save batch result:', e)
     }
-  }, [batchResults])
+  }, [batchResults, userId])
 
   const loadBatchResults = useCallback(() => {
     return batchResults
@@ -161,7 +185,7 @@ export function RecruiterSessionProvider({ children }) {
     try {
       const updated = { ...candidateActions, [candidateId]: action }
       setCandidateActions(updated)
-      const actionsKey = getStorageKey('candidate_actions')
+      const actionsKey = getStorageKey('candidate_actions', userId)
       const serialized = safeJsonStringify(updated)
       if (serialized) {
         localStorage.setItem(actionsKey, serialized)
@@ -169,7 +193,7 @@ export function RecruiterSessionProvider({ children }) {
     } catch (e) {
       console.error('Failed to save candidate action:', e)
     }
-  }, [candidateActions])
+  }, [candidateActions, userId])
 
   const loadCandidateActions = useCallback(() => {
     return candidateActions
@@ -184,7 +208,7 @@ export function RecruiterSessionProvider({ children }) {
         saved_at: new Date().toISOString()
       }]
       setDecisions(updated)
-      const decisionsKey = getStorageKey('decisions')
+      const decisionsKey = getStorageKey('decisions', userId)
       const serialized = safeJsonStringify(updated)
       if (serialized) {
         localStorage.setItem(decisionsKey, serialized)
@@ -192,7 +216,7 @@ export function RecruiterSessionProvider({ children }) {
     } catch (e) {
       console.error('Failed to save decision:', e)
     }
-  }, [decisions])
+  }, [decisions, userId])
 
   const loadDecisions = useCallback(() => {
     return decisions
@@ -203,7 +227,7 @@ export function RecruiterSessionProvider({ children }) {
     try {
       const updated = normalizeUsageRights(usageRights, updates)
       setUsageRights(updated)
-      const usageKey = 'recruiter_usage_rights'
+      const usageKey = getUsageRightsKey(userId)
       const serialized = safeJsonStringify(updated)
       if (serialized) {
         localStorage.setItem(usageKey, serialized)
@@ -211,7 +235,7 @@ export function RecruiterSessionProvider({ children }) {
     } catch (e) {
       console.error('Failed to update usage rights:', e)
     }
-  }, [usageRights])
+  }, [usageRights, userId])
 
   const loadUsageRights = useCallback(() => {
     return usageRights
@@ -226,17 +250,18 @@ export function RecruiterSessionProvider({ children }) {
       setUsageRights(defaultUsageRights())
       
       // Clear localStorage
-      const batchKey = getStorageKey('batch_results')
-      const actionsKey = getStorageKey('candidate_actions')
-      const decisionsKey = getStorageKey('decisions')
+      const batchKey = getStorageKey('batch_results', userId)
+      const actionsKey = getStorageKey('candidate_actions', userId)
+      const decisionsKey = getStorageKey('decisions', userId)
+      const usageKey = getUsageRightsKey(userId)
       localStorage.removeItem(batchKey)
       localStorage.removeItem(actionsKey)
       localStorage.removeItem(decisionsKey)
-      localStorage.removeItem('recruiter_usage_rights')
+      localStorage.removeItem(usageKey)
     } catch (e) {
       console.error('Failed to clear data:', e)
     }
-  }, [])
+  }, [userId])
 
   const value = {
     batchResults,
