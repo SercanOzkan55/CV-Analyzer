@@ -1,0 +1,328 @@
+/* ======================================================
+   RADAR CHART (Compare Page)
+   ====================================================== */
+.compare-radar-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.radar-chart-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 380px;
+}
+
+.radar-chart-svg {
+  width: 100%;
+  height: auto;
+}
+
+.radar-legend {
+  display: flex;
+  gap: 20px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.radar-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.radar-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+@media (max-width: 600px) {
+  .usage-chart-bars {
+    height: 80px;
+    gap: 2px;
+  }
+  .usage-chart-count {
+    display: none;
+  }
+  .radar-chart-wrapper {
+    max-width: 280px;
+  }
+  .favorites-title {
+    max-width: 100px;
+  }
+}
+
+/* ======================================================
+   UPGRADE PROMPT MODAL
+   ====================================================== */
+.upgrade-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.upgrade-modal {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 2rem;
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+  position: relative;
+}
+
+.upgrade-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.upgrade-close:hover {
+  background: var(--color-surface-raised);
+}
+
+.upgrade-icon-wrap {
+  color: #f59e0b;
+  margin-bottom: 12px;
+}
+
+.upgrade-modal h2 {
+  font-size: 1.25rem;
+  margin: 0 0 8px;
+}
+
+.upgrade-feature {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-surface-raised);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.upgrade-desc {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-bottom: 16px;
+}
+
+.upgrade-benefits {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.upgrade-benefit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text);
+}
+
+.upgrade-benefit svg {
+  color: #6366f1;
+  flex-shrink: 0;
+}
+
+.upgrade-cta {
+  width: 100%;
+  display: block;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.upgrade-skip {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.upgrade-skip:hover {
+  color: var(--color-text);
+}
+
+
+.feature-lock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.feature-lock-badge.small {
+  font-size: 9px;
+  padding: 1px 6px;
+}
+
+/* ======================================================
+   JD TEMPLATE SELECTOR
+   ====================================================== */
+.jd-template-selector {
+  margin-bottom: 10px;
+}
+
+.jd-template-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.jd-template-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--color-text);
+  transition: all 0.15s;
+}
+
+.jd-template-toggle:hover {
+  border-color: var(--color-accent);
+}
+
+.jd-template-toggle .rotated {
+  transform: rotate(180deg);
+}
+
+.jd-template-save-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid var(--color-border);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--color-accent);
+  transition: all 0.15s;
+}
+
+.jd-template-save-btn:hover {
+  background: var(--color-surface-raised);
+  border-color: var(--color-accent);
+}
+
+.jd-template-save-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.jd-template-save-form input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 12px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.jd-template-list {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.jd-template-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.jd-template-item:last-child {
+  border-bottom: none;
+}
+
+.jd-template-item-btn {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.jd-template-item-btn:hover .jd-template-item-title {
+  color: var(--color-accent);
+}
+
+.jd-template-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  transition: color 0.15s;
+}
+
+.jd-template-item-preview {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.jd-template-empty,
+.jd-template-limit {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: 12px;
+  margin: 0;
+}
+
+.jd-template-limit {
+  color: #eab308;
+  border-top: 1px solid var(--color-border);
+}
+

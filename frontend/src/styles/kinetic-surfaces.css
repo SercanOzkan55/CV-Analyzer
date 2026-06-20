@@ -1,0 +1,580 @@
+/* ======================================================
+   Kinetic Surface System: professional 3D motion pass
+   ====================================================== */
+@keyframes surfaceGlint {
+  0% { transform: translateX(-140%) skewX(-16deg); opacity: 0; }
+  22% { opacity: 0.58; }
+  100% { transform: translateX(140%) skewX(-16deg); opacity: 0; }
+}
+
+@keyframes depthBreath {
+  0%, 100% { transform: translate3d(0, 0, 0) rotateX(0deg); }
+  50% { transform: translate3d(0, -3px, 0) rotateX(1deg); }
+}
+
+.card,
+.admin-card,
+.glass-card,
+.glass-panel,
+.feature-card,
+.pricing-card,
+.testimonial-card,
+.lp-step-card,
+.lp-proof-strip,
+.db-hero,
+.db-stat-card,
+.db-analysis-card,
+.db-action-card,
+.db-premium-card,
+.recruiter-stat-card,
+.recruiter-upload-zone,
+.drag-drop-zone,
+.result-score-card,
+.analysis-diagnostic-item,
+.analysis-visual-grid > *,
+.autofix-score-strip > div,
+.cs-card,
+.cs-score-card,
+.iv-card,
+.jt-card {
+  position: relative;
+  isolation: isolate;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  transition:
+    transform var(--motion-base) var(--transition-spring),
+    border-color var(--motion-base) var(--transition-smooth),
+    box-shadow var(--motion-base) var(--transition-smooth),
+    background-color var(--motion-base) var(--transition-smooth);
+}
+
+.card::after,
+.admin-card::after,
+.glass-card::after,
+.glass-panel::after,
+.pricing-card::after,
+.testimonial-card::after,
+.lp-step-card::after,
+.lp-proof-strip::after,
+.db-hero::after,
+.db-stat-card::after,
+.db-analysis-card::after,
+.db-action-card::after,
+.recruiter-stat-card::after,
+.recruiter-upload-zone::after,
+.drag-drop-zone::after,
+.result-score-card::after,
+.analysis-diagnostic-item::after,
+.analysis-visual-grid > *::after,
+.autofix-score-strip > div::after,
+.cs-card::after,
+.cs-score-card::after,
+.iv-card::after,
+.jt-card::after {
+  content: '';
+  position: absolute;
+  inset: -1px auto -1px -55%;
+  z-index: -1;
+  width: 42%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-accent) 20%, transparent), transparent);
+  opacity: 0;
+  filter: blur(0.5px);
+}
+
+.card:hover,
+.admin-card:hover,
+.glass-card:hover,
+.glass-panel:hover,
+.pricing-card:hover,
+.testimonial-card:hover,
+.lp-step-card:hover,
+.lp-proof-strip:hover,
+.db-stat-card:hover,
+.db-analysis-card:hover,
+.db-action-card:hover,
+.db-premium-card:hover,
+.recruiter-stat-card:hover,
+.recruiter-upload-zone:hover,
+.drag-drop-zone:hover,
+.result-score-card:hover,
+.analysis-diagnostic-item:hover,
+.analysis-visual-grid > *:hover,
+.autofix-score-strip > div:hover,
+.cs-card:hover,
+.cs-score-card:hover,
+.iv-card:hover,
+.jt-card:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 34%, var(--color-border-hover));
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.08),
+    0 26px 58px -38px color-mix(in srgb, var(--color-accent) 45%, #000 55%),
+    var(--shadow-md);
+  transform: translateY(-3px);
+}
+
+.card:hover::after,
+.admin-card:hover::after,
+.glass-card:hover::after,
+.glass-panel:hover::after,
+.pricing-card:hover::after,
+.testimonial-card:hover::after,
+.lp-step-card:hover::after,
+.lp-proof-strip:hover::after,
+.db-hero:hover::after,
+.db-stat-card:hover::after,
+.db-analysis-card:hover::after,
+.db-action-card:hover::after,
+.recruiter-stat-card:hover::after,
+.recruiter-upload-zone:hover::after,
+.drag-drop-zone:hover::after,
+.result-score-card:hover::after,
+.analysis-diagnostic-item:hover::after,
+.analysis-visual-grid > *:hover::after,
+.autofix-score-strip > div:hover::after,
+.cs-card:hover::after,
+.cs-score-card:hover::after,
+.iv-card:hover::after,
+.jt-card:hover::after {
+  animation: surfaceGlint 1.05s var(--transition-smooth);
+}
+
+.db-hero,
+.product-page-header,
+.dashboard-welcome,
+.recruiter-page-header,
+.profile-hero,
+.ops-header,
+.cv-builder-hero {
+  perspective: 1400px;
+  transform-style: preserve-3d;
+}
+
+.db-hero::before,
+.product-page-header::after,
+.recruiter-page-header::after,
+.cv-builder-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(112deg, transparent 0 38%, color-mix(in srgb, var(--color-accent) 13%, transparent) 38% 38.35%, transparent 38.35%),
+    linear-gradient(24deg, transparent 0 63%, color-mix(in srgb, var(--color-warning) 10%, transparent) 63% 63.3%, transparent 63.3%);
+  opacity: 0.75;
+  transform: translateZ(-24px);
+}
+
+.db-hero-inner,
+.product-page-header > *,
+.recruiter-page-header > *,
+.cv-builder-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.db-hero-score,
+.score-circle-wrapper,
+.db-stat-icon-wrap,
+.db-action-icon,
+.recruiter-stat-icon,
+.feature-icon,
+.lp-step-icon-wrap {
+  transform-style: preserve-3d;
+}
+
+.db-hero-score,
+.score-circle-wrapper {
+  animation: depthBreath 5.4s ease-in-out infinite;
+}
+
+.lp-flip-card {
+  min-height: 286px;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  perspective: 1300px;
+  outline: none;
+}
+
+.lp-flip-card.feature-card-lg {
+  min-height: 316px;
+}
+
+.lp-flip-card:hover,
+.lp-flip-card:focus-visible {
+  transform: translateY(-2px);
+}
+
+.lp-flip-card::before,
+.lp-flip-card::after {
+  content: none !important;
+}
+
+.lp-flip-card-inner {
+  position: relative;
+  width: 100%;
+  min-height: inherit;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 720ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lp-flip-card:hover .lp-flip-card-inner,
+.lp-flip-card:focus-visible .lp-flip-card-inner {
+  transform: rotateY(180deg) rotateX(1.2deg);
+}
+
+.lp-flip-card:focus-visible .lp-flip-card-inner {
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-md);
+}
+
+.lp-flip-card-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: inherit;
+  padding: 30px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-card-solid) 94%, transparent), color-mix(in srgb, var(--bg-card) 94%, transparent)),
+    radial-gradient(circle at 12% 8%, color-mix(in srgb, var(--feature-color, var(--color-accent)) 18%, transparent), transparent 38%);
+  box-shadow: var(--shadow-sm);
+}
+
+.lp-flip-card-face::after {
+  content: '';
+  position: absolute;
+  inset: auto -18% -34% 18%;
+  height: 62%;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent, color-mix(in srgb, var(--feature-color, var(--color-accent)) 18%, transparent), transparent);
+  transform: rotate(-18deg);
+  opacity: 0.7;
+}
+
+.lp-flip-card-front > *,
+.lp-flip-card-back > * {
+  position: relative;
+  z-index: 1;
+  transform: translateZ(34px);
+}
+
+.lp-flip-card-back {
+  justify-content: space-between;
+  transform: rotateY(180deg);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--feature-color, var(--color-accent)) 18%, var(--bg-card-solid)), var(--bg-card)),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-warning) 12%, transparent), transparent);
+}
+
+.lp-flip-kicker {
+  width: max-content;
+  max-width: 100%;
+  padding: 5px 10px;
+  border: 1px solid color-mix(in srgb, var(--feature-color, var(--color-accent)) 30%, var(--color-border));
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lp-flip-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: 100%;
+  color: var(--color-text);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+@media (max-width: 900px) {
+  .hero-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-kinetic-section {
+    min-height: auto;
+    padding-bottom: 72px;
+  }
+
+  .hero-kinetic-section::after {
+    inset: -36px -18px 26px;
+    clip-path: polygon(0 0, 100% 0, 100% 86%, 0 100%);
+  }
+
+  .hero-kinetic-section .hero-demo {
+    min-height: 520px;
+  }
+
+  .hero-kinetic-stage {
+    min-height: 520px;
+  }
+
+  .hero-kinetic-rig {
+    width: min(100%, 560px);
+    min-height: 520px;
+  }
+
+  .hero-kinetic-float-left {
+    left: 8px;
+  }
+
+  .hero-kinetic-float-right {
+    right: 8px;
+  }
+
+  .navbar-inner {
+    padding: 12px 18px;
+  }
+
+  .navbar-links.open {
+    background: color-mix(in srgb, var(--bg-card-solid) 96%, transparent);
+    border-bottom: 1px solid var(--color-border);
+  }
+}
+
+@media (max-width: 640px) {
+  .navbar-inner {
+    padding-inline: 12px;
+    gap: 8px;
+  }
+
+  .navbar-logo {
+    gap: 8px;
+  }
+
+  .logo-wordmark {
+    font-size: 1rem;
+  }
+
+  .navbar-actions {
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .navbar-actions .lang-switcher {
+    padding: 3px;
+  }
+
+  .navbar-actions .lang-btn {
+    padding: 5px 9px;
+  }
+
+  .navbar-actions .nav-auth-link,
+  .navbar-actions .nav-register-wrap {
+    display: none;
+  }
+
+  .hero-kinetic-section .hero-demo {
+    min-height: 420px;
+  }
+
+  .hero-kinetic-stage {
+    width: 100%;
+    min-height: 420px;
+    perspective: none;
+  }
+
+  .hero-kinetic-rig {
+    width: 100%;
+    min-height: 410px;
+    transform-style: flat;
+  }
+
+  .hero-depth-plane-back {
+    inset: 38px 20px 54px;
+    transform: none;
+    opacity: 0.34;
+  }
+
+  .hero-plane-scan {
+    display: none;
+  }
+
+  .lp-demo-hologram {
+    inset: 44px 4px 6px;
+    opacity: 0.56;
+  }
+
+  .lp-holo-aura,
+  .lp-holo-sphere {
+    left: 50%;
+    translate: -50% 0;
+  }
+
+  .lp-holo-sphere {
+    width: min(176px, 58%);
+    top: 16%;
+  }
+
+  .lp-holo-aura {
+    width: min(206px, 68%);
+    top: 10%;
+  }
+
+  .lp-holo-floor {
+    left: 50%;
+    translate: -50% 0;
+    width: min(168px, 52%);
+  }
+
+  .hero-depth-plane-mid {
+    display: none;
+  }
+
+  .hero-demo-frame {
+    width: min(calc(100% - 28px), 340px);
+    transform: translate(-50%, -50%);
+  }
+
+  .hero-demo-frame .lp-float-badge {
+    transform: none;
+    max-width: calc(100% - 18px);
+  }
+
+  .hero-demo-frame .lp-float-badge-top {
+    left: 10px;
+  }
+
+  .hero-demo-frame .lp-float-badge-bottom {
+    right: 10px;
+  }
+
+  .hero-kinetic-float-left,
+  .hero-kinetic-float-right,
+  .hero-kinetic-float-bottom {
+    display: none;
+  }
+
+  .hero-kinetic-panel {
+    min-width: 156px;
+    padding: 10px 12px;
+  }
+
+  .lp-flip-card,
+  .lp-flip-card.feature-card-lg {
+    min-height: auto;
+  }
+
+  .lp-flip-card-inner {
+    transform: none !important;
+  }
+
+  .lp-flip-card-face {
+    position: relative;
+    min-height: auto;
+  }
+
+  .lp-flip-card-back {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-wrapper,
+  .auth-layout,
+  .app-layout > main,
+  .main-content,
+  .landing section,
+  .demo-circle,
+  .score-circle-wrapper {
+    animation: none !important;
+  }
+
+  .card:hover::before,
+  .glass-card:hover::before,
+  .feature-card:hover::before {
+    animation: none !important;
+  }
+
+  .hero-kinetic-section::after,
+  .hero-plane-scan,
+  .hero-flow-line,
+  .lp-demo-hologram,
+  .lp-demo-hologram *,
+  .db-hero-score,
+  .score-circle-wrapper {
+    animation: none !important;
+  }
+
+  .hero-kinetic-rig {
+    cursor: default;
+  }
+
+  .lp-flip-card-inner {
+    transition: none !important;
+    transform: none !important;
+  }
+
+  .lp-flip-card-back {
+    display: none;
+  }
+
+  .card:hover,
+  .admin-card:hover,
+  .glass-card:hover,
+  .glass-panel:hover,
+  .pricing-card:hover,
+  .testimonial-card:hover,
+  .lp-step-card:hover,
+  .lp-proof-strip:hover,
+  .db-stat-card:hover,
+  .db-analysis-card:hover,
+  .db-action-card:hover,
+  .db-premium-card:hover,
+  .recruiter-stat-card:hover,
+  .recruiter-upload-zone:hover,
+  .drag-drop-zone:hover,
+  .result-score-card:hover,
+  .analysis-diagnostic-item:hover,
+  .analysis-visual-grid > *:hover,
+  .autofix-score-strip > div:hover,
+  .cs-card:hover,
+  .cs-score-card:hover,
+  .iv-card:hover,
+  .jt-card:hover {
+    transform: none !important;
+  }
+
+  .card:hover::after,
+  .admin-card:hover::after,
+  .glass-card:hover::after,
+  .glass-panel:hover::after,
+  .pricing-card:hover::after,
+  .testimonial-card:hover::after,
+  .lp-step-card:hover::after,
+  .lp-proof-strip:hover::after,
+  .db-hero:hover::after,
+  .db-stat-card:hover::after,
+  .db-analysis-card:hover::after,
+  .db-action-card:hover::after,
+  .recruiter-stat-card:hover::after,
+  .recruiter-upload-zone:hover::after,
+  .drag-drop-zone:hover::after,
+  .result-score-card:hover::after,
+  .analysis-diagnostic-item:hover::after,
+  .analysis-visual-grid > *:hover::after,
+  .autofix-score-strip > div:hover::after,
+  .cs-card:hover::after,
+  .cs-score-card:hover::after,
+  .iv-card:hover::after,
+  .jt-card:hover::after {
+    animation: none !important;
+  }
+}
+
