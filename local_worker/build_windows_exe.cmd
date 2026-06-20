@@ -9,10 +9,9 @@ if not exist ".venv\Scripts\python.exe" (
   call "%~dp0install_windows.cmd"
 )
 
-echo Installing/updating runtime and build dependencies...
-".venv\Scripts\python.exe" -m pip install --upgrade pip
+REM pip upgrade disabled for build reproducibility
+REM ".venv\Scripts\python.exe" -m pip install --upgrade pip
 ".venv\Scripts\python.exe" -m pip install -r requirements.txt
-".venv\Scripts\python.exe" -m pip install --upgrade pyinstaller
 ".venv\Scripts\python.exe" -m PyInstaller --noconfirm --clean "CV Analyzer Local Worker.spec"
 
 echo.

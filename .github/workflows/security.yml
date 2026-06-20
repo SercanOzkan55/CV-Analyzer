@@ -41,7 +41,6 @@ jobs:
 
       - name: Review dependency changes
         uses: actions/dependency-review-action@v4
-        continue-on-error: true
         with:
           fail-on-severity: high
           deny-licenses: GPL-2.0, GPL-3.0, AGPL-1.0, AGPL-3.0
@@ -63,7 +62,6 @@ jobs:
           python -m pip install pip-audit
 
       - name: Audit requirements.txt
-        continue-on-error: true
         run: |
           pip-audit -r requirements.txt --strict --format json --output pip-audit-report.json
 
@@ -87,6 +85,7 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             frontend/package-lock.json
+            mobile/package-lock.json
 
       - name: Audit root npm dependencies
         run: |
@@ -97,11 +96,21 @@ jobs:
           fi
 
       - name: Audit frontend npm dependencies
+        if: always()
         run: |
           if [ -f frontend/package-lock.json ]; then
             npm audit --prefix frontend --audit-level=high --omit=dev --json > npm-audit-frontend.json
           else
             echo "{}" > npm-audit-frontend.json
+          fi
+
+      - name: Audit mobile npm dependencies
+        if: always()
+        run: |
+          if [ -f mobile/package-lock.json ]; then
+            npm audit --prefix mobile --audit-level=high --omit=dev --json > npm-audit-mobile.json
+          else
+            echo "{}" > npm-audit-mobile.json
           fi
 
       - name: Upload npm audit reports
@@ -112,3 +121,4 @@ jobs:
           path: |
             npm-audit-root.json
             npm-audit-frontend.json
+            npm-audit-mobile.json

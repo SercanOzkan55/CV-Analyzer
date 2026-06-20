@@ -89,3 +89,18 @@ locustfile.py
 # Feedback & logs (runtime data)
 feedback_records.jsonl
 logs/
+
+# Orphaned migration tree (active migrations live in migrations/)
+alembic/
+
+# Mobile app (not part of backend/frontend Docker images)
+mobile/
+
+# Coverage & profiling outputs
+htmlcov/
+*.lcov
+coverage/
+
+# Agent / AI dev scratch
+.agents/
+.codex/

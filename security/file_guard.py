@@ -28,7 +28,7 @@ MAGIC_DOCX = b"PK\x03\x04"  # ZIP (OOXML is ZIP-based)
 MAX_FILE_SIZE = MAX_UPLOAD_BYTES
 MIN_FILE_SIZE = 100              # too small = empty/garbage
 
-ALLOWED_EXTENSIONS = frozenset({"pdf", "docx"})
+ALLOWED_EXTENSIONS = frozenset({"pdf", "docx", "txt"})
 
 
 def validate_file_upload(
@@ -61,7 +61,7 @@ def validate_file_upload(
     ext = _extract_extension(filename)
     if ext not in ALLOWED_EXTENSIONS:
         logger.warning("file_guard:bad_extension ext=%s filename=%s", ext, filename)
-        raise ValueError(f"File type .{ext} is not allowed (only PDF and DOCX)")
+        raise ValueError(f"File type .{ext} is not allowed (only PDF, DOCX, and TXT)")
 
     # ── 3. Content-Type ─────────────────────────────────────────────
     ct = (content_type or "").lower().strip()
@@ -78,6 +78,10 @@ def validate_file_upload(
         if not file_bytes[:4].startswith(MAGIC_DOCX):
             logger.warning("file_guard:bad_magic expected=DOCX(ZIP) got=%s", file_bytes[:8])
             raise ValueError("File content does not match DOCX format")
+    elif ext == "txt":
+        if b"\x00" in file_bytes:
+            logger.warning("file_guard:bad_magic expected=TXT got null bytes")
+            raise ValueError("File content does not match plain text format")
 
     # ── 5. PDF complexity ───────────────────────────────────────────
     if ext == "pdf":
@@ -183,3 +187,67 @@ def validate_text_payload(text: str, max_length: int = 200_000) -> None:
     """Guard against oversized text payloads (memory/CPU protection)."""
     if len(text) > max_length:
         raise ValueError(f"Text exceeds {max_length} character limit")
+
+
+def validate_zip_archive(file_path: str) -> None:
+    """Validate ZIP archive for safety before processing.
+
+    Checks:
+    - Max uncompressed files: 200
+    - Max uncompressed total bytes: 100MB
+    - Max single file uncompressed size: 10MB
+    - Unsafe path traversals (.. or starting with /)
+    - Unsafe compression ratio (> 50.0 for files > 10KB)
+    - Encrypted zip entries
+    """
+    MAX_ZIP_FILES = 200
+    MAX_ZIP_UNCOMPRESSED_BYTES = 100_000_000
+    MAX_ZIP_SINGLE_FILE_UNCOMPRESSED = 10_000_000
+    MAX_ZIP_COMPRESSION_RATIO = 50.0
+
+    try:
+        with zipfile.ZipFile(file_path, 'r') as archive:
+            entries = archive.infolist()
+            if len(entries) > MAX_ZIP_FILES:
+                logger.warning("file_guard:zip_too_many_files count=%d limit=%d", len(entries), MAX_ZIP_FILES)
+                raise ValueError("ZIP archive contains too many files")
+
+            uncompressed_total = 0
+            for item in entries:
+                if item.is_dir():
+                    continue
+
+                # Path traversal check
+                name = item.filename.replace("\\", "/")
+                if name.startswith("/") or ".." in name.split("/"):
+                    logger.warning("file_guard:zip_path_traversal name=%s", item.filename[:80])
+                    raise ValueError("ZIP archive contains unsafe file path")
+
+                # Encryption check
+                if item.flag_bits & 0x1:
+                    logger.warning("file_guard:zip_encrypted name=%s", item.filename[:80])
+                    raise ValueError("Encrypted files in ZIP are not supported")
+
+                # Size checks
+                file_size = int(item.file_size or 0)
+                if file_size > MAX_ZIP_SINGLE_FILE_UNCOMPRESSED:
+                    logger.warning("file_guard:zip_file_too_large name=%s size=%d limit=%d", item.filename[:80], file_size, MAX_ZIP_SINGLE_FILE_UNCOMPRESSED)
+                    raise ValueError("File inside ZIP is too large")
+
+                # Compression ratio check
+                compress_size = int(item.compress_size or 0)
+                if file_size > 10240 and compress_size > 0:
+                    ratio = file_size / max(compress_size, 1)
+                    if ratio > MAX_ZIP_COMPRESSION_RATIO:
+                        logger.warning("file_guard:zip_bomb_ratio name=%s ratio=%.2f limit=%d", item.filename[:80], ratio, MAX_ZIP_COMPRESSION_RATIO)
+                        raise ValueError("ZIP archive compression ratio is unsafe")
+
+                uncompressed_total += file_size
+
+            if uncompressed_total > MAX_ZIP_UNCOMPRESSED_BYTES:
+                logger.warning("file_guard:zip_too_large_uncompressed size=%d limit=%d", uncompressed_total, MAX_ZIP_UNCOMPRESSED_BYTES)
+                raise ValueError("ZIP archive uncompressed size too large")
+
+    except zipfile.BadZipFile as exc:
+        logger.warning("file_guard:bad_zip")
+        raise ValueError("File content does not match ZIP format") from exc

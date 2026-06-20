@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
 
 /**
  * @typedef {Object} ThemeContextValue
@@ -29,15 +29,21 @@ function detectTheme() {
 
 export function ThemeProvider({ children }) {
   const [theme, setThemeState] = useState(detectTheme)
+  const timerRef = useRef(null)
 
   function setTheme(t) {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+    }
+
     document.documentElement.classList.add('theme-transition')
     setThemeState(t)
     localStorage.setItem('cv-analyzer-theme', t)
-    const timer = setTimeout(() => {
+
+    timerRef.current = setTimeout(() => {
       document.documentElement.classList.remove('theme-transition')
+      timerRef.current = null
     }, 450)
-    return () => clearTimeout(timer)
   }
 
   function toggleTheme() {
@@ -47,6 +53,14 @@ export function ThemeProvider({ children }) {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+      }
+    }
+  }, [])
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
