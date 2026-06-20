@@ -1,0 +1,247 @@
+/* ======================================================
+   ENHANCED FORM LABEL STYLING FOR ALL PAGES
+   ====================================================== */
+
+/* Settings page fields */
+.settings-field label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+}
+.settings-field input {
+  padding: 12px 16px;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.3s;
+}
+.settings-field input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+/* History page enhancements */
+.history-item {
+  transition: all 0.15s ease-out;
+}
+.history-item:hover {
+  transform: translateX(2px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Page title gradient option */
+.page-title-gradient {
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+/* ======================================================
+   ANIMATED BACKGROUND ORBS
+   ====================================================== */
+.animated-bg-orbs {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0.4;
+}
+.bg-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0;
+  animation: orbFloat 0.8s ease forwards;
+}
+.bg-orb-1 {
+  width: 500px; height: 500px;
+  top: -120px; left: -100px;
+  background: radial-gradient(circle, rgba(167, 139, 250, 0.06), transparent 70%);
+  animation: orbFadeIn 1.2s ease 0.1s both;
+}
+.bg-orb-2 {
+  width: 420px; height: 420px;
+  bottom: -80px; right: -80px;
+  background: radial-gradient(circle, rgba(167, 139, 250, 0.05), transparent 70%);
+  animation: orbFadeIn 1.2s ease 0.3s both;
+}
+.bg-orb-3 {
+  display: none;
+}
+.bg-orb-4 {
+  display: none;
+}
+
+@keyframes orbFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes orbFloat1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(40px, 30px) scale(1.05); }
+  66% { transform: translate(-20px, 50px) scale(0.97); }
+}
+@keyframes orbFloat2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40% { transform: translate(-50px, -30px) scale(1.06); }
+  70% { transform: translate(30px, -50px) scale(0.96); }
+}
+@keyframes orbFloat3 {
+  0%, 100% { transform: translateX(-50%) translateY(0) scale(1); }
+  50% { transform: translateX(-50%) translateY(-40px) scale(1.04); }
+}
+@keyframes orbFloat4 {
+  0%, 100% { transform: translate(0, 0); }
+  45% { transform: translate(-30px, 40px); }
+  80% { transform: translate(20px, -20px); }
+}
+
+/* Light mode orbs softer */
+[data-theme="light"] .bg-orb-1 {
+  background: radial-gradient(circle, rgba(147, 51, 234, 0.04), transparent 70%);
+}
+[data-theme="light"] .bg-orb-2 {
+  background: radial-gradient(circle, rgba(147, 51, 234, 0.03), transparent 70%);
+}
+
+/* Reduce particle canvas visibility in light mode */
+[data-theme="light"] canvas.animated-bg-canvas {
+  opacity: 0.12 !important;
+}
+
+/* ======================================================
+   LOADING SCREEN
+   ====================================================== */
+.loading-screen {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(ellipse 70% 45% at 50% 18%, var(--color-accent-glow), transparent 70%),
+    var(--bg-primary);
+  overflow: hidden;
+}
+.loading-screen .ls-orb {
+  display: none;
+}
+.loading-screen .ls-orb-1 {
+  display: none;
+}
+.loading-screen .ls-orb-2 {
+  display: none;
+}
+.loading-screen .ls-orb-3 {
+  display: none;
+}
+.ls-content {
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+  position: relative; z-index: 1;
+  padding: 28px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--bg-card-solid) 82%, transparent);
+  box-shadow: var(--shadow-md);
+}
+.ls-ring-wrapper {
+  position: relative; width: 64px; height: 64px;
+  display: flex; align-items: center; justify-content: center;
+}
+.ls-ring { width: 64px; height: 64px; }
+.ls-logo-icon {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--color-accent);
+}
+.ls-text {
+  font-size: 1.1rem; font-weight: 700; letter-spacing: 0;
+  color: var(--color-text);
+}
+.ls-dots { display: flex; gap: 6px; align-items: center; }
+.ls-dot {
+  display: block; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--color-accent);
+}
+
+/* ======================================================
+   NAVBAR SCROLL ENHANCEMENT
+   ====================================================== */
+.navbar-scrolled {
+  background: var(--bg-card) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  border-bottom-color: var(--color-border) !important;
+  transition: all 0.15s ease-out;
+}
+.navbar {
+  transition: background 0.3s, box-shadow 0.3s, border-color 0.3s;
+}
+
+/* Nav link indicator (shared animated underline via layoutId) */
+.nav-link-indicator {
+  position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 24px; height: 2.5px;
+  background: var(--color-accent);
+  border-radius: 2px;
+}
+
+/* ======================================================
+   BUTTON RIPPLE EFFECT
+   ====================================================== */
+.btn-primary {
+  overflow: hidden;
+}
+.btn-primary::after {
+  content: none;
+}
+
+/* ======================================================
+   ENHANCED CARD HOVER MICRO-INTERACTIONS
+   ====================================================== */
+.feature-card {
+  transition: all 0.15s ease-out;
+}
+.feature-card:hover {
+  box-shadow: var(--shadow-sm);
+}
+.stat-card {
+  transition: all 0.15s ease-out;
+}
+.pricing-card {
+  transition: all 0.15s ease-out;
+}
+
+/* ======================================================
+   ENHANCED SCORE CIRCLE GLOW
+   ====================================================== */
+@keyframes scoreGlow {
+  0%, 100% { filter: none; }
+  50% { filter: none; }
+}
+.score-circle-wrapper {
+  animation: none;
+}
+
+/* ======================================================
+   ENHANCED PROGRESS BAR ANIMATION
+   ====================================================== */
+@keyframes progressShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.progress-fill {
+  background: var(--color-accent) !important;
+  background-size: auto !important;
+  animation: none !important;
+}
+
+
+.stagger-container > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-container > *:nth-child(2) { animation-delay: 80ms; }
+.stagger-container > *:nth-child(3) { animation-delay: 160ms; }
+.stagger-container > *:nth-child(4) { animation-delay: 240ms; }
+.stagger-container > *:nth-child(5) { animation-delay: 320ms; }
+.stagger-container > *:nth-child(6) { animation-delay: 400ms; }
+

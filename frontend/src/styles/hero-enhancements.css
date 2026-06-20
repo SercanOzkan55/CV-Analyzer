@@ -1,0 +1,144 @@
+/* ======================================================
+   HERO ENHANCEMENTS
+   ====================================================== */
+.hero-badge {
+  animation: none;
+}
+@keyframes badgePulse {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: none; }
+}
+
+/* Demo card score circle animated stroke */
+.demo-circle {
+  position: relative;
+  overflow: hidden;
+}
+.demo-circle::after {
+  content: '';
+  position: absolute; inset: -2px;
+  border-radius: 50%;
+  background: conic-gradient(var(--color-success) 0% 75%, transparent 75%);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), black calc(100% - 4px));
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), black calc(100% - 4px));
+  animation: rotateDemoRing 4s ease-in-out infinite;
+}
+@keyframes rotateDemoRing {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+
+@keyframes revealFromBottom {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.reveal {
+  animation: revealFromBottom 0.5s ease both;
+}
+
+/* ===== RTL (Arabic) Support ===== */
+[dir="rtl"] {
+  text-align: right;
+  font-family: 'Noto Sans Arabic', 'Inter', sans-serif;
+}
+[dir="rtl"] .navbar-inner {
+  flex-direction: row-reverse;
+}
+[dir="rtl"] .navbar-links {
+  flex-direction: row-reverse;
+}
+[dir="rtl"] .navbar-actions {
+  flex-direction: row-reverse;
+}
+[dir="rtl"] .card,
+[dir="rtl"] .settings-grid,
+[dir="rtl"] .form-group,
+[dir="rtl"] .recruiter-form-group {
+  text-align: right;
+}
+[dir="rtl"] .radio-group {
+  direction: rtl;
+}
+[dir="rtl"] .plan-features-list {
+  padding-right: 1.2em;
+  padding-left: 0;
+}
+[dir="rtl"] .skill-tag {
+  direction: rtl;
+}
+[dir="rtl"] .score-bars .bar-row {
+  flex-direction: row-reverse;
+}
+[dir="rtl"] .results-grid {
+  direction: rtl;
+}
+
+/* ===== 404 Not Found Page ===== */
+.not-found-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 70vh;
+}
+.not-found-container {
+  text-align: center;
+  max-width: 480px;
+  padding: 3rem 2rem;
+}
+.not-found-code {
+  font-size: 8rem;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--color-accent);
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.04em;
+}
+.not-found-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  color: var(--color-text);
+}
+.not-found-desc {
+  color: var(--color-text-muted);
+  margin-bottom: 2rem;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+.not-found-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* ===== Error Boundary Page ===== */
+.error-boundary-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--bg-main);
+  color: var(--color-text);
+  font-family: var(--font-main);
+}
+.error-boundary-container {
+  text-align: center;
+  max-width: 440px;
+  padding: 3rem 2rem;
+}
+.error-boundary-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+.error-boundary-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+.error-boundary-desc {
+  color: var(--color-text-muted);
+  margin-bottom: 2rem;
+  line-height: 1.6;
+}
+

@@ -18,6 +18,13 @@
 @import './styles/messages.css';
 @import './styles/forms.css';
 @import './styles/responsive.css';
+@import './styles/cv-builder-support.css';
+@import './styles/quota-usage-favorites.css';
+@import './styles/compare-upgrade-templates.css';
+@import './styles/history-shared-analysis.css';
+@import './styles/premium-ui-enhancements.css';
+@import './styles/form-motion-polish.css';
+@import './styles/hero-enhancements.css';
 @import './styles/cookie-consent.css';
 @import './styles/legal.css';
 @import './styles/accessibility.css';
@@ -31,4 +38,9 @@
 @import './styles/interview-simulator.css';
 @import './styles/job-tracker.css';
 @import './styles/recruiter-hub.css';
-@import './styles/product-surfaces.css';
+@import './styles/product-identity.css';
+@import './styles/kinetic-surfaces.css';
+@import './styles/auth-gateway.css';
+@import './styles/support-notifications.css';
+@import './styles/feedback-polish.css';
+@import './styles/worker-polish.css';
