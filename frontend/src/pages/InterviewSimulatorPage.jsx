@@ -41,10 +41,15 @@ const DIFFICULTY_COLORS = { easy: '#34d399', medium: '#fbbf24', hard: '#ef4444' 
 const QUESTION_COUNT_OPTIONS = [3, 5, 7, 10]
 const INTERVIEW_SESSION_KEY = 'cv-analyzer:interview-session-v2'
 
-function readSavedInterviewSession() {
+export function getInterviewSessionKey(userId) {
+  return userId ? `${INTERVIEW_SESSION_KEY}_${userId}` : INTERVIEW_SESSION_KEY
+}
+
+function readSavedInterviewSession(userId) {
   if (typeof window === 'undefined') return {}
+  const key = getInterviewSessionKey(userId)
   try {
-    const raw = window.localStorage.getItem(INTERVIEW_SESSION_KEY)
+    const raw = window.localStorage.getItem(key)
     if (!raw) return {}
     const parsed = JSON.parse(raw)
     const questions = Array.isArray(parsed.questions) ? parsed.questions : []
@@ -75,12 +80,12 @@ function formatDuration(totalSeconds) {
   return `${minutes}:${String(seconds).padStart(2, '0')}`
 }
 
-export default function InterviewSimulatorPage() {
+function InterviewSimulator({ userId }) {
   const { token } = useAuth()
   const { t, lang } = useLanguage()
   const { addToast } = useToast()
   const savedSessionRef = useRef(null)
-  if (savedSessionRef.current === null) savedSessionRef.current = readSavedInterviewSession()
+  if (savedSessionRef.current === null) savedSessionRef.current = readSavedInterviewSession(userId)
   const savedSession = savedSessionRef.current || {}
 
   // ── Setup State ──
@@ -136,10 +141,11 @@ export default function InterviewSimulatorPage() {
       userAnswer,
       evaluation,
     }
+    const key = getInterviewSessionKey(userId)
     try {
-      window.localStorage.setItem(INTERVIEW_SESSION_KEY, JSON.stringify(snapshot))
+      window.localStorage.setItem(key, JSON.stringify(snapshot))
     } catch {}
-  }, [cvText, jobDescription, mode, questionCount, phase, questions, currentIdx, answeredQuestions, answerDrafts, userAnswer, evaluation])
+  }, [cvText, jobDescription, mode, questionCount, phase, questions, currentIdx, answeredQuestions, answerDrafts, userAnswer, evaluation, userId])
 
   useEffect(() => {
     if (phase !== 'practice' || evaluating) return undefined
@@ -296,6 +302,11 @@ export default function InterviewSimulatorPage() {
     setUserAnswer('')
   }
   function handleReset() {
+    setCvText('')
+    setJobDescription('')
+    setMode('senior')
+    setInputTab('paste')
+    setPdfFile(null)
     setPhase('setup')
     setQuestions([])
     setCurrentIdx(0)
@@ -307,7 +318,10 @@ export default function InterviewSimulatorPage() {
     setElapsedSeconds(0)
     setCategoryFilter('all')
     setQuestionCount(5)
-    try { window.localStorage.removeItem(INTERVIEW_SESSION_KEY) } catch {}
+    try {
+      window.localStorage.removeItem(getInterviewSessionKey(userId))
+      window.localStorage.removeItem(INTERVIEW_SESSION_KEY)
+    } catch {}
   }
 
   function handleRetryCurrent() {
@@ -741,4 +755,10 @@ export default function InterviewSimulatorPage() {
       </main>
     </div>
   )
+}
+
+export default function InterviewSimulatorPage() {
+  const { user } = useAuth()
+  const userId = user?.id || ''
+  return <InterviewSimulator key={userId} userId={userId} />
 }

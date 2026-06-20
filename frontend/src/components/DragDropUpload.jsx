@@ -1,29 +1,46 @@
 import React, { useRef, useState } from 'react'
 import { useLanguage } from '../i18n/LanguageContext'
+import { useToast } from './Toast'
 
 export default function DragDropUpload({ onFileSelect, file, onRemove }) {
   const { t } = useLanguage()
+  const { addToast } = useToast()
   const inputRef = useRef(null)
   const [dragOver, setDragOver] = useState(false)
 
-  function isSupported(fileValue) {
-    const ext = String(fileValue?.name || '').split('.').pop()?.toLowerCase()
-    return (
-      ['pdf', 'txt', 'docx'].includes(ext) ||
-      [
-        'application/pdf',
-        'text/plain',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      ].includes(fileValue?.type)
-    )
+  function handleFile(f) {
+    if (!f) return
+
+    // 10MB limit check
+    const maxSize = 10 * 1024 * 1024
+    if (f.size > maxSize) {
+      addToast(t('analyze.error_file_size') || 'File is too large (max 10MB)', 'error')
+      return
+    }
+
+    // Ext and MIME type check
+    const ext = String(f.name || '').split('.').pop()?.toLowerCase()
+    const allowedExtensions = ['pdf', 'txt', 'docx']
+    const allowedMimeTypes = [
+      'application/pdf',
+      'text/plain',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ]
+
+    if (!allowedExtensions.includes(ext) && !allowedMimeTypes.includes(f.type)) {
+      addToast(t('analyze.error_file_format') || 'Unsupported format. Allowed: PDF, TXT, DOCX', 'error')
+      return
+    }
+
+    onFileSelect(f)
   }
 
   function handleDrop(e) {
     e.preventDefault()
     setDragOver(false)
     const dropped = e.dataTransfer.files[0]
-    if (dropped && isSupported(dropped)) {
-      onFileSelect(dropped)
+    if (dropped) {
+      handleFile(dropped)
     }
   }
 
@@ -36,34 +53,44 @@ export default function DragDropUpload({ onFileSelect, file, onRemove }) {
     setDragOver(false)
   }
 
-  function handleBrowse() {
-    inputRef.current?.click()
-  }
-
   function handleInputChange(e) {
     const f = e.target.files[0]
-    if (f) onFileSelect(f)
+    if (f) {
+      handleFile(f)
+    }
+  }
+
+  function handleKeyDown(e) {
+    if (file) return
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      inputRef.current?.click()
+    }
   }
 
   return (
-    <div
+    <label
       className={`drag-drop-zone ${dragOver ? 'drag-over' : ''} ${file ? 'has-file' : ''}`}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
-      onClick={!file ? handleBrowse : undefined}
+      tabIndex={file ? -1 : 0}
+      onKeyDown={handleKeyDown}
+      role="button"
+      aria-label={file ? `${t('analyze.has_file') || 'File'}: ${file.name}` : t('analyze.upload_desc')}
+      style={{ cursor: file ? 'default' : 'pointer', display: 'block' }}
     >
       <input
         ref={inputRef}
         type="file"
         accept=".pdf,.txt,.docx,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         onChange={handleInputChange}
-        hidden
+        style={{ display: 'none' }}
       />
 
       {file ? (
         <div className="file-preview">
-          <div className="file-icon">📄</div>
+          <div className="file-icon" aria-hidden="true">CV</div>
           <div className="file-info">
             <span className="file-name">{file.name}</span>
             <span className="file-size">{(file.size / 1024).toFixed(0)} KB</span>
@@ -71,13 +98,15 @@ export default function DragDropUpload({ onFileSelect, file, onRemove }) {
           <button
             type="button"
             className="file-remove"
+            aria-label={`${t('analyze.remove_file') || 'Remove'} ${file.name}`}
             onClick={(e) => {
               e.stopPropagation()
+              e.preventDefault()
               onRemove()
               if (inputRef.current) inputRef.current.value = ''
             }}
           >
-            ✕
+            x
           </button>
         </div>
       ) : (
@@ -90,10 +119,10 @@ export default function DragDropUpload({ onFileSelect, file, onRemove }) {
             </svg>
           </div>
           <p className="drop-text">{t('analyze.upload_desc')}</p>
-          <button type="button" className="btn-outline btn-sm">{t('analyze.browse')}</button>
+          <span className="btn-outline btn-sm" style={{ display: 'inline-block' }}>{t('analyze.browse')}</span>
           <p className="drop-hint">{t('analyze.upload_hint')}</p>
         </div>
       )}
-    </div>
+    </label>
   )
 }

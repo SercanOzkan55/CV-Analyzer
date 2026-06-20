@@ -1,8 +1,13 @@
-# CV Analyzer
+# CV Analyzer: Enterprise-Grade Resume Intelligence, ATS Calibration, and Local Desktop Processing Grid
 
-CV Analyzer is an AI-assisted resume analysis, ATS scoring, recruiter workflow, and local desktop processing platform. The project combines a FastAPI backend, a React/Vite web application, an Expo mobile scaffold, and a native Qt Quick/QML Local Worker for private offline-first CV processing.
+CV Analyzer is a production-ready AI resume intelligence, applicant screening, ATS calibration, recruiter workflow, and local desktop processing platform. The codebase combines:
 
-The current product direction is hybrid SaaS plus local privacy:
+1. **FastAPI Backend Server Node:** ASGI web server for REST endpoints, database access, Stripe billing, Supabase JWT authentication, quota enforcement, storage adapters, worker sync, and scoring services.
+2. **Vite + React 18 Web Portal:** Responsive SaaS portal with animated landing pages, dashboards, CV analysis, CV Builder, recruiter workspaces, feedback, billing, and analytics-oriented UI flows.
+3. **Expo React Native Mobile Scaffold:** Mobile client scaffold prepared for CV upload and history tracking flows.
+4. **PySide6 Qt Quick/QML Local Worker:** Native desktop application for private local CV folder processing, offline-first workspace storage, local exports, and explicit website sync.
+
+The current product direction is hybrid SaaS plus local privacy. The website handles account, billing, recruiter, and cloud workflows; the Local Worker keeps sensitive batch processing on the user's own machine until sync is explicitly requested.
 
 - Web users can upload CVs, analyze ATS fit, build CVs, manage history, use recruiter tools, and manage premium/billing flows.
 - Recruiters can create jobs, upload or sync batches, rank candidates, review decisions, and generate reports.
@@ -69,24 +74,54 @@ CV Analyzer supports several user flows:
 ## Architecture
 
 ```text
-                         +--------------------------+
-                         | React / Vite Web Portal  |
-                         | localhost:5173           |
-                         +------------+-------------+
-                                      |
-                                      | REST / JSON
-                                      v
-+-----------------------+    +--------+---------+    +-----------------------+
-| Qt Quick Local Worker | -> | FastAPI Backend  | -> | Storage / Database    |
-| PySide6 + QML         |    | localhost:8001   |    | SQLite/Postgres/S3    |
-+-----------------------+    +--------+---------+    +-----------------------+
-                                      |
-                                      v
-                         +------------+-------------+
-                         | Services / ML / Scoring  |
-                         | ATS, parser, embeddings  |
-                         +--------------------------+
++-----------------------------------------------------------------------+
+|                         FastAPI REST Gateway                          |
++-----------------------------------------------------------------------+
+       |                                |                        |
+       v                                v                        v
++------------------+          +-------------------+    +----------------+
+| Supabase Auth    |          | Billing / Quotas  |    | Metrics / Ops  |
+| JWT Verification |          | Stripe Guards     |    | Runtime Guard  |
++------------------+          +-------------------+    +----------------+
+       |                                |                        |
+       +----------------+---------------+------------------------+
+                        |
+                        v
+         +-----------------------------+
+         |    Pipeline Runtime Engine  |
+         +-----------------------------+
+           /            |            \
+          /             |             \
+         v              v              v
+  +------------+  +------------+  +-------------+
+  | Extraction |  | Normalizer |  | ATS / ML    |
+  | Agent      |  | Agent      |  | Calibrator  |
+  +------------+  +------------+  +-------------+
+         |              |              |
+         +--------------+--------------+
+                        |
+                        v
+         +-----------------------------+
+         |    Storage Adapter Layer    |
+         +-----------------------------+
+           /             |             \
+          v              v              v
+  +---------------+ +-------------+ +----------------+
+  | Local Storage | | AWS S3      | | Local Worker   |
+  | Dev/Mock      | | Production  | | SQLite Sync    |
+  +---------------+ +-------------+ +----------------+
 ```
+
+### Architectural Blueprints and Design Patterns
+
+The platform uses several standard engineering patterns:
+
+- **Singleton Pattern:** Database session factories, Redis-style rate limit clients, loaded ML models, and runtime settings are initialized once and reused across request handling paths.
+- **Factory Pattern:** Extraction and parsing services select document handlers based on file type, document layout, and available text/OCR signals.
+- **Adapter Pattern:** `services/storage_service.py` abstracts S3 and local disk storage behind a common upload/download URL interface.
+- **Observer/Webhook Pattern:** `routes/billing.py` receives Stripe events, validates webhook signatures, and updates user plan or entitlement records.
+- **Command / Task Runner Pattern:** Parsing and scoring operations are wrapped into service commands; where external workers are not configured, the backend falls back to in-process execution.
+- **Runtime Guard Pattern:** Security and operational flags such as safe mode, kill switch, concurrency limits, and timeouts allow risky paths to be throttled or disabled.
 
 Main runtime layers:
 
@@ -363,43 +398,60 @@ Treat it as a scaffold unless active mobile work is requested.
 
 ## Processing Pipeline
 
-The analysis pipeline combines deterministic parsing/scoring, semantic matching, and optional AI-powered recommendations.
+The analysis pipeline combines deterministic parsing, schema building, rule-based ATS scoring, semantic matching, machine-learning calibration, and optional AI-powered recommendations.
+
+### Section Parsing and Linearization
 
 ```mermaid
 flowchart TD
-  A["CV file"] --> B["File guard and upload validation"]
-  B --> C["Text extraction"]
-  C --> D["Language detection"]
-  D --> E["Section classification"]
-  E --> F["Schema builder"]
-  F --> G["ATS scoring"]
-  F --> H["Skill and keyword matching"]
-  F --> I["Semantic similarity / embeddings"]
-  G --> J["Score calibration"]
-  H --> J
-  I --> J
-  J --> K["Recommendations and report"]
+  file["Uploaded File"] --> guard["File Guard / Size / Type Validation"]
+  guard --> extractor["PyMuPDF / DOCX / TXT Extractor"]
+  extractor --> geo["Geometric Block Extractor"]
+  geo --> layout{"Is Multi-column?"}
+
+  layout -- "Yes" --> lin["Linearize Columns by Geometry"]
+  layout -- "No" --> raw_text["Read Lines Sequentially"]
+
+  lin --> marker["Append Layout Marker"]
+  raw_text --> clean["Clean Noise, Bullets, Tabs"]
+  marker --> clean
+
+  clean --> detect_lang["Detect Language TR/EN"]
+  detect_lang --> classifier["Section Classifier"]
+  classifier --> resolver["Section Resolver"]
+  resolver --> builder["Pydantic CVSchema Builder"]
+  builder --> scoring["ATS + Semantic + ML Scoring"]
+  scoring --> report["Recommendations / Report / History"]
 ```
 
 ### Extraction
 
-- PDF parsing uses PyMuPDF-style extraction paths.
-- DOCX and TXT are handled through dedicated parsing helpers.
-- Layout logic attempts to preserve reading order for multi-column resumes.
-- Local worker can process files without uploading raw files first.
+Parsing starts by converting raw PDF, DOCX, and TXT documents into clean structured text.
+
+1. **File Guard:** Uploads are checked for size, extension, body limits, PDF page/object limits, and DOCX compression safety.
+2. **Geometric Analysis:** `services/pdf_text_extractor.py` analyzes text block positions. If distinct vertical lanes are detected, the system activates column linearization.
+3. **Linearization:** Column blocks are grouped by x-position, sorted vertically, and merged in reading order to avoid mixing unrelated sentences.
+4. **Noise Cleanup:** Stray bullets, duplicated tabs, broken whitespace, and low-value artifacts are normalized.
+5. **Local Worker Path:** `local_worker/worker.py` can execute the same broad extraction idea locally without uploading raw files first.
 
 ### Language and Sections
 
-The parser supports Turkish/English-oriented section detection and normalizes common resume sections such as:
+The parser supports Turkish/English-oriented section detection. Section aliases normalize common resume headings:
 
-- Summary/profile
-- Experience
-- Education
-- Skills
-- Projects
-- Certifications
-- Languages
-- Interests
+```python
+SECTION_ALIASES = {
+    "summary": ["summary", "ozet", "profile", "about", "objective"],
+    "experience": ["experience", "deneyim", "work history", "employment"],
+    "education": ["education", "egitim", "school", "university"],
+    "projects": ["projects", "projeler", "key projects"],
+    "skills": ["skills", "yetenekler", "technical skills", "frontend", "backend"],
+    "certifications": ["certifications", "sertifikalar", "certificates", "awards"],
+    "languages": ["languages", "yabanci diller", "diller"],
+    "interests": ["interests", "hobbies", "ilgi alanlari"],
+}
+```
+
+`services/section_resolver.py` then re-evaluates ambiguous blocks. For example, a job-like line incorrectly captured under education can be moved back to experience.
 
 ### Scoring
 
@@ -415,6 +467,59 @@ Scoring uses multiple signals:
 - Semantic job/CV similarity.
 - ML/rule-based calibration.
 
+### Deterministic ATS Evaluation Rules
+
+The deterministic scoring modules (`services/ats_scoring.py`, `services/ats_service.py`, and related helpers) evaluate the structural quality of a CV before AI suggestions are layered on top.
+
+| Metric | Role in Score | Validation Logic |
+| :--- | :--- | :--- |
+| Contact Quality | Identity and reachability | Email, phone, LinkedIn/GitHub, location, and malformed contact checks. |
+| Section Presence | Resume completeness | Experience, education, skills, summary, projects, certifications, and language sections. |
+| Formatting | ATS readability | Bullet use, overlong sentences, document length, noisy symbols, and parse stability. |
+| Keyword Coverage | Job description match | Required terms, repeated domain keywords, and role-specific vocabulary. |
+| Skill Coverage | Capability match | Required skill overlap, missing skills, adjacent technical terms, and category balance. |
+| Experience | Seniority and relevance | Year extraction, role alignment, responsibility signals, and career continuity. |
+| Semantic Match | Meaning similarity | Embedding cosine similarity between CV and job description. |
+
+### Semantic Similarity and ML Calibration
+
+When embeddings are available, semantic score is calculated with cosine similarity:
+
+```text
+semantic_similarity = cosine_similarity(cv_embedding, job_description_embedding) * 100
+```
+
+```mermaid
+flowchart TD
+  cv["CV Text + Schema"] --> cv_emb["CV Embedding"]
+  jd["Job Description"] --> jd_emb["JD Embedding"]
+
+  cv_emb --> cos["Cosine Similarity"]
+  jd_emb --> cos
+
+  cos --> blend["ML Calibrator"]
+
+  subgraph Features ["Feature Input Vector"]
+    feat1["Keyword Score"]
+    feat2["Skill Score"]
+    feat3["Experience Score"]
+    feat4["ATS Score"]
+    feat5["Semantic Match"]
+  end
+
+  Features --> blend
+  blend --> calibrated["Calibrated Overall Match Score"]
+```
+
+The final score is intentionally blended rather than fully AI-driven:
+
+```python
+def blend_with_rule_score(rule_score: float, ml_result: float) -> float:
+    return round((rule_score * 0.70) + (ml_result * 0.30), 2)
+```
+
+If embeddings fail, the system falls back to deterministic scores and applies caps where needed to avoid inflated uncalibrated matches.
+
 ### Auto-Fix and Rewrite
 
 Auto-fix and rewrite logic is designed to improve ATS fit while avoiding destructive rewrites:
@@ -422,6 +527,17 @@ Auto-fix and rewrite logic is designed to improve ATS fit while avoiding destruc
 - Protected section floor logic prevents large accidental content loss.
 - Regression checks can reject changes that reduce the score.
 - Sanitization and formatting safeguards protect generated CV output.
+
+The important rule is that generated improvements must not erase useful resume content. Protected section floor logic compares original and rewritten section density:
+
+```python
+for key in PROTECTED_SECTION_KEYS:
+    source_lines = _non_empty_section_lines(source_sections, key)
+    current_lines = _non_empty_section_lines(current_sections, key)
+    if source_lines and len(current_lines) < len(source_lines):
+        rebuilt_sections[key] = source_lines
+        restored.append(f"{key.upper()} section restored to protect content floor.")
+```
 
 ---
 

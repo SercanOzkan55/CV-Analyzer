@@ -1,4 +1,4 @@
-FROM python:3.14-slim AS builder
+FROM python:3.12-slim AS builder
 WORKDIR /app
 
 # Install build deps
@@ -10,7 +10,7 @@ COPY requirements.txt ./
 RUN python -m pip install --upgrade pip
 RUN if [ -f requirements.txt ]; then pip wheel -r requirements.txt -w /wheels; fi
 
-FROM python:3.14-slim
+FROM python:3.12-slim
 WORKDIR /app
 
 # Create non-root user

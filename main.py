@@ -228,8 +228,8 @@ from services.email_service import (  # noqa: F401
 
 
 # FastAPI docs hardening for production
-if os.getenv("ENV", "dev") == "prod":
-    app = FastAPI(docs_url=None, redoc_url=None)
+if os.getenv("ENV", "development").lower() in ("production", "prod"):
+    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 else:
     app = FastAPI()
 
@@ -243,6 +243,18 @@ app.include_router(recruiter_router)
 app.include_router(recruiter_extended_router)
 app.include_router(recruiter_local_router)
 app.include_router(downloads_router)
+
+@app.get("/metrics")
+def get_metrics(request: Request):
+    from core.http_runtime import _admin_access_error
+    admin_error = _admin_access_error(request)
+    if admin_error:
+        return admin_error
+    try:
+        from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+        return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Metrics collection failed")
 
 from config.aws import MAX_PDF_OBJECTS, MAX_PDF_PAGES, MAX_UPLOAD_BYTES
 from core.request_utils import (
@@ -385,7 +397,7 @@ except Exception:
 
 if Instrumentator:
     try:
-        Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+        Instrumentator().instrument(app)
     except Exception:
         pass
 

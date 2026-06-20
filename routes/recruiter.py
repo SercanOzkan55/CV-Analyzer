@@ -451,27 +451,13 @@ def recruiter_required(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
         raise HTTPException(status_code=403, detail="Recruiter role required")
 
     if db_user.role in ("admin", "recruiter") and not db_user.organization_id:
-        allow_auto_org = os.getenv("RECRUITER_AUTO_PROVISION_ORG", "0").lower() in ("1", "true", "yes")
-        if not allow_auto_org:
-            raise HTTPException(
-                status_code=403,
-                detail="Recruiter account is not assigned to an organization",
-            )
-        try:
-            domain = f"personal-recruiter-{db_user.id}.cvanalyzer.local"
-            org = db.query(Organization).filter(Organization.domain == domain).first()
-            if not org:
-                org = Organization(name=f"Personal Recruiter Workspace {db_user.id}", domain=domain)
-                db.add(org)
-                db.flush()
-            db_user.organization_id = org.id
-            db.flush()
-            db.commit()
-            logger.info("recruiter_required: provisioned personal org_id=%s for user_id=%s", org.id, db_user.id)
-        except Exception as exc:
-            db.rollback()
-            logger.error("recruiter_required: org auto-provision failed: %s", exc)
-            raise HTTPException(status_code=403, detail="Recruiter organization setup failed")
+        # CRITICAL FIX: Never auto-provision organization
+        # Require explicit invite instead
+        raise HTTPException(
+            status_code=403,
+            detail="Recruiter account is not assigned to an organization. "
+                   "Contact your admin to request an invite."
+        )
 
     return db_user
 
@@ -1143,7 +1129,7 @@ async def recruiter_batch_upload(
         )
 
     # Check organization credits
-    org = db.query(Organization).filter(Organization.id == org_id).first()
+    org = db.query(Organization).filter(Organization.id == org_id).with_for_update().first()
     if not org:
         raise HTTPException(
             status_code=500,

@@ -1,7 +1,6 @@
 import argparse
 import csv
 import difflib
-import glob
 import hashlib
 import html
 import json
@@ -14,6 +13,7 @@ from io import BytesIO
 from pathlib import Path
 
 import requests
+import urllib.parse
 
 from owner_workflow import build_candidate_notification, enrich_row_with_owner_workflow
 from credentials import load_worker_api_key, save_worker_api_key
@@ -21,7 +21,100 @@ from workspace import WorkspaceStore
 
 
 API_BASE_URL = os.environ.get("CV_ANALYZER_API_URL", "http://127.0.0.1:8001/api/worker")
-VERIFY_SSL = os.environ.get("VERIFY_SSL", "True").lower() not in ("false", "0", "no")
+LOCAL_API_HOSTS = {"127.0.0.1", "localhost", "::1"}
+LOCAL_FILE_EXTENSIONS = {".pdf", ".docx", ".txt"}
+MAX_PDF_PAGES = int(os.environ.get("CV_WORKER_MAX_PDF_PAGES", "50"))
+MAX_OCR_PAGES = int(os.environ.get("CV_WORKER_MAX_OCR_PAGES", "5"))
+MAX_DOCX_PARAGRAPHS = int(os.environ.get("CV_WORKER_MAX_DOCX_PARAGRAPHS", "3000"))
+
+
+def _is_local_host(hostname: str | None) -> bool:
+    return (hostname or "").strip().lower() in LOCAL_API_HOSTS
+
+
+def _default_port(scheme: str) -> int:
+    return 443 if scheme == "https" else 80
+
+
+def _url_origin(url: str) -> tuple[str, str, int]:
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ValueError("URL must be absolute HTTP(S).")
+    try:
+        port = parsed.port or _default_port(parsed.scheme)
+    except ValueError as exc:
+        raise ValueError("URL contains an invalid port.") from exc
+    return (parsed.scheme.lower(), parsed.hostname.lower(), port)
+
+
+def _validate_api_base_url(api_url: str) -> str:
+    raw = (api_url or "").strip().rstrip("/")
+    parsed = urllib.parse.urlparse(raw)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc or not parsed.hostname:
+        raise ValueError("Worker API URL must be an absolute http:// or https:// URL.")
+    try:
+        parsed.port
+    except ValueError as exc:
+        raise ValueError("Worker API URL contains an invalid port.") from exc
+    if parsed.scheme == "http" and not _is_local_host(parsed.hostname):
+        raise ValueError("Remote worker API URLs must use https://. http:// is allowed only for localhost.")
+    return raw
+
+
+def _validate_download_url(download_url: str, api_base_url: str) -> str:
+    api_base = _validate_api_base_url(api_base_url)
+    candidate = (download_url or "").strip()
+    if not candidate:
+        raise ValueError("Download URL is empty.")
+    resolved = urllib.parse.urljoin(f"{api_base}/", candidate)
+    _validate_api_base_url(resolved)
+    if _url_origin(resolved) != _url_origin(api_base):
+        raise ValueError("Download URL origin must match the configured worker API origin.")
+    return resolved
+
+
+def is_path_inside(path: Path, parent: Path) -> bool:
+    try:
+        child = Path(path).resolve()
+        base = Path(parent).resolve()
+    except (OSError, RuntimeError):
+        return False
+    if os.name == "nt":
+        child_key = os.path.normcase(str(child))
+        base_key = os.path.normcase(str(base)).rstrip("\\/")
+        return child_key == base_key or child_key.startswith(base_key + os.sep)
+    try:
+        child.relative_to(base)
+        return True
+    except ValueError:
+        return False
+
+
+def iter_supported_local_files(folder: Path, output: Path) -> list[Path]:
+    files: list[Path] = []
+    output_resolved = Path(output).expanduser().resolve()
+    for path in Path(folder).expanduser().rglob("*"):
+        try:
+            if (
+                path.is_file()
+                and path.suffix.lower() in LOCAL_FILE_EXTENSIONS
+                and not path.is_symlink()
+                and not is_path_inside(path, output_resolved)
+            ):
+                files.append(path)
+        except OSError:
+            continue
+    return sorted(files, key=lambda item: str(item).lower())
+
+def _should_verify_ssl(api_url: str) -> bool:
+    """SSL verification is bypassed only for local development servers."""
+    try:
+        parsed = urllib.parse.urlparse(_validate_api_base_url(api_url))
+    except ValueError:
+        return True
+    return not _is_local_host(parsed.hostname)
+
+VERIFY_SSL = _should_verify_ssl(API_BASE_URL)
 WORKER_VERSION = "1.2.0"
 ENGINE_VERSION = "rule_based_mvp_v1"
 PROGRESS_LOG = Path(os.environ.get("CV_WORKER_PROGRESS_LOG", "worker_progress.jsonl"))
@@ -54,7 +147,7 @@ def csv_safe(value):
         value = ", ".join(str(item) for item in value if str(item).strip())
     if not isinstance(value, str):
         return value
-    if value and (value[0] in "=+-@" or value[0] in "\t\r\n"):
+    if value and value[0] in "=+-@\t\r\n|\\!":
         return "'" + value
     return value
 
@@ -238,7 +331,7 @@ def _extract_pdf_with_pdfplumber(file_bytes: bytes) -> str:
 
     pages: list[str] = []
     with pdfplumber.open(BytesIO(file_bytes)) as pdf:
-        for page in pdf.pages:
+        for page in pdf.pages[:MAX_PDF_PAGES]:
             words = page.extract_words(use_text_flow=False) or []
             columns = _detect_columns(words, float(page.width))
             if len(columns) < 2:
@@ -269,6 +362,9 @@ def _looks_like_pdf(file_bytes: bytes) -> bool:
 
 
 def extract_text(file_bytes: bytes, file_type: str, file_name: str = "") -> str:
+    if len(file_bytes) > MAX_FILE_BYTES:
+        raise LocalWorkerError(f"File exceeds max size: {MAX_FILE_BYTES} bytes")
+
     kind = (file_type or Path(file_name).suffix.lstrip(".") or "txt").lower()
     if kind in {"txt", "text", "plain"}:
         for encoding in ("utf-8", "utf-16", "latin-1"):
@@ -291,7 +387,12 @@ def extract_text(file_bytes: bytes, file_type: str, file_name: str = "") -> str:
                 except ImportError:
                     from PyPDF2 import PdfReader
                 reader = PdfReader(BytesIO(file_bytes))
-                text = _fix_common_mojibake("\n".join((page.extract_text() or "") for page in reader.pages))
+                page_texts = []
+                for page_index, page in enumerate(reader.pages):
+                    if page_index >= MAX_PDF_PAGES:
+                        break
+                    page_texts.append(page.extract_text() or "")
+                text = _fix_common_mojibake("\n".join(page_texts))
             except Exception:
                 pass
         if text.strip():
@@ -304,13 +405,18 @@ def extract_text(file_bytes: bytes, file_type: str, file_name: str = "") -> str:
             import pytesseract
             
             doc = fitz.open(stream=file_bytes, filetype="pdf")
-            ocr_pages = []
-            for page in doc:
-                pix = page.get_pixmap()
-                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                page_text = pytesseract.image_to_string(img)
-                if page_text:
-                    ocr_pages.append(page_text)
+            try:
+                ocr_pages = []
+                for page_index, page in enumerate(doc):
+                    if page_index >= MAX_OCR_PAGES:
+                        break
+                    pix = page.get_pixmap()
+                    img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                    page_text = pytesseract.image_to_string(img)
+                    if page_text:
+                        ocr_pages.append(page_text)
+            finally:
+                doc.close()
             ocr_text = "\n".join(ocr_pages).strip()
             if ocr_text:
                 return _fix_common_mojibake(ocr_text)
@@ -323,7 +429,13 @@ def extract_text(file_bytes: bytes, file_type: str, file_name: str = "") -> str:
         try:
             from docx import Document
             doc = Document(BytesIO(file_bytes))
-            return "\n".join(p.text for p in doc.paragraphs if p.text)
+            paragraphs = []
+            for paragraph_index, paragraph in enumerate(doc.paragraphs):
+                if paragraph_index >= MAX_DOCX_PARAGRAPHS:
+                    break
+                if paragraph.text:
+                    paragraphs.append(paragraph.text)
+            return "\n".join(paragraphs)
         except Exception as exc:
             raise LocalWorkerError(f"DOCX extraction failed: {exc}") from exc
 
@@ -474,7 +586,7 @@ def maybe_apply_ai_review(cv_text: str, config: dict, score: dict, ai_mode: str)
                 "response_format": {"type": "json_object"},
             },
             timeout=45,
-            verify=VERIFY_SSL,
+            verify=True,
         )
         if resp.status_code >= 400:
             return {**score, "ai_review_status": f"failed_{resp.status_code}"}
@@ -487,6 +599,8 @@ def maybe_apply_ai_review(cv_text: str, config: dict, score: dict, ai_mode: str)
         }
     except Exception as exc:
         return {**score, "ai_review_status": f"failed_{type(exc).__name__}"}
+
+
 def _generate_html_report(ranked_rows: list[dict], config: dict, html_path: Path):
     def _script_safe_json(value: object) -> str:
         return (
@@ -506,9 +620,6 @@ def _generate_html_report(ranked_rows: list[dict], config: dict, html_path: Path
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CV Değerlendirme Sonuçları - {title}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {{
       --bg: hsl(230, 25%, 8%);
@@ -527,7 +638,7 @@ def _generate_html_report(ranked_rows: list[dict], config: dict, html_path: Path
       --color-reject: hsl(0, 84%, 60%);
       --color-reject-bg: rgba(220, 38, 38, 0.15);
       
-      --font: 'Outfit', sans-serif;
+      --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
     }}
     
     * {{
@@ -1408,12 +1519,24 @@ def _generate_html_report(ranked_rows: list[dict], config: dict, html_path: Path
 
 
 class LocalWorker:
-    def __init__(self, api_key: str, processing_mode: str, ai_mode: str, device_name: str, verify_ssl: bool = True):
+    def __init__(
+        self,
+        api_key: str,
+        processing_mode: str,
+        ai_mode: str,
+        device_name: str,
+        verify_ssl: bool | None = None,
+        api_base_url: str | None = None,
+    ):
         self.api_key = api_key
         self.processing_mode = processing_mode
         self.ai_mode = ai_mode
         self.device_name = device_name
-        self.verify_ssl = verify_ssl
+        try:
+            self.api_base_url = _validate_api_base_url(api_base_url or API_BASE_URL)
+        except ValueError as exc:
+            raise LocalWorkerError(str(exc)) from exc
+        self.verify_ssl = _should_verify_ssl(self.api_base_url) if verify_ssl is None else verify_ssl
         self.access_token = None
         self.company_id = None
         self.allowed_jobs = []
@@ -1423,7 +1546,7 @@ class LocalWorker:
         self.session.verify = self.verify_ssl
 
     def _request(self, method: str, path_or_url: str, *, absolute: bool = False, allow_reauth: bool = True, **kwargs):
-        url = path_or_url if absolute else f"{API_BASE_URL}{path_or_url}"
+        url = path_or_url if absolute else f"{self.api_base_url}{path_or_url}"
         last_error = None
         timeout = kwargs.pop("timeout", 30)
         for attempt in range(4):
@@ -1534,7 +1657,11 @@ class LocalWorker:
         return processed
 
     def _download_item(self, item: dict) -> bytes:
-        resp = self._request("GET", item["download_url"], absolute=True, timeout=60)
+        try:
+            download_url = _validate_download_url(item["download_url"], self.api_base_url)
+        except ValueError as exc:
+            raise LocalWorkerError(f"Unsafe download URL: {exc}") from exc
+        resp = self._request("GET", download_url, absolute=True, timeout=60)
         if resp.status_code != 200:
             raise LocalWorkerError(f"Download failed for candidate {item.get('candidate_id')}: {resp.text}")
         if len(resp.content) > MAX_FILE_BYTES:
@@ -1617,11 +1744,7 @@ class LocalWorker:
         folder = Path(folder_path).expanduser()
         output = Path(output_folder or (folder / "cv_analyzer_results")).expanduser()
         output.mkdir(parents=True, exist_ok=True)
-
-        files = []
-        for pattern in ("*.pdf", "*.docx", "*.txt"):
-            files.extend(glob.glob(str(folder / "**" / pattern), recursive=True))
-        files = sorted({str(Path(path)) for path in files})
+        files = iter_supported_local_files(folder, output)
         print(f"Found {len(files)} local file(s).")
         if self.quota_remaining <= 0:
             raise LocalWorkerError("No remaining CV scan quota. Renew your worker key or wait for quota reset.")
@@ -1793,7 +1916,7 @@ def _add_common_args(parser):
     parser.add_argument("--api-key", default=None, help="Worker API key. Defaults to CV_WORKER_API_KEY.")
     parser.add_argument("--save-api-key", action="store_true", help="Save the provided API key to the OS credential store.")
     parser.add_argument("--device-name", default=os.environ.get("COMPUTERNAME") or os.environ.get("HOSTNAME") or "Local Worker")
-    parser.add_argument("--no-verify-ssl", action="store_true", help="Bypass SSL verification for SaaS backend request calls.")
+    parser.add_argument("--no-verify-ssl", action="store_true", help="(Deprecated, ignored.) SSL bypass is now automatic for localhost only.")
 
 
 def _split_cli_terms(value: str | None) -> list[str]:
@@ -1861,10 +1984,9 @@ def main():
     if args.api_key and args.save_api_key:
         saved = save_worker_api_key(args.api_key)
         print("API key saved to OS credential store." if saved else "API key could not be saved to OS credential store.")
-    verify_ssl = VERIFY_SSL and not getattr(args, "no_verify_ssl", False)
-    worker = LocalWorker(api_key, args.processing_mode, args.ai_mode, args.device_name, verify_ssl=verify_ssl)
-
     try:
+        verify_ssl = VERIFY_SSL
+        worker = LocalWorker(api_key, args.processing_mode, args.ai_mode, args.device_name, verify_ssl=verify_ssl)
         if args.command == "login":
             worker.login()
         elif args.command == "jobs":

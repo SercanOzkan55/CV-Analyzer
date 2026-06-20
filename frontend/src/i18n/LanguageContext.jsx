@@ -158,34 +158,44 @@ export function LanguageProvider({ children }) {
   // On F5 within same tab, sessionStorage persists — we clear the manual flag
   // using a performance.navigation check so IP re-detects on refresh.
   useEffect(() => {
-    // Clear manual flag on hard refresh so IP detection kicks in
-    const isReload = performance?.navigation?.type === 1 ||
-      (performance?.getEntriesByType?.('navigation')?.[0]?.type === 'reload')
-    if (isReload) {
-      try { sessionStorage.removeItem('cv_lang_manual') } catch {}
-    }
+    function tryDetect() {
+      const hasConsent = localStorage.getItem('cookie_consent') === 'accepted'
+      if (!hasConsent) return
 
-    // If user manually selected a language in this session, keep it
-    const manual = (() => { try { return sessionStorage.getItem('cv_lang_manual') } catch { return null } })()
-    if (manual && translations[manual]) {
-      setLangState(manual)
-      document.documentElement.lang = manual
-      document.documentElement.dir = RTL_LANGUAGES.includes(manual) ? 'rtl' : 'ltr'
-      return
-    }
-
-    // Otherwise detect by IP
-    detectLanguageByIP().then(({ lang: detectedLang, cc }) => {
-      setCountryCode(cc)
-      const manual = (() => { try { return sessionStorage.getItem('cv_lang_manual') } catch { return null } })()
-      if (!manual && detectedLang && translations[detectedLang]) {
-        setLangState(detectedLang)
-        document.documentElement.lang = detectedLang
-        document.documentElement.dir = RTL_LANGUAGES.includes(detectedLang) ? 'rtl' : 'ltr'
+      // Clear manual flag on hard refresh so IP detection kicks in
+      const isReload = performance?.navigation?.type === 1 ||
+        (performance?.getEntriesByType?.('navigation')?.[0]?.type === 'reload')
+      if (isReload) {
+        try { sessionStorage.removeItem('cv_lang_manual') } catch {}
       }
-    }).catch(() => {
-      // IP detection failed — keep browser language, no user-visible error
-    })
+
+      // If user manually selected a language in this session, keep it
+      const manual = (() => { try { return sessionStorage.getItem('cv_lang_manual') } catch { return null } })()
+      if (manual && translations[manual]) {
+        setLangState(manual)
+        document.documentElement.lang = manual
+        document.documentElement.dir = RTL_LANGUAGES.includes(manual) ? 'rtl' : 'ltr'
+        return
+      }
+
+      // Otherwise detect by IP
+      detectLanguageByIP().then(({ lang: detectedLang, cc }) => {
+        setCountryCode(cc)
+        const manual = (() => { try { return sessionStorage.getItem('cv_lang_manual') } catch { return null } })()
+        if (!manual && detectedLang && translations[detectedLang]) {
+          setLangState(detectedLang)
+          document.documentElement.lang = detectedLang
+          document.documentElement.dir = RTL_LANGUAGES.includes(detectedLang) ? 'rtl' : 'ltr'
+        }
+      }).catch(() => {
+        // IP detection failed — keep browser language, no user-visible error
+      })
+    }
+
+    tryDetect()
+
+    window.addEventListener('cv-cookie-consent-accepted', tryDetect)
+    return () => window.removeEventListener('cv-cookie-consent-accepted', tryDetect)
   }, [])
 
   function t(path) {

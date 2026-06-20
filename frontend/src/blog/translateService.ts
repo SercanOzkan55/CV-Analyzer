@@ -92,6 +92,11 @@ async function translateChunkGoogle(text: string, targetLang: string): Promise<s
 export async function translateText(text: string, targetLang: string): Promise<string> {
   if (!text.trim()) return text;
 
+  const hasConsent = typeof window !== 'undefined' && localStorage.getItem('cookie_consent') === 'accepted';
+  if (!hasConsent) {
+    return text;
+  }
+
   const key = cacheKey(text, targetLang);
   const cache = loadCache();
   if (cache[key]) return cache[key];

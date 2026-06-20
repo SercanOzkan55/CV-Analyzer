@@ -30,10 +30,23 @@ def _default_workspace_db() -> Path:
 
 
 WORKSPACE_DB = _default_workspace_db()
+SENSITIVE_RESULT_FIELDS = {"cv_text"}
 
 
 def _now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _strip_sensitive_result_fields(value):
+    if isinstance(value, dict):
+        return {
+            key: _strip_sensitive_result_fields(item)
+            for key, item in value.items()
+            if key not in SENSITIVE_RESULT_FIELDS
+        }
+    if isinstance(value, list):
+        return [_strip_sensitive_result_fields(item) for item in value]
+    return value
 
 
 class WorkspaceStore:
@@ -94,6 +107,7 @@ class WorkspaceStore:
             self._ensure_column(conn, "analysis_results", "sync_status", "sync_status TEXT NOT NULL DEFAULT 'pending'")
             self._ensure_column(conn, "analysis_results", "sync_error", "sync_error TEXT")
             self._ensure_column(conn, "analysis_results", "candidate_status", "candidate_status TEXT NOT NULL DEFAULT 'pending_review'")
+            self._purge_sensitive_result_json(conn)
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS audit_logs (
@@ -139,6 +153,22 @@ class WorkspaceStore:
         columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()}
         if column_name not in columns:
             conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_sql}")
+
+    def _purge_sensitive_result_json(self, conn):
+        rows = conn.execute(
+            "SELECT id, result_json FROM analysis_results WHERE result_json LIKE '%cv_text%'"
+        ).fetchall()
+        for row_id, raw_payload in rows:
+            try:
+                payload = json.loads(raw_payload)
+            except (TypeError, json.JSONDecodeError):
+                continue
+            cleaned = _strip_sensitive_result_fields(payload)
+            if cleaned != payload:
+                conn.execute(
+                    "UPDATE analysis_results SET result_json = ? WHERE id = ?",
+                    (json.dumps(cleaned, ensure_ascii=False), row_id),
+                )
 
     def list_jobs(self) -> list[dict]:
         with self._connect() as conn:
@@ -198,7 +228,7 @@ class WorkspaceStore:
                     float(row.get("score") or 0),
                     row.get("decision", ""),
                     row.get("confidence", ""),
-                    json.dumps(row, ensure_ascii=False),
+                    json.dumps(_strip_sensitive_result_fields(row), ensure_ascii=False),
                     _now(),
                 ),
             )
@@ -308,7 +338,7 @@ class WorkspaceStore:
                 (run_id, file_path)
             ).fetchone()
             if row:
-                payload = json.loads(row[0])
+                payload = _strip_sensitive_result_fields(json.loads(row[0]))
                 payload["decision"] = decision
                 conn.execute(
                     "UPDATE analysis_results SET result_json = ? WHERE run_id = ? AND file_path = ?",

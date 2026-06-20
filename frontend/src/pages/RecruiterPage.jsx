@@ -948,6 +948,9 @@ export default function RecruiterPage() {
   // ── Preview candidate with strength/weakness ────────────────────────────────
   async function handleDashboardPreview(candidate) {
     try {
+      if (previewData?.pdfUrl) {
+        URL.revokeObjectURL(previewData.pdfUrl);
+      }
       const data = await recruiterDashboardPreview(token, {
         cv_text: candidate.cv_text || '',
         job_description: jdText,
@@ -965,6 +968,16 @@ export default function RecruiterPage() {
       setPreviewData({ ...data, ...candidate, pdfUrl })
       setPreviewOpen(true)
     } catch (err) { toast.error(err.message) }
+  }
+
+  function handleClosePreview() {
+    setPreviewOpen(false)
+    setPreviewData(prev => {
+      if (prev?.pdfUrl) {
+        URL.revokeObjectURL(prev.pdfUrl)
+      }
+      return null
+    })
   }
 
   // ── Open email modal ────────────────────────────────────────────────────────
@@ -1873,7 +1886,9 @@ export default function RecruiterPage() {
                                 if (cvFiles && cvFiles.length > 0 && fname) {
                                   const file = cvFiles.find(f => f.name === fname);
                                   if (file) {
-                                    window.open(URL.createObjectURL(file), '_blank');
+                                    const url = URL.createObjectURL(file);
+                                    window.open(url, '_blank');
+                                    setTimeout(() => URL.revokeObjectURL(url), 1000);
                                     return;
                                   }
                                 }
@@ -2510,9 +2525,9 @@ export default function RecruiterPage() {
         </Modal>
 
         {/* Preview with Enhanced Candidate Details Modal */}
-        <Modal 
-          open={previewOpen} 
-          onClose={() => setPreviewOpen(false)} 
+        <Modal
+          open={previewOpen}
+          onClose={handleClosePreview}
           title="Candidate Profile"
           style={{ maxWidth: '900px', width: '90vw' }}
         >
@@ -2521,7 +2536,7 @@ export default function RecruiterPage() {
               candidate={previewData}
               result={previewData}
               previewData={previewData}
-              onClose={() => setPreviewOpen(false)}
+              onClose={handleClosePreview}
             />
           )}
         </Modal>

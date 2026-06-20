@@ -24,7 +24,8 @@ if not exist ".venv" (
 )
 
 echo Installing worker dependencies...
-".venv\Scripts\python.exe" -m pip install --upgrade pip
+REM pip upgrade disabled for install reproducibility
+REM ".venv\Scripts\python.exe" -m pip install --upgrade pip
 ".venv\Scripts\python.exe" -m pip install -r requirements.txt
 
 echo Creating desktop shortcut...

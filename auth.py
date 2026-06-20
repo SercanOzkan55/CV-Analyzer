@@ -51,6 +51,30 @@ SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
 if not SUPABASE_JWT_SECRET:
     SUPABASE_JWT_SECRET = _read_secret_file(os.getenv("SUPABASE_JWT_SECRET_FILE"))
 
+# CRITICAL: Validate JWT secret exists for production
+def validate_jwt_config():
+    """Validate JWT configuration at startup."""
+    env = os.getenv("ENV", "development").lower()
+    
+    if env in ("production", "prod"):
+        secret = os.getenv("SUPABASE_JWT_SECRET")
+        secret_file = os.getenv("SUPABASE_JWT_SECRET_FILE")
+        
+        if not secret and not secret_file:
+            raise RuntimeError(
+                "CRITICAL: SUPABASE_JWT_SECRET or SUPABASE_JWT_SECRET_FILE required in production"
+            )
+        
+        if secret_file:
+            if not os.path.exists(secret_file):
+                raise RuntimeError(f"CRITICAL: Secret file not found: {secret_file}")
+            
+            if not os.access(secret_file, os.R_OK):
+                raise RuntimeError(f"CRITICAL: Cannot read secret file: {secret_file}")
+        
+        import logging
+        logging.getLogger(__name__).info("✓ JWT configuration validated for production")
+
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 
 
@@ -133,10 +157,20 @@ def verify_supabase_jwt(authorization: str = Header(None)):
     """
     # In development/testing mode, return a mock user when MOCK_SERVICES is set.
     # GUARD: never allow mock auth when ENV is production.
-    _env_mode = os.getenv("ENV", "development").lower()
+    env_mode = os.getenv("ENV", "development").lower()
+    
+    # CRITICAL: Block mock auth in production
+    if env_mode in ("production", "prod"):
+        if os.getenv("MOCK_SERVICES", "0").lower() in ("1", "true", "yes"):
+            raise RuntimeError(
+                "MOCK_SERVICES cannot be enabled in production environment. "
+                "This is a critical security violation."
+            )
+    
+    # Allow mock auth only in development
     if (
         os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes")
-        and _env_mode not in ("production", "prod")
+        and env_mode not in ("production", "prod")
     ):
         # Try to preserve per-user identity in mock mode by reading unverified
         # claims from the bearer token. This keeps quota/rate-limit behavior

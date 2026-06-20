@@ -17,8 +17,9 @@ secrets:
     file: ./secrets/db_password.txt
 ```
 
-GitHub Actions / Docker Hub
-- Use repository `secrets` for `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (already referenced in `.github/workflows/docker-build-push.yml`).
+GitHub Actions / Docker images
+- The current `.github/workflows/ci.yml` builds and health-checks the Docker image without pushing it to a registry.
+- If you add a registry-publish workflow later, store registry credentials in repository secrets rather than committing them to the repo.
 
 Sentry
 - Add the `SENTRY_DSN` value in your environment/secrets. Do not commit it to source control.

@@ -53,8 +53,9 @@ class APISubscription(Base):
     )
     organization = relationship("Organization", back_populates="api_subscriptions")
 
-    # API key for authentication
-    api_key = Column(String(255), unique=True, nullable=False, index=True)
+    # API key for authentication (hashed for security)
+    api_key_hash = Column(String(255), unique=True, nullable=False, index=True)
+    api_key_display = Column(String(50), nullable=True)  # Last 8 chars for UX, shown once
 
     # Monthly limits and usage
     monthly_limit = Column(Integer, default=1000, nullable=False)
@@ -71,6 +72,30 @@ class APISubscription(Base):
 
     # Reset monthly usage on the 1st of each month
     monthly_reset_day = Column(Integer, default=1, nullable=False)
+    
+    def set_api_key(self, plain_key: str):
+        """Hash and store API key securely."""
+        try:
+            from passlib.context import CryptContext
+            pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+            self.api_key_hash = pwd_context.hash(plain_key)
+            self.api_key_display = plain_key[-8:] if len(plain_key) > 8 else "****"
+        except ImportError:
+            # Fallback if passlib not available (should not happen in production)
+            import hashlib
+            self.api_key_hash = hashlib.sha256(plain_key.encode()).hexdigest()
+            self.api_key_display = plain_key[-8:] if len(plain_key) > 8 else "****"
+    
+    def verify_api_key(self, plain_key: str) -> bool:
+        """Verify plain text key against hash."""
+        try:
+            from passlib.context import CryptContext
+            pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+            return pwd_context.verify(plain_key, self.api_key_hash)
+        except ImportError:
+            # Fallback for missing passlib
+            import hashlib
+            return hashlib.sha256(plain_key.encode()).hexdigest() == self.api_key_hash
 
 
 class Analysis(Base):

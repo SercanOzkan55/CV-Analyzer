@@ -1,9 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function BlogPostForm({ onPost }) {
   const [text, setText] = useState('');
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
+
+  useEffect(() => {
+    return () => {
+      if (preview) {
+        URL.revokeObjectURL(preview);
+      }
+    };
+  }, [preview]);
 
   function handleImageChange(e) {
     const file = e.target.files[0];

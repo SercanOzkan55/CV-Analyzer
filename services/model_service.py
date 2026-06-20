@@ -7,7 +7,7 @@ from services.ml_model import predict_hire_proba as _ml_predict_hire
 
 
 def is_mock():
-    return os.getenv("MOCK_SERVICES", "1") == "1"
+    return os.getenv("MOCK_SERVICES", "0") == "1"
 
 
 def predict_hire(features):
