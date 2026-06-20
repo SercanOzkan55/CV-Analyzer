@@ -1,0 +1,94 @@
+/* =============================================
+   CV Analyzer - Base Styles
+   ============================================= */
+
+/* ---------- Reset & Base ---------- */
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; margin: 0; }
+}
+
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg-primary);
+  color: var(--color-text);
+  min-height: 100vh;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  letter-spacing: 0;
+  font-size: 14.5px;
+  transition: background-color 0.4s ease, color 0.3s ease;
+}
+
+/* ---------- Smooth Theme Transition ---------- */
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition:
+    background-color 0.4s ease,
+    color 0.3s ease,
+    border-color 0.35s ease,
+    box-shadow 0.35s ease,
+    opacity 0.3s ease !important;
+}
+
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 50% at 50% -5%, var(--color-accent-glow), transparent 70%);
+  transition: background 0.4s ease;
+}
+
+[data-theme="light"] body::before {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -5%, rgba(79, 70, 229, 0.07), transparent 65%),
+    radial-gradient(ellipse 40% 30% at 90% 20%, rgba(124, 58, 237, 0.04), transparent 60%);
+}
+
+#root { position: relative; z-index: 1; overflow-x: clip; }
+a { color: var(--color-accent); text-decoration: none; transition: color 0.2s; }
+a:hover { color: var(--color-accent-hover); }
+img { max-width: 100%; }
+
+/* ---------- Accessibility: Focus Visible ---------- */
+*:focus { outline: none; }
+*:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+  box-shadow: var(--focus-ring);
+}
+
+button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+:where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  transition: border-color var(--motion-fast) var(--transition-smooth), box-shadow var(--motion-fast) var(--transition-smooth), background-color var(--motion-fast) var(--transition-smooth);
+}
+
+:where(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus-visible {
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+}
+
+/* ---------- Page Fade-In ---------- */
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.page-wrapper,
+.auth-layout,
+.app-layout > main,
+.main-content {
+  animation: pageFadeIn 0.3s var(--transition-smooth) both;
+}

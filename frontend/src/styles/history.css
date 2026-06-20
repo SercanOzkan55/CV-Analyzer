@@ -1,0 +1,15 @@
+/* ---------- History Page ---------- */
+.history-grid { display: grid; grid-template-columns: 380px 1fr; gap: 32px; }
+.history-list { display: flex; flex-direction: column; gap: 8px; }
+.history-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 20px; border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s var(--transition-smooth);
+  background: var(--bg-card); border: 1px solid var(--color-border);
+}
+.history-item:hover { background: var(--bg-card-hover); }
+.history-item.active { border-color: var(--color-text-secondary); background: var(--bg-secondary); box-shadow: var(--shadow-sm); }
+.history-item-left { display: flex; align-items: center; gap: 16px; overflow: hidden; }
+.history-job { font-weight: 600; font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; color: var(--color-text); }
+.history-detail { min-height: 400px; }
+.detail-content { display: flex; flex-direction: column; gap: 24px; }
+
