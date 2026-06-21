@@ -95,17 +95,12 @@ def enforce_user_cv_limit(db, user_id: int, limit: int = MAX_CVS_PER_USER) -> No
     count = (
         db.query(CVVersion)
         .filter(CVVersion.user_id == user_id)
-        .filter(
-            (CVVersion.original_s3_key.isnot(None))
-            | (CVVersion.optimized_s3_key.isnot(None))
-        )
+        .filter((CVVersion.original_s3_key.isnot(None)) | (CVVersion.optimized_s3_key.isnot(None)))
         .count()
     )
     if count >= limit:
         logger.warning("s3_guard:cv_limit_reached user=%d count=%d", user_id, count)
-        raise ValueError(
-            f"Storage limit reached ({limit} CVs). Delete old CVs to upload new ones."
-        )
+        raise ValueError(f"Storage limit reached ({limit} CVs). Delete old CVs to upload new ones.")
 
 
 def clamp_presigned_expiry(requested: int) -> int:

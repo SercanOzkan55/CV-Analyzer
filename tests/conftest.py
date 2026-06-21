@@ -58,10 +58,7 @@ _service_stubs = [
             # Basic stub that returns candidate ids already present in DB (simple fallback for tests)
             "find_similar_candidates": (
                 lambda db, vec, k=10, organization_id=None: [
-                    (row[0], 0.1)
-                    for row in db.execute(
-                        text("SELECT id FROM candidates LIMIT :k"), {"k": k}
-                    ).fetchall()
+                    (row[0], 0.1) for row in db.execute(text("SELECT id FROM candidates LIMIT :k"), {"k": k}).fetchall()
                 ]
             ),
             "save_job_embedding": lambda db, jid, vec: True,
@@ -190,9 +187,7 @@ def _mock_verify_jwt(authorization: str = None):
 
 
 # ─── DB URL used by all fixtures ───
-_TEST_DB_URL = os.getenv(
-    "DATABASE_URL", "postgresql+psycopg2://testuser:testpass@localhost:5433/testdb"
-)
+_TEST_DB_URL = os.getenv("DATABASE_URL", "postgresql+psycopg2://testuser:testpass@localhost:5433/testdb")
 _FALLBACK_SQLITE_URL = f"sqlite:///./.pytest_test_{os.getpid()}.db"
 _ACTIVE_TEST_DB_URL = _TEST_DB_URL
 
@@ -244,17 +239,9 @@ def _ensure_test_db_ready():
             safe_url = _ACTIVE_TEST_DB_URL.replace("%", "%%")
             alembic_cfg.set_main_option("sqlalchemy.url", safe_url)
             with _engine.begin() as conn:
-                conn.execute(
-                    text(
-                        "CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(255) NOT NULL)"
-                    )
-                )
+                conn.execute(text("CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(255) NOT NULL)"))
                 try:
-                    conn.execute(
-                        text(
-                            "ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(255)"
-                        )
-                    )
+                    conn.execute(text("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(255)"))
                 except Exception:
                     pass
             alembic.command.upgrade(alembic_cfg, "heads")
@@ -318,11 +305,7 @@ def db_session():
     else:
         try:
             with engine.begin() as conn:
-                conn.execute(
-                    text(
-                        "TRUNCATE TABLE analysis, app_users, organizations RESTART IDENTITY CASCADE"
-                    )
-                )
+                conn.execute(text("TRUNCATE TABLE analysis, app_users, organizations RESTART IDENTITY CASCADE"))
         except Exception:
             pass
     db = Session()
@@ -334,11 +317,7 @@ def db_session():
         if not _is_sqlite_url(_ACTIVE_TEST_DB_URL):
             try:
                 with engine.begin() as conn:
-                    conn.execute(
-                        text(
-                            "TRUNCATE TABLE analysis, app_users, organizations RESTART IDENTITY CASCADE"
-                        )
-                    )
+                    conn.execute(text("TRUNCATE TABLE analysis, app_users, organizations RESTART IDENTITY CASCADE"))
             except Exception:
                 pass
 
@@ -378,10 +357,7 @@ def sample_texts():
         "Skills: Python, SQL\n"
         "Contact: john@example.com"
     )
-    job = (
-        "Looking for a software engineer with experience in Python and SQL. "
-        "Increase revenue and manage team."
-    )
+    job = "Looking for a software engineer with experience in Python and SQL. Increase revenue and manage team."
     return cv, job
 
 

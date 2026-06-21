@@ -1,4 +1,5 @@
 """Unit tests for services/language_service.py"""
+
 import pytest
 from services.language_service import (
     detect_language,
@@ -10,6 +11,7 @@ from services.language_service import (
 
 
 # ── detect_language ──────────────────────────────────────────
+
 
 class TestDetectLanguage:
     def test_english_text(self):
@@ -31,6 +33,7 @@ class TestDetectLanguage:
 
 
 # ── interpret_score_localized ────────────────────────────────
+
 
 class TestInterpretScoreLocalized:
     def test_high_score_english(self):
@@ -60,6 +63,7 @@ class TestInterpretScoreLocalized:
 
 # ── localize_risk_level ──────────────────────────────────────
 
+
 class TestLocalizeRiskLevel:
     def test_low_risk_en(self):
         assert localize_risk_level("Low Risk") == "Low Risk"
@@ -76,6 +80,7 @@ class TestLocalizeRiskLevel:
 
 
 # ── get_recommendation ───────────────────────────────────────
+
 
 class TestGetRecommendation:
     def test_semantic_low_en(self):
@@ -97,6 +102,7 @@ class TestGetRecommendation:
 
 
 # ── get_ats_suggestion ───────────────────────────────────────
+
 
 class TestGetAtsSuggestion:
     def test_keyword_low(self):

@@ -1,9 +1,11 @@
 """Unit tests for services/section_classifier.py — public API."""
+
 import pytest
 from services.section_classifier import classify_block, split_blocks, canonicalize_section_key
 
 
 # ── classify_block ───────────────────────────────────────────
+
 
 class TestClassifyBlock:
     def test_experience_header(self):
@@ -81,6 +83,7 @@ class TestClassifyBlock:
 
 # ── split_blocks ─────────────────────────────────────────────
 
+
 class TestSplitBlocks:
     def test_splits_on_blank_lines(self):
         text = "Block 1\nLine 2\n\nBlock 2\nLine 3"
@@ -107,6 +110,7 @@ class TestSplitBlocks:
 
 
 # ── canonicalize_section_key ─────────────────────────────────
+
 
 class TestCanonicalizeSectionKey:
     def test_standard_keys(self):

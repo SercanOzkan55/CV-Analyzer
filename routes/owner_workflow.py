@@ -111,12 +111,7 @@ def _env_bool(value: str | None) -> bool:
 
 
 def _owner_app_url() -> str:
-    return (
-        os.getenv("OWNER_APP_URL")
-        or os.getenv("FRONTEND_URL")
-        or os.getenv("APP_URL")
-        or ""
-    ).strip().rstrip("/")
+    return (os.getenv("OWNER_APP_URL") or os.getenv("FRONTEND_URL") or os.getenv("APP_URL") or "").strip().rstrip("/")
 
 
 def _owner_invite_email_enabled() -> bool:
@@ -250,9 +245,7 @@ def _candidate_action_payload(row: CandidateAction, db: Session | None = None) -
     }
     if db is not None:
         data["comment_count"] = (
-            db.query(CandidateComment)
-            .filter(CandidateComment.candidate_action_id == row.id)
-            .count()
+            db.query(CandidateComment).filter(CandidateComment.candidate_action_id == row.id).count()
         )
         latest_comment = (
             db.query(CandidateComment)
@@ -396,11 +389,7 @@ def owner_update_user_role(
 ):
     _require_permission(db, recruiter, "users.manage")
     role = _normalize_member_role(body.role)
-    row = (
-        db.query(User)
-        .filter(User.id == user_id, User.organization_id == recruiter.organization_id)
-        .first()
-    )
+    row = db.query(User).filter(User.id == user_id, User.organization_id == recruiter.organization_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="User not found")
     old_role = row.role or "individual"
@@ -539,7 +528,9 @@ def owner_candidate_actions(
         query = query.filter(CandidateAction.assigned_user_id == recruiter.id)
     if not include_deleted:
         query = query.filter(CandidateAction.deleted_at == None)
-    rows = query.order_by(CandidateAction.created_at.desc(), CandidateAction.id.desc()).offset(offset).limit(limit).all()
+    rows = (
+        query.order_by(CandidateAction.created_at.desc(), CandidateAction.id.desc()).offset(offset).limit(limit).all()
+    )
     return {
         "items": [_candidate_action_payload(row, db) for row in rows],
         "limit": limit,
@@ -585,7 +576,9 @@ def owner_create_candidate_comment(
     recruiter=Depends(owner_workflow_user),
 ):
     _require_permission(db, recruiter, "candidate_comments.create")
-    action = _candidate_action_query_for_user(db, recruiter, action_id).filter(CandidateAction.deleted_at == None).first()
+    action = (
+        _candidate_action_query_for_user(db, recruiter, action_id).filter(CandidateAction.deleted_at == None).first()
+    )
     if not action:
         raise HTTPException(status_code=404, detail="Candidate action not found")
     text = str(body.body or "").strip()

@@ -2,6 +2,7 @@ import pytest
 from agents.extract_agent import extract_structured, _is_fullname, _is_colon_label
 from services.layout_analyzer import analyze_layout
 
+
 def test_is_fullname_unicode():
     # Valid Name Title Case (English, Turkish, German, Spanish, French)
     assert _is_fullname("Sercan Özkan") is True
@@ -9,12 +10,12 @@ def test_is_fullname_unicode():
     assert _is_fullname("José María") is True
     assert _is_fullname("Álvaro Gómez") is True
     assert _is_fullname("Émile Zola") is True
-    
+
     # Valid Name All Caps
     assert _is_fullname("SERCAN ÖZKAN") is True
     assert _is_fullname("JÖRG MÜLLER") is True
     assert _is_fullname("JOSÉ MARÍA") is True
-    
+
     # Invalid Names
     assert _is_fullname("Sercan") is False  # Too short (1 word)
     assert _is_fullname("Sercan Özkan Deneme Sınavı Test") is False  # Too long (5 words)
@@ -26,7 +27,7 @@ def test_is_colon_label_unicode():
     assert _is_colon_label("Yabancı Dil: İngilizce") is True
     assert _is_colon_label("Über mich: Entwickler") is True
     assert _is_colon_label("Eğitim: Üniversite") is True
-    
+
     # Invalid cases
     assert _is_colon_label("C++: Senior") is False  # Left side has non-alpha
     assert _is_colon_label("Eğitim:") is False  # Right side is empty

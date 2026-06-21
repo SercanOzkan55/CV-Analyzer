@@ -22,14 +22,17 @@ def _clean_psycopg2_url(url):
 
 CLEAN_DB_URL = _clean_psycopg2_url(DATABASE_URL)
 
+
 def _get_client_and_model():
     if _mock_services_on():
         return None, None
     try:
         from services.ai_client_factory import get_ai_client_and_model
+
         return get_ai_client_and_model()
     except Exception:
         return None, None
+
 
 DOMAIN_THRESHOLD = 0.70
 

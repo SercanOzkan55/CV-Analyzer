@@ -21,6 +21,7 @@ def _stable_runtime(monkeypatch):
         pass
     try:
         from routes.recruiter import _IN_MEMORY_CACHE
+
         _IN_MEMORY_CACHE.clear()
     except Exception:
         pass
@@ -32,7 +33,7 @@ def _setup_org_with_recruiter(db):
     db.add(org)
     db.commit()
     db.refresh(org)
-    
+
     recruiter = User(
         supabase_id="test-recruiter",
         email="recruiter@test.io",
@@ -42,7 +43,7 @@ def _setup_org_with_recruiter(db):
     db.add(recruiter)
     db.commit()
     db.refresh(recruiter)
-    
+
     job = RecruiterJob(
         organization_id=org.id,
         created_by=recruiter.id,
@@ -52,7 +53,7 @@ def _setup_org_with_recruiter(db):
     db.add(job)
     db.commit()
     db.refresh(job)
-    
+
     return org, recruiter, job
 
 
@@ -67,19 +68,20 @@ def _mock_pipeline(cv_text, job_description, lang=""):
 
 # ── GET /candidates Tests ──
 
+
 def test_candidates_returns_proper_response_format(client, db_session):
     """Verify /candidates returns CandidatesResponse with 'total' field."""
     org, recruiter, _ = _setup_org_with_recruiter(db_session)
-    
+
     client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
         "user_id": recruiter.supabase_id,
         "email": recruiter.email,
     }
-    
+
     resp = client.get("/api/v1/recruiter/candidates")
     assert resp.status_code == 200
     data = resp.json()
-    
+
     # Verify response format
     assert "candidates" in data, "Response must have 'candidates' field"
     assert "total" in data, "Response must have 'total' field"
@@ -90,43 +92,44 @@ def test_candidates_returns_proper_response_format(client, db_session):
 def test_candidates_limit_validation(client, db_session):
     """Verify limit parameter bounds (1-1000)."""
     org, recruiter, _ = _setup_org_with_recruiter(db_session)
-    
+
     client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
         "user_id": recruiter.supabase_id,
         "email": recruiter.email,
     }
-    
+
     # Test invalid limit (> 1000)
     resp = client.get("/api/v1/recruiter/candidates?limit=1500")
     assert resp.status_code == 422, "Should reject limit > 1000"
-    
+
     # Test invalid limit (< 1)
     resp = client.get("/api/v1/recruiter/candidates?limit=0")
     assert resp.status_code == 422, "Should reject limit < 1"
-    
+
     # Test valid limits
     resp = client.get("/api/v1/recruiter/candidates?limit=1")
     assert resp.status_code == 200
-    
+
     resp = client.get("/api/v1/recruiter/candidates?limit=1000")
     assert resp.status_code == 200
 
 
 # ── GET /search Tests ──
 
+
 def test_search_requires_query(client, db_session):
     """Verify search endpoint requires 'q' parameter."""
     org, recruiter, _ = _setup_org_with_recruiter(db_session)
-    
+
     client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
         "user_id": recruiter.supabase_id,
         "email": recruiter.email,
     }
-    
+
     # Missing query parameter
     resp = client.get("/api/v1/recruiter/search")
     assert resp.status_code == 422, "Query 'q' is required"
-    
+
     # Empty query
     resp = client.get("/api/v1/recruiter/search?q=")
     assert resp.status_code == 422, "Empty query should fail validation"
@@ -135,16 +138,16 @@ def test_search_requires_query(client, db_session):
 def test_search_response_format(client, db_session):
     """Verify /search returns SearchResponse with proper fields."""
     org, recruiter, _ = _setup_org_with_recruiter(db_session)
-    
+
     client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
         "user_id": recruiter.supabase_id,
         "email": recruiter.email,
     }
-    
+
     resp = client.get("/api/v1/recruiter/search?q=python")
     assert resp.status_code == 200
     data = resp.json()
-    
+
     # Verify response format
     assert "results" in data, "Response must have 'results' field"
     assert "total" in data, "Response must have 'total' field"
@@ -156,12 +159,12 @@ def test_search_response_format(client, db_session):
 def test_search_query_length_validation(client, db_session):
     """Verify search query respects max length."""
     org, recruiter, _ = _setup_org_with_recruiter(db_session)
-    
+
     client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
         "user_id": recruiter.supabase_id,
         "email": recruiter.email,
     }
-    
+
     # Query too long (> 500)
     long_query = "x" * 501
     resp = client.get(f"/api/v1/recruiter/search?q={long_query}")
@@ -170,21 +173,19 @@ def test_search_query_length_validation(client, db_session):
 
 # ── POST /batch-upload Tests ──
 
+
 def test_batch_upload_rejects_too_many_files(client, db_session):
     """Verify batch-upload rejects > 50 files."""
     org, recruiter, job = _setup_org_with_recruiter(db_session)
-    
+
     client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
         "user_id": recruiter.supabase_id,
         "email": recruiter.email,
     }
-    
+
     # Create 51 dummy files
-    files = [
-        ("files", (f"cv_{i}.pdf", b"%PDF-1.4\n%test", "application/pdf"))
-        for i in range(51)
-    ]
-    
+    files = [("files", (f"cv_{i}.pdf", b"%PDF-1.4\n%test", "application/pdf")) for i in range(51)]
+
     resp = client.post(
         f"/api/v1/recruiter/dashboard/batch-upload",
         data={"job_id": job.id},
@@ -197,17 +198,15 @@ def test_batch_upload_rejects_too_many_files(client, db_session):
 def test_batch_upload_rejects_invalid_file_types(client, db_session):
     """Verify batch-upload only accepts PDF/TXT/DOCX."""
     org, recruiter, job = _setup_org_with_recruiter(db_session)
-    
+
     client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
         "user_id": recruiter.supabase_id,
         "email": recruiter.email,
     }
-    
+
     # Try to upload an image file
-    files = [
-        ("files", ("image.jpg", b"fake_image_data", "image/jpeg"))
-    ]
-    
+    files = [("files", ("image.jpg", b"fake_image_data", "image/jpeg"))]
+
     resp = client.post(
         f"/api/v1/recruiter/dashboard/batch-upload",
         data={"job_id": job.id},
@@ -220,16 +219,14 @@ def test_batch_upload_rejects_invalid_file_types(client, db_session):
 def test_batch_upload_rejects_empty_files(client, db_session):
     """Verify batch-upload rejects empty files."""
     org, recruiter, job = _setup_org_with_recruiter(db_session)
-    
+
     client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
         "user_id": recruiter.supabase_id,
         "email": recruiter.email,
     }
-    
-    files = [
-        ("files", ("empty.pdf", b"", "application/pdf"))
-    ]
-    
+
+    files = [("files", ("empty.pdf", b"", "application/pdf"))]
+
     resp = client.post(
         f"/api/v1/recruiter/dashboard/batch-upload",
         data={"job_id": job.id},
@@ -242,18 +239,16 @@ def test_batch_upload_rejects_empty_files(client, db_session):
 def test_batch_upload_rejects_oversized_files(client, db_session):
     """Verify batch-upload rejects files > 5MB."""
     org, recruiter, job = _setup_org_with_recruiter(db_session)
-    
+
     client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
         "user_id": recruiter.supabase_id,
         "email": recruiter.email,
     }
-    
+
     # Create file > 5MB
     oversized = b"x" * (5_000_001)
-    files = [
-        ("files", ("huge.pdf", oversized, "application/pdf"))
-    ]
-    
+    files = [("files", ("huge.pdf", oversized, "application/pdf"))]
+
     resp = client.post(
         f"/api/v1/recruiter/dashboard/batch-upload",
         data={"job_id": job.id},
@@ -265,10 +260,11 @@ def test_batch_upload_rejects_oversized_files(client, db_session):
 
 # ── POST /send-email Tests ──
 
+
 def test_send_email_requires_valid_recipient(client, db_session):
     """Verify send-email requires valid candidate email."""
     org, recruiter, job = _setup_org_with_recruiter(db_session)
-    
+
     from models import RecruiterEmailTemplate
 
     template = RecruiterEmailTemplate(
@@ -282,12 +278,12 @@ def test_send_email_requires_valid_recipient(client, db_session):
     db_session.add(template)
     db_session.commit()
     db_session.refresh(template)
-    
+
     client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
         "user_id": recruiter.supabase_id,
         "email": recruiter.email,
     }
-    
+
     # Invalid email
     resp = client.post(
         "/api/v1/recruiter/send-email",
@@ -304,12 +300,12 @@ def test_send_email_requires_valid_recipient(client, db_session):
 def test_send_email_requires_template(client, db_session):
     """Verify send-email requires valid template."""
     org, recruiter, job = _setup_org_with_recruiter(db_session)
-    
+
     client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
         "user_id": recruiter.supabase_id,
         "email": recruiter.email,
     }
-    
+
     # Non-existent template
     resp = client.post(
         "/api/v1/recruiter/send-email",
@@ -326,7 +322,7 @@ def test_send_email_requires_template(client, db_session):
 def test_export_candidates_csv(client, db_session):
     """Verify export candidates CSV endpoint returns recruiter organization's data."""
     org, recruiter, job = _setup_org_with_recruiter(db_session)
-    
+
     candidate = Candidate(
         organization_id=org.id,
         name="Jane Smith",
@@ -386,9 +382,9 @@ def test_export_rankings_json(client, db_session):
 def test_send_email_response_includes_timestamp(client, db_session, monkeypatch):
     """Verify send-email response includes timestamp."""
     org, recruiter, job = _setup_org_with_recruiter(db_session)
-    
+
     from models import RecruiterEmailTemplate
-    
+
     template = RecruiterEmailTemplate(
         organization_id=org.id,
         created_by=recruiter.id,
@@ -400,18 +396,17 @@ def test_send_email_response_includes_timestamp(client, db_session, monkeypatch)
     db_session.add(template)
     db_session.commit()
     db_session.refresh(template)
-    
+
     # Mock email sending
     monkeypatch.setattr(
-        "services.recruiter_helpers._do_send_email",
-        lambda to_email, subject, body, recruiter_email: True
+        "services.recruiter_helpers._do_send_email", lambda to_email, subject, body, recruiter_email: True
     )
-    
+
     client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
         "user_id": recruiter.supabase_id,
         "email": recruiter.email,
     }
-    
+
     resp = client.post(
         "/api/v1/recruiter/send-email",
         json={
@@ -420,7 +415,7 @@ def test_send_email_response_includes_timestamp(client, db_session, monkeypatch)
             "template_id": template.id,
         },
     )
-    
+
     # Verify response on success
     if resp.status_code == 200:
         data = resp.json()
@@ -431,15 +426,16 @@ def test_send_email_response_includes_timestamp(client, db_session, monkeypatch)
 
 # ── POST /reminders Tests ──
 
+
 def test_reminders_requires_future_date(client, db_session):
     """Verify reminders endpoint rejects past dates."""
     org, recruiter, job = _setup_org_with_recruiter(db_session)
-    
+
     client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
         "user_id": recruiter.supabase_id,
         "email": recruiter.email,
     }
-    
+
     # Past date
     past_date = (datetime.utcnow() - timedelta(days=1)).isoformat()
     resp = client.post(
@@ -457,14 +453,14 @@ def test_reminders_requires_future_date(client, db_session):
 def test_reminders_requires_title(client, db_session):
     """Verify reminders endpoint requires title."""
     org, recruiter, job = _setup_org_with_recruiter(db_session)
-    
+
     client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
         "user_id": recruiter.supabase_id,
         "email": recruiter.email,
     }
-    
+
     future_date = (datetime.utcnow() + timedelta(days=1)).isoformat()
-    
+
     # Empty title
     resp = client.post(
         "/api/v1/recruiter/reminders",
@@ -481,16 +477,16 @@ def test_reminders_requires_title(client, db_session):
 def test_reminders_response_format(client, db_session):
     """Verify reminders response includes expected fields."""
     org, recruiter, job = _setup_org_with_recruiter(db_session)
-    
+
     client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
         "user_id": recruiter.supabase_id,
         "email": recruiter.email,
     }
-    
+
     resp = client.get("/api/v1/recruiter/reminders")
     assert resp.status_code == 200
     data = resp.json()
-    
+
     assert "reminders" in data
     assert "total" in data, "Response should include 'total' field"
     assert isinstance(data["reminders"], list)
@@ -499,19 +495,20 @@ def test_reminders_response_format(client, db_session):
 
 # ── GET /jobs Tests ──
 
+
 def test_jobs_response_format(client, db_session):
     """Verify /jobs returns JobsResponse with 'total' field."""
     org, recruiter, job = _setup_org_with_recruiter(db_session)
-    
+
     client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
         "user_id": recruiter.supabase_id,
         "email": recruiter.email,
     }
-    
+
     resp = client.get("/api/v1/recruiter/jobs")
     assert resp.status_code == 200
     data = resp.json()
-    
+
     assert "jobs" in data
     assert "total" in data, "Response must have 'total' field"
     assert isinstance(data["jobs"], list)
@@ -521,22 +518,22 @@ def test_jobs_response_format(client, db_session):
 def test_jobs_includes_full_description(client, db_session):
     """Verify /jobs returns longer descriptions (500 chars, not 200)."""
     org, recruiter, job = _setup_org_with_recruiter(db_session)
-    
+
     # Create job with long description
     long_desc = "x" * 400
     job.description = long_desc
     db_session.add(job)
     db_session.commit()
-    
+
     client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
         "user_id": recruiter.supabase_id,
         "email": recruiter.email,
     }
-    
+
     resp = client.get("/api/v1/recruiter/jobs")
     assert resp.status_code == 200
     data = resp.json()
-    
+
     # Should include the full long description (not truncated at 200)
     if data["jobs"]:
         first_job = data["jobs"][0]
@@ -546,40 +543,38 @@ def test_jobs_includes_full_description(client, db_session):
 def test_jobs_caching_and_invalidation(client, db_session):
     """Verify /jobs endpoint caching and invalidation on POST /jobs."""
     from routes.recruiter import _IN_MEMORY_CACHE
+
     _IN_MEMORY_CACHE.clear()
 
     org, recruiter, job = _setup_org_with_recruiter(db_session)
-    
+
     client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
         "user_id": recruiter.supabase_id,
         "email": recruiter.email,
     }
-    
+
     # 1. Warm up the cache
     resp1 = client.get("/api/v1/recruiter/jobs")
     assert resp1.status_code == 200
     data1 = resp1.json()
     assert len(data1["jobs"]) == 1
     assert data1["jobs"][0]["title"] == "Senior Engineer"
-    
+
     # 2. Modify the job in DB directly (bypass endpoint/API)
     job.title = "Directly Modified Title"
     db_session.add(job)
     db_session.commit()
-    
+
     # 3. GET /jobs again - should return cached "Senior Engineer"
     resp2 = client.get("/api/v1/recruiter/jobs")
     assert resp2.status_code == 200
     data2 = resp2.json()
     assert data2["jobs"][0]["title"] == "Senior Engineer"
-    
+
     # 4. Create a new job via POST /jobs - should invalidate cache
-    resp3 = client.post(
-        "/api/v1/recruiter/jobs",
-        json={"title": "New Job via API", "description": "Some description"}
-    )
+    resp3 = client.post("/api/v1/recruiter/jobs", json={"title": "New Job via API", "description": "Some description"})
     assert resp3.status_code == 200
-    
+
     # 5. GET /jobs again - should reflect database state (both jobs, and title change)
     resp4 = client.get("/api/v1/recruiter/jobs")
     assert resp4.status_code == 200
@@ -593,20 +588,21 @@ def test_jobs_caching_and_invalidation(client, db_session):
 def test_templates_caching_and_invalidation(client, db_session):
     """Verify /templates endpoint caching and invalidation on POST and DELETE."""
     from routes.recruiter import _IN_MEMORY_CACHE
+
     _IN_MEMORY_CACHE.clear()
 
     org, recruiter, _ = _setup_org_with_recruiter(db_session)
-    
+
     client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
         "user_id": recruiter.supabase_id,
         "email": recruiter.email,
     }
-    
+
     # 1. Warm up cache (should be empty initially)
     resp1 = client.get("/api/v1/recruiter/templates")
     assert resp1.status_code == 200
     assert len(resp1.json()["templates"]) == 0
-    
+
     # 2. Create template via API - should invalidate cache
     resp2 = client.post(
         "/api/v1/recruiter/templates",
@@ -615,22 +611,22 @@ def test_templates_caching_and_invalidation(client, db_session):
             "template_type": "accept",
             "subject": "Hello",
             "body": "Welcome",
-        }
+        },
     )
     assert resp2.status_code == 200
     tpl_id = resp2.json()["id"]
-    
+
     # 3. GET /templates again - cache should be invalidated, returns 1 template
     resp3 = client.get("/api/v1/recruiter/templates")
     assert resp3.status_code == 200
     data3 = resp3.json()
     assert len(data3["templates"]) == 1
     assert data3["templates"][0]["name"] == "Template 1"
-    
+
     # 4. DELETE template via API - should invalidate cache
     resp4 = client.delete(f"/api/v1/recruiter/templates/{tpl_id}")
     assert resp4.status_code == 200
-    
+
     # 5. GET /templates again - cache should be invalidated, returns 0 templates
     resp5 = client.get("/api/v1/recruiter/templates")
     assert resp5.status_code == 200
@@ -643,12 +639,14 @@ def test_dashboard_action_saves_decision_message_and_sends_email(client, db_sess
     sent = {}
 
     def fake_send(to_email, subject, body, recruiter_email):
-        sent.update({
-            "to_email": to_email,
-            "subject": subject,
-            "body": body,
-            "recruiter_email": recruiter_email,
-        })
+        sent.update(
+            {
+                "to_email": to_email,
+                "subject": subject,
+                "body": body,
+                "recruiter_email": recruiter_email,
+            }
+        )
         return True
 
     monkeypatch.setattr("routes.recruiter._do_send_email", fake_send)

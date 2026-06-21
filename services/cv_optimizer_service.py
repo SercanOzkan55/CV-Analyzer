@@ -8,6 +8,7 @@ Provides:
 All functions operate on ``CVModel`` in-memory — no external API calls unless
 the caller opts in to AI-assisted rewrite (future).
 """
+
 from __future__ import annotations
 
 import copy
@@ -26,11 +27,33 @@ logger = logging.getLogger("app.cv_optimizer")
 
 # ── Action verb bank for bullet rewriting ────────────────────────────────
 _ACTION_VERBS = [
-    "Developed", "Implemented", "Designed", "Led", "Managed", "Optimized",
-    "Delivered", "Built", "Reduced", "Increased", "Automated", "Integrated",
-    "Streamlined", "Architected", "Deployed", "Migrated", "Established",
-    "Orchestrated", "Spearheaded", "Transformed", "Launched", "Mentored",
-    "Collaborated", "Analyzed", "Resolved", "Scaled", "Configured",
+    "Developed",
+    "Implemented",
+    "Designed",
+    "Led",
+    "Managed",
+    "Optimized",
+    "Delivered",
+    "Built",
+    "Reduced",
+    "Increased",
+    "Automated",
+    "Integrated",
+    "Streamlined",
+    "Architected",
+    "Deployed",
+    "Migrated",
+    "Established",
+    "Orchestrated",
+    "Spearheaded",
+    "Transformed",
+    "Launched",
+    "Mentored",
+    "Collaborated",
+    "Analyzed",
+    "Resolved",
+    "Scaled",
+    "Configured",
 ]
 
 _WEAK_STARTERS = re.compile(
@@ -44,17 +67,20 @@ _WEAK_STARTERS = re.compile(
 # RESULT DATACLASSES
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @dataclass(frozen=True, slots=True)
 class ChangeItem:
     """Single change applied to the CV."""
-    section: str        # "summary" | "skills" | "experience" | "structure"
-    action: str         # "added" | "rewritten" | "improved" | "injected"
+
+    section: str  # "summary" | "skills" | "experience" | "structure"
+    action: str  # "added" | "rewritten" | "improved" | "injected"
     detail: str
 
 
 @dataclass(frozen=True, slots=True)
 class RewriteResult:
     """Result of a smart CV rewrite."""
+
     model: CVModel
     changes: list[ChangeItem] = field(default_factory=list)
     score_before: int = 0
@@ -66,6 +92,7 @@ class RewriteResult:
 @dataclass(frozen=True, slots=True)
 class KeywordOptResult:
     """Result of keyword optimization."""
+
     model: CVModel
     added_to_skills: list[str] = field(default_factory=list)
     added_to_summary: list[str] = field(default_factory=list)
@@ -78,6 +105,7 @@ class KeywordOptResult:
 # ═══════════════════════════════════════════════════════════════════════════
 # 1. SMART CV REWRITE
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def optimize_cv(model: CVModel, job_text: str = "") -> RewriteResult:
     """Auto-fix CV based on job description and quality feedback.
@@ -101,6 +129,7 @@ def optimize_cv(model: CVModel, job_text: str = "") -> RewriteResult:
     gap = {}
     if (job_text or "").strip():
         from services.job_match_service import _cv_text
+
         cv_txt = _cv_text(m)
         gap = keyword_compare(cv_txt, job_text)
 
@@ -119,16 +148,15 @@ def optimize_cv(model: CVModel, job_text: str = "") -> RewriteResult:
         target_cat = "Technical Skills"
         if target_cat not in m.skills_categorized:
             m.skills_categorized[target_cat] = []
-        m.skills_categorized[target_cat].extend(
-            kw.title() if len(kw) > 3 else kw.upper() for kw in skills_to_add
+        m.skills_categorized[target_cat].extend(kw.title() if len(kw) > 3 else kw.upper() for kw in skills_to_add)
+        m.skills = list(m.skills or []) + [kw.title() if len(kw) > 3 else kw.upper() for kw in skills_to_add]
+        changes.append(
+            ChangeItem(
+                "skills",
+                "added",
+                f"Added {len(skills_to_add)} missing keywords: {', '.join(skills_to_add[:8])}",
+            )
         )
-        m.skills = list(m.skills or []) + [
-            kw.title() if len(kw) > 3 else kw.upper() for kw in skills_to_add
-        ]
-        changes.append(ChangeItem(
-            "skills", "added",
-            f"Added {len(skills_to_add)} missing keywords: {', '.join(skills_to_add[:8])}",
-        ))
         kw_added.extend(skills_to_add)
 
     # ── Step 3: Improve summary ───────────────────────────────────────
@@ -150,8 +178,7 @@ def optimize_cv(model: CVModel, job_text: str = "") -> RewriteResult:
         exp_years = len(m.experiences)
         if exp_years > 0:
             parts.append(
-                f"and {exp_years}+ years of progressive experience"
-                if exp_years >= 3 else f"with hands-on experience"
+                f"and {exp_years}+ years of progressive experience" if exp_years >= 3 else f"with hands-on experience"
             )
 
         parts.append(
@@ -170,10 +197,13 @@ def optimize_cv(model: CVModel, job_text: str = "") -> RewriteResult:
         if inject:
             snippet = ", ".join(kw.title() if len(kw) > 3 else kw.upper() for kw in inject)
             m.summary = m.summary.rstrip(". ") + f". Skilled in {snippet}."
-            changes.append(ChangeItem(
-                "summary", "improved",
-                f"Injected keywords into summary: {', '.join(inject[:5])}",
-            ))
+            changes.append(
+                ChangeItem(
+                    "summary",
+                    "improved",
+                    f"Injected keywords into summary: {', '.join(inject[:5])}",
+                )
+            )
             kw_added.extend(inject)
 
     # ── Step 4: Rewrite weak experience bullets ───────────────────────
@@ -196,10 +226,13 @@ def optimize_cv(model: CVModel, job_text: str = "") -> RewriteResult:
                     kw_strengthened.append(kw)
 
     if bullets_rewritten > 0:
-        changes.append(ChangeItem(
-            "experience", "rewritten",
-            f"Improved {bullets_rewritten} bullet(s) with action verbs",
-        ))
+        changes.append(
+            ChangeItem(
+                "experience",
+                "rewritten",
+                f"Improved {bullets_rewritten} bullet(s) with action verbs",
+            )
+        )
 
     # ── Step 5: Add missing structural components ─────────────────────
     if not m.education and not m.certifications:
@@ -282,6 +315,7 @@ def _pick_verb(bullet_text: str) -> str:
 # ═══════════════════════════════════════════════════════════════════════════
 # 2. KEYWORD OPTIMIZER
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def optimize_keywords(model: CVModel, job_text: str) -> KeywordOptResult:
     """Optimize CV keywords for a specific job description.

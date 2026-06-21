@@ -1,7 +1,20 @@
 from datetime import datetime
 
-from sqlalchemy import (TIMESTAMP, Boolean, Column, DateTime, Enum, Float, ForeignKey,
-                        Integer, JSON, String, Text, CheckConstraint, UniqueConstraint)
+from sqlalchemy import (
+    TIMESTAMP,
+    Boolean,
+    Column,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    JSON,
+    String,
+    Text,
+    CheckConstraint,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -22,9 +35,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     supabase_id = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, index=True, nullable=False)
-    plan_type = Column(
-        Enum(*PLAN_TYPES, name="plan_type_enum"), default="free", nullable=False
-    )
+    plan_type = Column(Enum(*PLAN_TYPES, name="plan_type_enum"), default="free", nullable=False)
     billing_status = Column(
         Enum(*BILLING_STATUSES, name="billing_status_enum"),
         default="trialing",
@@ -35,9 +46,7 @@ class User(Base):
     monthly_usage = Column(Integer, default=0)
     last_reset = Column(DateTime, nullable=True)
     role = Column(String, default="individual")
-    organization_id = Column(
-        Integer, ForeignKey("organizations.id"), nullable=True, index=True
-    )
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     organization = relationship("Organization", back_populates="users")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -45,12 +54,11 @@ class User(Base):
 
 class APISubscription(Base):
     """API subscription for local processing mode - zero data retention."""
+
     __tablename__ = "api_subscriptions"
 
     id = Column(Integer, primary_key=True, index=True)
-    organization_id = Column(
-        Integer, ForeignKey("organizations.id"), nullable=False, index=True
-    )
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
     organization = relationship("Organization", back_populates="api_subscriptions")
 
     # API key for authentication (hashed for security)
@@ -72,29 +80,33 @@ class APISubscription(Base):
 
     # Reset monthly usage on the 1st of each month
     monthly_reset_day = Column(Integer, default=1, nullable=False)
-    
+
     def set_api_key(self, plain_key: str):
         """Hash and store API key securely."""
         try:
             from passlib.context import CryptContext
+
             pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
             self.api_key_hash = pwd_context.hash(plain_key)
             self.api_key_display = plain_key[-8:] if len(plain_key) > 8 else "****"
         except ImportError:
             # Fallback if passlib not available (should not happen in production)
             import hashlib
+
             self.api_key_hash = hashlib.sha256(plain_key.encode()).hexdigest()
             self.api_key_display = plain_key[-8:] if len(plain_key) > 8 else "****"
-    
+
     def verify_api_key(self, plain_key: str) -> bool:
         """Verify plain text key against hash."""
         try:
             from passlib.context import CryptContext
+
             pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
             return pwd_context.verify(plain_key, self.api_key_hash)
         except ImportError:
             # Fallback for missing passlib
             import hashlib
+
             return hashlib.sha256(plain_key.encode()).hexdigest() == self.api_key_hash
 
 
@@ -116,9 +128,7 @@ class Analysis(Base):
     job_title = Column(String, nullable=True, index=True)
     result = Column(JSON, nullable=True)
 
-    created_at = Column(
-        TIMESTAMP(timezone=False), server_default=func.now(), index=True
-    )
+    created_at = Column(TIMESTAMP(timezone=False), server_default=func.now(), index=True)
 
 
 class Organization(Base):
@@ -130,9 +140,7 @@ class Organization(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
     domain = Column(String, nullable=False, unique=True, index=True)
-    plan_type = Column(
-        Enum(*PLAN_TYPES, name="org_plan_type_enum"), default="free", nullable=False
-    )
+    plan_type = Column(Enum(*PLAN_TYPES, name="org_plan_type_enum"), default="free", nullable=False)
     billing_status = Column(
         Enum(*BILLING_STATUSES, name="org_billing_status_enum"),
         default="trialing",
@@ -141,7 +149,7 @@ class Organization(Base):
     stripe_customer_id = Column(String, nullable=True, index=True)
     daily_usage = Column(Integer, default=0)
     monthly_usage = Column(Integer, default=0)
-    cv_credit_limit = Column(Integer, default=100) # Varsayılan aylık 100 CV kotası
+    cv_credit_limit = Column(Integer, default=100)  # Varsayılan aylık 100 CV kotası
     created_at = Column(DateTime, default=datetime.utcnow)
 
     users = relationship("User", back_populates="organization")
@@ -152,9 +160,7 @@ class Candidate(Base):
     __tablename__ = "candidates"
 
     id = Column(Integer, primary_key=True)
-    organization_id = Column(
-        Integer, ForeignKey("organizations.id"), nullable=True, index=True
-    )
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     name = Column(String, nullable=True)
     email = Column(String, nullable=True, index=True)
     phone = Column(String, nullable=True)
@@ -171,9 +177,7 @@ class Job(Base):
     __tablename__ = "jobs"
 
     id = Column(Integer, primary_key=True)
-    organization_id = Column(
-        Integer, ForeignKey("organizations.id"), nullable=True, index=True
-    )
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     raw_text = Column(Text, nullable=True)
     if Vector is not None:
         job_embedding = Column(Vector(1536), nullable=True)
@@ -241,12 +245,8 @@ class RecruiterJob(Base):
     __tablename__ = "recruiter_jobs"
 
     id = Column(Integer, primary_key=True)
-    organization_id = Column(
-        Integer, ForeignKey("organizations.id"), nullable=False, index=True
-    )
-    created_by = Column(
-        Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    created_by = Column(Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     is_active = Column(Boolean, default=True)
@@ -261,9 +261,7 @@ class EmailTemplate(Base):
     __tablename__ = "email_templates"
 
     id = Column(Integer, primary_key=True)
-    organization_id = Column(
-        Integer, ForeignKey("organizations.id"), nullable=False, index=True
-    )
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
     created_by = Column(Integer, ForeignKey("app_users.id"), nullable=False)
     name = Column(String, nullable=False)
     template_type = Column(String, nullable=False, default="accept")  # accept | reject | custom
@@ -271,6 +269,7 @@ class EmailTemplate(Base):
     body = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 
 # Backward-compatible alias for recruiter email template tests
 RecruiterEmailTemplate = EmailTemplate
@@ -282,15 +281,9 @@ class CandidateAction(Base):
     __tablename__ = "candidate_actions"
 
     id = Column(Integer, primary_key=True)
-    organization_id = Column(
-        Integer, ForeignKey("organizations.id"), nullable=False, index=True
-    )
-    job_id = Column(
-        Integer, ForeignKey("recruiter_jobs.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    recruiter_id = Column(
-        Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    job_id = Column(Integer, ForeignKey("recruiter_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
+    recruiter_id = Column(Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True)
     candidate_name = Column(String, nullable=False)
     candidate_email = Column(String, nullable=True)
     cv_text = Column(Text, nullable=True)
@@ -319,7 +312,9 @@ class CandidateComment(Base):
 
     id = Column(Integer, primary_key=True)
     organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
-    candidate_action_id = Column(Integer, ForeignKey("candidate_actions.id", ondelete="CASCADE"), nullable=False, index=True)
+    candidate_action_id = Column(
+        Integer, ForeignKey("candidate_actions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     author_user_id = Column(Integer, ForeignKey("app_users.id", ondelete="SET NULL"), nullable=True, index=True)
     body = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
@@ -339,12 +334,8 @@ class Reminder(Base):
     )
 
     id = Column(Integer, primary_key=True)
-    organization_id = Column(
-        Integer, ForeignKey("organizations.id"), nullable=False, index=True
-    )
-    created_by = Column(
-        Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    created_by = Column(Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     reminder_type = Column(String, nullable=False, default="interview")
@@ -366,12 +357,8 @@ class JobApplication(Base):
     __tablename__ = "job_applications"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(
-        Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    organization_id = Column(
-        Integer, ForeignKey("organizations.id"), nullable=True, index=True
-    )
+    user_id = Column(Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     company = Column(String(200), nullable=False)
     role = Column(String(200), nullable=False)
     status = Column(String(40), nullable=False, default="wishlist", index=True)
@@ -436,9 +423,7 @@ class UsageDaily(Base):
     __tablename__ = "usage_daily"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(
-        Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    user_id = Column(Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True)
     date = Column(DateTime, nullable=False, index=True)
     count = Column(Integer, nullable=False, default=0)
 
@@ -452,12 +437,8 @@ class Favorite(Base):
     __tablename__ = "favorites"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(
-        Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    analysis_id = Column(
-        Integer, ForeignKey("analysis.id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    user_id = Column(Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    analysis_id = Column(Integer, ForeignKey("analysis.id", ondelete="CASCADE"), nullable=False, index=True)
     note = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
@@ -471,9 +452,7 @@ class JobTemplate(Base):
     __tablename__ = "job_templates"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(
-        Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    user_id = Column(Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String(120), nullable=False)
     description = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -488,12 +467,8 @@ class AnalysisShare(Base):
     __tablename__ = "analysis_shares"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(
-        Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    analysis_id = Column(
-        Integer, ForeignKey("analysis.id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    user_id = Column(Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    analysis_id = Column(Integer, ForeignKey("analysis.id", ondelete="CASCADE"), nullable=False, index=True)
     share_token = Column(String(64), unique=True, nullable=False, index=True)
     is_active = Column(Boolean, default=True)
     views = Column(Integer, default=0)
@@ -509,18 +484,15 @@ class AnalysisNote(Base):
     __tablename__ = "analysis_notes"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(
-        Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    analysis_id = Column(
-        Integer, ForeignKey("analysis.id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    user_id = Column(Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    analysis_id = Column(Integer, ForeignKey("analysis.id", ondelete="CASCADE"), nullable=False, index=True)
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 # ── Local Worker Models ─────────────────────────────────────────
+
 
 class WorkerKey(Base):
     __tablename__ = "worker_keys"
@@ -563,13 +535,17 @@ class WorkerClaim(Base):
 
     id = Column(Integer, primary_key=True)
     worker_key_id = Column(Integer, ForeignKey("worker_keys.id", ondelete="CASCADE"), nullable=False, index=True)
-    worker_session_id = Column(Integer, ForeignKey("worker_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
+    worker_session_id = Column(
+        Integer, ForeignKey("worker_sessions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
     job_id = Column(Integer, ForeignKey("recruiter_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
     cv_id = Column(Integer, nullable=True)
     candidate_id = Column(Integer, ForeignKey("candidates.id", ondelete="CASCADE"), nullable=False, index=True)
-    candidate_action_id = Column(Integer, ForeignKey("candidate_actions.id", ondelete="SET NULL"), nullable=True, index=True)
-    status = Column(String, nullable=False, default="claimed") # claimed | completed | failed | expired
+    candidate_action_id = Column(
+        Integer, ForeignKey("candidate_actions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    status = Column(String, nullable=False, default="claimed")  # claimed | completed | failed | expired
     claim_expires_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
@@ -583,7 +559,9 @@ class WorkerAnalysisResult(Base):
     organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
     job_id = Column(Integer, ForeignKey("recruiter_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
     candidate_id = Column(Integer, ForeignKey("candidates.id", ondelete="CASCADE"), nullable=False, index=True)
-    candidate_action_id = Column(Integer, ForeignKey("candidate_actions.id", ondelete="SET NULL"), nullable=True, index=True)
+    candidate_action_id = Column(
+        Integer, ForeignKey("candidate_actions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     cv_id = Column(Integer, nullable=True)
     score = Column(Float, nullable=True)
     decision = Column(String, nullable=True)
@@ -609,7 +587,7 @@ class QuotaEvent(Base):
     organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
     job_id = Column(Integer, nullable=True)
     cv_id = Column(Integer, nullable=True)
-    event_type = Column(String, nullable=False) # reserved | completed | refunded | expired
+    event_type = Column(String, nullable=False)  # reserved | completed | refunded | expired
     amount = Column(Integer, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     metadata_ = Column("metadata", JSON, nullable=True)
@@ -695,8 +673,12 @@ class Notification(Base):
     actor_user_id = Column(Integer, ForeignKey("app_users.id", ondelete="SET NULL"), nullable=True, index=True)
     audit_log_id = Column(Integer, ForeignKey("audit_logs.id", ondelete="SET NULL"), nullable=True, index=True)
     candidate_id = Column(Integer, ForeignKey("candidates.id", ondelete="SET NULL"), nullable=True, index=True)
-    candidate_action_id = Column(Integer, ForeignKey("candidate_actions.id", ondelete="SET NULL"), nullable=True, index=True)
-    analysis_result_id = Column(Integer, ForeignKey("worker_analysis_results.id", ondelete="SET NULL"), nullable=True, index=True)
+    candidate_action_id = Column(
+        Integer, ForeignKey("candidate_actions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    analysis_result_id = Column(
+        Integer, ForeignKey("worker_analysis_results.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     type = Column(String, nullable=False, index=True)
     title = Column(String, nullable=False)
     message = Column(Text, nullable=False)

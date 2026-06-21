@@ -36,9 +36,9 @@ def generate_json_download(
             "job_id": job_id,
             "total_results": len(results),
             "exported_at": datetime.utcnow().isoformat(),
-            "format_version": "1.0"
+            "format_version": "1.0",
         },
-        "results": results
+        "results": results,
     }
 
     json_content = json.dumps(json_data, indent=2, ensure_ascii=False)
@@ -48,12 +48,12 @@ def generate_json_download(
     expires_at = datetime.utcnow() + timedelta(hours=1)
 
     _temp_downloads[download_id] = {
-        'content': json_content,
-        'content_type': 'application/json',
-        'filename': f'cv_rankings_job_{job_id}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json',
-        'expires_at': expires_at,
-        'owner_organization_id': owner_organization_id,
-        'owner_subscription_id': owner_subscription_id,
+        "content": json_content,
+        "content_type": "application/json",
+        "filename": f"cv_rankings_job_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+        "expires_at": expires_at,
+        "owner_organization_id": owner_organization_id,
+        "owner_subscription_id": owner_subscription_id,
     }
 
     return f"/api/v1/downloads/{download_id}?token={sign_download_id(download_id)}"
@@ -75,7 +75,7 @@ def get_temp_download(download_id: str) -> Dict[str, Any]:
     download = _temp_downloads[download_id]
 
     # Check expiration
-    if datetime.utcnow() > download['expires_at']:
+    if datetime.utcnow() > download["expires_at"]:
         del _temp_downloads[download_id]
         return None
 
@@ -85,10 +85,7 @@ def get_temp_download(download_id: str) -> Dict[str, Any]:
 def cleanup_expired_downloads():
     """Clean up expired temporary downloads."""
     current_time = datetime.utcnow()
-    expired = [
-        download_id for download_id, data in _temp_downloads.items()
-        if current_time > data['expires_at']
-    ]
+    expired = [download_id for download_id, data in _temp_downloads.items() if current_time > data["expires_at"]]
 
     for download_id in expired:
         del _temp_downloads[download_id]

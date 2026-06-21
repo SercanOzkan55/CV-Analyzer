@@ -19,6 +19,7 @@ Usage:
     * ``strip_contact_from_all_sections()`` — contact stripper (all other sections)
     * ``validate_section_placement()``  — score-based section validation
 """
+
 from __future__ import annotations
 
 import logging
@@ -35,7 +36,7 @@ _EMAIL_RE = re.compile(r"[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}", re.I)
 _PHONE_RE = re.compile(r"(?:\(?\+?\d[\d()\-\s.]{7,}\d)")
 _URL_RE = re.compile(r"https?://\S+|www\.\S+", re.I)
 
-_MAX_URL_LEN = 500             # max characters in any single URL
+_MAX_URL_LEN = 500  # max characters in any single URL
 
 _ADDRESS_RE = re.compile(
     r"\b(?:street|avenue|boulevard|road|drive|lane|apt\.?|suite"
@@ -74,10 +75,45 @@ _YEAR_RE = re.compile(r"\b(?:19|20)\d{2}\b")
 
 # ISO 639-1 codes that must NOT appear as spoken-language entries
 _ISO_LANG_CODES = {
-    "en", "tr", "de", "fr", "es", "ru", "ar", "zh", "ja", "ko",
-    "nl", "sv", "no", "da", "fi", "pl", "cs", "hu", "el", "ro",
-    "bg", "hr", "sr", "uk", "he", "hi", "fa", "th", "vi", "id",
-    "ms", "pt", "it", "ca", "sk", "sl", "lt", "lv", "et",
+    "en",
+    "tr",
+    "de",
+    "fr",
+    "es",
+    "ru",
+    "ar",
+    "zh",
+    "ja",
+    "ko",
+    "nl",
+    "sv",
+    "no",
+    "da",
+    "fi",
+    "pl",
+    "cs",
+    "hu",
+    "el",
+    "ro",
+    "bg",
+    "hr",
+    "sr",
+    "uk",
+    "he",
+    "hi",
+    "fa",
+    "th",
+    "vi",
+    "id",
+    "ms",
+    "pt",
+    "it",
+    "ca",
+    "sk",
+    "sl",
+    "lt",
+    "lv",
+    "et",
 }
 
 _MALFORMED_URL_RE = re.compile(
@@ -229,9 +265,7 @@ def sanitize_experience_entries(
         combined = f"{title} {company}"
         has_degree = bool(_DEGREE_RE.search(combined))
         has_inst = bool(_INSTITUTION_RE.search(combined))
-        has_year = bool(_YEAR_RE.search(
-            f"{combined} {exp.get('start_date', '')} {exp.get('end_date', '')}"
-        ))
+        has_year = bool(_YEAR_RE.search(f"{combined} {exp.get('start_date', '')} {exp.get('end_date', '')}"))
 
         if (has_degree or has_inst) and has_year and not kept_bullets:
             # This is an education entry masquerading as experience
@@ -273,15 +307,17 @@ def _move_exp_to_education(exp: Dict, data: Dict) -> None:
     if not isinstance(edu_list, list):
         edu_list = []
         data["education"] = edu_list
-    edu_list.append({
-        "degree": exp.get("title", ""),
-        "school": exp.get("company", ""),
-        "location": exp.get("location", ""),
-        "start_date": exp.get("start_date", ""),
-        "end_date": exp.get("end_date", ""),
-        "gpa": "",
-        "field": "",
-    })
+    edu_list.append(
+        {
+            "degree": exp.get("title", ""),
+            "school": exp.get("company", ""),
+            "location": exp.get("location", ""),
+            "start_date": exp.get("start_date", ""),
+            "end_date": exp.get("end_date", ""),
+            "gpa": "",
+            "field": "",
+        }
+    )
 
 
 def _create_edu_from_bullets(bullets: List[str], data: Dict) -> None:
@@ -294,15 +330,17 @@ def _create_edu_from_bullets(bullets: List[str], data: Dict) -> None:
         degree_m = _DEGREE_RE.search(b)
         inst_name = _extract_institution_name(b)
         years = _YEAR_RE.findall(b)
-        edu_list.append({
-            "degree": degree_m.group(0) if degree_m else "",
-            "school": inst_name,
-            "start_date": years[0] if years else "",
-            "end_date": years[1] if len(years) > 1 else "",
-            "gpa": "",
-            "field": "",
-            "location": "",
-        })
+        edu_list.append(
+            {
+                "degree": degree_m.group(0) if degree_m else "",
+                "school": inst_name,
+                "start_date": years[0] if years else "",
+                "end_date": years[1] if len(years) > 1 else "",
+                "gpa": "",
+                "field": "",
+                "location": "",
+            }
+        )
 
 
 def _route_contact_line(line: str, data: Dict) -> None:
@@ -328,6 +366,7 @@ def _maybe_set_location(line: str, data: Dict) -> None:
 # 2. AUTO-CREATE EDUCATION FROM DETECTED TEXT
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def create_education_from_text(data: Dict) -> None:
     """Ensure education entries exist when degree + institution/year signals
     are found anywhere in the CV.
@@ -343,10 +382,10 @@ def create_education_from_text(data: Dict) -> None:
     summary = data.get("summary", "")
     if isinstance(summary, str) and summary.strip():
         sources.append(summary)
-    for item in (data.get("misc") or []):
+    for item in data.get("misc") or []:
         if isinstance(item, str):
             sources.append(item)
-    for exp in (data.get("experiences") or []):
+    for exp in data.get("experiences") or []:
         if isinstance(exp, dict):
             # title + company may contain degree/institution
             title = exp.get("title", "")
@@ -354,17 +393,17 @@ def create_education_from_text(data: Dict) -> None:
             dates = f"{exp.get('start_date', '')} {exp.get('end_date', '')}"
             if title or company:
                 sources.append(f"{title} {company} {dates}")
-            for b in (exp.get("bullets") or []):
+            for b in exp.get("bullets") or []:
                 sources.append(str(b))
-    for item in (data.get("skills") or []):
+    for item in data.get("skills") or []:
         if isinstance(item, str):
             sources.append(item)
-    for cert in (data.get("certifications") or []):
+    for cert in data.get("certifications") or []:
         if isinstance(cert, dict):
             sources.append(str(cert.get("name", "")))
         elif isinstance(cert, str):
             sources.append(cert)
-    for item in (data.get("interests") or []):
+    for item in data.get("interests") or []:
         if isinstance(item, str):
             sources.append(item)
 
@@ -415,15 +454,17 @@ def _extract_education_from_lines(lines: List[str]) -> List[Dict]:
             if key in seen:
                 continue
             seen.add(key)
-            results.append({
-                "degree": degree_match,
-                "school": _extract_institution_name(line),
-                "start_date": start,
-                "end_date": end,
-                "gpa": "",
-                "field": "",
-                "location": "",
-            })
+            results.append(
+                {
+                    "degree": degree_match,
+                    "school": _extract_institution_name(line),
+                    "start_date": start,
+                    "end_date": end,
+                    "gpa": "",
+                    "field": "",
+                    "location": "",
+                }
+            )
     return results
 
 
@@ -432,7 +473,8 @@ def _extract_institution_name(line: str) -> str:
     match = re.search(
         r"(?:[\w\s]+(?:university|üniversite|institute|enstitü|college|school"
         r"|faculty|fakülte|academy|akademi)[\w\s]*)",
-        line, re.I,
+        line,
+        re.I,
     )
     if match:
         return match.group(0).strip()
@@ -448,23 +490,80 @@ _NAME_DISQUALIFY = re.compile(
     re.I,
 )
 _TITLE_HINTS = {
-    "engineer", "developer", "student", "manager", "analyst", "specialist",
-    "consultant", "architect", "designer", "intern", "lead", "director",
-    "officer", "professor", "scientist", "coordinator", "researcher",
-    "instructor", "teacher", "programmer", "administrator", "trainer",
-    "senior", "junior", "associate", "assistant", "head", "chief",
-    "freelance", "full-stack", "frontend", "backend", "devops", "data",
-    "software", "web", "mobile", "cloud", "machine learning",
+    "engineer",
+    "developer",
+    "student",
+    "manager",
+    "analyst",
+    "specialist",
+    "consultant",
+    "architect",
+    "designer",
+    "intern",
+    "lead",
+    "director",
+    "officer",
+    "professor",
+    "scientist",
+    "coordinator",
+    "researcher",
+    "instructor",
+    "teacher",
+    "programmer",
+    "administrator",
+    "trainer",
+    "senior",
+    "junior",
+    "associate",
+    "assistant",
+    "head",
+    "chief",
+    "freelance",
+    "full-stack",
+    "frontend",
+    "backend",
+    "devops",
+    "data",
+    "software",
+    "web",
+    "mobile",
+    "cloud",
+    "machine learning",
     # institutional
-    "university", "department", "faculty", "computer", "engineering",
-    "science", "technology", "academy", "school",
+    "university",
+    "department",
+    "faculty",
+    "computer",
+    "engineering",
+    "science",
+    "technology",
+    "academy",
+    "school",
 }
 _SECTION_HEADERS = {
-    "profile", "summary", "objective", "about", "personal",
-    "information", "contact", "details", "experience", "education",
-    "skills", "projects", "languages", "interests", "references",
-    "certifications", "achievements", "publications", "activities",
-    "hobbies", "awards", "volunteer", "work",
+    "profile",
+    "summary",
+    "objective",
+    "about",
+    "personal",
+    "information",
+    "contact",
+    "details",
+    "experience",
+    "education",
+    "skills",
+    "projects",
+    "languages",
+    "interests",
+    "references",
+    "certifications",
+    "achievements",
+    "publications",
+    "activities",
+    "hobbies",
+    "awards",
+    "volunteer",
+    "work",
 }
 
 
@@ -538,6 +637,7 @@ def ensure_name(data: Dict) -> None:
 # 4. LANGUAGE CODE FILTER
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def filter_language_codes(languages: List[str]) -> List[str]:
     """Structural filter for language entries.
 
@@ -577,6 +677,7 @@ def filter_language_codes(languages: List[str]) -> List[str]:
 # 5. MISC SECTION RE-EVALUATOR
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def redistribute_misc(data: Dict) -> None:
     """Move misc items into proper sections using multi-signal scoring.
 
@@ -589,8 +690,10 @@ def redistribute_misc(data: Dict) -> None:
     Mutates *data* in place.
     """
     from utils.section_scorer import (
-        score_text, locked_sections,
-        LOCKED_MIN_SCORE, LOCKED_MIN_MARGIN,
+        score_text,
+        locked_sections,
+        LOCKED_MIN_SCORE,
+        LOCKED_MIN_MARGIN,
     )
 
     misc = data.get("misc")
@@ -607,8 +710,13 @@ def redistribute_misc(data: Dict) -> None:
     # "summary" is excluded — schema_builder handles misc→summary promotion.
     # "experience" is excluded — prose without structure shouldn't become exp.
     _ALLOWED_TARGETS = {
-        "education", "certifications", "projects", "interests",
-        "skills", "languages", "contact",
+        "education",
+        "certifications",
+        "projects",
+        "interests",
+        "skills",
+        "languages",
+        "contact",
     }
 
     kept_misc: List[str] = []
@@ -643,15 +751,19 @@ def redistribute_misc(data: Dict) -> None:
             if not isinstance(edu_list, list):
                 edu_list = []
                 data["education"] = edu_list
-            edu_list.append({
-                "degree": (_DEGREE_RE.search(text) or type('', (), {'group': lambda s, *a: ''})()).group(0) if _DEGREE_RE.search(text) else "",
-                "school": _extract_institution_name(text),
-                "start_date": _YEAR_RE.findall(text)[0] if _YEAR_RE.findall(text) else "",
-                "end_date": "",
-                "gpa": "",
-                "field": "",
-                "location": "",
-            })
+            edu_list.append(
+                {
+                    "degree": (_DEGREE_RE.search(text) or type("", (), {"group": lambda s, *a: ""})()).group(0)
+                    if _DEGREE_RE.search(text)
+                    else "",
+                    "school": _extract_institution_name(text),
+                    "start_date": _YEAR_RE.findall(text)[0] if _YEAR_RE.findall(text) else "",
+                    "end_date": "",
+                    "gpa": "",
+                    "field": "",
+                    "location": "",
+                }
+            )
         elif best == "certifications":
             cert_list = data.get("certifications")
             if not isinstance(cert_list, list):
@@ -724,15 +836,17 @@ def _detect_structured_pattern(text: str, data: Dict) -> str | None:
         if not isinstance(edu_list, list):
             edu_list = []
             data["education"] = edu_list
-        edu_list.append({
-            "degree": (_DEGREE_RE.search(text).group(0) if _DEGREE_RE.search(text) else ""),
-            "school": _extract_institution_name(text),
-            "start_date": _YEAR_RE.findall(text)[0] if _YEAR_RE.findall(text) else "",
-            "end_date": "",
-            "gpa": "",
-            "field": "",
-            "location": "",
-        })
+        edu_list.append(
+            {
+                "degree": (_DEGREE_RE.search(text).group(0) if _DEGREE_RE.search(text) else ""),
+                "school": _extract_institution_name(text),
+                "start_date": _YEAR_RE.findall(text)[0] if _YEAR_RE.findall(text) else "",
+                "end_date": "",
+                "gpa": "",
+                "field": "",
+                "location": "",
+            }
+        )
         return "education"
 
     # ── Certifications: certificate keyword present ──
@@ -757,14 +871,16 @@ def _detect_structured_pattern(text: str, data: Dict) -> str | None:
             exp_list = []
             data["experiences"] = exp_list
         years = _YEAR_RE.findall(text)
-        exp_list.append({
-            "title": text[:80],
-            "company": "",
-            "location": "",
-            "start_date": years[0] if years else "",
-            "end_date": years[1] if len(years) > 1 else "",
-            "bullets": [],
-        })
+        exp_list.append(
+            {
+                "title": text[:80],
+                "company": "",
+                "location": "",
+                "start_date": years[0] if years else "",
+                "end_date": years[1] if len(years) > 1 else "",
+                "bullets": [],
+            }
+        )
         return "experiences"
 
     # ── Projects: project keyword or GitHub/GitLab URL ──
@@ -801,6 +917,7 @@ def _detect_structured_pattern(text: str, data: Dict) -> str | None:
 
     # ── Languages: structural detection (CEFR / level / sub-skill) ──
     from utils.section_scorer import is_language_entry
+
     if is_language_entry(text, strict=True) and word_count <= 8:
         lang_list = data.get("languages")
         if not isinstance(lang_list, list):
@@ -828,6 +945,7 @@ def _detect_structured_pattern(text: str, data: Dict) -> str | None:
 # ═══════════════════════════════════════════════════════════════════════════
 # 6. URL NORMALIZATION
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def normalize_urls(data: Dict) -> None:
     """Fix malformed URLs like ``https: site.com`` → ``https://site.com``.
@@ -869,6 +987,7 @@ def _fix_url_in_dict(d: Dict) -> None:
 # 7. ENSURE SUMMARY EXISTS
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def ensure_summary(data: Dict) -> None:
     """If summary is empty, try to derive one from misc or long experience bullets.
 
@@ -898,7 +1017,7 @@ def ensure_summary(data: Dict) -> None:
             return
 
     # Try first experience entry's first long bullet as summary
-    for exp in (data.get("experiences") or []):
+    for exp in data.get("experiences") or []:
         if isinstance(exp, dict):
             bullets = exp.get("bullets") or []
             for b in bullets:
@@ -910,6 +1029,7 @@ def ensure_summary(data: Dict) -> None:
 # ═══════════════════════════════════════════════════════════════════════════
 # 8. CONTACT STRIPPER (generic — works on education too)
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def strip_contact_from_education(data: Dict) -> None:
     """Remove contact info (email/phone/address/birth date) from education entries.
@@ -950,7 +1070,7 @@ def strip_contact_from_all_sections(data: Dict) -> None:
     Mutates *data* in place.
     """
     # Projects (list of dicts)
-    for proj in (data.get("projects") or []):
+    for proj in data.get("projects") or []:
         if not isinstance(proj, dict):
             continue
         for field_name in ("name", "description"):
@@ -985,7 +1105,7 @@ def strip_contact_from_all_sections(data: Dict) -> None:
             proj["bullets"] = kept
 
     # Certifications (list of dicts)
-    for cert in (data.get("certifications") or []):
+    for cert in data.get("certifications") or []:
         if not isinstance(cert, dict):
             continue
         for field_name in ("name", "issuer", "date"):
@@ -1030,6 +1150,7 @@ def strip_contact_from_all_sections(data: Dict) -> None:
 # 9. SCORE-BASED EXPERIENCE ENTRIES RE-EVALUATION
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def rescore_experience_entries(data: Dict) -> None:
     """Re-score each experience entry.  If an entry scores higher as
     education or another section, move it there.
@@ -1040,8 +1161,10 @@ def rescore_experience_entries(data: Dict) -> None:
     Mutates *data* in place.
     """
     from utils.section_scorer import (
-        score_dict_entry, locked_sections,
-        LOCKED_MIN_SCORE, LOCKED_MIN_MARGIN,
+        score_dict_entry,
+        locked_sections,
+        LOCKED_MIN_SCORE,
+        LOCKED_MIN_MARGIN,
     )
 
     experiences = data.get("experiences")
@@ -1067,15 +1190,17 @@ def rescore_experience_entries(data: Dict) -> None:
             if not isinstance(edu_list, list):
                 edu_list = []
                 data["education"] = edu_list
-            edu_list.append({
-                "degree": exp.get("title", ""),
-                "school": exp.get("company", ""),
-                "location": exp.get("location", ""),
-                "start_date": exp.get("start_date", ""),
-                "end_date": exp.get("end_date", ""),
-                "gpa": "",
-                "field": "",
-            })
+            edu_list.append(
+                {
+                    "degree": exp.get("title", ""),
+                    "school": exp.get("company", ""),
+                    "location": exp.get("location", ""),
+                    "start_date": exp.get("start_date", ""),
+                    "end_date": exp.get("end_date", ""),
+                    "gpa": "",
+                    "field": "",
+                }
+            )
         elif best == "contact" and scores.contact >= min_s and scores.contact - scores.experience >= min_m:
             text = " ".join(str(v) for v in exp.values() if isinstance(v, str))
             _route_contact_line(text, data)
@@ -1089,6 +1214,7 @@ def rescore_experience_entries(data: Dict) -> None:
 # 10. SCORE-BASED SECTION VALIDATION (all sections)
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def validate_section_placement(data: Dict) -> None:
     """Re-score items in education, projects, skills, certs, interests, languages.
 
@@ -1099,8 +1225,11 @@ def validate_section_placement(data: Dict) -> None:
     Mutates *data* in place.
     """
     from utils.section_scorer import (
-        score_text, score_dict_entry, locked_sections,
-        LOCKED_MIN_SCORE, LOCKED_MIN_MARGIN,
+        score_text,
+        score_dict_entry,
+        locked_sections,
+        LOCKED_MIN_SCORE,
+        LOCKED_MIN_MARGIN,
     )
 
     locked = locked_sections(data.get("section_titles"))
@@ -1127,14 +1256,16 @@ def validate_section_placement(data: Dict) -> None:
                 if not isinstance(exp_list, list):
                     exp_list = []
                     data["experiences"] = exp_list
-                exp_list.append({
-                    "title": edu.get("degree", ""),
-                    "company": edu.get("school", ""),
-                    "location": edu.get("location", ""),
-                    "start_date": edu.get("start_date", ""),
-                    "end_date": edu.get("end_date", ""),
-                    "bullets": [],
-                })
+                exp_list.append(
+                    {
+                        "title": edu.get("degree", ""),
+                        "company": edu.get("school", ""),
+                        "location": edu.get("location", ""),
+                        "start_date": edu.get("start_date", ""),
+                        "end_date": edu.get("end_date", ""),
+                        "bullets": [],
+                    }
+                )
             else:
                 kept_edu.append(edu)
         data["education"] = kept_edu
@@ -1172,6 +1303,7 @@ def validate_section_placement(data: Dict) -> None:
 # ═══════════════════════════════════════════════════════════════════════════
 # 11. COMBINED ENTRY POINT (raw-dict level, called from normalize_agent)
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def apply_normalization_rules(data: Dict) -> Dict:
     """Apply sanitization rules to raw data dict.
@@ -1219,6 +1351,7 @@ def apply_normalization_rules(data: Dict) -> Dict:
     languages = data.get("languages")
     if isinstance(languages, list):
         from services.cv_autofix_service import _normalize_language_lines
+
         languages = _normalize_language_lines(languages)
         data["languages"] = filter_language_codes(languages)
 

@@ -3,6 +3,7 @@
 Extracted from ``main.py`` to reduce monolith size while preserving
 backward-compatible attribute access via ``getattr(main, ...)``.
 """
+
 from __future__ import annotations
 
 import gc as _gc
@@ -233,10 +234,7 @@ _audit_rt_logger = logging.getLogger("app.audit.runtime")
 
 def _audit_event(event: str, **kwargs) -> None:
     """Log a structured audit event for runtime control changes."""
-    safe_kwargs = {
-        key: redact_for_log(value, key=key)
-        for key, value in kwargs.items()
-    }
+    safe_kwargs = {key: redact_for_log(value, key=key) for key, value in kwargs.items()}
     _audit_rt_logger.warning("AUDIT:%s %s", event, " ".join(f"{k}={v}" for k, v in safe_kwargs.items()))
 
 
@@ -427,6 +425,7 @@ def _get_cpu_percent() -> float:
         return _cpu_last_value
     try:
         import psutil
+
         _cpu_last_value = psutil.cpu_percent(interval=0)
     except Exception:
         _cpu_last_value = 0.0
@@ -442,6 +441,7 @@ def _get_rss_bytes() -> int:
     """Return process RSS in bytes (best-effort, 0 on failure)."""
     try:
         import psutil
+
         return psutil.Process().memory_info().rss
     except Exception:
         pass
@@ -466,6 +466,7 @@ def _get_disk_usage() -> float:
     if os.getenv("ENV") == "test" or os.getenv("TESTING") == "1":
         return 0.0
     import shutil
+
     total, used, free = shutil.disk_usage(os.path.dirname(os.path.dirname(__file__)) or "/")
     return round(used / total * 100, 1) if total > 0 else 0.0
 
@@ -475,6 +476,7 @@ def _check_disk_safety() -> None:
     from fastapi import HTTPException
 
     from shared import _alert
+
     try:
         pct = _get_disk_usage()
     except Exception:
@@ -498,6 +500,7 @@ _METRICS_COLLECT_INTERVAL = 15
 def _metrics_collector_loop():
     """Background thread: update process, worker, breaker, flag gauges."""
     from shared import _cb_lock, _circuit_breaker_state
+
     while True:
         time.sleep(_METRICS_COLLECT_INTERVAL)
         try:
@@ -506,6 +509,7 @@ def _metrics_collector_loop():
                 PROCESS_RSS_BYTES.set(rss)
             try:
                 import psutil
+
                 mem = psutil.Process().memory_info()
                 PROCESS_RSS_BYTES.set(mem.rss)
                 PROCESS_VMS_BYTES.set(mem.vms)
@@ -522,6 +526,7 @@ def _metrics_collector_loop():
             try:
                 from services.model_worker import _proc as _mw_proc
                 from services.model_worker import _request_queue as _mw_q
+
                 WORKER_ACTIVE_TASKS.set(1 if (_mw_proc and _mw_proc.is_alive()) else 0)
                 WORKER_QUEUE_SIZE.set(_mw_q.qsize() if _mw_q else 0)
             except Exception:
@@ -560,12 +565,14 @@ def _check_auto_safe_mode_from_guards(now: float) -> None:
         try:
             import services.cv_builder_service as _cbs
             from services.cv_builder_service import _safe_mode_lock
+
             with _safe_mode_lock:
                 if not _cbs._safe_mode_auto:
                     _cbs._safe_mode_auto = True
                     _guard_logger.warning(
                         "guard:auto_safe_mode_triggered rejections=%d window=%.0fs",
-                        count, _GUARD_SAFE_MODE_WINDOW,
+                        count,
+                        _GUARD_SAFE_MODE_WINDOW,
                     )
                     try:
                         GUARD_SAFE_MODE_TRIGGERS.inc()
@@ -583,11 +590,16 @@ def start_background_threads():
 
 def start_guard_cleanup_thread(
     prune_rate_bucket,
-    ip_global_lock, ip_global_counts,
-    user_global_lock, user_global_counts,
-    user_embed_lock, user_embed_counts,
-    search_lock, search_counts,
-    dedup_lock, dedup_cache,
+    ip_global_lock,
+    ip_global_counts,
+    user_global_lock,
+    user_global_counts,
+    user_embed_lock,
+    user_embed_counts,
+    search_lock,
+    search_counts,
+    dedup_lock,
+    dedup_cache,
     prune_abuse_dicts,
 ):
     """Start the guard cleanup background thread with references to rate dicts."""

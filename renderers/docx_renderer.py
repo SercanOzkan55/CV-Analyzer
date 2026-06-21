@@ -39,8 +39,7 @@ def render_docx(cv_model: CVModel, template: str = "classic", font_override: str
     normal.font.size = Pt(body_size)
     normal.paragraph_format.space_after = Pt(spacing)
 
-    def _para(text: str, bold: bool = False, size: float | None = None,
-              indent: float = 0.0, hanging: float = 0.0):
+    def _para(text: str, bold: bool = False, size: float | None = None, indent: float = 0.0, hanging: float = 0.0):
         p = doc.add_paragraph()
         run = p.add_run(_clean(text))
         run.bold = bold
@@ -77,8 +76,7 @@ def render_docx(cv_model: CVModel, template: str = "classic", font_override: str
         _section_title("EXPERIENCE")
         for exp in cv_model.experiences:
             lines = render_experience(exp)
-            has_title = bool((getattr(exp, "title", "") or "").strip() or
-                             (getattr(exp, "company", "") or "").strip())
+            has_title = bool((getattr(exp, "title", "") or "").strip() or (getattr(exp, "company", "") or "").strip())
             for i, txt in enumerate(lines):
                 if txt.startswith("- "):
                     _para(txt, indent=0.2, hanging=0.15)

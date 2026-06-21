@@ -11,7 +11,7 @@ sample_results = [
         "cv_text": "Experienced Python developer...",
         "final_score": 78.5,
         "ats_score": 74.0,
-        "details": {"detected_skills": ["python", "sql"]}
+        "details": {"detected_skills": ["python", "sql"]},
     }
 ]
 

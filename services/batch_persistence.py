@@ -7,6 +7,7 @@ candidate analyses into the `candidate_actions` table via
 The function is defensive: if DB is unavailable it will log and return
 without raising to avoid breaking batch pipelines.
 """
+
 import logging
 from typing import List, Dict, Any
 

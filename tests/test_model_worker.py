@@ -1,4 +1,5 @@
 """Tests for services/model_worker.py — worker process management."""
+
 import pytest
 from unittest.mock import patch, MagicMock
 from services.model_worker import stop, predict_sync

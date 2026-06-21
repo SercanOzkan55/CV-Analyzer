@@ -16,12 +16,13 @@ def test_ocr_fallback_success():
     mock_doc = MagicMock()
     mock_page = MagicMock()
     mock_doc.__iter__.return_value = [mock_page]
-    mock_page.get_pixmap.return_value = MagicMock(width=100, height=100, samples=b'\x00' * 30000)
-    
-    with patch('PIL.Image.frombytes') as mock_frombytes, \
-         patch('fitz.open', return_value=mock_doc) as mock_fitz_open, \
-         patch('pytesseract.image_to_string', return_value="OCR Text Extracted") as mock_ocr:
-         
+    mock_page.get_pixmap.return_value = MagicMock(width=100, height=100, samples=b"\x00" * 30000)
+
+    with (
+        patch("PIL.Image.frombytes") as mock_frombytes,
+        patch("fitz.open", return_value=mock_doc) as mock_fitz_open,
+        patch("pytesseract.image_to_string", return_value="OCR Text Extracted") as mock_ocr,
+    ):
         text = extract_text(b"scanned_pdf_bytes", "pdf", "cv.pdf")
         assert text == "OCR Text Extracted"
         mock_fitz_open.assert_called_once()
@@ -31,7 +32,7 @@ def test_ocr_fallback_success():
 def test_ocr_fallback_failure_raises_original_error():
     # When OCR raises an exception or PyMuPDF is not installed, it should raise the original extraction error
     # since we bypass pdfplumber and pypdf (by passing empty/dummy bytes that return empty text)
-    with patch('fitz.open', side_effect=ImportError("No module named fitz")):
+    with patch("fitz.open", side_effect=ImportError("No module named fitz")):
         with pytest.raises(LocalWorkerError) as exc_info:
             extract_text(b"scanned_pdf_bytes_empty", "pdf", "cv.pdf")
         assert "PDF extraction failed" in str(exc_info.value)

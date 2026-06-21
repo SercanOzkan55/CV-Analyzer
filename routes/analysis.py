@@ -38,6 +38,7 @@ def _extract_uploaded_cv_text(contents: bytes, file: UploadFile) -> tuple[str, b
 
     try:
         from security.file_guard import validate_file_upload
+
         validate_file_upload(contents, file.filename, file.content_type)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -134,22 +135,16 @@ def analyze(
         if user_throttle is not None:
             response.headers["X-User-RateLimit-Limit"] = str(user_throttle["limit"])
             response.headers["X-User-RateLimit-Used"] = str(user_throttle["used"])
-            response.headers["X-User-RateLimit-Remaining"] = str(
-                user_throttle["remaining"]
-            )
+            response.headers["X-User-RateLimit-Remaining"] = str(user_throttle["remaining"])
             if not user_throttle["allowed"]:
                 _metric_quota_hit("analyze", "user_per_minute")
                 raise HTTPException(
                     status_code=429,
-                    detail=(
-                        f"User rate limit exceeded ({user_throttle['limit']}/minute)"
-                    ),
+                    detail=(f"User rate limit exceeded ({user_throttle['limit']}/minute)"),
                 )
 
         if not mock_is_admin and not _is_premium_plan(mock_plan):
-            redis_quota = _consume_daily_quota(
-                str(mock_user_id), limit=_resolve_daily_limit_for_plan(mock_plan)
-            )
+            redis_quota = _consume_daily_quota(str(mock_user_id), limit=_resolve_daily_limit_for_plan(mock_plan))
             if redis_quota is not None:
                 response.headers["X-Daily-Limit"] = str(redis_quota["limit"])
                 response.headers["X-Daily-Used"] = str(redis_quota["used"])
@@ -174,6 +169,7 @@ def analyze(
                 record_ats_score as _bm_record,
                 get_benchmark_comparison as _bm_compare,
             )
+
             mock_db = SessionLocal()
             try:
                 _bm_prof = _bm_infer(
@@ -184,7 +180,9 @@ def analyze(
                 )
                 _bm_record(mock_db, float(result.get("ats_score") or 0), _bm_prof)
                 result["global_benchmark"] = _bm_compare(
-                    mock_db, float(result.get("ats_score") or 0), _bm_prof,
+                    mock_db,
+                    float(result.get("ats_score") or 0),
+                    _bm_prof,
                 )
             finally:
                 mock_db.close()
@@ -208,16 +206,12 @@ def analyze(
     if user_throttle is not None:
         response.headers["X-User-RateLimit-Limit"] = str(user_throttle["limit"])
         response.headers["X-User-RateLimit-Used"] = str(user_throttle["used"])
-        response.headers["X-User-RateLimit-Remaining"] = str(
-            user_throttle["remaining"]
-        )
+        response.headers["X-User-RateLimit-Remaining"] = str(user_throttle["remaining"])
         if not user_throttle["allowed"]:
             _metric_quota_hit("analyze", "user_per_minute")
             raise HTTPException(
                 status_code=429,
-                detail=(
-                    f"User rate limit exceeded ({user_throttle['limit']}/minute)"
-                ),
+                detail=(f"User rate limit exceeded ({user_throttle['limit']}/minute)"),
             )
 
     # reset daily/monthly counters if a new quota day/month has started
@@ -226,7 +220,10 @@ def analyze(
     if db_user.last_reset is None or db_user.last_reset.date() < quota_today:
         db_user.daily_usage = 0
         db_user.last_reset = now_utc
-    if db_user.updated_at is None or (db_user.updated_at.year, db_user.updated_at.month) != (quota_today.year, quota_today.month):
+    if db_user.updated_at is None or (db_user.updated_at.year, db_user.updated_at.month) != (
+        quota_today.year,
+        quota_today.month,
+    ):
         db_user.monthly_usage = 0
         db_user.updated_at = now_utc
 
@@ -234,29 +231,19 @@ def analyze(
     if db_user.role == "recruiter":
         org = None
         if db_user.organization_id:
-            org = (
-                db.query(Organization)
-                .filter(Organization.id == db_user.organization_id)
-                .first()
-            )
+            org = db.query(Organization).filter(Organization.id == db_user.organization_id).first()
         # organization daily/monthly quota based on org.plan_type
         if org:
-            org_daily_limit = ORG_PLAN_LIMITS_DAILY.get(
-                _normalize_plan(org.plan_type), ORG_PLAN_LIMITS_DAILY["free"]
-            )
+            org_daily_limit = ORG_PLAN_LIMITS_DAILY.get(_normalize_plan(org.plan_type), ORG_PLAN_LIMITS_DAILY["free"])
             org_monthly_limit = ORG_PLAN_LIMITS_MONTHLY.get(
                 _normalize_plan(org.plan_type), ORG_PLAN_LIMITS_MONTHLY["free"]
             )
             if (org.daily_usage or 0) >= org_daily_limit:
                 _metric_quota_hit("analyze", "org_daily")
-                raise HTTPException(
-                    status_code=403, detail="Organization daily limit reached"
-                )
+                raise HTTPException(status_code=403, detail="Organization daily limit reached")
             if (org.monthly_usage or 0) >= org_monthly_limit:
                 _metric_quota_hit("analyze", "org_monthly")
-                raise HTTPException(
-                    status_code=403, detail="Organization monthly limit reached"
-                )
+                raise HTTPException(status_code=403, detail="Organization monthly limit reached")
         redis_quota = _consume_daily_quota(
             db_user.supabase_id or str(db_user.id),
             limit=_resolve_daily_limit_for_plan(_resolve_effective_plan(db, db_user)),
@@ -309,19 +296,19 @@ def analyze(
             result["recommendations"] = [
                 "Strong match! Prepare for behavioral and technical interviews.",
                 "Highlight relevant projects and achievements in your CV.",
-                "Practice common interview questions for this role."
+                "Practice common interview questions for this role.",
             ]
         elif score > 0.6:
             result["recommendations"] = [
                 "Good potential. Tailor your CV to emphasize matching skills.",
                 "Consider gaining more experience in key areas.",
-                "Network with professionals in this field."
+                "Network with professionals in this field.",
             ]
         else:
             result["recommendations"] = [
                 "Consider upskilling in required technologies.",
                 "Seek entry-level positions or internships to build experience.",
-                "Get feedback on your CV from mentors."
+                "Get feedback on your CV from mentors.",
             ]
     except Exception:
         _metric_error("analyze", "pipeline")
@@ -357,11 +344,7 @@ def analyze(
     try:
         # increment counters now that the request is allowed
         if db_user.role == "recruiter" and db_user.organization_id:
-            org = (
-                db.query(Organization)
-                .filter(Organization.id == db_user.organization_id)
-                .first()
-            )
+            org = db.query(Organization).filter(Organization.id == db_user.organization_id).first()
             if org:
                 org.daily_usage = (org.daily_usage or 0) + 1
                 org.monthly_usage = (org.monthly_usage or 0) + 1
@@ -419,6 +402,7 @@ def analyze(
             record_ats_score as _bm_record,
             get_benchmark_comparison as _bm_compare,
         )
+
         _bm_prof = _bm_infer(
             job_title=_extract_job_title_from_jd(body.job_description),
             experience_titles=[],
@@ -427,7 +411,9 @@ def analyze(
         )
         _bm_record(db, float(result.get("ats_score") or 0), _bm_prof)
         result["global_benchmark"] = _bm_compare(
-            db, float(result.get("ats_score") or 0), _bm_prof,
+            db,
+            float(result.get("ats_score") or 0),
+            _bm_prof,
         )
     except Exception:
         result["global_benchmark"] = None
@@ -525,15 +511,15 @@ def _validate_job_import_url(raw_url: str) -> str:
 
     host = parsed.hostname.lower().strip(".")
     allowed_hosts = {
-        item.strip().lower()
-        for item in os.getenv("JOB_IMPORT_ALLOWED_HOSTS", "").split(",")
-        if item.strip()
+        item.strip().lower() for item in os.getenv("JOB_IMPORT_ALLOWED_HOSTS", "").split(",") if item.strip()
     }
     if allowed_hosts and host not in allowed_hosts:
         raise HTTPException(status_code=403, detail="Import URL host is not allowed")
 
     try:
-        infos = socket.getaddrinfo(host, parsed.port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM)
+        infos = socket.getaddrinfo(
+            host, parsed.port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM
+        )
     except socket.gaierror:
         raise HTTPException(status_code=400, detail="Import URL host could not be resolved")
 
@@ -543,7 +529,14 @@ def _validate_job_import_url(raw_url: str) -> str:
             ip = ipaddress.ip_address(address)
         except ValueError:
             raise HTTPException(status_code=400, detail="Import URL resolved to an invalid address")
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified:
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_reserved
+            or ip.is_unspecified
+        ):
             raise HTTPException(status_code=403, detail="Import URL host is not allowed")
 
     return url
@@ -583,16 +576,12 @@ def analyze_async(
     if user_throttle is not None:
         response.headers["X-User-RateLimit-Limit"] = str(user_throttle["limit"])
         response.headers["X-User-RateLimit-Used"] = str(user_throttle["used"])
-        response.headers["X-User-RateLimit-Remaining"] = str(
-            user_throttle["remaining"]
-        )
+        response.headers["X-User-RateLimit-Remaining"] = str(user_throttle["remaining"])
         if not user_throttle["allowed"]:
             _metric_quota_hit("analyze-async", "user_per_minute")
             raise HTTPException(
                 status_code=429,
-                detail=(
-                    f"User rate limit exceeded ({user_throttle['limit']}/minute)"
-                ),
+                detail=(f"User rate limit exceeded ({user_throttle['limit']}/minute)"),
             )
 
     # Daily/monthly quota checks (reuse logic from analyze).
@@ -601,35 +590,28 @@ def analyze_async(
     if db_user.last_reset is None or db_user.last_reset.date() < quota_today:
         db_user.daily_usage = 0
         db_user.last_reset = now_utc
-    if db_user.updated_at is None or (db_user.updated_at.year, db_user.updated_at.month) != (quota_today.year, quota_today.month):
+    if db_user.updated_at is None or (db_user.updated_at.year, db_user.updated_at.month) != (
+        quota_today.year,
+        quota_today.month,
+    ):
         db_user.monthly_usage = 0
         db_user.updated_at = now_utc
 
     if db_user.role == "recruiter":
         org = None
         if db_user.organization_id:
-            org = (
-                db.query(Organization)
-                .filter(Organization.id == db_user.organization_id)
-                .first()
-            )
+            org = db.query(Organization).filter(Organization.id == db_user.organization_id).first()
         if org:
-            org_daily_limit = ORG_PLAN_LIMITS_DAILY.get(
-                _normalize_plan(org.plan_type), ORG_PLAN_LIMITS_DAILY["free"]
-            )
+            org_daily_limit = ORG_PLAN_LIMITS_DAILY.get(_normalize_plan(org.plan_type), ORG_PLAN_LIMITS_DAILY["free"])
             org_monthly_limit = ORG_PLAN_LIMITS_MONTHLY.get(
                 _normalize_plan(org.plan_type), ORG_PLAN_LIMITS_MONTHLY["free"]
             )
             if (org.daily_usage or 0) >= org_daily_limit:
                 _metric_quota_hit("analyze-async", "org_daily")
-                raise HTTPException(
-                    status_code=403, detail="Organization daily limit reached"
-                )
+                raise HTTPException(status_code=403, detail="Organization daily limit reached")
             if (org.monthly_usage or 0) >= org_monthly_limit:
                 _metric_quota_hit("analyze-async", "org_monthly")
-                raise HTTPException(
-                    status_code=403, detail="Organization monthly limit reached"
-                )
+                raise HTTPException(status_code=403, detail="Organization monthly limit reached")
     elif not _is_admin_user(db_user):
         user_daily_limit = USER_PLAN_LIMITS_DAILY.get(
             _normalize_plan(db_user.plan_type), USER_PLAN_LIMITS_DAILY["free"]
@@ -731,22 +713,16 @@ async def analyze_pdf(
         if user_throttle is not None:
             response.headers["X-User-RateLimit-Limit"] = str(user_throttle["limit"])
             response.headers["X-User-RateLimit-Used"] = str(user_throttle["used"])
-            response.headers["X-User-RateLimit-Remaining"] = str(
-                user_throttle["remaining"]
-            )
+            response.headers["X-User-RateLimit-Remaining"] = str(user_throttle["remaining"])
             if not user_throttle["allowed"]:
                 _metric_quota_hit("analyze-pdf", "user_per_minute")
                 raise HTTPException(
                     status_code=429,
-                    detail=(
-                        f"User rate limit exceeded ({user_throttle['limit']}/minute)"
-                    ),
+                    detail=(f"User rate limit exceeded ({user_throttle['limit']}/minute)"),
                 )
 
         if not mock_is_admin and not _is_premium_plan(mock_plan):
-            redis_quota = _consume_daily_quota(
-                str(mock_user_id), limit=_resolve_daily_limit_for_plan(mock_plan)
-            )
+            redis_quota = _consume_daily_quota(str(mock_user_id), limit=_resolve_daily_limit_for_plan(mock_plan))
             if redis_quota is not None:
                 response.headers["X-Daily-Limit"] = str(redis_quota["limit"])
                 response.headers["X-Daily-Used"] = str(redis_quota["used"])
@@ -763,6 +739,7 @@ async def analyze_pdf(
 
         # ── CV detection: reject non-CV documents early ──
         from security.validators import is_probably_cv
+
         if not is_probably_cv(text):
             raise HTTPException(
                 status_code=400,
@@ -788,6 +765,7 @@ async def analyze_pdf(
                 record_ats_score as _bm_record,
                 get_benchmark_comparison as _bm_compare,
             )
+
             mock_db = SessionLocal()
             try:
                 _bm_prof = _bm_infer(
@@ -798,7 +776,9 @@ async def analyze_pdf(
                 )
                 _bm_record(mock_db, float(result.get("ats_score") or 0), _bm_prof)
                 result["global_benchmark"] = _bm_compare(
-                    mock_db, float(result.get("ats_score") or 0), _bm_prof,
+                    mock_db,
+                    float(result.get("ats_score") or 0),
+                    _bm_prof,
                 )
             finally:
                 mock_db.close()
@@ -821,23 +801,16 @@ async def analyze_pdf(
     if user_throttle is not None:
         response.headers["X-User-RateLimit-Limit"] = str(user_throttle["limit"])
         response.headers["X-User-RateLimit-Used"] = str(user_throttle["used"])
-        response.headers["X-User-RateLimit-Remaining"] = str(
-            user_throttle["remaining"]
-        )
+        response.headers["X-User-RateLimit-Remaining"] = str(user_throttle["remaining"])
         if not user_throttle["allowed"]:
             _metric_quota_hit("analyze-pdf", "user_per_minute")
             raise HTTPException(
                 status_code=429,
-                detail=(
-                    f"User rate limit exceeded ({user_throttle['limit']}/minute)"
-                ),
+                detail=(f"User rate limit exceeded ({user_throttle['limit']}/minute)"),
             )
 
     # reset daily counter if a new day has started
-    if (
-        db_user.last_reset is None
-        or db_user.last_reset.date() < _quota_today_date()
-    ):
+    if db_user.last_reset is None or db_user.last_reset.date() < _quota_today_date():
         db_user.daily_usage = 0
         db_user.last_reset = datetime.utcnow()
 
@@ -845,20 +818,10 @@ async def analyze_pdf(
     if db_user.role == "recruiter":
         org = None
         if db_user.organization_id:
-            org = (
-                db.query(Organization)
-                .filter(Organization.id == db_user.organization_id)
-                .first()
-            )
-        if (
-            org
-            and org.plan_type == "free"
-            and org.monthly_usage >= ORG_PLAN_LIMITS_MONTHLY["free"]
-        ):
+            org = db.query(Organization).filter(Organization.id == db_user.organization_id).first()
+        if org and org.plan_type == "free" and org.monthly_usage >= ORG_PLAN_LIMITS_MONTHLY["free"]:
             _metric_quota_hit("analyze-pdf", "org_monthly")
-            raise HTTPException(
-                status_code=429, detail="Organization monthly limit reached"
-            )
+            raise HTTPException(status_code=429, detail="Organization monthly limit reached")
         redis_quota = _consume_daily_quota(
             db_user.supabase_id or str(db_user.id),
             limit=_resolve_daily_limit_for_plan(_resolve_effective_plan(db, db_user)),
@@ -917,6 +880,7 @@ async def analyze_pdf(
     contents = await _read_upload_or_400(file)
     text, _pdf_truncated, _cv_file_type = _extract_uploaded_cv_text(contents, file)
     from security.validators import is_probably_cv
+
     if not is_probably_cv(text):
         raise HTTPException(
             status_code=400,
@@ -925,6 +889,7 @@ async def analyze_pdf(
 
     # Disable Zero Data Retention: Upload CV to storage
     from services.storage_service import upload_original_cv
+
     s3_key = None
     try:
         safe_user_id = db_user.supabase_id or str(db_user.id)
@@ -932,7 +897,7 @@ async def analyze_pdf(
             file_bytes=contents,
             user_id=safe_user_id,
             content_type=file.content_type or "application/pdf",
-            filename=file.filename
+            filename=file.filename,
         )
     except Exception as e:
         logger.warning(f"Failed to upload CV to S3 in analyze-pdf: {e}")
@@ -999,6 +964,7 @@ async def analyze_pdf(
                 try:
                     if s3_key:
                         from models import CVVersion
+
                         cv_ver = CVVersion(
                             user_id=db_user.id,
                             organization_id=db_user.organization_id,
@@ -1008,7 +974,7 @@ async def analyze_pdf(
                             cv_text=text,
                             job_description=job_description,
                             match_score=float(result.get("final_score", 0)),
-                            original_s3_key=s3_key
+                            original_s3_key=s3_key,
                         )
                         db.add(cv_ver)
                         db.commit()
@@ -1026,6 +992,7 @@ async def analyze_pdf(
                         record_ats_score as _bm_record,
                         get_benchmark_comparison as _bm_compare,
                     )
+
                     _bm_prof = _bm_infer(
                         job_title=_extract_job_title_from_jd(job_description),
                         experience_titles=[],
@@ -1034,7 +1001,9 @@ async def analyze_pdf(
                     )
                     _bm_record(db, float(result.get("ats_score") or 0), _bm_prof)
                     result["global_benchmark"] = _bm_compare(
-                        db, float(result.get("ats_score") or 0), _bm_prof,
+                        db,
+                        float(result.get("ats_score") or 0),
+                        _bm_prof,
                     )
                 except Exception:
                     result["global_benchmark"] = None
@@ -1130,9 +1099,7 @@ def get_history(
 
     # Apply filters
     if q:
-        base_query = base_query.filter(
-            Analysis.interpretation.ilike(f"%{q}%") | Analysis.job_title.ilike(f"%{q}%")
-        )
+        base_query = base_query.filter(Analysis.interpretation.ilike(f"%{q}%") | Analysis.job_title.ilike(f"%{q}%"))
     if job_title:
         base_query = base_query.filter(Analysis.job_title.ilike(f"%{job_title}%"))
     if from_date:
@@ -1154,13 +1121,7 @@ def get_history(
     total = base_query.count()
 
     # Return user's analysis records with pagination
-    records = (
-        base_query
-        .order_by(Analysis.id.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
+    records = base_query.order_by(Analysis.id.desc()).offset(offset).limit(limit).all()
 
     return {"items": records, "total": total, "limit": limit, "offset": offset}
 
@@ -1281,7 +1242,7 @@ def export_analysis_pdf(
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt=f"CV Analysis Report", ln=True, align='C')
+    pdf.cell(200, 10, txt=f"CV Analysis Report", ln=True, align="C")
     pdf.ln(10)
     pdf.cell(200, 10, txt=f"Job Title: {analysis.job_title or 'N/A'}", ln=True)
     pdf.cell(200, 10, txt=f"Similarity Score: {analysis.similarity_score:.2f}", ln=True)
@@ -1293,13 +1254,13 @@ def export_analysis_pdf(
         pdf.ln(10)
         pdf.multi_cell(0, 10, txt=f"Details: {str(analysis.result)}")
 
-    pdf_output = pdf.output(dest='S')
+    pdf_output = pdf.output(dest="S")
     if isinstance(pdf_output, str):
         pdf_output = pdf_output.encode("latin-1", errors="replace")
     return StreamingResponse(
         iter([pdf_output]),
-        media_type='application/pdf',
-        headers={"Content-Disposition": f"attachment; filename=analysis_{analysis_id}.pdf"}
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=analysis_{analysis_id}.pdf"},
     )
 
 
@@ -1419,14 +1380,7 @@ def get_usage_history(
         .all()
     )
 
-    return {
-        "days": [
-            {"date": r.date.strftime("%Y-%m-%d"), "count": r.count}
-            for r in rows
-        ]
-    }
+    return {"days": [{"date": r.date.strftime("%Y-%m-%d"), "count": r.count} for r in rows]}
 
 
 # ── Favorites CRUD ──────────────────────────────────────────────
-
-

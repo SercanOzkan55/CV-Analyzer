@@ -28,20 +28,14 @@ def main():
     engine = create_engine(url)
     with engine.connect() as conn:
         try:
-            r = conn.execute(
-                text("SELECT extname FROM pg_extension WHERE extname='vector';")
-            )
+            r = conn.execute(text("SELECT extname FROM pg_extension WHERE extname='vector';"))
             rows = r.fetchall()
             print("PGVECTOR:", "INSTALLED" if rows else "MISSING")
         except Exception as e:
             print("PGVECTOR_CHECK_ERROR", e)
 
         try:
-            r = conn.execute(
-                text(
-                    "SELECT column_name FROM information_schema.columns WHERE table_name='candidates';"
-                )
-            )
+            r = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='candidates';"))
             cols = [row[0] for row in r.fetchall()]
             print("CANDIDATES_TABLE_EXISTS:", bool(cols))
             if cols:
@@ -50,11 +44,7 @@ def main():
             print("CANDIDATES_TABLE_CHECK_ERROR", e)
 
         try:
-            r = conn.execute(
-                text(
-                    "SELECT column_name FROM information_schema.columns WHERE table_name='jobs';"
-                )
-            )
+            r = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='jobs';"))
             cols = [row[0] for row in r.fetchall()]
             print("JOBS_TABLE_EXISTS:", bool(cols))
             if cols:

@@ -35,66 +35,291 @@ _WORD3_RE = re.compile(r"[A-Za-z\u00C0-\u024F\u0400-\u04FF]{3,}", re.UNICODE)
 
 _GLOBAL_STOPWORDS = {
     # English
-    "the", "and", "for", "are", "but", "not", "you", "all", "can", "her",
-    "was", "one", "our", "out", "with", "that", "this", "have", "from",
-    "they", "will", "each", "make", "like", "been", "has", "its", "who",
-    "did", "get", "may", "him", "his", "how", "let", "say", "she", "too",
-    "use", "way", "about", "would", "there", "their", "what", "could",
-    "other", "than", "then", "them", "these", "some", "which", "into",
-    "over", "under", "between", "within", "without", "your", "role",
+    "the",
+    "and",
+    "for",
+    "are",
+    "but",
+    "not",
+    "you",
+    "all",
+    "can",
+    "her",
+    "was",
+    "one",
+    "our",
+    "out",
+    "with",
+    "that",
+    "this",
+    "have",
+    "from",
+    "they",
+    "will",
+    "each",
+    "make",
+    "like",
+    "been",
+    "has",
+    "its",
+    "who",
+    "did",
+    "get",
+    "may",
+    "him",
+    "his",
+    "how",
+    "let",
+    "say",
+    "she",
+    "too",
+    "use",
+    "way",
+    "about",
+    "would",
+    "there",
+    "their",
+    "what",
+    "could",
+    "other",
+    "than",
+    "then",
+    "them",
+    "these",
+    "some",
+    "which",
+    "into",
+    "over",
+    "under",
+    "between",
+    "within",
+    "without",
+    "your",
+    "role",
     # Turkish
-    "ve", "veya", "ile", "için", "icin", "bir", "bu", "şu", "su", "da",
-    "de", "mi", "mı", "mu", "mü", "olan", "olarak", "gibi", "çok", "cok",
-    "daha", "en", "her", "tüm", "tum", "ise", "hem", "ya", "ki",
+    "ve",
+    "veya",
+    "ile",
+    "için",
+    "icin",
+    "bir",
+    "bu",
+    "şu",
+    "su",
+    "da",
+    "de",
+    "mi",
+    "mı",
+    "mu",
+    "mü",
+    "olan",
+    "olarak",
+    "gibi",
+    "çok",
+    "cok",
+    "daha",
+    "en",
+    "her",
+    "tüm",
+    "tum",
+    "ise",
+    "hem",
+    "ya",
+    "ki",
     # German
-    "und", "oder", "mit", "für", "fur", "der", "die", "das", "ein", "eine",
-    "einen", "einem", "zu", "im", "in", "von", "den", "dem", "des", "als",
+    "und",
+    "oder",
+    "mit",
+    "für",
+    "fur",
+    "der",
+    "die",
+    "das",
+    "ein",
+    "eine",
+    "einen",
+    "einem",
+    "zu",
+    "im",
+    "in",
+    "von",
+    "den",
+    "dem",
+    "des",
+    "als",
     # French
-    "et", "ou", "avec", "pour", "les", "des", "une", "un", "du", "de",
-    "la", "le", "dans", "sur", "par", "aux", "au", "ce", "cette",
+    "et",
+    "ou",
+    "avec",
+    "pour",
+    "les",
+    "des",
+    "une",
+    "un",
+    "du",
+    "de",
+    "la",
+    "le",
+    "dans",
+    "sur",
+    "par",
+    "aux",
+    "au",
+    "ce",
+    "cette",
     # Spanish
-    "y", "o", "con", "para", "los", "las", "una", "uno", "del", "de",
-    "el", "la", "en", "por", "como", "que", "este", "esta",
+    "y",
+    "o",
+    "con",
+    "para",
+    "los",
+    "las",
+    "una",
+    "uno",
+    "del",
+    "de",
+    "el",
+    "la",
+    "en",
+    "por",
+    "como",
+    "que",
+    "este",
+    "esta",
     # Portuguese / Italian / Dutch
-    "e", "com", "para", "os", "as", "um", "uma", "do", "da", "no", "na",
-    "il", "lo", "gli", "le", "di", "per", "che", "een", "het", "van",
-    "voor", "met", "op", "aan", "als",
+    "e",
+    "com",
+    "para",
+    "os",
+    "as",
+    "um",
+    "uma",
+    "do",
+    "da",
+    "no",
+    "na",
+    "il",
+    "lo",
+    "gli",
+    "le",
+    "di",
+    "per",
+    "che",
+    "een",
+    "het",
+    "van",
+    "voor",
+    "met",
+    "op",
+    "aan",
+    "als",
 }
 
 _SOFT_SKILL_TERMS = {
     # English
-    "leadership", "teamwork", "communication", "collaboration", "problem solving",
-    "time management", "critical thinking", "adaptability", "creativity",
-    "mentoring", "negotiation", "presentation", "stakeholder", "cross functional",
-    "strategic", "initiative", "empathy", "conflict resolution",
+    "leadership",
+    "teamwork",
+    "communication",
+    "collaboration",
+    "problem solving",
+    "time management",
+    "critical thinking",
+    "adaptability",
+    "creativity",
+    "mentoring",
+    "negotiation",
+    "presentation",
+    "stakeholder",
+    "cross functional",
+    "strategic",
+    "initiative",
+    "empathy",
+    "conflict resolution",
     # Turkish
-    "liderlik", "takım çalışması", "takim calismasi", "iletişim", "iletisim",
-    "iş birliği", "is birligi", "problem çözme", "problem cozme", "zaman yönetimi",
-    "zaman yonetimi", "eleştirel düşünme", "elestirel dusunme", "uyum sağlama",
-    "uyum saglama", "yaratıcılık", "yaraticilik", "mentorluk", "müzakere",
-    "muzakere", "sunum", "paydaş", "paydas", "stratejik", "inisiyatif", "empati",
-    "çatışma çözümü", "catisma cozumu",
+    "liderlik",
+    "takım çalışması",
+    "takim calismasi",
+    "iletişim",
+    "iletisim",
+    "iş birliği",
+    "is birligi",
+    "problem çözme",
+    "problem cozme",
+    "zaman yönetimi",
+    "zaman yonetimi",
+    "eleştirel düşünme",
+    "elestirel dusunme",
+    "uyum sağlama",
+    "uyum saglama",
+    "yaratıcılık",
+    "yaraticilik",
+    "mentorluk",
+    "müzakere",
+    "muzakere",
+    "sunum",
+    "paydaş",
+    "paydas",
+    "stratejik",
+    "inisiyatif",
+    "empati",
+    "çatışma çözümü",
+    "catisma cozumu",
     # German
-    "führung", "fuhrung", "teamarbeit", "kommunikation", "zusammenarbeit",
-    "problemlösung", "problemlosung", "zeitmanagement", "kritisches denken",
-    "anpassungsfähigkeit", "kreativität", "mentoring", "verhandlung", "präsentation",
+    "führung",
+    "fuhrung",
+    "teamarbeit",
+    "kommunikation",
+    "zusammenarbeit",
+    "problemlösung",
+    "problemlosung",
+    "zeitmanagement",
+    "kritisches denken",
+    "anpassungsfähigkeit",
+    "kreativität",
+    "mentoring",
+    "verhandlung",
+    "präsentation",
     # French
-    "leadership", "travail d'équipe", "travail equipe", "communication",
-    "collaboration", "résolution de problèmes", "resolution de problemes",
-    "gestion du temps", "pensée critique", "adaptabilité", "créativité",
+    "leadership",
+    "travail d'équipe",
+    "travail equipe",
+    "communication",
+    "collaboration",
+    "résolution de problèmes",
+    "resolution de problemes",
+    "gestion du temps",
+    "pensée critique",
+    "adaptabilité",
+    "créativité",
     # Spanish
-    "liderazgo", "trabajo en equipo", "comunicación", "comunicacion",
-    "colaboración", "colaboracion", "resolución de problemas",
-    "resolucion de problemas", "gestión del tiempo", "gestion del tiempo",
-    "pensamiento crítico", "pensamiento critico", "adaptabilidad", "creatividad",
+    "liderazgo",
+    "trabajo en equipo",
+    "comunicación",
+    "comunicacion",
+    "colaboración",
+    "colaboracion",
+    "resolución de problemas",
+    "resolucion de problemas",
+    "gestión del tiempo",
+    "gestion del tiempo",
+    "pensamiento crítico",
+    "pensamiento critico",
+    "adaptabilidad",
+    "creatividad",
 }
 
 _EDUCATION_LEVEL_PATTERNS = (
     (100.0, r"\b(ph\.?d|doctorate|doctoral|doctorado|doctorat|doktor|doktora|promotion)\b"),
-    (80.0, r"\b(master|msc|m\.sc|m\.a\.|mba|magistrale|maestr[ií]a|ma[îi]trise|yüksek\s*lisans|yuksek\s*lisans|mast[eè]re|magister)\b"),
+    (
+        80.0,
+        r"\b(master|msc|m\.sc|m\.a\.|mba|magistrale|maestr[ií]a|ma[îi]trise|yüksek\s*lisans|yuksek\s*lisans|mast[eè]re|magister)\b",
+    ),
     (60.0, r"\b(bachelor|bsc|b\.sc|b\.a\.|licenciatura|licence|laurea|lisans|undergraduate|grado|studium)\b"),
     (40.0, r"\b(associate|ön\s*lisans|on\s*lisans|diploma|berufsabschluss|technicien|t[eé]cnico)\b"),
-    (20.0, r"\b(high\s*school|lise|certificate|certificat|certificado|zertifikat|abitur|gymnasium|baccalaur[eé]at|bachillerato)\b"),
+    (
+        20.0,
+        r"\b(high\s*school|lise|certificate|certificat|certificado|zertifikat|abitur|gymnasium|baccalaur[eé]at|bachillerato)\b",
+    ),
 )
 
 
@@ -139,9 +364,18 @@ def interpret_score(score):
 
 
 def build_features(
-    semantic, keyword, skill, exp, missing_skills, domain_similarity, ats_score,
-    ats_details=None, title_match=0.0, seniority_match=0.0,
-    cv_text="", job_description="",
+    semantic,
+    keyword,
+    skill,
+    exp,
+    missing_skills,
+    domain_similarity,
+    ats_score,
+    ats_details=None,
+    title_match=0.0,
+    seniority_match=0.0,
+    cv_text="",
+    job_description="",
 ):
     # Floor values: prevent 0-scores from bad parse / empty PDF / student CV
     semantic = max(float(semantic), 5.0)
@@ -188,12 +422,24 @@ def build_features(
 
     # Soft skill detection: leadership, teamwork, communication keywords
     _SOFT_SKILL_PATTERNS = [
-        r"\bleadership\b", r"\bteamwork\b", r"\bcommunication\b",
-        r"\bcollaboration\b", r"\bproblem.solving\b", r"\btime.management\b",
-        r"\bcritical.thinking\b", r"\badaptability\b", r"\bcreativity\b",
-        r"\bmentoring\b", r"\bnegotiation\b", r"\bpresentation\b",
-        r"\bstakeholder\b", r"\bcross.functional\b", r"\bstrategic\b",
-        r"\binitiative\b", r"\bempathy\b", r"\bconflict.resolution\b",
+        r"\bleadership\b",
+        r"\bteamwork\b",
+        r"\bcommunication\b",
+        r"\bcollaboration\b",
+        r"\bproblem.solving\b",
+        r"\btime.management\b",
+        r"\bcritical.thinking\b",
+        r"\badaptability\b",
+        r"\bcreativity\b",
+        r"\bmentoring\b",
+        r"\bnegotiation\b",
+        r"\bpresentation\b",
+        r"\bstakeholder\b",
+        r"\bcross.functional\b",
+        r"\bstrategic\b",
+        r"\binitiative\b",
+        r"\bempathy\b",
+        r"\bconflict.resolution\b",
     ]
     _cv_lower = clean_lower(cv_text or "")
     _soft_hits = sum(1 for term in _SOFT_SKILL_TERMS if _contains_soft_skill(_cv_lower, term))
@@ -207,12 +453,62 @@ def build_features(
 
     # Keyword density: how well matched keywords spread across the text
     _jd_words = set(_word_tokens(job_description, min_len=3))
-    _stop = {"the", "and", "for", "are", "but", "not", "you", "all", "can", "her",
-             "was", "one", "our", "out", "with", "that", "this", "have", "from",
-             "they", "will", "each", "make", "like", "been", "has", "its", "who",
-             "did", "get", "may", "him", "his", "how", "its", "let", "say", "she",
-             "too", "use", "way", "about", "would", "there", "their", "what",
-             "could", "other", "than", "then", "them", "these", "some", "which"}
+    _stop = {
+        "the",
+        "and",
+        "for",
+        "are",
+        "but",
+        "not",
+        "you",
+        "all",
+        "can",
+        "her",
+        "was",
+        "one",
+        "our",
+        "out",
+        "with",
+        "that",
+        "this",
+        "have",
+        "from",
+        "they",
+        "will",
+        "each",
+        "make",
+        "like",
+        "been",
+        "has",
+        "its",
+        "who",
+        "did",
+        "get",
+        "may",
+        "him",
+        "his",
+        "how",
+        "its",
+        "let",
+        "say",
+        "she",
+        "too",
+        "use",
+        "way",
+        "about",
+        "would",
+        "there",
+        "their",
+        "what",
+        "could",
+        "other",
+        "than",
+        "then",
+        "them",
+        "these",
+        "some",
+        "which",
+    }
     _jd_kw = _jd_words - _GLOBAL_STOPWORDS
     if _jd_kw and _total_words > 0:
         _kw_found = sum(1 for w in _words if w in _jd_kw)
@@ -337,11 +633,72 @@ def _title_match_score(cv_text: str, job_description: str) -> float:
 def _detect_seniority(text: str) -> str:
     lowered = clean_lower(text or "")
     senior_patterns = {
-        "intern": ["intern", "internship", "trainee", "stajyer", "praktikant", "stagiaire", "pasante", "becario", "tirocinante", "practicante"],
-        "junior": ["junior", "entry level", "entry-level", "associate", "júnior", "juniorentwickler", "débutant", "debutant", "principiante"],
-        "mid": ["mid", "mid level", "mid-level", "intermediate", "regular", "mittelstufe", "confirmé", "confirme", "intermedio"],
-        "senior": ["senior", "lead", "principal", "staff", "experienced", "kıdemli", "kidemli", "leiter", "chef", "responsable", "principal", "avanzado"],
-        "manager": ["manager", "head", "director", "vp", "chief", "yönetici", "yonetici", "müdür", "mudur", "leiter", "geschäftsführer", "chef", "directeur", "gerente", "jefe", "diretor"],
+        "intern": [
+            "intern",
+            "internship",
+            "trainee",
+            "stajyer",
+            "praktikant",
+            "stagiaire",
+            "pasante",
+            "becario",
+            "tirocinante",
+            "practicante",
+        ],
+        "junior": [
+            "junior",
+            "entry level",
+            "entry-level",
+            "associate",
+            "júnior",
+            "juniorentwickler",
+            "débutant",
+            "debutant",
+            "principiante",
+        ],
+        "mid": [
+            "mid",
+            "mid level",
+            "mid-level",
+            "intermediate",
+            "regular",
+            "mittelstufe",
+            "confirmé",
+            "confirme",
+            "intermedio",
+        ],
+        "senior": [
+            "senior",
+            "lead",
+            "principal",
+            "staff",
+            "experienced",
+            "kıdemli",
+            "kidemli",
+            "leiter",
+            "chef",
+            "responsable",
+            "principal",
+            "avanzado",
+        ],
+        "manager": [
+            "manager",
+            "head",
+            "director",
+            "vp",
+            "chief",
+            "yönetici",
+            "yonetici",
+            "müdür",
+            "mudur",
+            "leiter",
+            "geschäftsführer",
+            "chef",
+            "directeur",
+            "gerente",
+            "jefe",
+            "diretor",
+        ],
     }
     for level, patterns in senior_patterns.items():
         for pattern in patterns:
@@ -378,19 +735,60 @@ def _assess_job_description_quality(job_description: str, jd_skills: list | None
     lower = text.lower()
     has_skill = bool(jd_skills)
     role_terms = {
-        "developer", "engineer", "analyst", "manager", "designer", "intern", "specialist",
-        "consultant", "assistant", "coordinator", "architect", "technician", "administrator",
-        "backend", "frontend", "fullstack", "full-stack", "software", "data", "devops",
-        "qa", "tester", "sales", "marketing", "teacher", "nurse", "accountant", "product",
-        "recruiter", "junior", "senior", "lead", "mühendis", "muhendis", "geliştirici",
-        "gelistirici", "uzman", "stajyer", "analist", "tasarımcı", "tasarimci", "yönetici",
-        "yonetici", "öğretmen", "ogretmen", "hemşire", "hemsire", "satış", "satis",
+        "developer",
+        "engineer",
+        "analyst",
+        "manager",
+        "designer",
+        "intern",
+        "specialist",
+        "consultant",
+        "assistant",
+        "coordinator",
+        "architect",
+        "technician",
+        "administrator",
+        "backend",
+        "frontend",
+        "fullstack",
+        "full-stack",
+        "software",
+        "data",
+        "devops",
+        "qa",
+        "tester",
+        "sales",
+        "marketing",
+        "teacher",
+        "nurse",
+        "accountant",
+        "product",
+        "recruiter",
+        "junior",
+        "senior",
+        "lead",
+        "mühendis",
+        "muhendis",
+        "geliştirici",
+        "gelistirici",
+        "uzman",
+        "stajyer",
+        "analist",
+        "tasarımcı",
+        "tasarimci",
+        "yönetici",
+        "yonetici",
+        "öğretmen",
+        "ogretmen",
+        "hemşire",
+        "hemsire",
+        "satış",
+        "satis",
     }
     has_role = any(re.search(rf"\b{re.escape(term)}\b", lower) for term in role_terms)
     vowel_re = re.compile(r"[aeiouıöüAEIOUİÖÜ]")
     meaningful_alpha = [
-        tok for tok in alpha_tokens
-        if vowel_re.search(tok) or tok.lower() in {"qa", "hr", "ui", "ux", "c++", "c#"}
+        tok for tok in alpha_tokens if vowel_re.search(tok) or tok.lower() in {"qa", "hr", "ui", "ux", "c++", "c#"}
     ]
 
     if not has_skill and not has_role:
@@ -426,12 +824,7 @@ def _build_match_score_v2(result: dict, keyword_gap_v2: dict) -> dict:
     title_match = float(result.get("title_match", 0.0) or 0.0)
     seniority_match = float(result.get("seniority_match", 0.0) or 0.0)
 
-    weighted = (
-        keyword_coverage * 0.35
-        + experience_match * 0.30
-        + title_match * 0.20
-        + seniority_match * 0.15
-    )
+    weighted = keyword_coverage * 0.35 + experience_match * 0.30 + title_match * 0.20 + seniority_match * 0.15
     overall = round(min(100.0, max(0.0, weighted)), 2)
 
     weak_notes = []
@@ -540,12 +933,15 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
         semantic_score = 0.0
         embedding_failed = True
         warnings.append(
-            "Semantic analysis unavailable (embedding service offline). "
-            "Scores are based on keyword matching only."
+            "Semantic analysis unavailable (embedding service offline). Scores are based on keyword matching only."
         )
     else:
         try:
-            semantic_score = calculate_similarity(cv_embedding, job_embedding) * 100 if (_has_jd and cv_embedding and job_embedding) else 0.0
+            semantic_score = (
+                calculate_similarity(cv_embedding, job_embedding) * 100
+                if (_has_jd and cv_embedding and job_embedding)
+                else 0.0
+            )
         except Exception:
             semantic_score = 0.0
     keyword_score = keyword_match_score(cv_text, job_description)
@@ -648,9 +1044,7 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
     except Exception:
         hire_decision, hire_probability = False, 0.5
 
-    recommendations = generate_recommendations(
-        missing_skills, semantic_score, keyword_score, lang=detected_lang
-    )
+    recommendations = generate_recommendations(missing_skills, semantic_score, keyword_score, lang=detected_lang)
 
     content_score = float(ats_details.get("content", {}).get("content_score", 0.0))
     layout_score = float(ats_details.get("layout", {}).get("layout_score", 0.0))
@@ -662,6 +1056,7 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
     # When no job description is provided, use ATS overall_score directly
     # since keyword/skill/semantic scores are meaningless without a JD target.
     from services.ats_service import compute_final_score
+
     breakdown = None
     if not _has_jd:
         final_score = round(float(ats_score), 2)
@@ -702,6 +1097,7 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
     if bool(job_description and job_description.strip()):
         try:
             from services.ml_calibrator import predict_calibrated_score, blend_with_rule_score
+
             ml_pred = predict_calibrated_score(
                 keyword_score=keyword_score,
                 skill_score=skill_score,
@@ -742,9 +1138,7 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
                 warnings.append("Embedding cap configured but invalid; skipping cap.")
         else:
             # No cap configured: keep final_score as computed, but warn
-            warnings.append(
-                "Embeddings unavailable; semantic signals disabled for this analysis."
-            )
+            warnings.append("Embeddings unavailable; semantic signals disabled for this analysis.")
 
     if _has_jd and jd_quality.get("status") == "invalid":
         final_score = 0.0
@@ -790,12 +1184,13 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
     # because the CV is well-structured, even though relevance is near zero.
     if _has_jd:
         # Job match: keyword + skill + semantic + seniority (content relevance)
-        _job_match = round(min(100.0, max(0.0,
-            keyword_score * 0.35
-            + skill_score * 0.25
-            + semantic_score * 0.25
-            + seniority_match * 0.15
-        )), 2)
+        _job_match = round(
+            min(
+                100.0,
+                max(0.0, keyword_score * 0.35 + skill_score * 0.25 + semantic_score * 0.25 + seniority_match * 0.15),
+            ),
+            2,
+        )
         # ATS quality: structural quality independent of JD
         _ats_quality = round(min(100.0, max(0.0, float(ats_score))), 2)
         # Interpretation text
@@ -869,6 +1264,7 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
     # ── Score Suggestions (actionable improvement tips) ────────────
     if _has_jd and jd_quality.get("status") != "invalid":
         from services.ats_service import generate_score_suggestions
+
         result["score_suggestions"] = generate_score_suggestions(
             missing_skills=missing_skills,
             keyword_gap=keyword_gap,
@@ -924,6 +1320,7 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
 
     return result
 
+
 # =====================================================
 # TEXT ANALYZE
 # =====================================================
@@ -936,5 +1333,3 @@ def run_pipeline(cv_text: str, job_description: str, lang: str = ""):
 
 
 # User data, retention, reminder, and specialization routes moved to routes/user_data.py
-
-

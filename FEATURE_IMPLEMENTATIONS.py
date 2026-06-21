@@ -11,6 +11,7 @@
 Add to response models in routes/recruiter.py:
 """
 
+
 class PaginationMeta(BaseModel):
     total: int
     limit: int
@@ -71,7 +72,7 @@ def recruiter_candidates(
 # ║ FEATURE 5: BULK EMAIL SEND                                                ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
 
-BULK_EMAIL_MODELS = '''
+BULK_EMAIL_MODELS = """
 class BulkEmailRequest(BaseModel):
     template_id: int
     candidate_emails: list[str]  # List of email addresses
@@ -88,7 +89,7 @@ class BulkEmailResponse(BaseModel):
     successful: int
     failed: int
     results: list[BulkEmailResult]
-'''
+"""
 
 BULK_EMAIL_ENDPOINT = '''
 @router.post("/send-email-bulk")

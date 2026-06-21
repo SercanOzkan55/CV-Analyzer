@@ -19,6 +19,7 @@ def _get_pipeline_agents():
     """Lazy import to avoid circular dependency with agents module."""
     from agents.extract_agent import extract_structured
     from agents.normalize_agent import get_section_order, normalize
+
     return extract_structured, normalize, get_section_order
 
 
@@ -27,7 +28,7 @@ SUMMARY_MAX_CHARS = 500
 MAX_HEADER_CONTACTS = 6
 STRUCTURED_SCORE_TOLERANCE = 5.0
 USE_PIPELINE = True
-_MAX_PROJECT_ENTRIES = 200      # max project entries from parser loop
+_MAX_PROJECT_ENTRIES = 200  # max project entries from parser loop
 PROTECTED_SECTION_KEYS = {"education", "skills", "projects", "certifications", "languages"}
 
 from .language_service import SECTION_ALIASES, clean_lower
@@ -77,100 +78,220 @@ SECTION_TITLES = {
 # Multilingual section titles — used when CV language is known
 SECTION_TITLES_I18N: dict[str, dict[str, str]] = {
     "summary": {
-        "en": "PROFESSIONAL SUMMARY", "tr": "PROFESYONEL ÖZET",
-        "fr": "RÉSUMÉ PROFESSIONNEL", "de": "ZUSAMMENFASSUNG",
-        "es": "RESUMEN PROFESIONAL", "pt": "RESUMO PROFISSIONAL",
-        "it": "PROFILO PROFESSIONALE", "nl": "SAMENVATTING",
-        "ru": "РЕЗЮМЕ", "pl": "PODSUMOWANIE ZAWODOWE",
-        "sv": "SAMMANFATTNING", "no": "SAMMENDRAG", "da": "RESUMÉ",
-        "fi": "YHTEENVETO", "cs": "SHRNUTÍ", "hu": "ÖSSZEFOGLALÓ",
-        "ro": "REZUMAT", "ar": "الملخص", "zh": "个人简介",
-        "ja": "職務要約", "ko": "요약", "hi": "सारांश",
-        "id": "RINGKASAN", "vi": "TÓM TẮT", "th": "สรุป",
+        "en": "PROFESSIONAL SUMMARY",
+        "tr": "PROFESYONEL ÖZET",
+        "fr": "RÉSUMÉ PROFESSIONNEL",
+        "de": "ZUSAMMENFASSUNG",
+        "es": "RESUMEN PROFESIONAL",
+        "pt": "RESUMO PROFISSIONAL",
+        "it": "PROFILO PROFESSIONALE",
+        "nl": "SAMENVATTING",
+        "ru": "РЕЗЮМЕ",
+        "pl": "PODSUMOWANIE ZAWODOWE",
+        "sv": "SAMMANFATTNING",
+        "no": "SAMMENDRAG",
+        "da": "RESUMÉ",
+        "fi": "YHTEENVETO",
+        "cs": "SHRNUTÍ",
+        "hu": "ÖSSZEFOGLALÓ",
+        "ro": "REZUMAT",
+        "ar": "الملخص",
+        "zh": "个人简介",
+        "ja": "職務要約",
+        "ko": "요약",
+        "hi": "सारांश",
+        "id": "RINGKASAN",
+        "vi": "TÓM TẮT",
+        "th": "สรุป",
     },
     "experience": {
-        "en": "EXPERIENCE", "tr": "DENEYİM",
-        "fr": "EXPÉRIENCE", "de": "ERFAHRUNG",
-        "es": "EXPERIENCIA", "pt": "EXPERIÊNCIA",
-        "it": "ESPERIENZA", "nl": "ERVARING",
-        "ru": "ОПЫТ РАБОТЫ", "pl": "DOŚWIADCZENIE",
-        "sv": "ERFARENHET", "no": "ERFARING", "da": "ERFARING",
-        "fi": "TYÖKOKEMUS", "cs": "ZKUŠENOSTI", "hu": "TAPASZTALAT",
-        "ro": "EXPERIENȚĂ", "ar": "الخبرة", "zh": "工作经验",
-        "ja": "職歴", "ko": "경력", "hi": "अनुभव",
-        "id": "PENGALAMAN", "vi": "KINH NGHIỆM", "th": "ประสบการณ์",
+        "en": "EXPERIENCE",
+        "tr": "DENEYİM",
+        "fr": "EXPÉRIENCE",
+        "de": "ERFAHRUNG",
+        "es": "EXPERIENCIA",
+        "pt": "EXPERIÊNCIA",
+        "it": "ESPERIENZA",
+        "nl": "ERVARING",
+        "ru": "ОПЫТ РАБОТЫ",
+        "pl": "DOŚWIADCZENIE",
+        "sv": "ERFARENHET",
+        "no": "ERFARING",
+        "da": "ERFARING",
+        "fi": "TYÖKOKEMUS",
+        "cs": "ZKUŠENOSTI",
+        "hu": "TAPASZTALAT",
+        "ro": "EXPERIENȚĂ",
+        "ar": "الخبرة",
+        "zh": "工作经验",
+        "ja": "職歴",
+        "ko": "경력",
+        "hi": "अनुभव",
+        "id": "PENGALAMAN",
+        "vi": "KINH NGHIỆM",
+        "th": "ประสบการณ์",
     },
     "education": {
-        "en": "EDUCATION", "tr": "EĞİTİM",
-        "fr": "FORMATION", "de": "AUSBILDUNG",
-        "es": "EDUCACIÓN", "pt": "EDUCAÇÃO",
-        "it": "ISTRUZIONE", "nl": "OPLEIDING",
-        "ru": "ОБРАЗОВАНИЕ", "pl": "WYKSZTAŁCENIE",
-        "sv": "UTBILDNING", "no": "UTDANNING", "da": "UDDANNELSE",
-        "fi": "KOULUTUS", "cs": "VZDĚLÁNÍ", "hu": "VÉGZETTSÉG",
-        "ro": "EDUCAȚIE", "ar": "التعليم", "zh": "教育",
-        "ja": "学歴", "ko": "학력", "hi": "शिक्षा",
-        "id": "PENDIDIKAN", "vi": "HỌC VẤN", "th": "การศึกษา",
+        "en": "EDUCATION",
+        "tr": "EĞİTİM",
+        "fr": "FORMATION",
+        "de": "AUSBILDUNG",
+        "es": "EDUCACIÓN",
+        "pt": "EDUCAÇÃO",
+        "it": "ISTRUZIONE",
+        "nl": "OPLEIDING",
+        "ru": "ОБРАЗОВАНИЕ",
+        "pl": "WYKSZTAŁCENIE",
+        "sv": "UTBILDNING",
+        "no": "UTDANNING",
+        "da": "UDDANNELSE",
+        "fi": "KOULUTUS",
+        "cs": "VZDĚLÁNÍ",
+        "hu": "VÉGZETTSÉG",
+        "ro": "EDUCAȚIE",
+        "ar": "التعليم",
+        "zh": "教育",
+        "ja": "学歴",
+        "ko": "학력",
+        "hi": "शिक्षा",
+        "id": "PENDIDIKAN",
+        "vi": "HỌC VẤN",
+        "th": "การศึกษา",
     },
     "skills": {
-        "en": "SKILLS", "tr": "BECERİLER",
-        "fr": "COMPÉTENCES", "de": "FÄHIGKEITEN",
-        "es": "HABILIDADES", "pt": "HABILIDADES",
-        "it": "COMPETENZE", "nl": "VAARDIGHEDEN",
-        "ru": "НАВЫКИ", "pl": "UMIEJĘTNOŚCI",
-        "sv": "FÄRDIGHETER", "no": "FERDIGHETER", "da": "FÆRDIGHEDER",
-        "fi": "TAIDOT", "cs": "DOVEDNOSTI", "hu": "KÉSZSÉGEK",
-        "ro": "COMPETENȚE", "ar": "المهارات", "zh": "技能",
-        "ja": "スキル", "ko": "기술", "hi": "कौशल",
-        "id": "KEAHLIAN", "vi": "KỸ NĂNG", "th": "ทักษะ",
+        "en": "SKILLS",
+        "tr": "BECERİLER",
+        "fr": "COMPÉTENCES",
+        "de": "FÄHIGKEITEN",
+        "es": "HABILIDADES",
+        "pt": "HABILIDADES",
+        "it": "COMPETENZE",
+        "nl": "VAARDIGHEDEN",
+        "ru": "НАВЫКИ",
+        "pl": "UMIEJĘTNOŚCI",
+        "sv": "FÄRDIGHETER",
+        "no": "FERDIGHETER",
+        "da": "FÆRDIGHEDER",
+        "fi": "TAIDOT",
+        "cs": "DOVEDNOSTI",
+        "hu": "KÉSZSÉGEK",
+        "ro": "COMPETENȚE",
+        "ar": "المهارات",
+        "zh": "技能",
+        "ja": "スキル",
+        "ko": "기술",
+        "hi": "कौशल",
+        "id": "KEAHLIAN",
+        "vi": "KỸ NĂNG",
+        "th": "ทักษะ",
     },
     "certifications": {
-        "en": "CERTIFICATIONS", "tr": "SERTİFİKALAR",
-        "fr": "CERTIFICATIONS", "de": "ZERTIFIZIERUNGEN",
-        "es": "CERTIFICACIONES", "pt": "CERTIFICAÇÕES",
-        "it": "CERTIFICAZIONI", "nl": "CERTIFICERINGEN",
-        "ru": "СЕРТИФИКАТЫ", "pl": "CERTYFIKATY",
-        "sv": "CERTIFIERINGAR", "no": "SERTIFISERINGER", "da": "CERTIFICERINGER",
-        "fi": "SERTIFIKAATIT", "cs": "CERTIFIKÁTY", "hu": "TANÚSÍTVÁNYOK",
-        "ro": "CERTIFICĂRI", "ar": "الشهادات", "zh": "证书",
-        "ja": "資格", "ko": "자격증", "hi": "प्रमाणपत्र",
-        "id": "SERTIFIKASI", "vi": "CHỨNG CHỈ", "th": "ใบรับรอง",
+        "en": "CERTIFICATIONS",
+        "tr": "SERTİFİKALAR",
+        "fr": "CERTIFICATIONS",
+        "de": "ZERTIFIZIERUNGEN",
+        "es": "CERTIFICACIONES",
+        "pt": "CERTIFICAÇÕES",
+        "it": "CERTIFICAZIONI",
+        "nl": "CERTIFICERINGEN",
+        "ru": "СЕРТИФИКАТЫ",
+        "pl": "CERTYFIKATY",
+        "sv": "CERTIFIERINGAR",
+        "no": "SERTIFISERINGER",
+        "da": "CERTIFICERINGER",
+        "fi": "SERTIFIKAATIT",
+        "cs": "CERTIFIKÁTY",
+        "hu": "TANÚSÍTVÁNYOK",
+        "ro": "CERTIFICĂRI",
+        "ar": "الشهادات",
+        "zh": "证书",
+        "ja": "資格",
+        "ko": "자격증",
+        "hi": "प्रमाणपत्र",
+        "id": "SERTIFIKASI",
+        "vi": "CHỨNG CHỈ",
+        "th": "ใบรับรอง",
     },
     "projects": {
-        "en": "PROJECTS", "tr": "PROJELER",
-        "fr": "PROJETS", "de": "PROJEKTE",
-        "es": "PROYECTOS", "pt": "PROJETOS",
-        "it": "PROGETTI", "nl": "PROJECTEN",
-        "ru": "ПРОЕКТЫ", "pl": "PROJEKTY",
-        "sv": "PROJEKT", "no": "PROSJEKTER", "da": "PROJEKTER",
-        "fi": "PROJEKTIT", "cs": "PROJEKTY", "hu": "PROJEKTEK",
-        "ro": "PROIECTE", "ar": "المشاريع", "zh": "项目",
-        "ja": "プロジェクト", "ko": "프로젝트", "hi": "परियोजनाएं",
-        "id": "PROYEK", "vi": "DỰ ÁN", "th": "โครงการ",
+        "en": "PROJECTS",
+        "tr": "PROJELER",
+        "fr": "PROJETS",
+        "de": "PROJEKTE",
+        "es": "PROYECTOS",
+        "pt": "PROJETOS",
+        "it": "PROGETTI",
+        "nl": "PROJECTEN",
+        "ru": "ПРОЕКТЫ",
+        "pl": "PROJEKTY",
+        "sv": "PROJEKT",
+        "no": "PROSJEKTER",
+        "da": "PROJEKTER",
+        "fi": "PROJEKTIT",
+        "cs": "PROJEKTY",
+        "hu": "PROJEKTEK",
+        "ro": "PROIECTE",
+        "ar": "المشاريع",
+        "zh": "项目",
+        "ja": "プロジェクト",
+        "ko": "프로젝트",
+        "hi": "परियोजनाएं",
+        "id": "PROYEK",
+        "vi": "DỰ ÁN",
+        "th": "โครงการ",
     },
     "languages": {
-        "en": "LANGUAGES", "tr": "DİLLER",
-        "fr": "LANGUES", "de": "SPRACHEN",
-        "es": "IDIOMAS", "pt": "IDIOMAS",
-        "it": "LINGUE", "nl": "TALEN",
-        "ru": "ЯЗЫКИ", "pl": "JĘZYKI",
-        "sv": "SPRÅK", "no": "SPRÅK", "da": "SPROG",
-        "fi": "KIELET", "cs": "JAZYKY", "hu": "NYELVEK",
-        "ro": "LIMBI", "ar": "اللغات", "zh": "语言",
-        "ja": "言語", "ko": "언어", "hi": "भाषाएं",
-        "id": "BAHASA", "vi": "NGÔN NGỮ", "th": "ภาษา",
+        "en": "LANGUAGES",
+        "tr": "DİLLER",
+        "fr": "LANGUES",
+        "de": "SPRACHEN",
+        "es": "IDIOMAS",
+        "pt": "IDIOMAS",
+        "it": "LINGUE",
+        "nl": "TALEN",
+        "ru": "ЯЗЫКИ",
+        "pl": "JĘZYKI",
+        "sv": "SPRÅK",
+        "no": "SPRÅK",
+        "da": "SPROG",
+        "fi": "KIELET",
+        "cs": "JAZYKY",
+        "hu": "NYELVEK",
+        "ro": "LIMBI",
+        "ar": "اللغات",
+        "zh": "语言",
+        "ja": "言語",
+        "ko": "언어",
+        "hi": "भाषाएं",
+        "id": "BAHASA",
+        "vi": "NGÔN NGỮ",
+        "th": "ภาษา",
     },
     "interests": {
-        "en": "INTERESTS", "tr": "İLGİ ALANLARI",
-        "fr": "CENTRES D'INTÉRÊT", "de": "INTERESSEN",
-        "es": "INTERESES", "pt": "INTERESSES",
-        "it": "INTERESSI", "nl": "INTERESSES",
-        "ru": "ИНТЕРЕСЫ", "pl": "ZAINTERESOWANIA",
-        "sv": "INTRESSEN", "no": "INTERESSER", "da": "INTERESSER",
-        "fi": "KIINNOSTUKSET", "cs": "ZÁJMY", "hu": "ÉRDEKLŐDÉS",
-        "ro": "INTERESE", "ar": "الاهتمامات", "zh": "兴趣",
-        "ja": "趣味", "ko": "관심사", "hi": "रुचियां",
-        "id": "MINAT", "vi": "SỞ THÍCH", "th": "ความสนใจ",
+        "en": "INTERESTS",
+        "tr": "İLGİ ALANLARI",
+        "fr": "CENTRES D'INTÉRÊT",
+        "de": "INTERESSEN",
+        "es": "INTERESES",
+        "pt": "INTERESSES",
+        "it": "INTERESSI",
+        "nl": "INTERESSES",
+        "ru": "ИНТЕРЕСЫ",
+        "pl": "ZAINTERESOWANIA",
+        "sv": "INTRESSEN",
+        "no": "INTERESSER",
+        "da": "INTERESSER",
+        "fi": "KIINNOSTUKSET",
+        "cs": "ZÁJMY",
+        "hu": "ÉRDEKLŐDÉS",
+        "ro": "INTERESE",
+        "ar": "الاهتمامات",
+        "zh": "兴趣",
+        "ja": "趣味",
+        "ko": "관심사",
+        "hi": "रुचियां",
+        "id": "MINAT",
+        "vi": "SỞ THÍCH",
+        "th": "ความสนใจ",
     },
 }
 
@@ -247,14 +368,22 @@ def _clean_lines(text: str) -> list[str]:
 
 
 # ── Turkish → ASCII mapping for English CVs ──
-_TR_TO_EN = str.maketrans({
-    "İ": "I", "ı": "i",
-    "Ğ": "G", "ğ": "g",
-    "Ş": "S", "ş": "s",
-    "Ç": "C", "ç": "c",
-    "Ö": "O", "ö": "o",
-    "Ü": "U", "ü": "u",
-})
+_TR_TO_EN = str.maketrans(
+    {
+        "İ": "I",
+        "ı": "i",
+        "Ğ": "G",
+        "ğ": "g",
+        "Ş": "S",
+        "ş": "s",
+        "Ç": "C",
+        "ç": "c",
+        "Ö": "O",
+        "ö": "o",
+        "Ü": "U",
+        "ü": "u",
+    }
+)
 _TR_KEEP_LOWER = {"istanbul", "özkan", "kuşcu", "üsküdar", "kadıköy", "beşiktaş", "şişli"}
 _COMMON_TECH_SPELLING_FIXES = (
     (re.compile(r"\bJAVASCRIPT\b", re.I), "JavaScript"),
@@ -431,8 +560,7 @@ def _parse_sections(cv_text: str) -> tuple[list[str], dict[str, list[str]], list
     # sections were found, run the NLP-style block classifier on the
     # *entire* text and merge results.
     filled_sections = sum(
-        1 for key, vals in sections.items()
-        if key != "contact" and any((v or "").strip() for v in vals)
+        1 for key, vals in sections.items() if key != "contact" and any((v or "").strip() for v in vals)
     )
     # Heuristic: if fewer than 2 sections were recognized AND header_lines
     # contain a lot of content, the alias matcher missed the sections.
@@ -473,8 +601,7 @@ def _parse_sections(cv_text: str) -> tuple[list[str], dict[str, list[str]], list
     #    non-contact header content into the first detected section.  ──
     if len(header_lines) > 6 and not _header_has_contact(header_lines):
         first_section = next(
-            (k for k in ("summary", "experience", "education")
-             if any((v or "").strip() for v in sections.get(k, []))),
+            (k for k in ("summary", "experience", "education") if any((v or "").strip() for v in sections.get(k, []))),
             None,
         )
         if first_section:
@@ -491,24 +618,84 @@ _NAME_DISQUALIFY_RE = re.compile(
     re.I,
 )
 _TITLE_HINT_WORDS = {
-    "engineer", "developer", "student", "manager", "analyst", "specialist",
-    "consultant", "architect", "designer", "intern", "lead", "director",
-    "officer", "professor", "scientist", "coordinator", "researcher",
-    "instructor", "teacher", "programmer", "administrator", "trainer",
-    "senior", "junior", "associate", "assistant", "head", "chief",
-    "freelance", "full-stack", "frontend", "backend", "devops", "data",
-    "software", "web", "mobile", "cloud", "cyber", "machine learning",
-    "ai", "qa", "quality",
+    "engineer",
+    "developer",
+    "student",
+    "manager",
+    "analyst",
+    "specialist",
+    "consultant",
+    "architect",
+    "designer",
+    "intern",
+    "lead",
+    "director",
+    "officer",
+    "professor",
+    "scientist",
+    "coordinator",
+    "researcher",
+    "instructor",
+    "teacher",
+    "programmer",
+    "administrator",
+    "trainer",
+    "senior",
+    "junior",
+    "associate",
+    "assistant",
+    "head",
+    "chief",
+    "freelance",
+    "full-stack",
+    "frontend",
+    "backend",
+    "devops",
+    "data",
+    "software",
+    "web",
+    "mobile",
+    "cloud",
+    "cyber",
+    "machine learning",
+    "ai",
+    "qa",
+    "quality",
     # institutional / academic keywords
-    "university", "department", "faculty", "computer", "engineering",
-    "science", "technology", "academy", "school",
+    "university",
+    "department",
+    "faculty",
+    "computer",
+    "engineering",
+    "science",
+    "technology",
+    "academy",
+    "school",
 }
 _SECTION_HEADER_WORDS = {
-    "profile", "summary", "objective", "about", "personal",
-    "information", "contact", "details", "experience", "education",
-    "skills", "projects", "languages", "interests", "references",
-    "certifications", "achievements", "publications", "activities",
-    "hobbies", "awards", "volunteer", "work",
+    "profile",
+    "summary",
+    "objective",
+    "about",
+    "personal",
+    "information",
+    "contact",
+    "details",
+    "experience",
+    "education",
+    "skills",
+    "projects",
+    "languages",
+    "interests",
+    "references",
+    "certifications",
+    "achievements",
+    "publications",
+    "activities",
+    "hobbies",
+    "awards",
+    "volunteer",
+    "work",
 }
 _TRAILING_TITLE_RE = re.compile(
     r"\b(?:student|engineer|developer|intern|manager|specialist)\s*$",
@@ -564,10 +751,10 @@ def guess_name_from_lines(lines: list[str], limit: int = 5) -> str | None:
 
 # ── Header safety: reject header blocks without any contact signal ──
 _CONTACT_SIGNAL_RE = re.compile(
-    r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}"        # email
-    r"|(?:\(?\+?\d[\d()\-\s.]{7,}\d)"                  # phone
-    r"|linkedin\.com|github\.com"                       # profile URLs
-    r"|https?://",                                      # any URL
+    r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}"  # email
+    r"|(?:\(?\+?\d[\d()\-\s.]{7,}\d)"  # phone
+    r"|linkedin\.com|github\.com"  # profile URLs
+    r"|https?://",  # any URL
     re.IGNORECASE,
 )
 
@@ -588,24 +775,88 @@ def _extract_contact_block(
     leftovers: list[str] = []
     title_hint_words = (
         # English
-        "engineer", "developer", "student", "manager", "analyst", "specialist", "consultant",
-        "architect", "designer", "intern", "lead", "director", "officer", "professor",
-        "assistant", "coordinator", "technician", "administrator", "backend", "frontend",
-        "fullstack", "full-stack", "software", "data", "devops", "qa", "tester",
+        "engineer",
+        "developer",
+        "student",
+        "manager",
+        "analyst",
+        "specialist",
+        "consultant",
+        "architect",
+        "designer",
+        "intern",
+        "lead",
+        "director",
+        "officer",
+        "professor",
+        "assistant",
+        "coordinator",
+        "technician",
+        "administrator",
+        "backend",
+        "frontend",
+        "fullstack",
+        "full-stack",
+        "software",
+        "data",
+        "devops",
+        "qa",
+        "tester",
         # Turkish
-        "mühendis", "muhendis", "geliştirici", "gelistirici", "uzman", "stajyer", "analist",
-        "tasarımcı", "tasarimci", "yönetici", "yonetici", "öğretmen", "ogretmen", "hemşire",
-        "hemsire", "satış", "satis", "danışman", "danisman", "koordinatör", "koordinator",
+        "mühendis",
+        "muhendis",
+        "geliştirici",
+        "gelistirici",
+        "uzman",
+        "stajyer",
+        "analist",
+        "tasarımcı",
+        "tasarimci",
+        "yönetici",
+        "yonetici",
+        "öğretmen",
+        "ogretmen",
+        "hemşire",
+        "hemsire",
+        "satış",
+        "satis",
+        "danışman",
+        "danisman",
+        "koordinatör",
+        "koordinator",
         # German
-        "entwickler", "ingenieur", "leiter", "spezialist", "berater", "architekt",
-        "assistent", "praktikant", "administrator",
+        "entwickler",
+        "ingenieur",
+        "leiter",
+        "spezialist",
+        "berater",
+        "architekt",
+        "assistent",
+        "praktikant",
+        "administrator",
         # French
-        "développeur", "developpeur", "ingénieur", "ingenieur", "directeur",
-        "spécialiste", "specialiste", "consultant", "architecte", "assistant",
-        "stagiaire", "administrateur",
+        "développeur",
+        "developpeur",
+        "ingénieur",
+        "ingenieur",
+        "directeur",
+        "spécialiste",
+        "specialiste",
+        "consultant",
+        "architecte",
+        "assistant",
+        "stagiaire",
+        "administrateur",
         # Spanish
-        "desarrollador", "ingeniero", "director", "especialista", "consultor",
-        "arquitecto", "asistente", "becario", "administrador",
+        "desarrollador",
+        "ingeniero",
+        "director",
+        "especialista",
+        "consultor",
+        "arquitecto",
+        "asistente",
+        "becario",
+        "administrador",
     )
 
     # Language-agnostic contact-label pattern: any short label followed by a colon
@@ -638,7 +889,9 @@ def _extract_contact_block(
         return val
 
     def _extract_url(line: str) -> str | None:
-        match = re.search(r"(?:https?://)?(?:www\.)?(?:linkedin\.com|github\.com|[A-Za-z0-9.-]+\.[A-Za-z]{2,})(?:/\S*)?", line, re.I)
+        match = re.search(
+            r"(?:https?://)?(?:www\.)?(?:linkedin\.com|github\.com|[A-Za-z0-9.-]+\.[A-Za-z]{2,})(?:/\S*)?", line, re.I
+        )
         if not match:
             return None
         url = match.group(0).strip().rstrip(",.;")
@@ -657,7 +910,7 @@ def _extract_contact_block(
         # Detect labeled contact lines (e.g. "Phone: ...", "Email: ...")
         label_match = _CONTACT_LABEL_RE.match(line)
         if label_match:
-            value_part = line[label_match.end():].strip()
+            value_part = line[label_match.end() :].strip()
             if value_part:
                 email = _extract_email(value_part)
                 phone = _extract_phone(value_part)
@@ -694,7 +947,10 @@ def _extract_contact_block(
                 contacts.append(phone)
                 consumed_any = True
                 continue
-            if any(key in token.lower() for key in ("linkedin", "github", "portfolio", "http://", "https://", ".com", ".io")):
+            if any(
+                key in token.lower()
+                for key in ("linkedin", "github", "portfolio", "http://", "https://", ".com", ".io")
+            ):
                 url = _extract_url(token)
                 contacts.append(url or token)
                 consumed_any = True
@@ -915,19 +1171,28 @@ def _normalize_language_lines(lines: list[str]) -> list[str]:
         pairs = _SUBSKILL_CEFR_RE.findall(entry)
         if pairs and len(pairs) >= 2:
             first_skill_match = _SUBSKILL_CEFR_RE.search(entry)
-            lang_name = entry[:first_skill_match.start()].strip(" :,-–—()")
+            lang_name = entry[: first_skill_match.start()].strip(" :,-–—()")
             if not lang_name:
                 for token in entry.split():
                     if token.strip(" :,-()").lower() in _KNOWN_LANGS:
                         lang_name = token.strip(" :,-()")
                         break
             if lang_name:
-                parts_str = [f"{skill.capitalize()}: {level.upper() if len(level) <= 2 else level.capitalize()}" for skill, level in pairs]
+                parts_str = [
+                    f"{skill.capitalize()}: {level.upper() if len(level) <= 2 else level.capitalize()}"
+                    for skill, level in pairs
+                ]
                 result.append(f"{lang_name.capitalize()} ({', '.join(parts_str)})")
                 continue
 
         # Case 2: Simple Language Level (e.g., "English C1", "Almanca: B2", "English (Native)")
-        match = re.search(r"^([A-Za-z\u00C0-\u024F\u0400-\u04FF\u011E\u011F\u0130\u0131\u015E\u015F\u00C7\u00E7\u00D6\u00F6\u00DC\u00FC\s]+?)\s*[:\-–—,\s]?\s*\(?\s*" + _LEVELS_PATTERN + r"\s*\)?$", entry, re.I | re.UNICODE)
+        match = re.search(
+            r"^([A-Za-z\u00C0-\u024F\u0400-\u04FF\u011E\u011F\u0130\u0131\u015E\u015F\u00C7\u00E7\u00D6\u00F6\u00DC\u00FC\s]+?)\s*[:\-–—,\s]?\s*\(?\s*"
+            + _LEVELS_PATTERN
+            + r"\s*\)?$",
+            entry,
+            re.I | re.UNICODE,
+        )
         if match:
             lang = match.group(1).strip(" :,-–—()")
             level = match.group(2).strip()
@@ -1143,8 +1408,12 @@ def _build_structured_cv(
     elif mode == "strict":
         experience_lines = _normalize_experience(experience_raw)
     else:
-        has_bullets = any(re.match(r"^\s*[-*•\u2013\u2014\u2023\u25aa\u25a0\uf0b7]\s+", line) for line in experience_raw)
-        experience_lines = _normalize_experience(experience_raw) if (experience_raw and not has_bullets) else experience_raw
+        has_bullets = any(
+            re.match(r"^\s*[-*•\u2013\u2014\u2023\u25aa\u25a0\uf0b7]\s+", line) for line in experience_raw
+        )
+        experience_lines = (
+            _normalize_experience(experience_raw) if (experience_raw and not has_bullets) else experience_raw
+        )
     education_lines = sections.get("education", []) or []
     certification_lines = [line for line in sections.get("certifications", []) if line]
     project_raw = [line for line in sections.get("projects", []) if line]
@@ -1153,7 +1422,9 @@ def _build_structured_cv(
     elif mode == "strict":
         project_lines = _normalize_experience(project_raw)
     else:
-        has_project_bullets = any(re.match(r"^\s*[-*•\u2013\u2014\u2023\u25aa\u25a0\uf0b7]\s+", line) for line in project_raw)
+        has_project_bullets = any(
+            re.match(r"^\s*[-*•\u2013\u2014\u2023\u25aa\u25a0\uf0b7]\s+", line) for line in project_raw
+        )
         project_lines = _normalize_experience(project_raw) if (project_raw and not has_project_bullets) else project_raw
     language_lines = _normalize_list_section(sections.get("languages", []))
     skills = _ordered_skills(cv_text, sections.get("skills", []), job_description)
@@ -1258,12 +1529,16 @@ def _pipeline_to_structured_text(
 
     # ── experience ──
     experience_lines: list[str] = []
-    for exp in (normalized.get("experiences") or normalized.get("experience") or []):
-        header_parts = [p for p in [
-            exp.get("title", ""),
-            exp.get("company", ""),
-            exp.get("location", ""),
-        ] if p]
+    for exp in normalized.get("experiences") or normalized.get("experience") or []:
+        header_parts = [
+            p
+            for p in [
+                exp.get("title", ""),
+                exp.get("company", ""),
+                exp.get("location", ""),
+            ]
+            if p
+        ]
         start = exp.get("start_date", "")
         end = exp.get("end_date", "")
         if start or end:
@@ -1272,19 +1547,20 @@ def _pipeline_to_structured_text(
             experience_lines.append(" | ".join(header_parts))
         for bullet in exp.get("bullets", []):
             if bullet:
-                experience_lines.append(
-                    bullet if bullet.lstrip().startswith(("•", "- ", "* "))
-                    else f"• {bullet}"
-                )
+                experience_lines.append(bullet if bullet.lstrip().startswith(("•", "- ", "* ")) else f"• {bullet}")
 
     # ── education (GPA stays attached) ──
     education_lines: list[str] = []
-    for edu in (normalized.get("education") or []):
-        parts = [p for p in [
-            edu.get("degree", ""),
-            edu.get("field", ""),
-            edu.get("school", ""),
-        ] if p]
+    for edu in normalized.get("education") or []:
+        parts = [
+            p
+            for p in [
+                edu.get("degree", ""),
+                edu.get("field", ""),
+                edu.get("school", ""),
+            ]
+            if p
+        ]
         start = edu.get("start_date", "")
         end = edu.get("end_date", "")
         if start or end:
@@ -1299,10 +1575,7 @@ def _pipeline_to_structured_text(
     skills_flat = list(normalized.get("skills") or normalized.get("skill") or [])
     skills_cat = normalized.get("skills_categorized", {})
     if job_description and skills_flat:
-        job_skills = set(
-            s.lower()
-            for s in _extract_skill_names(extract_skills(job_description))
-        )
+        job_skills = set(s.lower() for s in _extract_skill_names(extract_skills(job_description)))
         matched = [s for s in skills_flat if s.lower() in job_skills]
         rest = [s for s in skills_flat if s.lower() not in job_skills]
         skills_flat = matched + rest
@@ -1319,7 +1592,7 @@ def _pipeline_to_structured_text(
 
     # ── projects ──
     project_lines: list[str] = []
-    for proj in (normalized.get("projects") or normalized.get("project") or []):
+    for proj in normalized.get("projects") or normalized.get("project") or []:
         proj_name = proj.get("name") or proj.get("title") or ""
         if proj_name:
             project_lines.append(proj_name)
@@ -1328,23 +1601,17 @@ def _pipeline_to_structured_text(
         has_bullets = any(b and b.strip() for b in bullets)
         # If no bullets but description exists, promote description to bullet
         if proj_desc and not has_bullets:
-            project_lines.append(
-                proj_desc if proj_desc.lstrip().startswith(("•", "- ", "* "))
-                else f"• {proj_desc}"
-            )
+            project_lines.append(proj_desc if proj_desc.lstrip().startswith(("•", "- ", "* ")) else f"• {proj_desc}")
         else:
             if proj_desc:
                 project_lines.append(proj_desc)
             for bullet in bullets:
                 if bullet:
-                    project_lines.append(
-                        bullet if bullet.lstrip().startswith(("•", "- ", "* "))
-                        else f"• {bullet}"
-                    )
+                    project_lines.append(bullet if bullet.lstrip().startswith(("•", "- ", "* ")) else f"• {bullet}")
 
     # ── certifications ──
     cert_lines: list[str] = []
-    for cert in (normalized.get("certifications") or normalized.get("certification") or []):
+    for cert in normalized.get("certifications") or normalized.get("certification") or []:
         if isinstance(cert, dict):
             cname = cert.get("name", "")
             if cname:
@@ -1353,11 +1620,7 @@ def _pipeline_to_structured_text(
             cert_lines.append(str(cert))
 
     # ── languages ──
-    language_lines = [
-        str(lang)
-        for lang in (normalized.get("languages") or normalized.get("language") or [])
-        if lang
-    ]
+    language_lines = [str(lang) for lang in (normalized.get("languages") or normalized.get("language") or []) if lang]
 
     # ── assemble sections ──
     structured_sections: dict[str, list[str]] = {}
@@ -1381,7 +1644,11 @@ def _pipeline_to_structured_text(
     title_lines = [title] if title else []
 
     text = _render_structured_sections(
-        name, title_lines, contacts, structured_sections, section_order,
+        name,
+        title_lines,
+        contacts,
+        structured_sections,
+        section_order,
     )
     return text, structured_sections, dropped, section_order
 
@@ -1457,28 +1724,97 @@ def _ensure_identity_header(
 
 
 _BOOST_ACTION_VERBS = [
-    "led", "managed", "developed", "implemented", "designed", "delivered",
-    "optimized", "created", "improved", "built", "launched", "coordinated",
-    "established", "streamlined", "executed", "analyzed", "achieved",
-    "automated", "resolved", "maintained", "collaborated", "configured",
-    "integrated", "deployed", "enhanced", "reduced", "increased",
-    "spearheaded", "architected", "engineered",
+    "led",
+    "managed",
+    "developed",
+    "implemented",
+    "designed",
+    "delivered",
+    "optimized",
+    "created",
+    "improved",
+    "built",
+    "launched",
+    "coordinated",
+    "established",
+    "streamlined",
+    "executed",
+    "analyzed",
+    "achieved",
+    "automated",
+    "resolved",
+    "maintained",
+    "collaborated",
+    "configured",
+    "integrated",
+    "deployed",
+    "enhanced",
+    "reduced",
+    "increased",
+    "spearheaded",
+    "architected",
+    "engineered",
 ]
 
 # Full set of action verbs (from ats_service) for detection purposes
 _ALL_ACTION_VERBS = set(_BOOST_ACTION_VERBS) | {
-    "directed", "supervised", "oversaw", "orchestrated", "mentored", "coached",
-    "exceeded", "surpassed", "earned", "won", "awarded",
-    "founded", "initiated", "introduced", "pioneered",
-    "upgraded", "refactored", "modernized", "revamped", "transformed", "accelerated",
-    "assessed", "evaluated", "researched", "investigated", "identified",
-    "diagnosed", "audited", "reviewed", "benchmarked",
-    "shipped", "completed",
-    "expanded", "scaled", "grew", "generated", "boosted",
-    "decreased", "minimized", "eliminated", "consolidated", "cut", "saved",
-    "presented", "communicated", "negotiated", "facilitated", "documented",
-    "reported", "trained", "taught", "educated",
-    "programmed", "migrated", "containerized", "provisioned", "instrumented",
+    "directed",
+    "supervised",
+    "oversaw",
+    "orchestrated",
+    "mentored",
+    "coached",
+    "exceeded",
+    "surpassed",
+    "earned",
+    "won",
+    "awarded",
+    "founded",
+    "initiated",
+    "introduced",
+    "pioneered",
+    "upgraded",
+    "refactored",
+    "modernized",
+    "revamped",
+    "transformed",
+    "accelerated",
+    "assessed",
+    "evaluated",
+    "researched",
+    "investigated",
+    "identified",
+    "diagnosed",
+    "audited",
+    "reviewed",
+    "benchmarked",
+    "shipped",
+    "completed",
+    "expanded",
+    "scaled",
+    "grew",
+    "generated",
+    "boosted",
+    "decreased",
+    "minimized",
+    "eliminated",
+    "consolidated",
+    "cut",
+    "saved",
+    "presented",
+    "communicated",
+    "negotiated",
+    "facilitated",
+    "documented",
+    "reported",
+    "trained",
+    "taught",
+    "educated",
+    "programmed",
+    "migrated",
+    "containerized",
+    "provisioned",
+    "instrumented",
 }
 
 
@@ -1679,7 +2015,7 @@ def _parse_experience_entries(lines: list[str]) -> list[dict]:
             return text, "", ""
         start = match.group("start").strip(" ()")
         end = match.group("end").strip(" ()")
-        cleaned = (text[: match.start()] + " " + text[match.end():]).strip(" -\u2013\u2014|()")
+        cleaned = (text[: match.start()] + " " + text[match.end() :]).strip(" -\u2013\u2014|()")
         cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
         return cleaned, start, end
 
@@ -1727,7 +2063,8 @@ def _parse_experience_entries(lines: list[str]) -> list[dict]:
         re.I,
     )
     single_date_pattern = re.compile(
-        rf"^(?:{_month_word}\s+|{_numeric_prefix})?{year_pattern}$", re.I,
+        rf"^(?:{_month_word}\s+|{_numeric_prefix})?{year_pattern}$",
+        re.I,
     )
 
     def _is_date_like(value: str) -> bool:
@@ -1746,13 +2083,47 @@ def _parse_experience_entries(lines: list[str]) -> list[dict]:
         return False
 
     _ROLE_KEYWORDS = {
-        "engineer", "developer", "manager", "analyst", "designer", "architect",
-        "lead", "director", "consultant", "specialist", "coordinator",
-        "administrator", "intern", "trainee", "associate", "senior", "junior",
-        "principal", "staff", "head", "chief", "vp", "president", "officer",
-        "scientist", "researcher", "technician", "programmer", "lecturer",
-        "professor", "assistant", "executive", "founder", "co-founder",
-        "cto", "ceo", "cfo", "coo", "devops", "qa", "tester",
+        "engineer",
+        "developer",
+        "manager",
+        "analyst",
+        "designer",
+        "architect",
+        "lead",
+        "director",
+        "consultant",
+        "specialist",
+        "coordinator",
+        "administrator",
+        "intern",
+        "trainee",
+        "associate",
+        "senior",
+        "junior",
+        "principal",
+        "staff",
+        "head",
+        "chief",
+        "vp",
+        "president",
+        "officer",
+        "scientist",
+        "researcher",
+        "technician",
+        "programmer",
+        "lecturer",
+        "professor",
+        "assistant",
+        "executive",
+        "founder",
+        "co-founder",
+        "cto",
+        "ceo",
+        "cfo",
+        "coo",
+        "devops",
+        "qa",
+        "tester",
     }
 
     def _looks_like_role(text: str) -> bool:
@@ -1830,13 +2201,11 @@ def _parse_experience_entries(lines: list[str]) -> list[dict]:
         # or is a very short role-like phrase (≤3 words after marker).
         _bullet_m = re.match(r"^\s*[-*•\u2013\u2014\u2023\u25aa\u25a0\uf0b7]\s*", line)
         if _bullet_m and not _is_date_like(line):
-            bullet_text = line[_bullet_m.end():].strip()
+            bullet_text = line[_bullet_m.end() :].strip()
             # Only reject as "role title" if the after-marker text is very
             # short (≤3 words) AND looks like a role — longer lines are
             # descriptions that happen to mention role keywords.
-            _is_short_role = (
-                len(bullet_text.split()) <= 3 and _looks_like_role(bullet_text)
-            )
+            _is_short_role = len(bullet_text.split()) <= 3 and _looks_like_role(bullet_text)
             if bullet_text and not _is_short_role:
                 if current is None:
                     current = _new_entry("Experience")
@@ -1850,8 +2219,7 @@ def _parse_experience_entries(lines: list[str]) -> list[dict]:
             # If current entry has title but no company, and this is a short
             # pipe line (2 parts like "Company | Dates"), treat as company+date
             # for current entry, NOT as a new entry.
-            if (current and current.get("title") and not current.get("company")
-                    and len(pipe_parts) <= 2):
+            if current and current.get("title") and not current.get("company") and len(pipe_parts) <= 2:
                 current["company"] = pipe_entry.get("title", "")
                 current["start_date"] = pipe_entry.get("start_date", "")
                 current["end_date"] = pipe_entry.get("end_date", "")
@@ -1977,9 +2345,7 @@ _PAREN_DATE_RE = re.compile(
 
 def _looks_like_degree(line: str) -> bool:
     """Return True if the line looks like the start of a new education entry."""
-    return (bool(_DEGREE_RE.search(line))
-            or bool(_DEGREE_TR_RE.search(line))
-            or bool(_DEGREE_TITLE_RE.search(line)))
+    return bool(_DEGREE_RE.search(line)) or bool(_DEGREE_TR_RE.search(line)) or bool(_DEGREE_TITLE_RE.search(line))
 
 
 def _extract_paren_dates(text: str) -> tuple:
@@ -2019,13 +2385,19 @@ def _parse_education_entries(lines: list[str]) -> list[dict]:
     entries: list[dict] = []
     current: dict | None = None
     university_keywords = (
-        "university", "universit",
-        "institute", "enstit",
+        "university",
+        "universit",
+        "institute",
+        "enstit",
         "college",
         "school",
-        "faculty", "fak\u00fclte", "fakulte",
-        "academy", "akademi",
-        "\u00fcniversite", "universitesi",
+        "faculty",
+        "fak\u00fclte",
+        "fakulte",
+        "academy",
+        "akademi",
+        "\u00fcniversite",
+        "universitesi",
     )
 
     for raw in lines:
@@ -2036,14 +2408,18 @@ def _parse_education_entries(lines: list[str]) -> list[dict]:
         lowered = line.lower()
 
         # ── 0. If current entry is complete (school + degree + dates), flush it ──
-        if (current
-                and current.get("degree") and current.get("school")
-                and (current.get("start_date") or current.get("end_date"))):
+        if (
+            current
+            and current.get("degree")
+            and current.get("school")
+            and (current.get("start_date") or current.get("end_date"))
+        ):
             # Don't flush if current school is incomplete (no university keyword)
             # and this line contains one — it's likely a continuation.
             school_low = current["school"].lower()
-            if (any(kw in lowered for kw in university_keywords)
-                    and not any(kw in school_low for kw in university_keywords)):
+            if any(kw in lowered for kw in university_keywords) and not any(
+                kw in school_low for kw in university_keywords
+            ):
                 pass  # let step 4 handle the merge
             else:
                 entries.append(current)
@@ -2053,7 +2429,13 @@ def _parse_education_entries(lines: list[str]) -> list[dict]:
         if "|" in line:
             parts = [p.strip() for p in line.split("|") if p.strip()]
             if len(parts) >= 2:
-                if current and current.get("school") and not current.get("degree") and not current.get("start_date") and not current.get("end_date"):
+                if (
+                    current
+                    and current.get("school")
+                    and not current.get("degree")
+                    and not current.get("start_date")
+                    and not current.get("end_date")
+                ):
                     pass  # merge into current
                 else:
                     if current:
@@ -2079,9 +2461,7 @@ def _parse_education_entries(lines: list[str]) -> list[dict]:
                 continue
 
         # ── 2. GPA line → attach to current entry (or last entry) ──
-        gpa_like = re.search(
-            r"\b\d(?:\.\d{1,2})?\s*/\s*(?:4(?:\.0+)?|5(?:\.0+)?)\b", line
-        )
+        gpa_like = re.search(r"\b\d(?:\.\d{1,2})?\s*/\s*(?:4(?:\.0+)?|5(?:\.0+)?)\b", line)
         if "gpa" in lowered or "cgpa" in lowered or "not:" in lowered or gpa_like:
             if current:
                 current["gpa"] = line
@@ -2201,9 +2581,7 @@ def _extract_categorized_skills(lines: list[str]) -> tuple[dict[str, list[str]],
         if re.match(r"^\s*[-*•]\s+", line):
             uncategorized.append(re.sub(r"^\s*[-*•]\s+", "", line).strip())
         else:
-            uncategorized.extend(
-                [item.strip() for item in re.split(r"\s*[,;/|]\s*", line) if item.strip()]
-            )
+            uncategorized.extend([item.strip() for item in re.split(r"\s*[,;/|]\s*", line) if item.strip()])
 
     if uncategorized:
         dedup_uncat: list[str] = []
@@ -2248,24 +2626,139 @@ def _looks_like_description(line: str) -> bool:
 
 
 _KNOWN_TECHS = {
-    "python", "javascript", "java", "c++", "c#", "ruby", "php", "go", "rust",
-    "react", "angular", "vue", "django", "flask", "spring", "node", "express",
-    "sql", "mysql", "postgresql", "mongodb", "redis", "elasticsearch",
-    "aws", "azure", "gcp", "docker", "kubernetes", "jenkins", "git",
-    "html", "css", "sass", "less", "bootstrap", "tailwind", "typescript",
-    "jquery", "redux", "graphql", "rest", "api", "apis", "fastapi",
-    "pytorch", "tensorflow", "keras", "opencv", "numpy", "pandas", "scipy",
-    "scikit-learn", "matlab", "r", "swift", "kotlin", "android", "ios",
-    "flutter", "dart", "scala", "haskell", "perl", "bash", "shell", "powershell",
-    "linux", "unix", "windows", "macos", "ansible", "terraform", "vagrant", "firebase",
-    "sqlite", "oracle", "mssql", "cassandra", "mariadb", "dynamodb", "neo4j",
-    "kafka", "rabbitmq", "celery", "webpack", "babel", "vite", "npm", "yarn", "pnpm",
-    "c", "assembly", "lisp", "prolog", "clojure", "elixir", "erlang", "lua",
-    "oop", "restful", "ci", "cd", "agile", "scrum", "kanban", "github", "gitlab",
-    "nginx", "apache", "iis", "tomcat", "springboot", "hibernate", "jpa", "jdbc",
-    "unity", "unreal", "godot", "blender", "photoshop", "figma", "sketch",
-    "tcp", "udp", "ip", "dns", "http", "https", "ssh", "ssl", "tls"
+    "python",
+    "javascript",
+    "java",
+    "c++",
+    "c#",
+    "ruby",
+    "php",
+    "go",
+    "rust",
+    "react",
+    "angular",
+    "vue",
+    "django",
+    "flask",
+    "spring",
+    "node",
+    "express",
+    "sql",
+    "mysql",
+    "postgresql",
+    "mongodb",
+    "redis",
+    "elasticsearch",
+    "aws",
+    "azure",
+    "gcp",
+    "docker",
+    "kubernetes",
+    "jenkins",
+    "git",
+    "html",
+    "css",
+    "sass",
+    "less",
+    "bootstrap",
+    "tailwind",
+    "typescript",
+    "jquery",
+    "redux",
+    "graphql",
+    "rest",
+    "api",
+    "apis",
+    "fastapi",
+    "pytorch",
+    "tensorflow",
+    "keras",
+    "opencv",
+    "numpy",
+    "pandas",
+    "scipy",
+    "scikit-learn",
+    "matlab",
+    "r",
+    "swift",
+    "kotlin",
+    "android",
+    "ios",
+    "flutter",
+    "dart",
+    "scala",
+    "haskell",
+    "perl",
+    "bash",
+    "shell",
+    "powershell",
+    "linux",
+    "unix",
+    "windows",
+    "macos",
+    "ansible",
+    "terraform",
+    "vagrant",
+    "firebase",
+    "sqlite",
+    "oracle",
+    "mssql",
+    "cassandra",
+    "mariadb",
+    "dynamodb",
+    "neo4j",
+    "kafka",
+    "rabbitmq",
+    "celery",
+    "webpack",
+    "babel",
+    "vite",
+    "npm",
+    "yarn",
+    "pnpm",
+    "c",
+    "assembly",
+    "lisp",
+    "prolog",
+    "clojure",
+    "elixir",
+    "erlang",
+    "lua",
+    "oop",
+    "restful",
+    "ci",
+    "cd",
+    "agile",
+    "scrum",
+    "kanban",
+    "github",
+    "gitlab",
+    "nginx",
+    "apache",
+    "iis",
+    "tomcat",
+    "springboot",
+    "hibernate",
+    "jpa",
+    "jdbc",
+    "unity",
+    "unreal",
+    "godot",
+    "blender",
+    "photoshop",
+    "figma",
+    "sketch",
+    "tcp",
+    "udp",
+    "ip",
+    "dns",
+    "http",
+    "https",
+    "ssh",
+    "ssl",
+    "tls",
 }
+
 
 def _looks_like_tech_list(line: str) -> bool:
     """Return True if *line* is a comma/pipe-separated list of short tokens.
@@ -2310,9 +2803,7 @@ def _parse_project_entries(lines: list[str]) -> list[dict]:
         re.I,
     )
     _URL_LINE = re.compile(r"^\s*(?:https?://\S+|www\.\S+)\s*$", re.I)
-    _BULLET_RE_PROJ = re.compile(
-        r"^\s*[-*•\u2013\u2014\u2023\u25aa\u25a0►]\s+"
-    )
+    _BULLET_RE_PROJ = re.compile(r"^\s*[-*•\u2013\u2014\u2023\u25aa\u25a0►]\s+")
 
     _PROJECT_CONTINUATION_RE = re.compile(
         r"^(?:and|or|with|to|for|in|on|of|by|as|using|between|while|through|that|which|ve|ile|i[cç]in|olarak)\b",
@@ -2323,28 +2814,28 @@ def _parse_project_entries(lines: list[str]) -> list[dict]:
         text = (value or "").strip()
         if not text or _BULLET_RE_PROJ.match(text):
             return False
-        
+
         is_continuation_word = bool(_PROJECT_CONTINUATION_RE.match(text))
-        
+
         first_char = text[0] if text else ""
         if first_char.islower() or is_continuation_word:
             return True
-            
+
         # If the previous bullet ended with a period, and this line starts with a capital letter,
         # it is highly likely a new project or entry, not a continuation.
         if current_entry and current_entry.get("bullets"):
             prev_bullet = current_entry["bullets"][-1].strip()
             if prev_bullet.endswith((".", "!", "?")):
                 return False
-                
+
         # Length check fallback with title/capitalization guard:
         if len(text.split()) >= 6 and not text.isupper():
             words = text.split()
             cap_words = sum(1 for w in words if w and w[0].isupper())
-            if cap_words >= len(words) // 2: # More than half the words capitalized -> likely a title
+            if cap_words >= len(words) // 2:  # More than half the words capitalized -> likely a title
                 return False
             return True
-            
+
         return False
 
     entries: list[dict] = []
@@ -2359,7 +2850,8 @@ def _parse_project_entries(lines: list[str]) -> list[dict]:
         # Split on dash/pipe separator when the suffix is a tech list.
         # This MUST run before we assume a line is a tech-continuation of the previous project.
         _title_tech_m = re.match(
-            r'^(.+?)\s*[\u2013\u2014|–—-]\s+(.+)$', line,
+            r"^(.+?)\s*[\u2013\u2014|–—-]\s+(.+)$",
+            line,
         )
         if _title_tech_m and _looks_like_tech_list(_title_tech_m.group(2)):
             if current is not None:
@@ -2375,7 +2867,7 @@ def _parse_project_entries(lines: list[str]) -> list[dict]:
         if m_bullet:
             if current is None:
                 current = {"name": "", "description": "", "bullets": []}
-            current.setdefault("bullets", []).append(line[m_bullet.end():].strip())
+            current.setdefault("bullets", []).append(line[m_bullet.end() :].strip())
             continue
 
         # Tech-header line → fold into current project description
@@ -2383,7 +2875,7 @@ def _parse_project_entries(lines: list[str]) -> list[dict]:
         if m:
             if current is None:
                 current = {"name": "", "description": "", "bullets": []}
-            after = line[m.end():].strip()
+            after = line[m.end() :].strip()
             if after:
                 desc = current.get("description", "")
                 current["description"] = (desc + " | " + after) if desc else after
@@ -2394,7 +2886,7 @@ def _parse_project_entries(lines: list[str]) -> list[dict]:
         if m_link:
             if current is None:
                 current = {"name": "", "description": "", "bullets": []}
-            after = line[m_link.end():].strip() or line.strip()
+            after = line[m_link.end() :].strip() or line.strip()
             current.setdefault("bullets", []).append(after)
             continue
 
@@ -2414,11 +2906,13 @@ def _parse_project_entries(lines: list[str]) -> list[dict]:
         # no bullet), treat it as continuation of the tech list.
         # Catches: "Used Technologies: HTML, CSS\nJavaScript" where JavaScript
         # overflows onto the next line.
-        if (current is not None
-                and not current.get("bullets")
-                and len(line.split()) == 1
-                and not _BULLET_RE_PROJ.match(line)
-                and not re.search(r"\d{4}|https?://|@", line)):
+        if (
+            current is not None
+            and not current.get("bullets")
+            and len(line.split()) == 1
+            and not _BULLET_RE_PROJ.match(line)
+            and not re.search(r"\d{4}|https?://|@", line)
+        ):
             desc = current.get("description", "")
             if desc and re.search(r",", desc):
                 # Description has commas → looks like a tech list → merge
@@ -2428,10 +2922,12 @@ def _parse_project_entries(lines: list[str]) -> list[dict]:
         # Continuation after trailing comma: if the current description ends
         # with a comma (e.g. "HTML, CSS,") and this line is a short token
         # (≤3 words, no bullet prefix), treat it as description continuation.
-        if (current is not None
-                and current.get("description", "").rstrip().endswith(",")
-                and len(line.split()) <= 3
-                and not _BULLET_RE_PROJ.match(line)):
+        if (
+            current is not None
+            and current.get("description", "").rstrip().endswith(",")
+            and len(line.split()) <= 3
+            and not _BULLET_RE_PROJ.match(line)
+        ):
             desc = current["description"]
             current["description"] = (desc + " " + line).rstrip(",").strip()
             continue
@@ -2442,9 +2938,7 @@ def _parse_project_entries(lines: list[str]) -> list[dict]:
 
         # If current project exists, hasn't collected bullets yet, and this
         # line looks like a sentence/description → treat as description
-        if (current is not None
-                and not current.get("bullets")
-                and _looks_like_description(line)):
+        if current is not None and not current.get("bullets") and _looks_like_description(line):
             desc = current.get("description", "")
             current["description"] = (desc + " " + line).strip() if desc else line
             continue
@@ -2459,8 +2953,7 @@ def _parse_project_entries(lines: list[str]) -> list[dict]:
 
     # Security: cap project entry count
     if len(entries) > _MAX_PROJECT_ENTRIES:
-        logger.warning("parse_projects: entries capped %d → %d",
-                       len(entries), _MAX_PROJECT_ENTRIES)
+        logger.warning("parse_projects: entries capped %d → %d", len(entries), _MAX_PROJECT_ENTRIES)
         entries = entries[:_MAX_PROJECT_ENTRIES]
 
     return entries
@@ -2515,7 +3008,7 @@ def _collect_applied_changes(
 
     def _score(name: str, b: float, a: float):
         if a > b:
-            changes.append(f"{name} improved ({round(b,2)} → {round(a,2)})")
+            changes.append(f"{name} improved ({round(b, 2)} → {round(a, 2)})")
 
     _score(
         "Keyword relevance",
@@ -2547,10 +3040,7 @@ def _collect_applied_changes(
         changes.append(f"Removed non-ATS sections: {', '.join(dropped_sections)}")
 
     if structured_sections:
-        changes.append(
-            "Standardized ATS section structure: "
-            + ", ".join(sorted(structured_sections.keys()))
-        )
+        changes.append("Standardized ATS section structure: " + ", ".join(sorted(structured_sections.keys())))
 
     if used_ai:
         changes.append("Applied AI rewrite to improve ATS wording")
@@ -2572,9 +3062,9 @@ def _verify_section_preservation(
     """
     _, orig_sections, _ = _parse_sections(cv_text)
     original_keys = {
-        k for k, v in orig_sections.items()
-        if k not in {"contact", "interests"}
-        and any((line or "").strip() for line in v)
+        k
+        for k, v in orig_sections.items()
+        if k not in {"contact", "interests"} and any((line or "").strip() for line in v)
     }
     structured_keys = {k for k, v in structured_sections.items() if v}
     return original_keys - structured_keys
@@ -2598,8 +3088,11 @@ def _restore_lost_sections(
     if not lost:
         return (
             _render_structured_sections(
-                orig_name, orig_title_lines, orig_contacts,
-                structured_sections, section_order,
+                orig_name,
+                orig_title_lines,
+                orig_contacts,
+                structured_sections,
+                section_order,
             ),
             structured_sections,
             section_order,
@@ -2622,8 +3115,11 @@ def _restore_lost_sections(
             logger.info("restore_lost_section: %s (%d lines)", lost_key, len(orig_lines))
 
     rebuilt_text = _render_structured_sections(
-        orig_name, orig_title_lines, orig_contacts,
-        structured_sections, section_order,
+        orig_name,
+        orig_title_lines,
+        orig_contacts,
+        structured_sections,
+        section_order,
     )
     return rebuilt_text, structured_sections, section_order, restoration_warnings
 
@@ -2651,9 +3147,7 @@ def _enforce_protected_section_floor(
     _, source_sections, _ = _parse_sections(cv_text)
     _, current_sections, _ = _parse_sections(optimized_text)
     restored: list[str] = []
-    rebuilt_sections: dict[str, list[str]] = {
-        key: list(values or []) for key, values in structured_sections.items()
-    }
+    rebuilt_sections: dict[str, list[str]] = {key: list(values or []) for key, values in structured_sections.items()}
 
     for key in PROTECTED_SECTION_KEYS:
         source_lines = _non_empty_section_lines(source_sections, key)
@@ -2700,6 +3194,7 @@ def auto_fix_cv_text(
     _, _, raw_dropped_sections = _parse_sections(cv_text)
 
     from services.extraction_validator import validate_extraction
+
     quality = validate_extraction(cv_text, normalized)
     needs_llm_fallback = quality.get("needs_llm_fallback", False)
 
@@ -2751,46 +3246,52 @@ def auto_fix_cv_text(
     else:
         # Use pipeline output → clean structured text
         build_mode = "balanced" if detected_mode == "light_fix" else "strict"
-        optimized_text, structured_sections, dropped_sections, section_order = (
-            _pipeline_to_structured_text(normalized, job_description, mode=build_mode)
+        optimized_text, structured_sections, dropped_sections, section_order = _pipeline_to_structured_text(
+            normalized, job_description, mode=build_mode
         )
         dropped_sections = sorted(set(raw_dropped_sections) | set(dropped_sections))
 
         # ═══ SECTION PRESERVATION: restore any sections lost by the pipeline ═══
         _pipe_name = normalized.get("full_name", "")
         _pipe_title = normalized.get("title", "")
-        _pipe_contacts = [v for v in [
-            normalized.get("email", ""),
-            normalized.get("phone", ""),
-            normalized.get("location", ""),
-            normalized.get("linkedin", ""),
-        ] if v]
-        optimized_text, structured_sections, section_order, _restore_warns = (
-            _restore_lost_sections(
-                cv_text, structured_sections, section_order,
-                orig_name=_pipe_name,
-                orig_title_lines=[_pipe_title] if _pipe_title else [],
-                orig_contacts=_pipe_contacts,
-            )
+        _pipe_contacts = [
+            v
+            for v in [
+                normalized.get("email", ""),
+                normalized.get("phone", ""),
+                normalized.get("location", ""),
+                normalized.get("linkedin", ""),
+            ]
+            if v
+        ]
+        optimized_text, structured_sections, section_order, _restore_warns = _restore_lost_sections(
+            cv_text,
+            structured_sections,
+            section_order,
+            orig_name=_pipe_name,
+            orig_title_lines=[_pipe_title] if _pipe_title else [],
+            orig_contacts=_pipe_contacts,
         )
 
     # ═══ KEYWORD BOOSTING ═══
     if detected_mode != "preserve" and (job_description or use_ai or detected_mode == "rebuild"):
         boost_mode = "strict" if use_ai else ("balanced" if detected_mode == "light_fix" else "strict")
         boosted_text = _boost_keywords(
-            optimized_text, structured_sections, job_description,
-            mode=boost_mode, section_order=section_order,
+            optimized_text,
+            structured_sections,
+            job_description,
+            mode=boost_mode,
+            section_order=section_order,
         )
         boosted_ats = analyze_cv(boosted_text, job_description, lang=lang)
         plain_ats = analyze_cv(optimized_text, job_description, lang=lang)
-        if float(boosted_ats.get("overall_score", 0) or 0) >= float(
-            plain_ats.get("overall_score", 0) or 0
-        ):
+        if float(boosted_ats.get("overall_score", 0) or 0) >= float(plain_ats.get("overall_score", 0) or 0):
             optimized_text = boosted_text
 
     # ═══ SKILLS INJECTION ═══
     optimized_text, updated_sections, skills_inferred = _inject_skills_section_if_missing(
-        optimized_text, job_description=job_description,
+        optimized_text,
+        job_description=job_description,
     )
     if skills_inferred:
         structured_sections = {
@@ -2838,12 +3339,16 @@ def auto_fix_cv_text(
     # ═══ IDENTITY HEADER (from pipeline — always accurate) ═══
     orig_name = normalized.get("full_name", "")
     orig_title = normalized.get("title", "")
-    orig_contacts = [v for v in [
-        normalized.get("email", ""),
-        normalized.get("phone", ""),
-        normalized.get("location", ""),
-        normalized.get("linkedin", ""),
-    ] if v]
+    orig_contacts = [
+        v
+        for v in [
+            normalized.get("email", ""),
+            normalized.get("phone", ""),
+            normalized.get("location", ""),
+            normalized.get("linkedin", ""),
+        ]
+        if v
+    ]
     optimized_text = _ensure_identity_header(
         optimized_text,
         fallback_name=orig_name,
@@ -2853,16 +3358,14 @@ def auto_fix_cv_text(
 
     # ═══ TEXT POLISHING (typos, punctuation, Turkish chars in English CVs) ═══
     optimized_text = _polish_text(optimized_text, lang=lang)
-    optimized_text, structured_sections, section_order, _floor_warns = (
-        _enforce_protected_section_floor(
-            cv_text,
-            optimized_text,
-            structured_sections,
-            section_order,
-            orig_name=orig_name,
-            orig_title_lines=[orig_title] if orig_title else [],
-            orig_contacts=orig_contacts,
-        )
+    optimized_text, structured_sections, section_order, _floor_warns = _enforce_protected_section_floor(
+        cv_text,
+        optimized_text,
+        structured_sections,
+        section_order,
+        orig_name=orig_name,
+        orig_title_lines=[orig_title] if orig_title else [],
+        orig_contacts=orig_contacts,
     )
     warnings.extend(_floor_warns)
     if _floor_warns:
@@ -2918,9 +3421,7 @@ def auto_fix_cv_text(
             if _non_empty_section_lines(original_sections, key)
         }
         section_order = _extract_section_order_from_text(cv_text)
-        warnings.append(
-            "No safe auto-fix variant improved the ATS score, so the original CV text was preserved."
-        )
+        warnings.append("No safe auto-fix variant improved the ATS score, so the original CV text was preserved.")
 
     score_delta = round(
         float(after_ats.get("overall_score", 0)) - float(before_ats.get("overall_score", 0)),

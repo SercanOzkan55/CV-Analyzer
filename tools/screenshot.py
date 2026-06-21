@@ -2,23 +2,21 @@ import sys
 import subprocess
 import os
 
+
 def take_screenshot(url: str, output_path: str = "tools/app_screenshot.png"):
     print(f"Taking screenshot of: {url}")
-    cmd = [
-        "npx", "playwright", "screenshot",
-        "--viewport-size", "1280,800",
-        url,
-        output_path
-    ]
+    npx_bin = "npx.cmd" if os.name == "nt" else "npx"
+    cmd = [npx_bin, "playwright", "screenshot", "--viewport-size", "1280,800", url, output_path]
     try:
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         # Run playwright screenshot CLI
-        subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
         print(f"[+] Screenshot saved to: {os.path.abspath(output_path)}")
         return True
     except Exception as e:
         print(f"Error capturing screenshot: {e}")
         return False
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

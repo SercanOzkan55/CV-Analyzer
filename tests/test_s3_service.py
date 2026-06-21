@@ -1,4 +1,5 @@
 """Tests for services/s3_service.py — S3 operations with mocked boto3."""
+
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -26,6 +27,7 @@ class TestUploadMocked:
     @patch("services.s3_service.validate_key")
     def test_upload_calls_put_object(self, mock_validate, mock_get_client):
         from services.s3_service import upload
+
         mock_client = MagicMock()
         mock_get_client.return_value = mock_client
 
@@ -53,6 +55,7 @@ class TestGetPresignedUrlMocked:
     @patch("services.s3_service.validate_key")
     def test_returns_url(self, mock_validate, mock_get_client):
         from services.s3_service import get_presigned_url
+
         mock_client = MagicMock()
         mock_client.generate_presigned_url.return_value = "https://s3.example.com/test"
         mock_get_client.return_value = mock_client
@@ -66,6 +69,7 @@ class TestDeleteMocked:
     @patch("services.s3_service.validate_key")
     def test_delete_calls_delete_object(self, mock_validate, mock_get_client):
         from services.s3_service import delete
+
         mock_client = MagicMock()
         mock_get_client.return_value = mock_client
 

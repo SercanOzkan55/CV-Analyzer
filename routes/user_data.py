@@ -12,6 +12,7 @@ from core.route_dependencies import *  # noqa: F403
 
 router = APIRouter(tags=["user-data"])
 
+
 class UserReminderCreateRequest(BaseModel):
     title: str
     description: str | None = None
@@ -126,11 +127,7 @@ def _owned_job_application_or_404(db, db_user: User, application_id: int) -> Job
 def _validate_owned_reminder_id(db, db_user: User, reminder_id: int | None) -> int | None:
     if reminder_id is None:
         return None
-    row = (
-        db.query(Reminder)
-        .filter(Reminder.id == reminder_id, Reminder.created_by == db_user.id)
-        .first()
-    )
+    row = db.query(Reminder).filter(Reminder.id == reminder_id, Reminder.created_by == db_user.id).first()
     if not row:
         raise HTTPException(status_code=400, detail="Reminder does not belong to the current user")
     return int(reminder_id)
@@ -147,11 +144,7 @@ def list_job_applications(
     query = db.query(JobApplication).filter(JobApplication.user_id == db_user.id)
     if status:
         query = query.filter(JobApplication.status == _normalize_application_status(status))
-    rows = (
-        query.order_by(JobApplication.board_order.asc(), JobApplication.updated_at.desc())
-        .limit(limit)
-        .all()
-    )
+    rows = query.order_by(JobApplication.board_order.asc(), JobApplication.updated_at.desc()).limit(limit).all()
     return {"items": [_serialize_job_application(row) for row in rows], "total": len(rows)}
 
 
@@ -312,12 +305,7 @@ def _delete_cv_versions_for_user(db, db_user: User, rows: list[CVVersion]) -> di
 def _delete_analysis_records_for_user(db, user_id: int) -> dict:
     from models import AnalysisNote, AnalysisShare, Favorite
 
-    analysis_ids = [
-        row[0]
-        for row in db.query(Analysis.id)
-        .filter(Analysis.user_id == user_id)
-        .all()
-    ]
+    analysis_ids = [row[0] for row in db.query(Analysis.id).filter(Analysis.user_id == user_id).all()]
     if not analysis_ids:
         return {
             "deleted_analyses": 0,
@@ -326,22 +314,38 @@ def _delete_analysis_records_for_user(db, user_id: int) -> dict:
             "deleted_notes": 0,
         }
 
-    deleted_notes = db.query(AnalysisNote).filter(
-        AnalysisNote.user_id == user_id,
-        AnalysisNote.analysis_id.in_(analysis_ids),
-    ).delete(synchronize_session=False)
-    deleted_shares = db.query(AnalysisShare).filter(
-        AnalysisShare.user_id == user_id,
-        AnalysisShare.analysis_id.in_(analysis_ids),
-    ).delete(synchronize_session=False)
-    deleted_favorites = db.query(Favorite).filter(
-        Favorite.user_id == user_id,
-        Favorite.analysis_id.in_(analysis_ids),
-    ).delete(synchronize_session=False)
-    deleted_analyses = db.query(Analysis).filter(
-        Analysis.user_id == user_id,
-        Analysis.id.in_(analysis_ids),
-    ).delete(synchronize_session=False)
+    deleted_notes = (
+        db.query(AnalysisNote)
+        .filter(
+            AnalysisNote.user_id == user_id,
+            AnalysisNote.analysis_id.in_(analysis_ids),
+        )
+        .delete(synchronize_session=False)
+    )
+    deleted_shares = (
+        db.query(AnalysisShare)
+        .filter(
+            AnalysisShare.user_id == user_id,
+            AnalysisShare.analysis_id.in_(analysis_ids),
+        )
+        .delete(synchronize_session=False)
+    )
+    deleted_favorites = (
+        db.query(Favorite)
+        .filter(
+            Favorite.user_id == user_id,
+            Favorite.analysis_id.in_(analysis_ids),
+        )
+        .delete(synchronize_session=False)
+    )
+    deleted_analyses = (
+        db.query(Analysis)
+        .filter(
+            Analysis.user_id == user_id,
+            Analysis.id.in_(analysis_ids),
+        )
+        .delete(synchronize_session=False)
+    )
 
     return {
         "deleted_analyses": int(deleted_analyses or 0),
@@ -365,12 +369,7 @@ def get_my_data_summary(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
 
     db_user = _get_current_db_user(user, db)
     cv_rows = db.query(CVVersion).filter(CVVersion.user_id == db_user.id).all()
-    stored_files = sum(
-        1
-        for row in cv_rows
-        for key in (row.original_s3_key, row.optimized_s3_key)
-        if key
-    )
+    stored_files = sum(1 for row in cv_rows for key in (row.original_s3_key, row.optimized_s3_key) if key)
 
     return {
         "user_id": db_user.id,
@@ -423,22 +422,53 @@ def export_my_data(
 
     db_user = _get_current_db_user(user, db)
     cv_rows = db.query(CVVersion).filter(CVVersion.user_id == db_user.id).order_by(CVVersion.created_at.desc()).all()
-    analyses = db.query(Analysis).filter(Analysis.user_id == db_user.id).order_by(Analysis.created_at.desc()).limit(500).all()
+    analyses = (
+        db.query(Analysis).filter(Analysis.user_id == db_user.id).order_by(Analysis.created_at.desc()).limit(500).all()
+    )
     favorites = db.query(Favorite).filter(Favorite.user_id == db_user.id).all()
     shares = db.query(AnalysisShare).filter(AnalysisShare.user_id == db_user.id).all()
     notes = db.query(AnalysisNote).filter(AnalysisNote.user_id == db_user.id).all()
     templates = db.query(JobTemplate).filter(JobTemplate.user_id == db_user.id).all()
-    usage_days = db.query(UsageDaily).filter(UsageDaily.user_id == db_user.id).order_by(UsageDaily.date.desc()).limit(400).all()
+    usage_days = (
+        db.query(UsageDaily).filter(UsageDaily.user_id == db_user.id).order_by(UsageDaily.date.desc()).limit(400).all()
+    )
     reminders = db.query(Reminder).filter(Reminder.created_by == db_user.id).order_by(Reminder.event_date.desc()).all()
-    actions = db.query(CandidateAction).filter(CandidateAction.recruiter_id == db_user.id).order_by(CandidateAction.created_at.desc()).limit(500).all()
+    actions = (
+        db.query(CandidateAction)
+        .filter(CandidateAction.recruiter_id == db_user.id)
+        .order_by(CandidateAction.created_at.desc())
+        .limit(500)
+        .all()
+    )
 
     candidates = []
     comments = []
     worker_results = []
     if db_user.organization_id is not None:
-        candidates = db.query(Candidate).filter(Candidate.organization_id == db_user.organization_id).order_by(Candidate.created_at.desc()).limit(500).all()
-        comments = db.query(CandidateComment).filter(CandidateComment.organization_id == db_user.organization_id, CandidateComment.author_user_id == db_user.id).order_by(CandidateComment.created_at.desc()).limit(500).all()
-        worker_results = db.query(WorkerAnalysisResult).filter(WorkerAnalysisResult.organization_id == db_user.organization_id).order_by(WorkerAnalysisResult.created_at.desc()).limit(500).all()
+        candidates = (
+            db.query(Candidate)
+            .filter(Candidate.organization_id == db_user.organization_id)
+            .order_by(Candidate.created_at.desc())
+            .limit(500)
+            .all()
+        )
+        comments = (
+            db.query(CandidateComment)
+            .filter(
+                CandidateComment.organization_id == db_user.organization_id,
+                CandidateComment.author_user_id == db_user.id,
+            )
+            .order_by(CandidateComment.created_at.desc())
+            .limit(500)
+            .all()
+        )
+        worker_results = (
+            db.query(WorkerAnalysisResult)
+            .filter(WorkerAnalysisResult.organization_id == db_user.organization_id)
+            .order_by(WorkerAnalysisResult.created_at.desc())
+            .limit(500)
+            .all()
+        )
 
     payload = {
         "exported_at": datetime.utcnow().isoformat() + "Z",
@@ -482,10 +512,36 @@ def export_my_data(
             }
             for row in analyses
         ],
-        "favorites": [{"analysis_id": row.analysis_id, "note": row.note, "created_at": _dt(row.created_at)} for row in favorites],
-        "shares": [{"analysis_id": row.analysis_id, "active": row.is_active, "views": row.views, "created_at": _dt(row.created_at)} for row in shares],
-        "notes": [{"analysis_id": row.analysis_id, "content": row.content if include_raw else None, "chars": len(row.content or ""), "created_at": _dt(row.created_at)} for row in notes],
-        "job_templates": [{"id": row.id, "title": row.title, "description": _text_meta(row.description), "created_at": _dt(row.created_at)} for row in templates],
+        "favorites": [
+            {"analysis_id": row.analysis_id, "note": row.note, "created_at": _dt(row.created_at)} for row in favorites
+        ],
+        "shares": [
+            {
+                "analysis_id": row.analysis_id,
+                "active": row.is_active,
+                "views": row.views,
+                "created_at": _dt(row.created_at),
+            }
+            for row in shares
+        ],
+        "notes": [
+            {
+                "analysis_id": row.analysis_id,
+                "content": row.content if include_raw else None,
+                "chars": len(row.content or ""),
+                "created_at": _dt(row.created_at),
+            }
+            for row in notes
+        ],
+        "job_templates": [
+            {
+                "id": row.id,
+                "title": row.title,
+                "description": _text_meta(row.description),
+                "created_at": _dt(row.created_at),
+            }
+            for row in templates
+        ],
         "usage_days": [{"date": _dt(row.date), "count": row.count} for row in usage_days],
         "reminders": [
             {
@@ -595,32 +651,40 @@ def delete_my_data(
             summary.update(_delete_analysis_records_for_user(db, db_user.id))
 
         if scope in ("workspace", "all"):
-            deleted_templates = db.query(JobTemplate).filter(
-                JobTemplate.user_id == db_user.id
-            ).delete(synchronize_session=False)
-            deleted_usage_days = db.query(UsageDaily).filter(
-                UsageDaily.user_id == db_user.id
-            ).delete(synchronize_session=False)
-            deleted_reminders = db.query(Reminder).filter(
-                Reminder.created_by == db_user.id
-            ).delete(synchronize_session=False)
-            deleted_candidate_actions = db.query(CandidateAction).filter(
-                CandidateAction.recruiter_id == db_user.id
-            ).delete(synchronize_session=False)
-            
-            deleted_comments = db.query(CandidateComment).filter(
-                CandidateComment.author_user_id == db_user.id
-            ).delete(synchronize_session=False)
-            
+            deleted_templates = (
+                db.query(JobTemplate).filter(JobTemplate.user_id == db_user.id).delete(synchronize_session=False)
+            )
+            deleted_usage_days = (
+                db.query(UsageDaily).filter(UsageDaily.user_id == db_user.id).delete(synchronize_session=False)
+            )
+            deleted_reminders = (
+                db.query(Reminder).filter(Reminder.created_by == db_user.id).delete(synchronize_session=False)
+            )
+            deleted_candidate_actions = (
+                db.query(CandidateAction)
+                .filter(CandidateAction.recruiter_id == db_user.id)
+                .delete(synchronize_session=False)
+            )
+
+            deleted_comments = (
+                db.query(CandidateComment)
+                .filter(CandidateComment.author_user_id == db_user.id)
+                .delete(synchronize_session=False)
+            )
+
             deleted_candidates = 0
             deleted_worker_results = 0
             if db_user.organization_id is not None:
-                deleted_worker_results = db.query(WorkerAnalysisResult).filter(
-                    WorkerAnalysisResult.organization_id == db_user.organization_id
-                ).delete(synchronize_session=False)
-                deleted_candidates = db.query(Candidate).filter(
-                    Candidate.organization_id == db_user.organization_id
-                ).delete(synchronize_session=False)
+                deleted_worker_results = (
+                    db.query(WorkerAnalysisResult)
+                    .filter(WorkerAnalysisResult.organization_id == db_user.organization_id)
+                    .delete(synchronize_session=False)
+                )
+                deleted_candidates = (
+                    db.query(Candidate)
+                    .filter(Candidate.organization_id == db_user.organization_id)
+                    .delete(synchronize_session=False)
+                )
 
             summary.update(
                 {
@@ -665,12 +729,7 @@ def _purge_expired_cv_versions(db, days: int, limit: int, dry_run: bool = True) 
         .all()
     )
     if dry_run:
-        file_count = sum(
-            1
-            for row in rows
-            for key in (row.original_s3_key, row.optimized_s3_key)
-            if key
-        )
+        file_count = sum(1 for row in rows for key in (row.original_s3_key, row.optimized_s3_key) if key)
         return {
             "dry_run": True,
             "retention_days": days,
@@ -800,11 +859,7 @@ def _serialize_reminder(reminder: Reminder) -> dict:
 
 
 def _get_user_reminder_or_404(db, db_user: User, reminder_id: int) -> Reminder:
-    reminder = (
-        db.query(Reminder)
-        .filter(Reminder.id == reminder_id, Reminder.created_by == db_user.id)
-        .first()
-    )
+    reminder = db.query(Reminder).filter(Reminder.id == reminder_id, Reminder.created_by == db_user.id).first()
     if not reminder:
         raise HTTPException(status_code=404, detail="Reminder not found")
     return reminder
@@ -813,12 +868,7 @@ def _get_user_reminder_or_404(db, db_user: User, reminder_id: int) -> Reminder:
 @router.get("/api/v1/reminders")
 def list_user_reminders(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
     db_user = _get_current_db_user(user, db)
-    reminders = (
-        db.query(Reminder)
-        .filter(Reminder.created_by == db_user.id)
-        .order_by(Reminder.event_date.asc())
-        .all()
-    )
+    reminders = db.query(Reminder).filter(Reminder.created_by == db_user.id).order_by(Reminder.event_date.asc()).all()
     return {"reminders": [_serialize_reminder(r) for r in reminders], "total": len(reminders)}
 
 
@@ -986,5 +1036,3 @@ def get_benchmark_specializations(user=Depends(verify_supabase_jwt), db=Depends(
 # =====================================================
 # SEMANTIC SEARCH (job -> candidate retrieval)
 # =====================================================
-
-

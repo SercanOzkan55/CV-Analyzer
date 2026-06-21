@@ -10,11 +10,7 @@ def test_redact_sensitive_text_masks_common_pii_and_secrets():
     bearer_header = "Authorization:" + " Bearer " + "eyJhbGciOiJIUzI1NiJ9.abcdefghijklmnop.qrstuvwxyz123456"
     secret_key_name = "OPENAI_" + "API_KEY"
     secret_value = "sk-" + "abcdefghijklmnopqrstuvwxyz" + "123456"
-    raw = (
-        "email=person@example.com phone=+90 555 123 45 67 "
-        f"{bearer_header} "
-        f"{secret_key_name}={secret_value}"
-    )
+    raw = f"email=person@example.com phone=+90 555 123 45 67 {bearer_header} {secret_key_name}={secret_value}"
 
     redacted = redact_sensitive_text(raw)
 

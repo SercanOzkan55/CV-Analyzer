@@ -1,4 +1,5 @@
 """Tests for services/ats_config.py — ATS weight configuration."""
+
 import os
 import tempfile
 import pytest
@@ -42,6 +43,7 @@ class TestGetAtsWeights:
         """When ats_config.yaml doesn't exist, defaults are used."""
         # Force cache reset
         import services.ats_config as mod
+
         mod._cached_weights = None
         monkeypatch.setattr(mod, "_parse_ats_config", lambda p: None)
         weights = get_ats_weights()

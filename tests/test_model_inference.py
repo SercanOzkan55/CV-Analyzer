@@ -35,13 +35,28 @@ def test_deterministic_prediction():
     base_features = [80, 70, 60, 50, 2, 0.1, 48.0, 42.0, 80.0]
     # Pad with realistic defaults for extra features added in v2/v3
     extra = [
-        70.0, 5, 80.0, 85.0, 75.0, 90.0,  # layout features
-        60.0, 40.0,                          # content features
-        1, 1, 1, 1, 0,                       # section flags
-        65.0, 70.0, 60.0,                    # job match
-        50.0, 65.0, 40.0, 60.0,             # quality: soft_skill, readability, keyword_density, education_quality
+        70.0,
+        5,
+        80.0,
+        85.0,
+        75.0,
+        90.0,  # layout features
+        60.0,
+        40.0,  # content features
+        1,
+        1,
+        1,
+        1,
+        0,  # section flags
+        65.0,
+        70.0,
+        60.0,  # job match
+        50.0,
+        65.0,
+        40.0,
+        60.0,  # quality: soft_skill, readability, keyword_density, education_quality
     ]
-    features = base_features + extra[:max(0, n_features - len(base_features))]
+    features = base_features + extra[: max(0, n_features - len(base_features))]
     features = features[:n_features]
 
     model = joblib.load("resume_model.pkl")

@@ -1,4 +1,5 @@
 """Tests for services/model_service.py — model predictions with mocking."""
+
 import os
 import pytest
 from services.model_service import is_mock, predict_hire, predict_match

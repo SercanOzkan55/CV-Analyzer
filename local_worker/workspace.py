@@ -106,7 +106,9 @@ class WorkspaceStore:
             self._ensure_column(conn, "analysis_results", "duplicate_of", "duplicate_of TEXT")
             self._ensure_column(conn, "analysis_results", "sync_status", "sync_status TEXT NOT NULL DEFAULT 'pending'")
             self._ensure_column(conn, "analysis_results", "sync_error", "sync_error TEXT")
-            self._ensure_column(conn, "analysis_results", "candidate_status", "candidate_status TEXT NOT NULL DEFAULT 'pending_review'")
+            self._ensure_column(
+                conn, "analysis_results", "candidate_status", "candidate_status TEXT NOT NULL DEFAULT 'pending_review'"
+            )
             self._purge_sensitive_result_json(conn)
             conn.execute(
                 """
@@ -175,10 +177,7 @@ class WorkspaceStore:
             rows = conn.execute(
                 "SELECT id, name, config_json, updated_at FROM local_jobs ORDER BY updated_at DESC, name ASC"
             ).fetchall()
-        return [
-            {"id": row[0], "name": row[1], "config": json.loads(row[2]), "updated_at": row[3]}
-            for row in rows
-        ]
+        return [{"id": row[0], "name": row[1], "config": json.loads(row[2]), "updated_at": row[3]} for row in rows]
 
     def save_job(self, name: str, config: dict) -> int:
         clean_name = (name or "").strip() or "Untitled local job"
@@ -198,7 +197,9 @@ class WorkspaceStore:
             )
             return int(cursor.lastrowid)
 
-    def create_run(self, job_id: int | None, job_name: str, cv_folder: str, output_folder: str, total_files: int) -> int:
+    def create_run(
+        self, job_id: int | None, job_name: str, cv_folder: str, output_folder: str, total_files: int
+    ) -> int:
         with self._connect() as conn:
             cursor = conn.execute(
                 """
@@ -327,22 +328,21 @@ class WorkspaceStore:
         with self._connect() as conn:
             existing_row = conn.execute(
                 "SELECT decision, candidate_status, result_json, id FROM analysis_results WHERE run_id = ? AND file_path = ?",
-                (run_id, file_path)
+                (run_id, file_path),
             ).fetchone()
             conn.execute(
                 "UPDATE analysis_results SET decision = ? WHERE run_id = ? AND file_path = ?",
                 (decision, run_id, file_path),
             )
             row = conn.execute(
-                "SELECT result_json FROM analysis_results WHERE run_id = ? AND file_path = ?",
-                (run_id, file_path)
+                "SELECT result_json FROM analysis_results WHERE run_id = ? AND file_path = ?", (run_id, file_path)
             ).fetchone()
             if row:
                 payload = _strip_sensitive_result_fields(json.loads(row[0]))
                 payload["decision"] = decision
                 conn.execute(
                     "UPDATE analysis_results SET result_json = ? WHERE run_id = ? AND file_path = ?",
-                    (json.dumps(payload, ensure_ascii=False), run_id, file_path)
+                    (json.dumps(payload, ensure_ascii=False), run_id, file_path),
                 )
         if existing_row:
             self.create_audit_log(

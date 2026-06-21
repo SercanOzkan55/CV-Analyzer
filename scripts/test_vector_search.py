@@ -23,14 +23,12 @@ def main():
         try:
             # Insert using literal vector representation (safe for test data)
             conn.execute(
-                text(
-                    f"INSERT INTO candidates (cv_text, cv_embedding) VALUES ('cand1', '{v1}'::vector)"
-                )
+                text("INSERT INTO candidates (cv_text, cv_embedding) VALUES (:name, CAST(:embedding AS vector))"),
+                {"name": "cand1", "embedding": v1},
             )
             conn.execute(
-                text(
-                    f"INSERT INTO candidates (cv_text, cv_embedding) VALUES ('cand2', '{v2}'::vector)"
-                )
+                text("INSERT INTO candidates (cv_text, cv_embedding) VALUES (:name, CAST(:embedding AS vector))"),
+                {"name": "cand2", "embedding": v2},
             )
             conn.commit()
         except Exception as e:
@@ -41,8 +39,15 @@ def main():
         try:
             res = conn.execute(
                 text(
-                    f"SELECT id, cv_text, (cv_embedding <#> '{q}'::vector) AS score FROM candidates WHERE cv_embedding IS NOT NULL ORDER BY score LIMIT 5"
-                )
+                    """
+                    SELECT id, cv_text, (cv_embedding <#> CAST(:query_vector AS vector)) AS score
+                    FROM candidates
+                    WHERE cv_embedding IS NOT NULL
+                    ORDER BY score
+                    LIMIT 5
+                    """
+                ),
+                {"query_vector": q},
             ).fetchall()
             print("SEARCH_RESULTS:")
             for row in res:

@@ -166,7 +166,9 @@ sys.modules["slowapi.util"] = util_mod
 import services.ats_service as ats
 
 print("Running ATS unit test (analyze_cv)...")
-cv = "John Doe\nExperience: Managed a team that increased revenue by 20%\nSkills: Python, SQL\nContact: john@example.com"
+cv = (
+    "John Doe\nExperience: Managed a team that increased revenue by 20%\nSkills: Python, SQL\nContact: john@example.com"
+)
 job = "Looking for a software engineer with experience in Python and SQL. Increase revenue and manage team."
 res = ats.analyze_cv(cv, job)
 print("ATS result:", res)

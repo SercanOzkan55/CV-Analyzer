@@ -30,18 +30,12 @@ def _worker_loop(task_q: Queue, res_q: Queue, model_path: str, onnx_path: str):
             import onnxruntime as ort
 
             ort_sess = ort.InferenceSession(onnx_path)
-            logger.info(
-                json.dumps({"event": "model_loaded", "type": "onnx", "path": onnx_path})
-            )
+            logger.info(json.dumps({"event": "model_loaded", "type": "onnx", "path": onnx_path}))
         else:
             import joblib
 
             model = joblib.load(model_path)
-            logger.info(
-                json.dumps(
-                    {"event": "model_loaded", "type": "joblib", "path": model_path}
-                )
-            )
+            logger.info(json.dumps({"event": "model_loaded", "type": "joblib", "path": model_path}))
     except Exception as e:
         logger.exception(json.dumps({"event": "model_load_fail", "error": str(e)}))
         # continue loop but will return errors on predict
@@ -73,11 +67,7 @@ def _worker_loop(task_q: Queue, res_q: Queue, model_path: str, onnx_path: str):
                     pred_val = float(np.mean(preds))
                     std = float(np.std(preds))
                     confidence = float(round(float(np.exp(-std / 10) * 100), 2))
-                    risk = (
-                        "High Risk"
-                        if confidence < 60
-                        else ("Medium Risk" if pred_val < 50 else "Low Risk")
-                    )
+                    risk = "High Risk" if confidence < 60 else ("Medium Risk" if pred_val < 50 else "Low Risk")
                     res = {
                         "prediction": pred_val,
                         "confidence": confidence,
@@ -98,9 +88,7 @@ def _worker_loop(task_q: Queue, res_q: Queue, model_path: str, onnx_path: str):
                             n_trees = model.get_booster().num_boosted_rounds()
                             if n_trees > 10:
                                 early_pred = float(
-                                    model.get_booster().predict(
-                                        dmat, iteration_range=(0, n_trees // 2)
-                                    )[0]
+                                    model.get_booster().predict(dmat, iteration_range=(0, n_trees // 2))[0]
                                 )
                                 std = abs(pred_val - early_pred) * 0.5
                         except Exception:
@@ -109,11 +97,7 @@ def _worker_loop(task_q: Queue, res_q: Queue, model_path: str, onnx_path: str):
                     import numpy as np
 
                     confidence = float(round(float(np.exp(-std / 10) * 100), 2))
-                    risk = (
-                        "High Risk"
-                        if confidence < 60
-                        else ("Medium Risk" if pred_val < 50 else "Low Risk")
-                    )
+                    risk = "High Risk" if confidence < 60 else ("Medium Risk" if pred_val < 50 else "Low Risk")
                     res = {
                         "prediction": pred_val,
                         "confidence": confidence,
@@ -137,9 +121,7 @@ def start(model_path: str = MODEL_PATH, onnx_path: str = ONNX_PATH):
     _res_q = Queue()
     with _pending_lock:
         _pending_results = {}
-    _proc = Process(
-        target=_worker_loop, args=(_task_q, _res_q, model_path, onnx_path), daemon=True
-    )
+    _proc = Process(target=_worker_loop, args=(_task_q, _res_q, model_path, onnx_path), daemon=True)
     _proc.start()
     _res_dispatcher = threading.Thread(
         target=_dispatch_results,
@@ -149,9 +131,7 @@ def start(model_path: str = MODEL_PATH, onnx_path: str = ONNX_PATH):
     _res_dispatcher.start()
     # give it a moment
     time.sleep(0.1)
-    logger.info(
-        json.dumps({"event": "worker_started", "pid": getattr(_proc, "pid", None)})
-    )
+    logger.info(json.dumps({"event": "worker_started", "pid": getattr(_proc, "pid", None)}))
 
 
 def stop():
@@ -196,17 +176,14 @@ def _ensure_worker_alive():
         if _worker_last_restart and (now - _worker_last_restart) > _WORKER_RESTART_DECAY_SECONDS:
             _worker_restart_count = 0
         if _worker_restart_count >= _MAX_WORKER_RESTARTS:
-            logger.error(
-                json.dumps({"event": "worker_restart_limit", "restarts": _worker_restart_count})
-            )
+            logger.error(json.dumps({"event": "worker_restart_limit", "restarts": _worker_restart_count}))
             return False
         _worker_restart_count += 1
         _worker_last_restart = now
-        logger.warning(
-            json.dumps({"event": "worker_auto_restart", "attempt": _worker_restart_count})
-        )
+        logger.warning(json.dumps({"event": "worker_auto_restart", "attempt": _worker_restart_count}))
         try:
             from shared import WORKER_RESTARTS_TOTAL, _alert
+
             WORKER_RESTARTS_TOTAL.inc()
             _alert("worker_crash", f"Model worker auto-restart attempt {_worker_restart_count}")
         except Exception:
@@ -215,9 +192,7 @@ def _ensure_worker_alive():
             start()
             return _proc is not None and _proc.is_alive()
         except Exception as e:
-            logger.exception(
-                json.dumps({"event": "worker_restart_failed", "error": str(e)})
-            )
+            logger.exception(json.dumps({"event": "worker_restart_failed", "error": str(e)}))
             return False
 
 

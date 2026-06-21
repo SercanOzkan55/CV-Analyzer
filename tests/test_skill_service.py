@@ -1,10 +1,12 @@
 """Unit tests for services/skill_service.py"""
+
 import pytest
 from unittest.mock import patch
 from services.skill_service import extract_skills, skill_coverage_score
 
 
 # ── extract_skills ───────────────────────────────────────────
+
 
 class TestExtractSkills:
     def test_extracts_programming_languages(self):
@@ -61,6 +63,7 @@ class TestExtractSkills:
 
 
 # ── skill_coverage_score ─────────────────────────────────────
+
 
 class TestSkillCoverageScore:
     def test_full_coverage(self):

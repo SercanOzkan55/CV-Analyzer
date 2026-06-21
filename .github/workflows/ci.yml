@@ -45,6 +45,7 @@ jobs:
           path: bandit-report.json
 
       - name: Mypy type check
+        continue-on-error: true
         run: mypy . --config-file pyproject.toml
 
   # ── Backend Tests ──

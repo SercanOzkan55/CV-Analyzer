@@ -2,7 +2,6 @@ import importlib
 import sys
 
 
-
 def test_run_pipeline_happy_path(sample_texts):
     main = importlib.import_module("main")
     cv, job = sample_texts

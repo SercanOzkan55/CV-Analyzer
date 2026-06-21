@@ -10,6 +10,7 @@ Usage:
 
 The model is optional and feature-flagged via ML_CALIBRATOR_ENABLED env var.
 """
+
 import json
 import pathlib
 import pickle
@@ -109,9 +110,14 @@ def train_model():
 
     # Feature names for interpretability
     feature_names = [
-        "keyword_score", "skill_score", "ats_score",
-        "content_score", "layout_score", "missing_count",
-        "cv_length_k", "jd_length_k",
+        "keyword_score",
+        "skill_score",
+        "ats_score",
+        "content_score",
+        "layout_score",
+        "missing_count",
+        "cv_length_k",
+        "jd_length_k",
     ]
 
     print("\n[2/3] Training Ridge Regression...")
@@ -141,8 +147,8 @@ def train_model():
     # Metrics
     residuals = y - y_pred
     mae = np.mean(np.abs(residuals))
-    rmse = np.sqrt(np.mean(residuals ** 2))
-    r2 = 1 - np.sum(residuals ** 2) / np.sum((y - np.mean(y)) ** 2)
+    rmse = np.sqrt(np.mean(residuals**2))
+    r2 = 1 - np.sum(residuals**2) / np.sum((y - np.mean(y)) ** 2)
 
     print(f"  MAE:  {mae:.2f}")
     print(f"  RMSE: {rmse:.2f}")

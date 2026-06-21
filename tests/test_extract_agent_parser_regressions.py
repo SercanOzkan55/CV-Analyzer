@@ -37,9 +37,7 @@ AI on the cloud using Google Cloud Platform.
 
     assert result["experiences"][0]["title"] == "Accenture"
     assert "Application Development Associate" in result["experiences"][0]["company"]
-    assert result["experiences"][0]["bullets"] == [
-        "Created SAP master data and configuration documents for clients."
-    ]
+    assert result["experiences"][0]["bullets"] == ["Created SAP master data and configuration documents for clients."]
     assert len(result["experiences"]) == 1
 
 

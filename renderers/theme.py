@@ -11,18 +11,18 @@ THEMES_DIR = ROOT / "themes"
 # Keys are the canonical font identifiers sent by the frontend.
 # Values are display labels.
 ALLOWED_FONTS: dict[str, str] = {
-    "Arial":            "Arial",
-    "Calibri":          "Calibri",
-    "Times New Roman":  "Times New Roman",
-    "Georgia":          "Georgia",
-    "Cambria":          "Cambria",
-    "Garamond":         "Garamond",
-    "Tahoma":           "Tahoma",
-    "Segoe UI":         "Segoe UI",
-    "Consolas":         "Consolas",
-    "Helvetica":        "Helvetica",
-    "Palatino":         "Palatino",
-    "Verdana":          "Verdana",
+    "Arial": "Arial",
+    "Calibri": "Calibri",
+    "Times New Roman": "Times New Roman",
+    "Georgia": "Georgia",
+    "Cambria": "Cambria",
+    "Garamond": "Garamond",
+    "Tahoma": "Tahoma",
+    "Segoe UI": "Segoe UI",
+    "Consolas": "Consolas",
+    "Helvetica": "Helvetica",
+    "Palatino": "Palatino",
+    "Verdana": "Verdana",
 }
 
 DEFAULT_FONT = "Arial"

@@ -1,4 +1,5 @@
 """Unit tests for services/cv_optimizer_service.py"""
+
 import pytest
 from schemas.cv_model import CVModel, Experience, Education
 from services.cv_optimizer_service import optimize_cv, KeywordOptResult

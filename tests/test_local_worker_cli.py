@@ -172,23 +172,29 @@ def test_local_folder_mode_blocks_when_quota_is_too_low(tmp_path):
 
 def test_score_cv_honors_custom_scoring_weights():
     text = "Candidate with Python and SQL production experience."
-    default_score = score_cv(text, {
-        "required_skills": ["Python", "SQL"],
-        "nice_to_have_skills": ["React"],
-        "accept_threshold": 75,
-        "review_threshold": 50,
-    })
-    weighted_score = score_cv(text, {
-        "required_skills": ["Python", "SQL"],
-        "nice_to_have_skills": ["React"],
-        "accept_threshold": 75,
-        "review_threshold": 50,
-        "scoring_weights": {
-            "required_skills": 90,
-            "nice_to_have_skills": 5,
-            "content_quality": 5,
+    default_score = score_cv(
+        text,
+        {
+            "required_skills": ["Python", "SQL"],
+            "nice_to_have_skills": ["React"],
+            "accept_threshold": 75,
+            "review_threshold": 50,
         },
-    })
+    )
+    weighted_score = score_cv(
+        text,
+        {
+            "required_skills": ["Python", "SQL"],
+            "nice_to_have_skills": ["React"],
+            "accept_threshold": 75,
+            "review_threshold": 50,
+            "scoring_weights": {
+                "required_skills": 90,
+                "nice_to_have_skills": 5,
+                "content_quality": 5,
+            },
+        },
+    )
 
     assert weighted_score["score"] > default_score["score"]
     assert weighted_score["score_breakdown"]["required_skills"] == 90
@@ -284,7 +290,7 @@ def test_openai_review_keeps_tls_verification_enabled(monkeypatch):
         status_code = 200
 
         def json(self):
-            return {"choices": [{"message": {"content": "{\"decision\":\"recommended_review\"}"}}]}
+            return {"choices": [{"message": {"content": '{"decision":"recommended_review"}'}}]}
 
     def fake_post(url, **kwargs):
         captured["url"] = url
@@ -352,7 +358,7 @@ def test_workspace_store_purges_legacy_cv_text_payloads(tmp_path):
 
 def test_local_worker_unicode_and_i18n():
     from worker import _normalize, _token_set, _derive_keywords, STOPWORDS
-    
+
     # 1. Test clean lowercasing & Unicode normalization
     assert _normalize("İSTANBUL") == "istanbul"
     assert _normalize("ılık") == "ılık"
@@ -363,19 +369,19 @@ def test_local_worker_unicode_and_i18n():
     assert _normalize("ci/cd pipeline") == "ci/cd pipeline"
     assert _normalize("node.js") == "node.js"
     assert _normalize("python_django") == "python django"
-    
+
     # 2. Test token extraction
     tokens = _token_set("geliştirici c++ c# .net")
     assert "geliştirici" in tokens
     assert "c++" in tokens
     assert "c#" in tokens
-    
+
     # 3. Test multilingual stopwords filtering
     assert "ve" in STOPWORDS
     assert "und" in STOPWORDS
     assert "para" in STOPWORDS
     assert "avec" in STOPWORDS
-    
+
     # 4. Test keyword derivation with Unicode letters
     jd = "Aradığımız aday gelişmiş Python ve Django bilgisine sahip, tecrübeli bir geliştirici olmalıdır."
     derived = _derive_keywords(jd)

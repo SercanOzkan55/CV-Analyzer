@@ -1,4 +1,5 @@
 """Tests for services/tasks.py — Celery task fallback."""
+
 import pytest
 import services.tasks as tasks_module
 from services.tasks import analyze_pdf_task, analyze_text_task

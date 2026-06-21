@@ -1,9 +1,11 @@
 """Unit tests for services/experience_service.py"""
+
 import pytest
 from services.experience_service import extract_years, experience_score
 
 
 # ── extract_years ────────────────────────────────────────────
+
 
 class TestExtractYears:
     def test_direct_pattern_years(self):
@@ -24,6 +26,7 @@ class TestExtractYears:
 
     def test_present_keyword(self):
         from datetime import datetime
+
         years = extract_years("2020 - present")
         expected = datetime.now().year - 2020
         assert years == expected
@@ -39,6 +42,7 @@ class TestExtractYears:
 
     def test_turkish_present_keyword(self):
         from datetime import datetime
+
         years = extract_years("2019 - halen")
         expected = datetime.now().year - 2019
         assert years == expected
@@ -53,6 +57,7 @@ class TestExtractYears:
 
 
 # ── experience_score ─────────────────────────────────────────
+
 
 class TestExperienceScore:
     def test_meets_requirement(self):

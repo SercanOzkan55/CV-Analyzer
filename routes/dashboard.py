@@ -12,6 +12,7 @@ from core.route_dependencies import *  # noqa: F403
 
 router = APIRouter(tags=["dashboard"])
 
+
 class FavoriteToggleRequest(BaseModel):
     analysis_id: int
     note: str = ""
@@ -42,11 +43,7 @@ def list_favorites(
     analysis_ids = [f.analysis_id for f in favs]
     analyses = {}
     if analysis_ids:
-        records = (
-            db.query(Analysis)
-            .filter(Analysis.id.in_(analysis_ids), Analysis.user_id == db_user.id)
-            .all()
-        )
+        records = db.query(Analysis).filter(Analysis.id.in_(analysis_ids), Analysis.user_id == db_user.id).all()
         analyses = {a.id: a for a in records}
 
     return {
@@ -61,7 +58,9 @@ def list_favorites(
                     "interpretation": a.interpretation,
                     "job_title": a.job_title,
                     "created_at": a.created_at.isoformat() if a.created_at else None,
-                } if (a := analyses.get(f.analysis_id)) else None,
+                }
+                if (a := analyses.get(f.analysis_id))
+                else None,
             }
             for f in favs
         ]
@@ -99,9 +98,7 @@ def toggle_favorite(
                 )
 
     existing = (
-        db.query(Favorite)
-        .filter(Favorite.user_id == db_user.id, Favorite.analysis_id == body.analysis_id)
-        .first()
+        db.query(Favorite).filter(Favorite.user_id == db_user.id, Favorite.analysis_id == body.analysis_id).first()
     )
 
     if existing:
@@ -131,11 +128,7 @@ def get_favorite_ids(
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
 
-    ids = (
-        db.query(Favorite.analysis_id)
-        .filter(Favorite.user_id == db_user.id)
-        .all()
-    )
+    ids = db.query(Favorite.analysis_id).filter(Favorite.user_id == db_user.id).all()
     return {"ids": [r[0] for r in ids]}
 
 
@@ -160,10 +153,7 @@ def list_jd_templates(
     db_user = get_or_create_user(db, supabase_id, email)
 
     templates = (
-        db.query(JobTemplate)
-        .filter(JobTemplate.user_id == db_user.id)
-        .order_by(JobTemplate.created_at.desc())
-        .all()
+        db.query(JobTemplate).filter(JobTemplate.user_id == db_user.id).order_by(JobTemplate.created_at.desc()).all()
     )
     return {
         "templates": [
@@ -225,11 +215,7 @@ def delete_jd_template(
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
 
-    tmpl = (
-        db.query(JobTemplate)
-        .filter(JobTemplate.id == template_id, JobTemplate.user_id == db_user.id)
-        .first()
-    )
+    tmpl = db.query(JobTemplate).filter(JobTemplate.id == template_id, JobTemplate.user_id == db_user.id).first()
     if not tmpl:
         raise HTTPException(status_code=404, detail="Template not found")
     db.delete(tmpl)
@@ -330,11 +316,7 @@ def view_shared_analysis(
     if not share:
         raise HTTPException(status_code=404, detail="Share link not found or expired")
 
-    analysis = (
-        db.query(Analysis)
-        .filter(Analysis.id == share.analysis_id, Analysis.user_id == share.user_id)
-        .first()
-    )
+    analysis = db.query(Analysis).filter(Analysis.id == share.analysis_id, Analysis.user_id == share.user_id).first()
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
 
@@ -375,31 +357,32 @@ def export_history_csv(
         )
 
     records = (
-        db.query(Analysis)
-        .filter(Analysis.user_id == db_user.id)
-        .order_by(Analysis.created_at.desc())
-        .limit(500)
-        .all()
+        db.query(Analysis).filter(Analysis.user_id == db_user.id).order_by(Analysis.created_at.desc()).limit(500).all()
     )
 
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(["Date", "Job Title", "Score", "Interpretation", "ATS Score", "Semantic", "Keyword", "Skill", "Experience"])
+    writer.writerow(
+        ["Date", "Job Title", "Score", "Interpretation", "ATS Score", "Semantic", "Keyword", "Skill", "Experience"]
+    )
     for r in records:
         res = r.result if isinstance(r.result, dict) else {}
-        writer.writerow([
-            r.created_at.isoformat() if r.created_at else "",
-            r.job_title or "",
-            r.similarity_score or 0,
-            r.interpretation or "",
-            res.get("ats_score", ""),
-            res.get("semantic_score", ""),
-            res.get("keyword_score", ""),
-            res.get("skill_score", ""),
-            res.get("experience_score", ""),
-        ])
+        writer.writerow(
+            [
+                r.created_at.isoformat() if r.created_at else "",
+                r.job_title or "",
+                r.similarity_score or 0,
+                r.interpretation or "",
+                res.get("ats_score", ""),
+                res.get("semantic_score", ""),
+                res.get("keyword_score", ""),
+                res.get("skill_score", ""),
+                res.get("experience_score", ""),
+            ]
+        )
 
     from starlette.responses import StreamingResponse
+
     buf.seek(0)
     return StreamingResponse(
         iter([buf.getvalue()]),
@@ -534,7 +517,7 @@ def get_usage_streak(
     if not rows:
         return {"current_streak": 0, "longest_streak": 0, "total_active_days": 0}
 
-    dates = sorted(set(r[0].date() if hasattr(r[0], 'date') else r[0] for r in rows), reverse=True)
+    dates = sorted(set(r[0].date() if hasattr(r[0], "date") else r[0] for r in rows), reverse=True)
     today = datetime.utcnow().date()
 
     # Current streak
@@ -578,11 +561,7 @@ def get_dashboard_insights(
     db_user = get_or_create_user(db, supabase_id, email)
 
     records = (
-        db.query(Analysis)
-        .filter(Analysis.user_id == db_user.id)
-        .order_by(Analysis.created_at.desc())
-        .limit(20)
-        .all()
+        db.query(Analysis).filter(Analysis.user_id == db_user.id).order_by(Analysis.created_at.desc()).limit(20).all()
     )
 
     if not records:
@@ -597,8 +576,8 @@ def get_dashboard_insights(
     # Trend: compare last 5 vs previous 5
     recent_5 = scores[:5] if len(scores) >= 5 else scores
     prev_5 = scores[5:10] if len(scores) >= 10 else []
-    trend = "improving" if prev_5 and (sum(recent_5)/len(recent_5)) > (sum(prev_5)/len(prev_5)) else "stable"
-    if prev_5 and (sum(recent_5)/len(recent_5)) < (sum(prev_5)/len(prev_5)) - 5:
+    trend = "improving" if prev_5 and (sum(recent_5) / len(recent_5)) > (sum(prev_5) / len(prev_5)) else "stable"
+    if prev_5 and (sum(recent_5) / len(recent_5)) < (sum(prev_5) / len(prev_5)) - 5:
         trend = "declining"
 
     # Find weakest dimensions
@@ -610,52 +589,70 @@ def get_dashboard_insights(
             if val is not None:
                 dim_totals[dim].append(val)
 
-    dim_avgs = {k: sum(v)/len(v) if v else 0 for k, v in dim_totals.items()}
+    dim_avgs = {k: sum(v) / len(v) if v else 0 for k, v in dim_totals.items()}
     weakest = sorted(dim_avgs.items(), key=lambda x: x[1])[:2]
 
     insights = []
 
     if trend == "improving":
-        insights.append({
-            "type": "positive",
-            "icon": "📈",
-            "text": f"Skorlarınız yükseliyor! Son analizlerde ortalama {sum(recent_5)/len(recent_5):.0f}%",
-        })
+        insights.append(
+            {
+                "type": "positive",
+                "icon": "📈",
+                "text": f"Skorlarınız yükseliyor! Son analizlerde ortalama {sum(recent_5) / len(recent_5):.0f}%",
+            }
+        )
     elif trend == "declining":
-        insights.append({
-            "type": "warning",
-            "icon": "📉",
-            "text": "Son analizlerde skorlarınız düşüş eğiliminde. Önerilere dikkat edin.",
-        })
+        insights.append(
+            {
+                "type": "warning",
+                "icon": "📉",
+                "text": "Son analizlerde skorlarınız düşüş eğiliminde. Önerilere dikkat edin.",
+            }
+        )
 
     if weakest and weakest[0][1] < 60:
-        dim_name = {"semantic": "Semantik uyum", "keyword": "Anahtar kelime", "skill": "Yetenek eşleşme", "experience": "Deneyim", "ats": "ATS uyumluluk"}.get(weakest[0][0], weakest[0][0])
-        insights.append({
-            "type": "tip",
-            "icon": "💡",
-            "text": f"En zayıf alanınız: {dim_name} (ort. {weakest[0][1]:.0f}%). Bu boyutu iyileştirmeye odaklanın.",
-        })
+        dim_name = {
+            "semantic": "Semantik uyum",
+            "keyword": "Anahtar kelime",
+            "skill": "Yetenek eşleşme",
+            "experience": "Deneyim",
+            "ats": "ATS uyumluluk",
+        }.get(weakest[0][0], weakest[0][0])
+        insights.append(
+            {
+                "type": "tip",
+                "icon": "💡",
+                "text": f"En zayıf alanınız: {dim_name} (ort. {weakest[0][1]:.0f}%). Bu boyutu iyileştirmeye odaklanın.",
+            }
+        )
 
     if total >= 5 and avg_score >= 70:
-        insights.append({
-            "type": "achievement",
-            "icon": "🏆",
-            "text": f"{total} analiz tamamlandı, ortalama {avg_score:.0f}%. Harika gidiyorsunuz!",
-        })
+        insights.append(
+            {
+                "type": "achievement",
+                "icon": "🏆",
+                "text": f"{total} analiz tamamlandı, ortalama {avg_score:.0f}%. Harika gidiyorsunuz!",
+            }
+        )
 
     if best_score >= 90:
-        insights.append({
-            "type": "positive",
-            "icon": "⭐",
-            "text": f"En iyi skorunuz {best_score:.0f}%! Mükemmel CV-iş uyumu.",
-        })
+        insights.append(
+            {
+                "type": "positive",
+                "icon": "⭐",
+                "text": f"En iyi skorunuz {best_score:.0f}%! Mükemmel CV-iş uyumu.",
+            }
+        )
 
     if total < 3:
-        insights.append({
-            "type": "tip",
-            "icon": "🚀",
-            "text": "Daha fazla analiz yaparak trend verilerinizi zenginleştirin.",
-        })
+        insights.append(
+            {
+                "type": "tip",
+                "icon": "🚀",
+                "text": "Daha fazla analiz yaparak trend verilerinizi zenginleştirin.",
+            }
+        )
 
     return {
         "insights": insights[:4],
@@ -675,6 +672,7 @@ def get_dashboard_insights(
 
 # ── Blog Feed: trending tech articles from Dev.to ───────────────────
 _blog_feed_cache: dict = {"data": [], "ts": 0}
+
 
 @router.get("/api/v1/blog/feed")
 @rate_limit("10/minute")
@@ -703,21 +701,23 @@ async def get_blog_feed(request: Request):
                         raw_url = str(item.get("url") or "")
                         raw_image = str(item.get("cover_image") or item.get("social_image") or "")
                         raw_avatar = str(item.get("user", {}).get("profile_image_90") or "")
-                        articles.append({
-                            "id": item.get("id"),
-                            "title": str(item.get("title") or "")[:200],
-                            "summary": str(item.get("description") or "")[:500],
-                            "url": raw_url if raw_url.startswith("https://") else "",
-                            "image": raw_image if raw_image.startswith("https://") else "",
-                            "author": str(item.get("user", {}).get("name") or "")[:100],
-                            "author_avatar": raw_avatar if raw_avatar.startswith("https://") else "",
-                            "published_at": item.get("published_at", ""),
-                            "reading_time": item.get("reading_time_minutes", 3),
-                            "tags": item.get("tag_list", [])[:10],
-                            "reactions": item.get("positive_reactions_count", 0),
-                            "comments": item.get("comments_count", 0),
-                            "source": "dev.to",
-                        })
+                        articles.append(
+                            {
+                                "id": item.get("id"),
+                                "title": str(item.get("title") or "")[:200],
+                                "summary": str(item.get("description") or "")[:500],
+                                "url": raw_url if raw_url.startswith("https://") else "",
+                                "image": raw_image if raw_image.startswith("https://") else "",
+                                "author": str(item.get("user", {}).get("name") or "")[:100],
+                                "author_avatar": raw_avatar if raw_avatar.startswith("https://") else "",
+                                "published_at": item.get("published_at", ""),
+                                "reading_time": item.get("reading_time_minutes", 3),
+                                "tags": item.get("tag_list", [])[:10],
+                                "reactions": item.get("positive_reactions_count", 0),
+                                "comments": item.get("comments_count", 0),
+                                "source": "dev.to",
+                            }
+                        )
     except Exception as exc:
         logger.warning("blog_feed: dev.to fetch failed: %s", exc)
         if _blog_feed_cache["data"]:
@@ -743,6 +743,7 @@ async def get_blog_feed(request: Request):
 def get_global_benchmark_stats(request: Request, db=Depends(get_db)):
     """Return global ATS benchmark statistics (public, aggregated only)."""
     from services.benchmark_service import get_global_stats as _bm_global
+
     return _bm_global(db)
 
 
@@ -751,6 +752,7 @@ def get_global_benchmark_stats(request: Request, db=Depends(get_db)):
 def get_profession_benchmarks(request: Request, db=Depends(get_db)):
     """Return ATS benchmark statistics per profession group."""
     from services.benchmark_service import get_profession_stats as _bm_profs
+
     return {"professions": _bm_profs(db)}
 
 
@@ -767,11 +769,7 @@ def get_benchmark(analysis_id: int, user=Depends(verify_supabase_jwt), db=Depend
     if not _is_premium_plan(effective_plan):
         raise HTTPException(status_code=403, detail="Premium plan required")
 
-    analysis_record = (
-        db.query(Analysis)
-        .filter(Analysis.id == analysis_id, Analysis.user_id == db_user.id)
-        .first()
-    )
+    analysis_record = db.query(Analysis).filter(Analysis.id == analysis_id, Analysis.user_id == db_user.id).first()
     if not analysis_record:
         raise HTTPException(status_code=404, detail="Analysis not found")
 
@@ -811,10 +809,15 @@ def get_usage(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
                 },
                 "monthly": {
                     "used": int(db_user.monthly_usage or 0),
-                    "limit": (10**12) if is_admin else int(USER_PLAN_LIMITS_MONTHLY.get(effective_plan, USER_PLAN_LIMITS_MONTHLY["free"])),
-                    "remaining": (10**12) if is_admin else max(
+                    "limit": (10**12)
+                    if is_admin
+                    else int(USER_PLAN_LIMITS_MONTHLY.get(effective_plan, USER_PLAN_LIMITS_MONTHLY["free"])),
+                    "remaining": (10**12)
+                    if is_admin
+                    else max(
                         0,
-                        int(USER_PLAN_LIMITS_MONTHLY.get(effective_plan, USER_PLAN_LIMITS_MONTHLY["free"])) - int(db_user.monthly_usage or 0),
+                        int(USER_PLAN_LIMITS_MONTHLY.get(effective_plan, USER_PLAN_LIMITS_MONTHLY["free"]))
+                        - int(db_user.monthly_usage or 0),
                     ),
                 },
             }
@@ -829,10 +832,15 @@ def get_usage(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
             },
             "monthly": {
                 "used": int(db_user.monthly_usage or 0),
-                "limit": (10**12) if is_admin else int(USER_PLAN_LIMITS_MONTHLY.get(effective_plan, USER_PLAN_LIMITS_MONTHLY["free"])),
-                "remaining": (10**12) if is_admin else max(
+                "limit": (10**12)
+                if is_admin
+                else int(USER_PLAN_LIMITS_MONTHLY.get(effective_plan, USER_PLAN_LIMITS_MONTHLY["free"])),
+                "remaining": (10**12)
+                if is_admin
+                else max(
                     0,
-                    int(USER_PLAN_LIMITS_MONTHLY.get(effective_plan, USER_PLAN_LIMITS_MONTHLY["free"])) - int(db_user.monthly_usage or 0),
+                    int(USER_PLAN_LIMITS_MONTHLY.get(effective_plan, USER_PLAN_LIMITS_MONTHLY["free"]))
+                    - int(db_user.monthly_usage or 0),
                 ),
             },
         }
@@ -844,9 +852,7 @@ def get_usage(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
     plan_type = _resolve_effective_plan(db, db_user)
     is_admin = _is_admin_user(db_user)
     user_daily_limit = USER_PLAN_LIMITS_DAILY.get(plan_type, USER_PLAN_LIMITS_DAILY["free"])
-    user_monthly_limit = USER_PLAN_LIMITS_MONTHLY.get(
-        plan_type, USER_PLAN_LIMITS_MONTHLY["free"]
-    )
+    user_monthly_limit = USER_PLAN_LIMITS_MONTHLY.get(plan_type, USER_PLAN_LIMITS_MONTHLY["free"])
 
     redis_quota = _get_daily_quota_status(
         db_user.supabase_id or str(db_user.id),
@@ -902,5 +908,3 @@ def get_me(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
         "email": db_user.email,
         "organization_id": db_user.organization_id,
     }
-
-

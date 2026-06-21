@@ -26,7 +26,7 @@ MAGIC_DOCX = b"PK\x03\x04"  # ZIP (OOXML is ZIP-based)
 
 # ── Limits ──────────────────────────────────────────────────────────
 MAX_FILE_SIZE = MAX_UPLOAD_BYTES
-MIN_FILE_SIZE = 100              # too small = empty/garbage
+MIN_FILE_SIZE = 100  # too small = empty/garbage
 
 ALLOWED_EXTENSIONS = frozenset({"pdf", "docx", "txt"})
 
@@ -206,7 +206,7 @@ def validate_zip_archive(file_path: str) -> None:
     MAX_ZIP_COMPRESSION_RATIO = 50.0
 
     try:
-        with zipfile.ZipFile(file_path, 'r') as archive:
+        with zipfile.ZipFile(file_path, "r") as archive:
             entries = archive.infolist()
             if len(entries) > MAX_ZIP_FILES:
                 logger.warning("file_guard:zip_too_many_files count=%d limit=%d", len(entries), MAX_ZIP_FILES)
@@ -231,7 +231,12 @@ def validate_zip_archive(file_path: str) -> None:
                 # Size checks
                 file_size = int(item.file_size or 0)
                 if file_size > MAX_ZIP_SINGLE_FILE_UNCOMPRESSED:
-                    logger.warning("file_guard:zip_file_too_large name=%s size=%d limit=%d", item.filename[:80], file_size, MAX_ZIP_SINGLE_FILE_UNCOMPRESSED)
+                    logger.warning(
+                        "file_guard:zip_file_too_large name=%s size=%d limit=%d",
+                        item.filename[:80],
+                        file_size,
+                        MAX_ZIP_SINGLE_FILE_UNCOMPRESSED,
+                    )
                     raise ValueError("File inside ZIP is too large")
 
                 # Compression ratio check
@@ -239,13 +244,22 @@ def validate_zip_archive(file_path: str) -> None:
                 if file_size > 10240 and compress_size > 0:
                     ratio = file_size / max(compress_size, 1)
                     if ratio > MAX_ZIP_COMPRESSION_RATIO:
-                        logger.warning("file_guard:zip_bomb_ratio name=%s ratio=%.2f limit=%d", item.filename[:80], ratio, MAX_ZIP_COMPRESSION_RATIO)
+                        logger.warning(
+                            "file_guard:zip_bomb_ratio name=%s ratio=%.2f limit=%d",
+                            item.filename[:80],
+                            ratio,
+                            MAX_ZIP_COMPRESSION_RATIO,
+                        )
                         raise ValueError("ZIP archive compression ratio is unsafe")
 
                 uncompressed_total += file_size
 
             if uncompressed_total > MAX_ZIP_UNCOMPRESSED_BYTES:
-                logger.warning("file_guard:zip_too_large_uncompressed size=%d limit=%d", uncompressed_total, MAX_ZIP_UNCOMPRESSED_BYTES)
+                logger.warning(
+                    "file_guard:zip_too_large_uncompressed size=%d limit=%d",
+                    uncompressed_total,
+                    MAX_ZIP_UNCOMPRESSED_BYTES,
+                )
                 raise ValueError("ZIP archive uncompressed size too large")
 
     except zipfile.BadZipFile as exc:

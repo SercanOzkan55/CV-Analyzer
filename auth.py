@@ -25,6 +25,7 @@ def _jwt_fail():
     """Increment JWT failure metric (best-effort)."""
     try:
         from main import JWT_FAILURES_TOTAL
+
         JWT_FAILURES_TOTAL.inc()
     except Exception:
         pass
@@ -51,29 +52,30 @@ SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
 if not SUPABASE_JWT_SECRET:
     SUPABASE_JWT_SECRET = _read_secret_file(os.getenv("SUPABASE_JWT_SECRET_FILE"))
 
+
 # CRITICAL: Validate JWT secret exists for production
 def validate_jwt_config():
     """Validate JWT configuration at startup."""
     env = os.getenv("ENV", "development").lower()
-    
+
     if env in ("production", "prod"):
         secret = os.getenv("SUPABASE_JWT_SECRET")
         secret_file = os.getenv("SUPABASE_JWT_SECRET_FILE")
-        
+
         if not secret and not secret_file:
-            raise RuntimeError(
-                "CRITICAL: SUPABASE_JWT_SECRET or SUPABASE_JWT_SECRET_FILE required in production"
-            )
-        
+            raise RuntimeError("CRITICAL: SUPABASE_JWT_SECRET or SUPABASE_JWT_SECRET_FILE required in production")
+
         if secret_file:
             if not os.path.exists(secret_file):
                 raise RuntimeError(f"CRITICAL: Secret file not found: {secret_file}")
-            
+
             if not os.access(secret_file, os.R_OK):
                 raise RuntimeError(f"CRITICAL: Cannot read secret file: {secret_file}")
-        
+
         import logging
+
         logging.getLogger(__name__).info("✓ JWT configuration validated for production")
+
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 
@@ -158,20 +160,16 @@ def verify_supabase_jwt(authorization: str = Header(None)):
     # In development/testing mode, return a mock user when MOCK_SERVICES is set.
     # GUARD: never allow mock auth when ENV is production.
     env_mode = os.getenv("ENV", "development").lower()
-    
+
     # CRITICAL: Block mock auth in production
     if env_mode in ("production", "prod"):
         if os.getenv("MOCK_SERVICES", "0").lower() in ("1", "true", "yes"):
             raise RuntimeError(
-                "MOCK_SERVICES cannot be enabled in production environment. "
-                "This is a critical security violation."
+                "MOCK_SERVICES cannot be enabled in production environment. This is a critical security violation."
             )
-    
+
     # Allow mock auth only in development
-    if (
-        os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes")
-        and env_mode not in ("production", "prod")
-    ):
+    if os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes") and env_mode not in ("production", "prod"):
         # Try to preserve per-user identity in mock mode by reading unverified
         # claims from the bearer token. This keeps quota/rate-limit behavior
         # meaningful across different accounts during local testing.
@@ -207,9 +205,7 @@ def verify_supabase_jwt(authorization: str = Header(None)):
             raise HTTPException(status_code=401, detail="Invalid auth scheme")
     except ValueError:
         _jwt_fail()
-        raise HTTPException(
-            status_code=401, detail="Invalid Authorization header format"
-        )
+        raise HTTPException(status_code=401, detail="Invalid Authorization header format")
 
     # ── Token length guard ──
     if len(token) > _MAX_TOKEN_LENGTH:
@@ -276,9 +272,7 @@ def verify_supabase_jwt(authorization: str = Header(None)):
             # jwcrypto accepts JSON string; ensure key is serializable
             jwk_key = jwk_mod.JWK(**key_obj)
             pem = jwk_key.export_to_pem(public_key=True, password=None)
-            payload = jwt.decode(
-                token, pem, algorithms=[alg], **_jwt_decode_kwargs()
-            )
+            payload = jwt.decode(token, pem, algorithms=[alg], **_jwt_decode_kwargs())
         except Exception:
             _jwt_fail()
             raise HTTPException(
@@ -299,6 +293,7 @@ def verify_supabase_jwt(authorization: str = Header(None)):
 # =====================================================================
 #  RECRUITER AUTH DEPENDENCY
 # =====================================================================
+
 
 def recruiter_required(authorization: str = Header(None)):
     """
@@ -335,7 +330,7 @@ def recruiter_required(authorization: str = Header(None)):
             "email": user.email,
             "organization_id": user.organization_id,
             "organization": org,
-            "user": user
+            "user": user,
         }
 
     finally:

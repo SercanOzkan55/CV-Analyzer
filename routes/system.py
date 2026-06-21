@@ -12,6 +12,7 @@ from core.route_dependencies import *  # noqa: F403
 
 router = APIRouter(tags=["system"])
 
+
 @router.get("/")
 def read_root():
     """Root endpoint for health checks and basic landing."""
@@ -19,7 +20,7 @@ def read_root():
         content={
             "status": "online",
             "mode": "private" if os.getenv("STORAGE_BACKEND") == "local" else "cloud",
-            "message": "CV Analyzer API is running. Access frontend via http://localhost:5173 or /static"
+            "message": "CV Analyzer API is running. Access frontend via http://localhost:5173 or /static",
         }
     )
 
@@ -63,11 +64,9 @@ def demo_sample_workspace():
 def list_fonts():
     """Return available font families for CV generation."""
     from renderers.theme import ALLOWED_FONTS, DEFAULT_FONT
+
     return {
-        "fonts": [
-            {"id": fid, "label": label}
-            for fid, label in ALLOWED_FONTS.items()
-        ],
+        "fonts": [{"id": fid, "label": label} for fid, label in ALLOWED_FONTS.items()],
         "default": DEFAULT_FONT,
     }
 
@@ -125,8 +124,10 @@ def health_check(request: Request = None):
     _s3_t = time.time()
     try:
         from config.aws import is_configured as _s3_configured
+
         if _s3_configured():
             from services.storage_service import check_health as _s3_health
+
             if _s3_health():
                 checks["s3"] = "ok"
                 _cb_record_success("s3")
@@ -144,9 +145,7 @@ def health_check(request: Request = None):
     # pgvector extension
     _vec_db = SessionLocal()
     try:
-        row = _vec_db.execute(
-            text("SELECT 1 FROM pg_extension WHERE extname = 'vector'")
-        ).fetchone()
+        row = _vec_db.execute(text("SELECT 1 FROM pg_extension WHERE extname = 'vector'")).fetchone()
         checks["vector"] = "ok" if row else "missing"
     except Exception:
         checks["vector"] = "unknown"
@@ -157,6 +156,7 @@ def health_check(request: Request = None):
     _wk_t = time.time()
     try:
         from services.model_worker import _proc as _mw_proc
+
         if _mw_proc is not None and _mw_proc.is_alive():
             checks["worker"] = "ok"
             _cb_record_success("worker")
@@ -228,8 +228,7 @@ def health_check(request: Request = None):
         "memory_rss_limit_mb": _MEMORY_RSS_LIMIT_MB,
         "memory_rss_current_mb": round(_get_rss_bytes() / (1024 * 1024), 1),
         "circuit_breakers_open": [
-            svc for svc, st in _circuit_breaker_state.items()
-            if st.get("open_until", 0) > time.time()
+            svc for svc, st in _circuit_breaker_state.items() if st.get("open_until", 0) > time.time()
         ],
         "ban_dict_size": len(_LOCAL_ABUSE_BANS),
         "rate_dict_sizes": {
@@ -244,7 +243,7 @@ def health_check(request: Request = None):
     is_prod = os.getenv("ENV", "development").lower() in ("production", "prod")
     has_admin = False
     if request is not None:
-        has_admin = (_admin_access_error(request) is None)
+        has_admin = _admin_access_error(request) is None
 
     if is_prod and not has_admin:
         return {
@@ -291,8 +290,7 @@ def _check_backup_age() -> dict:
         if not os.path.isdir(_BACKUP_DIR):
             return {"status": "no_backup_dir"}
         files = sorted(
-            (os.path.join(_BACKUP_DIR, f) for f in os.listdir(_BACKUP_DIR)
-             if f.endswith((".sql.gz", ".sql", ".dump"))),
+            (os.path.join(_BACKUP_DIR, f) for f in os.listdir(_BACKUP_DIR) if f.endswith((".sql.gz", ".sql", ".dump"))),
             key=lambda p: os.path.getmtime(p),
             reverse=True,
         )
@@ -334,6 +332,7 @@ def health_full(request: Request):
     # Worker restart count
     try:
         from services.model_worker import _worker_restart_count
+
         base["worker_restarts"] = _worker_restart_count
     except Exception:
         base["worker_restarts"] = "unknown"
@@ -341,6 +340,7 @@ def health_full(request: Request):
     # ML model health
     try:
         from services.ml_model import health_check as ml_health_check
+
         base["ml_models"] = ml_health_check()
     except Exception:
         base["ml_models"] = {"error": "could not check"}
@@ -379,6 +379,7 @@ def health_full(request: Request):
 
 
 # ── Admin safe endpoints ─────────────────────────────────────────────────
+
 
 @router.get("/admin/status")
 def admin_status(request: Request):
@@ -509,5 +510,3 @@ async def admin_breakers_reset(request: Request):
 # In development you can still bootstrap the database by running
 # ``python setup_db.py`` or ``alembic upgrade head``; this automatic call
 # is intentionally disabled.
-
-

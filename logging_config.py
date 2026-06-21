@@ -20,11 +20,13 @@ from datetime import datetime, timezone
 try:
     from security.redaction import redact_for_log, redact_sensitive_text
 except Exception:  # pragma: no cover - logging must keep working during boot
+
     def redact_sensitive_text(value: str, max_length: int = 2000) -> str:
         return value
 
     def redact_for_log(value, key: str | None = None, max_depth: int = 4):
         return value
+
 
 _LOG_DIR = os.getenv("LOG_DIR", "/app/logs")
 _LOG_MAX_BYTES = int(os.getenv("LOG_MAX_BYTES", str(50 * 1024 * 1024)))  # 50 MB
@@ -41,10 +43,7 @@ class RedactingFilter(logging.Filter):
             if isinstance(record.msg, str) and not record.args:
                 record.msg = redact_sensitive_text(record.msg)
             if isinstance(record.args, dict):
-                record.args = {
-                    key: redact_for_log(value, key=str(key))
-                    for key, value in record.args.items()
-                }
+                record.args = {key: redact_for_log(value, key=str(key)) for key, value in record.args.items()}
             elif isinstance(record.args, tuple):
                 record.args = tuple(redact_for_log(value) for value in record.args)
             elif record.args:

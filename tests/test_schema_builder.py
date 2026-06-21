@@ -1,4 +1,5 @@
 """Tests for services/schema_builder.py — mapping normalized data to CVSchema."""
+
 import pytest
 from services.schema_builder import (
     build_schema,

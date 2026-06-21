@@ -14,6 +14,7 @@ Higher score wins.  Used by ``utils.cv_normalizer`` to place ambiguous
 blocks (particularly misc items and contaminated sections) before final
 assignment.
 """
+
 from __future__ import annotations
 
 import re
@@ -79,62 +80,177 @@ _PROJECT_RE = re.compile(
 # ── Canonical known-language set (single source of truth) ─────────────
 # Import as ``from utils.section_scorer import KNOWN_LANGUAGES, CEFR_RE``.
 # Coverage: 60+ languages in English name, native name, and major variants.
-KNOWN_LANGUAGES: frozenset = frozenset({
-    # ── English names ──
-    "english", "turkish", "german", "french", "spanish", "italian",
-    "portuguese", "russian", "arabic", "chinese", "japanese", "korean",
-    "dutch", "swedish", "norwegian", "danish", "finnish", "polish",
-    "czech", "hungarian", "greek", "romanian", "bulgarian", "croatian",
-    "serbian", "ukrainian", "hebrew", "hindi", "persian", "thai",
-    "vietnamese", "indonesian", "malay", "bengali", "urdu", "swahili",
-    "tagalog", "filipino", "catalan", "basque", "galician", "welsh",
-    "irish", "scottish gaelic", "icelandic", "latvian", "lithuanian",
-    "estonian", "slovenian", "slovak", "albanian", "macedonian",
-    "bosnian", "montenegrin", "georgian", "armenian", "azerbaijani",
-    "kazakh", "uzbek", "afrikaans", "amharic", "somali", "hausa",
-    "yoruba", "igbo", "zulu", "xhosa", "nepali", "sinhala",
-    "tamil", "telugu", "kannada", "malayalam", "marathi", "gujarati",
-    "punjabi", "burmese", "khmer", "lao", "mongolian", "tibetan",
-    "mandarin", "cantonese", "hokkien", "sign language",
-    # ── Turkish native names ──
-    "türkçe", "ingilizce", "almanca", "fransızca", "ispanyolca",
-    "italyanca", "portekizce", "rusça", "arapça", "çince", "japonca",
-    "korece", "hollandaca", "lehçe", "yunanca", "bulgarca", "sırpça",
-    "hırvatça", "ukraynaca", "farsça", "kürtçe",
-    # ── European native names ──
-    "deutsch", "français", "español", "italiano", "português",
-    "nederlands", "svenska", "norsk", "dansk", "suomi",
-    "polski", "čeština", "magyar", "română", "slovenčina",
-    "slovenščina", "hrvatski", "srpski", "bosanski",
-    "ελληνικά", "български",
-    # ── Non-Latin ──
-    "русский", "українська", "العربية", "فارسی", "עברית",
-    "हिन्दी", "日本語", "中文", "한국어", "ไทย", "tiếng việt",
-    "bahasa indonesia", "bahasa melayu",
-})
+KNOWN_LANGUAGES: frozenset = frozenset(
+    {
+        # ── English names ──
+        "english",
+        "turkish",
+        "german",
+        "french",
+        "spanish",
+        "italian",
+        "portuguese",
+        "russian",
+        "arabic",
+        "chinese",
+        "japanese",
+        "korean",
+        "dutch",
+        "swedish",
+        "norwegian",
+        "danish",
+        "finnish",
+        "polish",
+        "czech",
+        "hungarian",
+        "greek",
+        "romanian",
+        "bulgarian",
+        "croatian",
+        "serbian",
+        "ukrainian",
+        "hebrew",
+        "hindi",
+        "persian",
+        "thai",
+        "vietnamese",
+        "indonesian",
+        "malay",
+        "bengali",
+        "urdu",
+        "swahili",
+        "tagalog",
+        "filipino",
+        "catalan",
+        "basque",
+        "galician",
+        "welsh",
+        "irish",
+        "scottish gaelic",
+        "icelandic",
+        "latvian",
+        "lithuanian",
+        "estonian",
+        "slovenian",
+        "slovak",
+        "albanian",
+        "macedonian",
+        "bosnian",
+        "montenegrin",
+        "georgian",
+        "armenian",
+        "azerbaijani",
+        "kazakh",
+        "uzbek",
+        "afrikaans",
+        "amharic",
+        "somali",
+        "hausa",
+        "yoruba",
+        "igbo",
+        "zulu",
+        "xhosa",
+        "nepali",
+        "sinhala",
+        "tamil",
+        "telugu",
+        "kannada",
+        "malayalam",
+        "marathi",
+        "gujarati",
+        "punjabi",
+        "burmese",
+        "khmer",
+        "lao",
+        "mongolian",
+        "tibetan",
+        "mandarin",
+        "cantonese",
+        "hokkien",
+        "sign language",
+        # ── Turkish native names ──
+        "türkçe",
+        "ingilizce",
+        "almanca",
+        "fransızca",
+        "ispanyolca",
+        "italyanca",
+        "portekizce",
+        "rusça",
+        "arapça",
+        "çince",
+        "japonca",
+        "korece",
+        "hollandaca",
+        "lehçe",
+        "yunanca",
+        "bulgarca",
+        "sırpça",
+        "hırvatça",
+        "ukraynaca",
+        "farsça",
+        "kürtçe",
+        # ── European native names ──
+        "deutsch",
+        "français",
+        "español",
+        "italiano",
+        "português",
+        "nederlands",
+        "svenska",
+        "norsk",
+        "dansk",
+        "suomi",
+        "polski",
+        "čeština",
+        "magyar",
+        "română",
+        "slovenčina",
+        "slovenščina",
+        "hrvatski",
+        "srpski",
+        "bosanski",
+        "ελληνικά",
+        "български",
+        # ── Non-Latin ──
+        "русский",
+        "українська",
+        "العربية",
+        "فارسی",
+        "עברית",
+        "हिन्दी",
+        "日本語",
+        "中文",
+        "한국어",
+        "ไทย",
+        "tiếng việt",
+        "bahasa indonesia",
+        "bahasa melayu",
+    }
+)
 
 # Backward-compatible alias used internally by scoring engine
 _LANG_NAMES = KNOWN_LANGUAGES
 
 CEFR_RE = re.compile(
-    r"\b(?:A[12]|B[12]|C[12]"               # CEFR levels
-    r"|N[1-5]"                                # JLPT levels
+    r"\b(?:A[12]|B[12]|C[12]"  # CEFR levels
+    r"|N[1-5]"  # JLPT levels
     r"|native|fluent|advanced|intermediate"
     r"|beginner|proficient|basic|elementary"
     r"|upper[\s-]?intermediate"
     r"|mother\s*tongue|bilingual"
     # International proficiency words
-    r"|ana\s*dil(?:i)?"                       # Turkish: native
-    r"|muttersprache"                         # German: native
-    r"|langue\s*maternelle"                   # French: native
-    r"|lengua\s*materna|nativo"               # Spanish: native
-    r"|lingua\s*madre|madrelingua"            # Italian: native
-    r"|courant|flie[ßs]end|competente"        # FR/DE/ES: fluent
-    r"|débutant|anfänger|principiante"        # FR/DE/ES/IT: beginner
-    r"|avancé|fortgeschritten|avanzado"       # FR/DE/ES: advanced
+    r"|ana\s*dil(?:i)?"  # Turkish: native
+    r"|muttersprache"  # German: native
+    r"|langue\s*maternelle"  # French: native
+    r"|lengua\s*materna|nativo"  # Spanish: native
+    r"|lingua\s*madre|madrelingua"  # Italian: native
+    r"|courant|flie[ßs]end|competente"  # FR/DE/ES: fluent
+    r"|débutant|anfänger|principiante"  # FR/DE/ES/IT: beginner
+    r"|avancé|fortgeschritten|avanzado"  # FR/DE/ES: advanced
     r"|intermédiaire|mittelstufe|intermedio"  # intermediate
-    r"|très\s*bien|bien|scolaire"             # FR: proficiency
-    r"|iyi|çok\s*iyi|orta"                    # Turkish: levels
+    r"|très\s*bien|bien|scolaire"  # FR: proficiency
+    r"|iyi|çok\s*iyi|orta"  # Turkish: levels
     r")\b",
     re.I,
 )
@@ -221,6 +337,7 @@ def is_language_entry(text: str, *, strict: bool = True) -> bool:
 
     return False
 
+
 _INTEREST_RE = re.compile(
     r"\b(?:hobby|hobbies|interest|volunteer|swimming|reading|traveling"
     r"|gaming|photography|cooking|music|sport|yoga|chess|hiking"
@@ -229,7 +346,8 @@ _INTEREST_RE = re.compile(
 )
 
 _BIRTH_RE = re.compile(
-    r"\b(?:birth|dob|doğum|geboren|date\s+of\s+birth)\b", re.I,
+    r"\b(?:birth|dob|doğum|geboren|date\s+of\s+birth)\b",
+    re.I,
 )
 _ADDRESS_RE = re.compile(
     r"\b(?:street|avenue|boulevard|road|drive|lane|apt\.?|suite"
@@ -243,9 +361,17 @@ _ADDRESS_RE = re.compile(
 # SCORE RESULT
 # ═══════════════════════════════════════════════════════════════════════════
 
-SECTIONS = ("education", "experience", "skills", "projects",
-            "languages", "contact", "certifications", "interests",
-            "summary")
+SECTIONS = (
+    "education",
+    "experience",
+    "skills",
+    "projects",
+    "languages",
+    "contact",
+    "certifications",
+    "interests",
+    "summary",
+)
 
 # Thresholds for overriding a section that came from an explicit header.
 # Much higher than normal (0.35 / 0.10) to protect author intent.
@@ -275,6 +401,7 @@ def locked_sections(
 @dataclass
 class SectionScores:
     """Multi-signal scores for a single text block."""
+
     education: float = 0.0
     experience: float = 0.0
     skills: float = 0.0
@@ -303,9 +430,15 @@ class SectionScores:
 
     def best_score(self) -> float:
         return max(
-            self.education, self.experience, self.skills,
-            self.projects, self.languages, self.contact,
-            self.certifications, self.interests, self.summary,
+            self.education,
+            self.experience,
+            self.skills,
+            self.projects,
+            self.languages,
+            self.contact,
+            self.certifications,
+            self.interests,
+            self.summary,
         )
 
     def second_score(self) -> float:
@@ -334,8 +467,7 @@ class SectionScores:
         Locked sections come from explicit headers in the original CV.
         Uses ``LOCKED_MIN_SCORE`` / ``LOCKED_MIN_MARGIN``.
         """
-        return (self.best_score() >= LOCKED_MIN_SCORE
-                and self.margin() >= LOCKED_MIN_MARGIN)
+        return self.best_score() >= LOCKED_MIN_SCORE and self.margin() >= LOCKED_MIN_MARGIN
 
     def as_dict(self) -> Dict[str, float]:
         return {s: getattr(self, s) for s in SECTIONS}
@@ -344,6 +476,7 @@ class SectionScores:
 # ═══════════════════════════════════════════════════════════════════════════
 # SCORING ENGINE
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def score_text(text: str) -> SectionScores:
     """Score a text block against all candidate sections.
@@ -575,6 +708,7 @@ def score_dict_entry(entry: Dict) -> SectionScores:
 # BATCH SCORING FOR MISC ITEMS
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def classify_item(text: str, min_confidence: float = 0.35) -> str:
     """Classify a single text item into a section. Returns section name.
 
@@ -600,21 +734,20 @@ def is_contact_data(text: str) -> bool:
     Used to strip contact lines from experience / education bullets.
     """
     scores = score_text(text)
-    return (scores.contact >= 0.35
-            and scores.contact - scores.second_score() >= 0.10
-            if scores.best() == "contact"
-            else scores.contact > scores.experience and scores.contact >= 0.35)
+    return (
+        scores.contact >= 0.35 and scores.contact - scores.second_score() >= 0.10
+        if scores.best() == "contact"
+        else scores.contact > scores.experience and scores.contact >= 0.35
+    )
 
 
 def is_education_data(text: str) -> bool:
     """Return True if text is primarily education-related."""
     scores = score_text(text)
-    return (scores.education >= 0.35
-            and scores.education - scores.experience >= 0.10)
+    return scores.education >= 0.35 and scores.education - scores.experience >= 0.10
 
 
 def is_language_item(text: str) -> bool:
     """Return True if text is a spoken language entry (not tech/ISO code)."""
     scores = score_text(text)
-    return (scores.languages >= 0.35
-            and scores.languages - scores.skills >= 0.10)
+    return scores.languages >= 0.35 and scores.languages - scores.skills >= 0.10

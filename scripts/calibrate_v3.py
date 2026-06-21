@@ -1,4 +1,5 @@
 """Calibrate new benchmark entries based on actual scores."""
+
 import json, pathlib
 
 DS = pathlib.Path(__file__).resolve().parent.parent / "tests/benchmark/benchmark_dataset.json"

@@ -25,172 +25,423 @@ logger = logging.getLogger(__name__)
 # dynamically via _MULTILANG_DICTIONARY (see Phase 1b).
 _PROFESSION_RULES: list[tuple[str, list[str]]] = [
     # ── Software / IT ───────────────────────────────────
-    ("software_engineer", [
-        r"software\s*engineer", r"yazılım\s*müh", r"full[- ]?stack", r"front[- ]?end",
-        r"back[- ]?end", r"web\s*developer", r"web\s*geliştir",
-        r"mobile\s*developer", r"mobil\s*geliştir",
-        r"ios\s*developer", r"android\s*developer",
-        r"devops", r"sre\b", r"site\s*reliability", r"platform\s*engineer",
-        r"\bswe\b", r"software\s*developer", r"programmer", r"programcı",
-        r"react\b.*developer", r"node\.?js", r"python\b.*developer",
-        r"java\b.*developer", r"golang", r"\bdev\b", r"cloud\s*engineer",
-        r"bilgisayar\s*müh", r"bilişim\s*müh", r"sistem\s*müh",
-        r"information\s*tech", r"it\s*engineer", r"it\s*specialist",
-        r"bilgi\s*teknoloj", r"siber\s*güvenlik", r"cyber\s*security",
-        r"network\s*engineer", r"ağ\s*müh",
-    ]),
+    (
+        "software_engineer",
+        [
+            r"software\s*engineer",
+            r"yazılım\s*müh",
+            r"full[- ]?stack",
+            r"front[- ]?end",
+            r"back[- ]?end",
+            r"web\s*developer",
+            r"web\s*geliştir",
+            r"mobile\s*developer",
+            r"mobil\s*geliştir",
+            r"ios\s*developer",
+            r"android\s*developer",
+            r"devops",
+            r"sre\b",
+            r"site\s*reliability",
+            r"platform\s*engineer",
+            r"\bswe\b",
+            r"software\s*developer",
+            r"programmer",
+            r"programcı",
+            r"react\b.*developer",
+            r"node\.?js",
+            r"python\b.*developer",
+            r"java\b.*developer",
+            r"golang",
+            r"\bdev\b",
+            r"cloud\s*engineer",
+            r"bilgisayar\s*müh",
+            r"bilişim\s*müh",
+            r"sistem\s*müh",
+            r"information\s*tech",
+            r"it\s*engineer",
+            r"it\s*specialist",
+            r"bilgi\s*teknoloj",
+            r"siber\s*güvenlik",
+            r"cyber\s*security",
+            r"network\s*engineer",
+            r"ağ\s*müh",
+        ],
+    ),
     # ── Data / AI ───────────────────────────────────────
-    ("data_scientist", [
-        r"data\s*scien", r"veri\s*bilim", r"machine\s*learn", r"makine\s*öğren",
-        r"\bml\s*engineer", r"\bai\s*engineer", r"yapay\s*zeka",
-        r"deep\s*learn", r"derin\s*öğren", r"nlp\s*engineer",
-        r"data\s*engineer", r"veri\s*müh", r"big\s*data", r"büyük\s*veri",
-        r"data\s*analy", r"veri\s*anali", r"business\s*intellig",
-        r"\bbi\s*analy", r"quantitative", r"research\s*scien",
-        r"computer\s*vision", r"bilgisayarlı\s*görü",
-    ]),
+    (
+        "data_scientist",
+        [
+            r"data\s*scien",
+            r"veri\s*bilim",
+            r"machine\s*learn",
+            r"makine\s*öğren",
+            r"\bml\s*engineer",
+            r"\bai\s*engineer",
+            r"yapay\s*zeka",
+            r"deep\s*learn",
+            r"derin\s*öğren",
+            r"nlp\s*engineer",
+            r"data\s*engineer",
+            r"veri\s*müh",
+            r"big\s*data",
+            r"büyük\s*veri",
+            r"data\s*analy",
+            r"veri\s*anali",
+            r"business\s*intellig",
+            r"\bbi\s*analy",
+            r"quantitative",
+            r"research\s*scien",
+            r"computer\s*vision",
+            r"bilgisayarlı\s*görü",
+        ],
+    ),
     # ── Mechanical Engineering ──────────────────────────
-    ("mechanical_engineer", [
-        r"mechanical\s*engineer", r"makine\s*müh", r"makina\s*müh",
-        r"mekatronik", r"mechatronics", r"hvac\s*engineer",
-        r"thermal\s*engineer", r"termal\s*müh", r"otomotiv\s*müh",
-        r"automotive\s*engineer", r"manufacturing\s*engineer",
-        r"üretim\s*müh", r"kalite\s*müh", r"quality\s*engineer",
-        r"maintenance\s*engineer", r"bakım\s*müh",
-    ]),
+    (
+        "mechanical_engineer",
+        [
+            r"mechanical\s*engineer",
+            r"makine\s*müh",
+            r"makina\s*müh",
+            r"mekatronik",
+            r"mechatronics",
+            r"hvac\s*engineer",
+            r"thermal\s*engineer",
+            r"termal\s*müh",
+            r"otomotiv\s*müh",
+            r"automotive\s*engineer",
+            r"manufacturing\s*engineer",
+            r"üretim\s*müh",
+            r"kalite\s*müh",
+            r"quality\s*engineer",
+            r"maintenance\s*engineer",
+            r"bakım\s*müh",
+        ],
+    ),
     # ── Civil Engineering ───────────────────────────────
-    ("civil_engineer", [
-        r"civil\s*engineer", r"inşaat\s*müh", r"insaat\s*m[uü]h",
-        r"structural\s*engineer", r"yapı\s*müh",
-        r"geotechni", r"jeoteknik", r"şantiye\s*şef",
-        r"construction\s*manager", r"site\s*engineer",
-        r"urban\s*plann", r"şehir\s*planc", r"harita\s*müh",
-        r"surveying", r"çevre\s*müh", r"environmental\s*engineer",
-    ]),
+    (
+        "civil_engineer",
+        [
+            r"civil\s*engineer",
+            r"inşaat\s*müh",
+            r"insaat\s*m[uü]h",
+            r"structural\s*engineer",
+            r"yapı\s*müh",
+            r"geotechni",
+            r"jeoteknik",
+            r"şantiye\s*şef",
+            r"construction\s*manager",
+            r"site\s*engineer",
+            r"urban\s*plann",
+            r"şehir\s*planc",
+            r"harita\s*müh",
+            r"surveying",
+            r"çevre\s*müh",
+            r"environmental\s*engineer",
+        ],
+    ),
     # ── Electrical / Electronics ────────────────────────
-    ("electrical_engineer", [
-        r"electri\w*\s*engineer", r"elektrik\s*müh",
-        r"elektron\w*\s*engineer", r"elektronik\s*müh",
-        r"embedded\s*(?:systems?\s*)?engineer", r"gömülü\s*sistem",
-        r"hardware\s*engineer", r"donanım\s*müh",
-        r"power\s*engineer", r"enerji\s*müh",
-        r"control\s*engineer", r"kontrol\s*müh",
-        r"otomasyon\s*müh", r"automation\s*engineer",
-        r"telecom", r"telekom\w*\s*müh",
-        r"signal\s*process", r"sinyal\s*işleme",
-    ]),
+    (
+        "electrical_engineer",
+        [
+            r"electri\w*\s*engineer",
+            r"elektrik\s*müh",
+            r"elektron\w*\s*engineer",
+            r"elektronik\s*müh",
+            r"embedded\s*(?:systems?\s*)?engineer",
+            r"gömülü\s*sistem",
+            r"hardware\s*engineer",
+            r"donanım\s*müh",
+            r"power\s*engineer",
+            r"enerji\s*müh",
+            r"control\s*engineer",
+            r"kontrol\s*müh",
+            r"otomasyon\s*müh",
+            r"automation\s*engineer",
+            r"telecom",
+            r"telekom\w*\s*müh",
+            r"signal\s*process",
+            r"sinyal\s*işleme",
+        ],
+    ),
     # ── Industrial Engineering ──────────────────────────
-    ("industrial_engineer", [
-        r"industrial\s*engineer", r"endüstri\s*müh",
-        r"operations\s*research", r"yöneylem",
-        r"supply\s*chain", r"tedarik\s*zincir",
-        r"logistics\s*engineer", r"lojistik\s*müh",
-        r"process\s*engineer", r"süreç\s*müh",
-        r"lean\s*engineer", r"six\s*sigma",
-    ]),
+    (
+        "industrial_engineer",
+        [
+            r"industrial\s*engineer",
+            r"endüstri\s*müh",
+            r"operations\s*research",
+            r"yöneylem",
+            r"supply\s*chain",
+            r"tedarik\s*zincir",
+            r"logistics\s*engineer",
+            r"lojistik\s*müh",
+            r"process\s*engineer",
+            r"süreç\s*müh",
+            r"lean\s*engineer",
+            r"six\s*sigma",
+        ],
+    ),
     # ── Chemical Engineering ────────────────────────────
-    ("chemical_engineer", [
-        r"chemical\s*engineer", r"kimya\s*müh", r"kimyager",
-        r"chemist\b", r"petrole?um\s*engineer", r"petrol\s*müh",
-        r"polymer", r"polimer", r"biyokimya", r"biochemi",
-        r"food\s*engineer", r"gıda\s*müh",
-    ]),
+    (
+        "chemical_engineer",
+        [
+            r"chemical\s*engineer",
+            r"kimya\s*müh",
+            r"kimyager",
+            r"chemist\b",
+            r"petrole?um\s*engineer",
+            r"petrol\s*müh",
+            r"polymer",
+            r"polimer",
+            r"biyokimya",
+            r"biochemi",
+            r"food\s*engineer",
+            r"gıda\s*müh",
+        ],
+    ),
     # ── Architecture ────────────────────────────────────
-    ("architect", [
-        r"\barchitect\b", r"\bmimar\b", r"mimarlık",
-        r"interior\s*design", r"iç\s*mimar", r"peyzaj",
-        r"landscape\s*arch", r"building\s*design",
-    ]),
+    (
+        "architect",
+        [
+            r"\barchitect\b",
+            r"\bmimar\b",
+            r"mimarlık",
+            r"interior\s*design",
+            r"iç\s*mimar",
+            r"peyzaj",
+            r"landscape\s*arch",
+            r"building\s*design",
+        ],
+    ),
     # ── Design (UX/UI/Graphic) ──────────────────────────
-    ("designer", [
-        r"\bux\b", r"\bui\b", r"user\s*experience", r"user\s*interface",
-        r"graphic\s*design", r"grafik\s*tasarım",
-        r"product\s*design", r"ürün\s*tasarım",
-        r"visual\s*design", r"görsel\s*tasarım",
-        r"interaction\s*design", r"web\s*design",
-        r"creative\s*direct", r"yaratıcı\s*yönet",
-    ]),
+    (
+        "designer",
+        [
+            r"\bux\b",
+            r"\bui\b",
+            r"user\s*experience",
+            r"user\s*interface",
+            r"graphic\s*design",
+            r"grafik\s*tasarım",
+            r"product\s*design",
+            r"ürün\s*tasarım",
+            r"visual\s*design",
+            r"görsel\s*tasarım",
+            r"interaction\s*design",
+            r"web\s*design",
+            r"creative\s*direct",
+            r"yaratıcı\s*yönet",
+        ],
+    ),
     # ── Product / Project Management ────────────────────
-    ("product_manager", [
-        r"product\s*manager", r"ürün\s*yönet",
-        r"product\s*owner", r"program\s*manager",
-        r"project\s*manager", r"proje\s*yönet",
-        r"scrum\s*master", r"agile\s*coach",
-        r"technical\s*program", r"tpm\b",
-    ]),
+    (
+        "product_manager",
+        [
+            r"product\s*manager",
+            r"ürün\s*yönet",
+            r"product\s*owner",
+            r"program\s*manager",
+            r"project\s*manager",
+            r"proje\s*yönet",
+            r"scrum\s*master",
+            r"agile\s*coach",
+            r"technical\s*program",
+            r"tpm\b",
+        ],
+    ),
     # ── Marketing ───────────────────────────────────────
-    ("marketing", [
-        r"marketing", r"pazarlama", r"growth\s*hacker",
-        r"seo\b", r"sem\b", r"content\s*strat", r"içerik\s*strat",
-        r"social\s*media", r"sosyal\s*medya",
-        r"brand\s*manager", r"marka\s*yönet",
-        r"digital\s*market", r"dijital\s*pazarlama",
-        r"copywriter", r"metin\s*yazar",
-    ]),
+    (
+        "marketing",
+        [
+            r"marketing",
+            r"pazarlama",
+            r"growth\s*hacker",
+            r"seo\b",
+            r"sem\b",
+            r"content\s*strat",
+            r"içerik\s*strat",
+            r"social\s*media",
+            r"sosyal\s*medya",
+            r"brand\s*manager",
+            r"marka\s*yönet",
+            r"digital\s*market",
+            r"dijital\s*pazarlama",
+            r"copywriter",
+            r"metin\s*yazar",
+        ],
+    ),
     # ── Sales ───────────────────────────────────────────
-    ("sales", [
-        r"\bsales\b", r"\bsatış\b", r"account\s*exec",
-        r"business\s*develop", r"iş\s*geliştir",
-        r"\bbdr\b", r"\bsdr\b", r"customer\s*success",
-        r"müşteri\s*başarı", r"relationship\s*manager",
-    ]),
+    (
+        "sales",
+        [
+            r"\bsales\b",
+            r"\bsatış\b",
+            r"account\s*exec",
+            r"business\s*develop",
+            r"iş\s*geliştir",
+            r"\bbdr\b",
+            r"\bsdr\b",
+            r"customer\s*success",
+            r"müşteri\s*başarı",
+            r"relationship\s*manager",
+        ],
+    ),
     # ── Management / Leadership ─────────────────────────
-    ("manager", [
-        r"engineering\s*manager", r"mühendislik\s*müdür",
-        r"team\s*lead", r"takım\s*lid", r"tech\s*lead",
-        r"\bcto\b", r"vp\s*of\s*engineer", r"director\s*of",
-        r"müdür", r"head\s*of", r"chief", r"genel\s*müdür",
-        r"c-level", r"executive", r"yönetici",
-        r"\bceo\b", r"\bcfo\b", r"\bcoo\b", r"general\s*manager",
-    ]),
+    (
+        "manager",
+        [
+            r"engineering\s*manager",
+            r"mühendislik\s*müdür",
+            r"team\s*lead",
+            r"takım\s*lid",
+            r"tech\s*lead",
+            r"\bcto\b",
+            r"vp\s*of\s*engineer",
+            r"director\s*of",
+            r"müdür",
+            r"head\s*of",
+            r"chief",
+            r"genel\s*müdür",
+            r"c-level",
+            r"executive",
+            r"yönetici",
+            r"\bceo\b",
+            r"\bcfo\b",
+            r"\bcoo\b",
+            r"general\s*manager",
+        ],
+    ),
     # ── Finance / Accounting ────────────────────────────
-    ("accountant", [
-        r"accountant", r"muhasebe", r"accounting", r"auditor", r"denetçi",
-        r"bookkeeper", r"tax\s*specialist", r"vergi\s*uzman",
-        r"financial\s*analyst", r"finans\s*analist",
-        r"controller", r"treasury", r"hazine",
-        r"\bcpa\b", r"\bsmmm\b", r"finance\s*manager",
-        r"bankacı", r"banker", r"aktüer", r"actuary",
-    ]),
+    (
+        "accountant",
+        [
+            r"accountant",
+            r"muhasebe",
+            r"accounting",
+            r"auditor",
+            r"denetçi",
+            r"bookkeeper",
+            r"tax\s*specialist",
+            r"vergi\s*uzman",
+            r"financial\s*analyst",
+            r"finans\s*analist",
+            r"controller",
+            r"treasury",
+            r"hazine",
+            r"\bcpa\b",
+            r"\bsmmm\b",
+            r"finance\s*manager",
+            r"bankacı",
+            r"banker",
+            r"aktüer",
+            r"actuary",
+        ],
+    ),
     # ── Human Resources ─────────────────────────────────
-    ("hr", [
-        r"human\s*resource", r"insan\s*kaynak",
-        r"\bhr\b.*(?:manager|specialist|partner|generalist|uzman)",
-        r"talent\s*acqui", r"yetenek\s*kazanım",
-        r"recruiter", r"işe\s*alım", r"people\s*ops",
-        r"compensation", r"ücret\s*uzman",
-    ]),
+    (
+        "hr",
+        [
+            r"human\s*resource",
+            r"insan\s*kaynak",
+            r"\bhr\b.*(?:manager|specialist|partner|generalist|uzman)",
+            r"talent\s*acqui",
+            r"yetenek\s*kazanım",
+            r"recruiter",
+            r"işe\s*alım",
+            r"people\s*ops",
+            r"compensation",
+            r"ücret\s*uzman",
+        ],
+    ),
     # ── Healthcare ──────────────────────────────────────
-    ("healthcare", [
-        r"nurse", r"hemşire", r"physician", r"doktor", r"doctor",
-        r"pharmacist", r"eczacı", r"therapist", r"terapist",
-        r"surgeon", r"cerrah", r"dentist", r"diş\s*hek",
-        r"medical", r"tıbbi", r"clinical", r"klinik",
-        r"healthcare", r"sağlık", r"fizyoterap", r"physiotherap",
-        r"laborat", r"biyomed", r"biomedic",
-    ]),
+    (
+        "healthcare",
+        [
+            r"nurse",
+            r"hemşire",
+            r"physician",
+            r"doktor",
+            r"doctor",
+            r"pharmacist",
+            r"eczacı",
+            r"therapist",
+            r"terapist",
+            r"surgeon",
+            r"cerrah",
+            r"dentist",
+            r"diş\s*hek",
+            r"medical",
+            r"tıbbi",
+            r"clinical",
+            r"klinik",
+            r"healthcare",
+            r"sağlık",
+            r"fizyoterap",
+            r"physiotherap",
+            r"laborat",
+            r"biyomed",
+            r"biomedic",
+        ],
+    ),
     # ── Law ─────────────────────────────────────────────
-    ("lawyer", [
-        r"\blawyer\b", r"\bavukat\b", r"\battorney\b", r"\bjurist\b",
-        r"hukuk\w*", r"legal\s*counsel", r"\bnoter\b", r"\bnotary\b",
-        r"savcı", r"prosecutor", r"hakim\b", r"\bjudge\b",
-    ]),
+    (
+        "lawyer",
+        [
+            r"\blawyer\b",
+            r"\bavukat\b",
+            r"\battorney\b",
+            r"\bjurist\b",
+            r"hukuk\w*",
+            r"legal\s*counsel",
+            r"\bnoter\b",
+            r"\bnotary\b",
+            r"savcı",
+            r"prosecutor",
+            r"hakim\b",
+            r"\bjudge\b",
+        ],
+    ),
     # ── Education / Academia ────────────────────────────
-    ("teacher", [
-        r"\bteacher\b", r"öğretmen", r"\bprofessor\b", r"profesör",
-        r"öğretim\s*üye", r"öğretim\s*görev",
-        r"lecturer", r"akademisyen", r"academic",
-        r"eğitmen", r"instructor", r"trainer",
-        r"araştırma\s*görev", r"research\s*assist",
-    ]),
+    (
+        "teacher",
+        [
+            r"\bteacher\b",
+            r"öğretmen",
+            r"\bprofessor\b",
+            r"profesör",
+            r"öğretim\s*üye",
+            r"öğretim\s*görev",
+            r"lecturer",
+            r"akademisyen",
+            r"academic",
+            r"eğitmen",
+            r"instructor",
+            r"trainer",
+            r"araştırma\s*görev",
+            r"research\s*assist",
+        ],
+    ),
     # ── Student / Entry-level ───────────────────────────
-    ("student", [
-        r"\bstudent\b", r"\böğrenci\b", r"\bintern\b", r"\bstajyer\b",
-        r"fresh\s*grad", r"new\s*grad", r"yeni\s*mezun",
-        r"entry[- ]?level", r"junior\s*developer",
-        r"trainee", r"apprentice", r"çırak",
-        r"undergraduate", r"graduate\s*student", r"lisansüstü",
-    ]),
+    (
+        "student",
+        [
+            r"\bstudent\b",
+            r"\böğrenci\b",
+            r"\bintern\b",
+            r"\bstajyer\b",
+            r"fresh\s*grad",
+            r"new\s*grad",
+            r"yeni\s*mezun",
+            r"entry[- ]?level",
+            r"junior\s*developer",
+            r"trainee",
+            r"apprentice",
+            r"çırak",
+            r"undergraduate",
+            r"graduate\s*student",
+            r"lisansüstü",
+        ],
+    ),
 ]
 
 # ── Multi-Language Translation Dictionary ───────────────────────
@@ -295,99 +546,129 @@ _MULTILANG_PHRASES: dict[str, str] = {
 
 _MULTILANG_WORDS: dict[str, str] = {
     # ── "engineer" in various languages ─────────────────
-    "ingeniero": "engineer", "ingeniera": "engineer",     # ES
-    "ingenieur": "engineer",                               # FR/NL
-    "ingegnere": "engineer",                               # IT
-    "engenheiro": "engineer", "engenheira": "engineer",   # PT
-    "ingenieur": "engineer",                               # DE
-    "inzynier": "engineer",                                # PL (inżynier after fold)
+    "ingeniero": "engineer",
+    "ingeniera": "engineer",  # ES
+    "ingenieur": "engineer",  # FR/NL
+    "ingegnere": "engineer",  # IT
+    "engenheiro": "engineer",
+    "engenheira": "engineer",  # PT
+    "ingenieur": "engineer",  # DE
+    "inzynier": "engineer",  # PL (inżynier after fold)
     # ── "mechanical" ────────────────────────────────────
-    "mecanico": "mechanical", "mecanica": "mechanical",   # ES/PT
-    "mecanique": "mechanical",                             # FR
-    "meccanico": "mechanical", "meccanica": "mechanical", # IT
-    "maschinenbau": "mechanical",                          # DE
-    "werktuigbouw": "mechanical",                          # NL
-    "mechanik": "mechanical",                              # PL
+    "mecanico": "mechanical",
+    "mecanica": "mechanical",  # ES/PT
+    "mecanique": "mechanical",  # FR
+    "meccanico": "mechanical",
+    "meccanica": "mechanical",  # IT
+    "maschinenbau": "mechanical",  # DE
+    "werktuigbouw": "mechanical",  # NL
+    "mechanik": "mechanical",  # PL
     # ── "civil" ─────────────────────────────────────────
-    "civile": "civil",   # IT
-    "civiel": "civil",   # NL
+    "civile": "civil",  # IT
+    "civiel": "civil",  # NL
     "budownictwo": "civil engineering",  # PL
-    "budowlany": "civil",                  # PL
+    "budowlany": "civil",  # PL
     # ── "electrical/electronic" ─────────────────────────
-    "electrico": "electrical", "electrica": "electrical",       # ES
-    "electrique": "electrical",                                  # FR
-    "elettrico": "electrical", "elettronico": "electronic",     # IT
-    "eletrico": "electrical", "eletronico": "electronic",       # PT
-    "elektryczny": "electrical",                                 # PL
+    "electrico": "electrical",
+    "electrica": "electrical",  # ES
+    "electrique": "electrical",  # FR
+    "elettrico": "electrical",
+    "elettronico": "electronic",  # IT
+    "eletrico": "electrical",
+    "eletronico": "electronic",  # PT
+    "elektryczny": "electrical",  # PL
     # ── "industrial" ────────────────────────────────────
-    "industriel": "industrial", "industrielle": "industrial",   # FR
-    "industriale": "industrial",                                 # IT
-    "przemyslowy": "industrial",                                 # PL
+    "industriel": "industrial",
+    "industrielle": "industrial",  # FR
+    "industriale": "industrial",  # IT
+    "przemyslowy": "industrial",  # PL
     # ── "chemical" ──────────────────────────────────────
-    "quimico": "chemical", "quimica": "chemical",               # ES/PT
-    "chimique": "chemical",                                      # FR
-    "chimico": "chemical", "chimica": "chemical",               # IT
-    "chemiczny": "chemical",                                     # PL
+    "quimico": "chemical",
+    "quimica": "chemical",  # ES/PT
+    "chimique": "chemical",  # FR
+    "chimico": "chemical",
+    "chimica": "chemical",  # IT
+    "chemiczny": "chemical",  # PL
     # ── "software" ──────────────────────────────────────
-    "logiciel": "software",     # FR
+    "logiciel": "software",  # FR
     "entwickler": "developer",  # DE
-    "ontwikkelaar": "developer",# NL
+    "ontwikkelaar": "developer",  # NL
     "desenvolvedor": "software developer",  # PT
     "desarrollador": "software developer",  # ES
-    "developpeur": "developer", # FR
-    "sviluppatore": "developer",# IT
-    "programist": "programmer", "programista": "programmer",  # PL
+    "developpeur": "developer",  # FR
+    "sviluppatore": "developer",  # IT
+    "programist": "programmer",
+    "programista": "programmer",  # PL
     "informaticien": "software engineer",  # FR
-    "informatyk": "software engineer",     # PL
+    "informatyk": "software engineer",  # PL
     # ── "architect" ─────────────────────────────────────
-    "arquitecto": "architect", "arquitecta": "architect",       # ES
-    "arquiteto": "architect", "arquiteta": "architect",         # PT
-    "architecte": "architect",                                   # FR
-    "architetto": "architect",                                   # IT
-    "architekt": "architect",                                    # DE/PL
+    "arquitecto": "architect",
+    "arquitecta": "architect",  # ES
+    "arquiteto": "architect",
+    "arquiteta": "architect",  # PT
+    "architecte": "architect",  # FR
+    "architetto": "architect",  # IT
+    "architekt": "architect",  # DE/PL
     # ── "lawyer / attorney" ─────────────────────────────
-    "abogado": "lawyer", "abogada": "lawyer",                  # ES
-    "avocat": "lawyer", "avocate": "lawyer",                   # FR
-    "avvocato": "lawyer", "avvocata": "lawyer",                # IT
-    "advogado": "lawyer", "advogada": "lawyer",                # PT
-    "advocaat": "lawyer",                                       # NL
-    "rechtsanwalt": "lawyer",                                   # DE
-    "adwokat": "lawyer",                                        # PL
+    "abogado": "lawyer",
+    "abogada": "lawyer",  # ES
+    "avocat": "lawyer",
+    "avocate": "lawyer",  # FR
+    "avvocato": "lawyer",
+    "avvocata": "lawyer",  # IT
+    "advogado": "lawyer",
+    "advogada": "lawyer",  # PT
+    "advocaat": "lawyer",  # NL
+    "rechtsanwalt": "lawyer",  # DE
+    "adwokat": "lawyer",  # PL
     # ── "teacher / professor" ───────────────────────────
-    "professeur": "professor", "professeure": "professor",     # FR
-    "professore": "professor", "professoressa": "professor",   # IT
-    "profesor": "professor", "profesora": "professor",         # ES
-    "lehrer": "teacher", "lehrerin": "teacher",                # DE
-    "nauczyciel": "teacher", "nauczycielka": "teacher",        # PL
-    "maestro": "teacher", "maestra": "teacher",                # ES/IT
-    "dozent": "lecturer",                                       # DE
+    "professeur": "professor",
+    "professeure": "professor",  # FR
+    "professore": "professor",
+    "professoressa": "professor",  # IT
+    "profesor": "professor",
+    "profesora": "professor",  # ES
+    "lehrer": "teacher",
+    "lehrerin": "teacher",  # DE
+    "nauczyciel": "teacher",
+    "nauczycielka": "teacher",  # PL
+    "maestro": "teacher",
+    "maestra": "teacher",  # ES/IT
+    "dozent": "lecturer",  # DE
     # ── "accountant" ────────────────────────────────────
-    "contador": "accountant", "contadora": "accountant",       # ES/PT
-    "comptable": "accountant",                                  # FR
-    "buchhalter": "accountant",                                 # DE
-    "ragioniere": "accountant", "ragioniera": "accountant",    # IT
-    "ksiegowy": "accountant", "ksiegowa": "accountant",        # PL
+    "contador": "accountant",
+    "contadora": "accountant",  # ES/PT
+    "comptable": "accountant",  # FR
+    "buchhalter": "accountant",  # DE
+    "ragioniere": "accountant",
+    "ragioniera": "accountant",  # IT
+    "ksiegowy": "accountant",
+    "ksiegowa": "accountant",  # PL
     # ── "doctor / nurse / healthcare" ───────────────────
-    "medecin": "physician",                                     # FR
-    "medico": "doctor",                                         # ES/IT/PT
-    "arzt": "doctor", "arztin": "doctor",                      # DE
-    "enfermero": "nurse", "enfermera": "nurse",                # ES
-    "enfermeiro": "nurse", "enfermeira": "nurse",              # PT
-    "infirmier": "nurse", "infirmiere": "nurse",               # FR
+    "medecin": "physician",  # FR
+    "medico": "doctor",  # ES/IT/PT
+    "arzt": "doctor",
+    "arztin": "doctor",  # DE
+    "enfermero": "nurse",
+    "enfermera": "nurse",  # ES
+    "enfermeiro": "nurse",
+    "enfermeira": "nurse",  # PT
+    "infirmier": "nurse",
+    "infirmiere": "nurse",  # FR
     # ── "project / product" ─────────────────────────────
-    "projet": "project",     # FR
-    "proyecto": "project",   # ES
-    "progetto": "project",   # IT
-    "projeto": "project",    # PT
-    "produto": "product",    # PT
-    "producto": "product",   # ES
-    "produit": "product",    # FR
-    "prodotto": "product",   # IT
+    "projet": "project",  # FR
+    "proyecto": "project",  # ES
+    "progetto": "project",  # IT
+    "projeto": "project",  # PT
+    "produto": "product",  # PT
+    "producto": "product",  # ES
+    "produit": "product",  # FR
+    "prodotto": "product",  # IT
     # ── "manager / director" ────────────────────────────
-    "gerente": "manager",    # ES/PT
-    "directeur": "director", # FR
-    "direttore": "director", # IT
-    "diretor": "director",   # PT
+    "gerente": "manager",  # ES/PT
+    "directeur": "director",  # FR
+    "direttore": "director",  # IT
+    "diretor": "director",  # PT
     "direktor": "director",  # DE
     # ── Cyrillic (RU) ──────────────────────────────────
     "инженер": "engineer",
@@ -408,7 +689,8 @@ _MULTILANG_WORDS: dict[str, str] = {
     # ── Arabic ──────────────────────────────────────────
     "مهندس": "engineer",
     "مبرمج": "programmer",
-    "محامي": "lawyer", "محام": "lawyer",
+    "محامي": "lawyer",
+    "محام": "lawyer",
     "محاسب": "accountant",
     "طبيب": "doctor",
     "ممرض": "nurse",
@@ -449,32 +731,53 @@ def _translate_to_english(text: str) -> str:
     for word in _WORD_KEYS_SORTED:
         if word in folded:
             # Use regex word-boundary to avoid replacing substrings
-            folded = re.sub(r'(?<!\w)' + re.escape(word) + r'(?!\w)', _MULTILANG_WORDS[word], folded)
+            folded = re.sub(r"(?<!\w)" + re.escape(word) + r"(?!\w)", _MULTILANG_WORDS[word], folded)
 
     return folded
 
+
 _SKILL_PROFESSION_MAP: dict[str, str] = {
-    "react": "software_engineer", "angular": "software_engineer",
-    "vue": "software_engineer", "django": "software_engineer",
-    "flask": "software_engineer", "spring": "software_engineer",
-    "kubernetes": "software_engineer", "docker": "software_engineer",
-    "terraform": "software_engineer", "aws": "software_engineer",
-    "tensorflow": "data_scientist", "pytorch": "data_scientist",
-    "pandas": "data_scientist", "scikit-learn": "data_scientist",
-    "tableau": "data_scientist", "power bi": "data_scientist",
-    "figma": "designer", "sketch": "designer", "adobe xd": "designer",
-    "photoshop": "designer", "illustrator": "designer",
-    "jira": "product_manager", "confluence": "product_manager",
-    "google analytics": "marketing", "hubspot": "marketing",
+    "react": "software_engineer",
+    "angular": "software_engineer",
+    "vue": "software_engineer",
+    "django": "software_engineer",
+    "flask": "software_engineer",
+    "spring": "software_engineer",
+    "kubernetes": "software_engineer",
+    "docker": "software_engineer",
+    "terraform": "software_engineer",
+    "aws": "software_engineer",
+    "tensorflow": "data_scientist",
+    "pytorch": "data_scientist",
+    "pandas": "data_scientist",
+    "scikit-learn": "data_scientist",
+    "tableau": "data_scientist",
+    "power bi": "data_scientist",
+    "figma": "designer",
+    "sketch": "designer",
+    "adobe xd": "designer",
+    "photoshop": "designer",
+    "illustrator": "designer",
+    "jira": "product_manager",
+    "confluence": "product_manager",
+    "google analytics": "marketing",
+    "hubspot": "marketing",
     "salesforce": "sales",
-    "quickbooks": "accountant", "sap": "accountant",
-    "solidworks": "mechanical_engineer", "autocad": "civil_engineer",
-    "catia": "mechanical_engineer", "ansys": "mechanical_engineer",
-    "revit": "architect", "sketchup": "architect",
-    "matlab": "electrical_engineer", "simulink": "electrical_engineer",
-    "plc": "electrical_engineer", "scada": "electrical_engineer",
+    "quickbooks": "accountant",
+    "sap": "accountant",
+    "solidworks": "mechanical_engineer",
+    "autocad": "civil_engineer",
+    "catia": "mechanical_engineer",
+    "ansys": "mechanical_engineer",
+    "revit": "architect",
+    "sketchup": "architect",
+    "matlab": "electrical_engineer",
+    "simulink": "electrical_engineer",
+    "plc": "electrical_engineer",
+    "scada": "electrical_engineer",
     "arena simulation": "industrial_engineer",
-    "aspen": "chemical_engineer", "hysys": "chemical_engineer",
+    "aspen": "chemical_engineer",
+    "hysys": "chemical_engineer",
 }
 
 # ── Title Normalization ─────────────────────────────────────────
@@ -484,11 +787,38 @@ _TR_MAP = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
 
 # Noise words to strip when building a canonical profession key
 _NOISE_WORDS = {
-    "senior", "junior", "lead", "staff", "principal", "chief",
-    "kıdemli", "kidemli", "baş", "uzman", "specialist",
-    "associate", "assistant", "yardımcı", "head", "of", "the",
-    "bir", "ve", "and", "in", "at", "ile",
-    "sr", "jr", "i", "ii", "iii", "iv", "1", "2", "3",
+    "senior",
+    "junior",
+    "lead",
+    "staff",
+    "principal",
+    "chief",
+    "kıdemli",
+    "kidemli",
+    "baş",
+    "uzman",
+    "specialist",
+    "associate",
+    "assistant",
+    "yardımcı",
+    "head",
+    "of",
+    "the",
+    "bir",
+    "ve",
+    "and",
+    "in",
+    "at",
+    "ile",
+    "sr",
+    "jr",
+    "i",
+    "ii",
+    "iii",
+    "iv",
+    "1",
+    "2",
+    "3",
 }
 
 # Minimum similarity ratio to consider two profession keys as the same
@@ -558,7 +888,7 @@ def infer_profession(
     parts: list[str] = []
     if job_title:
         parts.append(job_title)
-    for t in (experience_titles or []):
+    for t in experience_titles or []:
         parts.append(t)
     raw = " ".join(parts)
     # Fix Turkish İ/ı before lowering: İ.lower() produces i+combining_dot which
@@ -597,7 +927,7 @@ def infer_profession(
 
     # Phase 2: skill-based voting
     skill_votes: dict[str, int] = {}
-    for skill in (skills or []):
+    for skill in skills or []:
         key = skill.strip().lower()
         prof = _SKILL_PROFESSION_MAP.get(key)
         if prof:
@@ -621,10 +951,7 @@ def infer_profession(
     all_keys = list(_KNOWN_PROFESSION_KEYS)
     if db is not None:
         try:
-            db_profs = [
-                r[0] for r in
-                db.query(ATSBenchmarkProfession.profession).all()
-            ]
+            db_profs = [r[0] for r in db.query(ATSBenchmarkProfession.profession).all()]
             for k in db_profs:
                 if k not in all_keys:
                     all_keys.append(k)
@@ -643,6 +970,7 @@ def infer_profession(
 
 
 # ── Aggregate Helpers ───────────────────────────────────────────
+
 
 def _compute_median(scores: list[float]) -> float:
     if not scores:
@@ -692,6 +1020,7 @@ def _profession_display(profession: str) -> str:
 
 # ── DB-aware infer helper (passes db session) ──────────────────
 
+
 def infer_profession_with_db(
     db: Session,
     job_title: str | None = None,
@@ -703,6 +1032,7 @@ def infer_profession_with_db(
 
 
 # ── Core API ────────────────────────────────────────────────────
+
 
 def record_ats_score(
     db: Session,
@@ -748,24 +1078,21 @@ def _update_global_aggregate(db: Session, new_score: float) -> None:
 
     # Recompute median from stored scores (sampled for perf)
     all_scores = [
-        r[0] for r in db.query(ATSBenchmarkScore.ats_score)
-        .order_by(ATSBenchmarkScore.ats_score)
-        .limit(50000)
-        .all()
+        r[0] for r in db.query(ATSBenchmarkScore.ats_score).order_by(ATSBenchmarkScore.ats_score).limit(50000).all()
     ]
     row.median_ats = _compute_median(all_scores)
 
 
 def _update_profession_aggregate(db: Session, profession: str, new_score: float) -> None:
-    row = (
-        db.query(ATSBenchmarkProfession)
-        .filter(ATSBenchmarkProfession.profession == profession)
-        .first()
-    )
+    row = db.query(ATSBenchmarkProfession).filter(ATSBenchmarkProfession.profession == profession).first()
     if not row:
         row = ATSBenchmarkProfession(
-            profession=profession, total_cvs=0,
-            sum_ats=0.0, avg_ats=0.0, median_ats=0.0, top_10_pct=0.0,
+            profession=profession,
+            total_cvs=0,
+            sum_ats=0.0,
+            avg_ats=0.0,
+            median_ats=0.0,
+            top_10_pct=0.0,
         )
         db.add(row)
         db.flush()
@@ -777,7 +1104,8 @@ def _update_profession_aggregate(db: Session, profession: str, new_score: float)
 
     # Recompute median & top 10% for this profession
     prof_scores = [
-        r[0] for r in db.query(ATSBenchmarkScore.ats_score)
+        r[0]
+        for r in db.query(ATSBenchmarkScore.ats_score)
         .filter(ATSBenchmarkScore.profession == profession)
         .order_by(ATSBenchmarkScore.ats_score)
         .limit(50000)
@@ -805,11 +1133,7 @@ def get_benchmark_comparison(
     total_cvs = g_row.total_cvs if g_row else 0
 
     # Profession stats
-    p_row = (
-        db.query(ATSBenchmarkProfession)
-        .filter(ATSBenchmarkProfession.profession == profession)
-        .first()
-    )
+    p_row = db.query(ATSBenchmarkProfession).filter(ATSBenchmarkProfession.profession == profession).first()
     prof_avg = p_row.avg_ats if p_row else global_avg
     prof_median = p_row.median_ats if p_row else global_median
     prof_top10 = p_row.top_10_pct if p_row else 0.0
@@ -819,12 +1143,7 @@ def get_benchmark_comparison(
     target_table = ATSBenchmarkScore.profession == profession
     if prof_total < 10:
         target_table = True  # use all scores
-    peer_scores = [
-        r[0] for r in db.query(ATSBenchmarkScore.ats_score)
-        .filter(target_table)
-        .limit(50000)
-        .all()
-    ]
+    peer_scores = [r[0] for r in db.query(ATSBenchmarkScore.ats_score).filter(target_table).limit(50000).all()]
     percentile = _compute_percentile(ats_score, peer_scores) if peer_scores else 50
 
     vs_global = round(ats_score - global_avg, 1)
@@ -850,12 +1169,12 @@ def get_benchmark_comparison(
         "percentile": percentile,
         "rank_label": _rank_label(percentile),
         "rank_description": (
-            f"You are in the top {100 - percentile}% of "
-            f"{_profession_display(profession)}s"
+            f"You are in the top {100 - percentile}% of {_profession_display(profession)}s"
             if percentile >= 50
-            else f"You are in the {_rank_label(percentile).lower()} range among "
-                 f"{_profession_display(profession)}s"
-        ) if profession != "general" else (
+            else f"You are in the {_rank_label(percentile).lower()} range among {_profession_display(profession)}s"
+        )
+        if profession != "general"
+        else (
             f"You are in the top {100 - percentile}% of all CVs"
             if percentile >= 50
             else f"You are in the {_rank_label(percentile).lower()} range among all CVs"

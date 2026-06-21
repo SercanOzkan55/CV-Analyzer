@@ -147,7 +147,9 @@ def _inject_theme(content: str, theme: dict) -> str:
     return content
 
 
-def fill_template(template_text: str, model: CVModel, template_name: Optional[str] = None, font_override: str = "") -> str:
+def fill_template(
+    template_text: str, model: CVModel, template_name: Optional[str] = None, font_override: str = ""
+) -> str:
     theme = load_theme(template_name or "classic", font_override=font_override)
     rendered = _inject_theme(template_text, theme)
 

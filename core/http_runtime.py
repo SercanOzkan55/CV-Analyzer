@@ -161,11 +161,7 @@ _cors_origins = [
     if origin.strip()
 ]
 _APP_ENV = (
-    os.getenv("APP_ENV")
-    or os.getenv("ENV")
-    or os.getenv("ENVIRONMENT")
-    or os.getenv("STAGE")
-    or "development"
+    os.getenv("APP_ENV") or os.getenv("ENV") or os.getenv("ENVIRONMENT") or os.getenv("STAGE") or "development"
 ).lower()
 _CSRF_PROTECTION_ENABLED = os.getenv("CSRF_PROTECTION_ENABLED", "0").lower() in ("1", "true", "yes")
 _UNSAFE_CSRF_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
@@ -326,6 +322,9 @@ def _check_admin_token(request: Request) -> bool:
     token = main_value("_ADMIN_TOKEN", _ADMIN_TOKEN)
     if not token:
         return False
+    header_token = request.headers.get("x-admin-token", "").strip()
+    if header_token and hmac.compare_digest(header_token, token):
+        return True
     auth = request.headers.get("authorization", "")
     if not auth.startswith("Bearer "):
         return False
@@ -721,6 +720,7 @@ limiter = _build_limiter()
 
 def rate_limit(limit_string):
     if bool(main_value("MOCK_SERVICES_ON", MOCK_SERVICES_ON)):
+
         def noop_decorator(func):
             return func
 

@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 # ── Key builder ─────────────────────────────────────────────────────
 
+
 def sanitize_filename(filename: str) -> str:
     if not filename:
         return "cv"
@@ -71,6 +72,7 @@ def _storage_extension(filename: str | None, content_type: str | None) -> str:
 
 # ── Uploads ─────────────────────────────────────────────────────────
 
+
 def _validate_upload(
     file_bytes: bytes,
     content_type: str,
@@ -97,12 +99,12 @@ def upload_original_cv(
     safe_uid = validate_user_id(user_id)
     ct = _validate_upload(file_bytes, content_type, filename)
     key = build_key(safe_uid, "original", _storage_extension(filename, ct))
-    
+
     if STORAGE_BACKEND == "local":
         local_storage_service.upload(file_bytes, key, ct)
     else:
         s3_service.upload(file_bytes, key, ct)
-        
+
     logger.info("storage:original_uploaded backend=%s user=%s key=%s", STORAGE_BACKEND, safe_uid, redact_s3_key(key))
     return key
 
@@ -117,17 +119,18 @@ def upload_optimized_cv(
     safe_uid = validate_user_id(user_id)
     ct = _validate_upload(file_bytes, content_type, filename)
     key = build_key(safe_uid, "optimized", _storage_extension(filename, ct))
-    
+
     if STORAGE_BACKEND == "local":
         local_storage_service.upload(file_bytes, key, ct)
     else:
         s3_service.upload(file_bytes, key, ct)
-        
+
     logger.info("storage:optimized_uploaded backend=%s user=%s key=%s", STORAGE_BACKEND, safe_uid, redact_s3_key(key))
     return key
 
 
 # ── Downloads ───────────────────────────────────────────────────────
+
 
 def get_download_url(key: str, user_id: str, expires: int = 60) -> str:
     """Return a presigned download URL for a stored CV.
@@ -135,30 +138,32 @@ def get_download_url(key: str, user_id: str, expires: int = 60) -> str:
     Enforces ownership and clamps expiry.
     """
     enforce_ownership(key, user_id)
-    
+
     if STORAGE_BACKEND == "local":
         # For local storage, we might return a local file path or a specialized internal route
         # For now, return the absolute path (used by internal processes)
         return local_storage_service.get_local_path(key)
-    
+
     return s3_service.get_presigned_url(key, expires)
 
 
 # ── Delete ──────────────────────────────────────────────────────────
 
+
 def delete_cv(key: str, user_id: str) -> None:
     """Delete a CV from S3.  Enforces ownership."""
     enforce_ownership(key, user_id)
-    
+
     if STORAGE_BACKEND == "local":
         local_storage_service.delete(key)
     else:
         s3_service.delete(key)
-        
+
     logger.info("storage:deleted backend=%s user=%s key=%s", STORAGE_BACKEND, user_id, redact_s3_key(key))
 
 
 # ── Existence check ─────────────────────────────────────────────────
+
 
 def exists(key: str) -> bool:
     """Return True if the key exists in configured storage."""
@@ -168,6 +173,7 @@ def exists(key: str) -> bool:
 
 
 # ── Health ──────────────────────────────────────────────────────────
+
 
 def check_health() -> bool:
     """Verify storage backend is reachable."""

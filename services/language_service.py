@@ -3,7 +3,6 @@ CV language detection and localized string maps for analysis results.
 Uses langdetect for automatic language identification from CV text.
 """
 
-
 try:
     from langdetect import LangDetectException
     from langdetect import detect as _detect_lang
@@ -394,32 +393,65 @@ SECTION_ALIASES = {
         "objective",
         "career summary",
         # TR
-        "özet", "profil", "kişisel bilgiler", "kariyer özeti",
+        "özet",
+        "profil",
+        "kişisel bilgiler",
+        "kariyer özeti",
         # FR
-        "résumé professionnel", "profil professionnel",
+        "résumé professionnel",
+        "profil professionnel",
         # DE
-        "zusammenfassung", "über mich", "kurzprofil",
+        "zusammenfassung",
+        "über mich",
+        "kurzprofil",
         # ES
-        "resumen profesional", "perfil profesional", "resumen", "perfil",
+        "resumen profesional",
+        "perfil profesional",
+        "resumen",
+        "perfil",
         # PT
-        "resumo profissional", "resumo",
+        "resumo profissional",
+        "resumo",
         # IT
-        "profilo professionale", "riepilogo", "sommario",
+        "profilo professionale",
+        "riepilogo",
+        "sommario",
         # NL
-        "samenvatting", "profiel", "persoonlijk profiel",
+        "samenvatting",
+        "profiel",
+        "persoonlijk profiel",
         # RU
-        "резюме", "профиль", "о себе",
+        "резюме",
+        "профиль",
+        "о себе",
         # PL
-        "podsumowanie", "podsumowanie zawodowe", "profil zawodowy",
+        "podsumowanie",
+        "podsumowanie zawodowe",
+        "profil zawodowy",
         # SV/NO/DA/FI
-        "sammanfattning", "sammendrag", "yhteenveto", "profiili",
+        "sammanfattning",
+        "sammendrag",
+        "yhteenveto",
+        "profiili",
         # CS/HU/RO
-        "shrnutí", "összefoglaló", "rezumat",
+        "shrnutí",
+        "összefoglaló",
+        "rezumat",
         # AR/ZH/JA/KO/HI
-        "ملخص", "الملف الشخصي", "个人简介", "摘要", "概要",
-        "プロフィール", "요약", "프로필", "सारांश",
+        "ملخص",
+        "الملف الشخصي",
+        "个人简介",
+        "摘要",
+        "概要",
+        "プロフィール",
+        "요약",
+        "프로필",
+        "सारांश",
         # ID/VI/TH
-        "ringkasan", "tóm tắt", "สรุป", "โปรไฟล์",
+        "ringkasan",
+        "tóm tắt",
+        "สรุป",
+        "โปรไฟล์",
     },
     "experience": {
         "experience",
@@ -429,64 +461,116 @@ SECTION_ALIASES = {
         "employment history",
         "work history",
         # TR
-        "deneyim", "iş deneyimi", "mesleki deneyim",
+        "deneyim",
+        "iş deneyimi",
+        "mesleki deneyim",
         # FR
-        "expérience", "expérience professionnelle",
+        "expérience",
+        "expérience professionnelle",
         # DE
-        "erfahrung", "berufserfahrung",
+        "erfahrung",
+        "berufserfahrung",
         # ES
-        "experiencia", "experiencia laboral", "experiencia profesional",
+        "experiencia",
+        "experiencia laboral",
+        "experiencia profesional",
         # PT
-        "experiência", "experiência profissional",
+        "experiência",
+        "experiência profissional",
         # IT
-        "esperienza", "esperienza lavorativa",
+        "esperienza",
+        "esperienza lavorativa",
         # NL
-        "ervaring", "werkervaring",
+        "ervaring",
+        "werkervaring",
         # RU
-        "опыт", "опыт работы",
+        "опыт",
+        "опыт работы",
         # PL
-        "doświadczenie", "doświadczenie zawodowe",
+        "doświadczenie",
+        "doświadczenie zawodowe",
         # SV/NO/DA/FI
-        "erfarenhet", "erfaring", "kokemus", "työkokemus",
+        "erfarenhet",
+        "erfaring",
+        "kokemus",
+        "työkokemus",
         # CS/HU/RO
-        "zkušenosti", "tapasztalat", "experiență",
+        "zkušenosti",
+        "tapasztalat",
+        "experiență",
         # AR/ZH/JA/KO/HI
-        "الخبرة", "الخبرة المهنية", "工作经验", "工作经历",
-        "職歴", "경력", "경험", "अनुभव",
+        "الخبرة",
+        "الخبرة المهنية",
+        "工作经验",
+        "工作经历",
+        "職歴",
+        "경력",
+        "경험",
+        "अनुभव",
         # ID/VI/TH
-        "pengalaman", "pengalaman kerja", "kinh nghiệm",
-        "předchozí zaměstnání", "geçmiş işler", "professional history",
-        "pengalaman", "pengalaman kerja", "kinh nghiệm",
+        "pengalaman",
+        "pengalaman kerja",
+        "kinh nghiệm",
+        "předchozí zaměstnání",
+        "geçmiş işler",
+        "professional history",
+        "pengalaman",
+        "pengalaman kerja",
+        "kinh nghiệm",
         "ประสบการณ์",
     },
     "education": {
-        "education", "academic background", "qualifications",
+        "education",
+        "academic background",
+        "qualifications",
         # TR
-        "eğitim", "akademik geçmiş",
+        "eğitim",
+        "akademik geçmiş",
         # FR
-        "formation", "études",
+        "formation",
+        "études",
         # DE
-        "ausbildung", "bildung", "studium",
+        "ausbildung",
+        "bildung",
+        "studium",
         # ES
-        "educación", "formación",
+        "educación",
+        "formación",
         # PT
-        "educação", "formação acadêmica",
+        "educação",
+        "formação acadêmica",
         # IT
-        "istruzione", "formazione",
+        "istruzione",
+        "formazione",
         # NL
-        "opleiding", "onderwijs",
+        "opleiding",
+        "onderwijs",
         # RU
         "образование",
         # PL
-        "wykształcenie", "edukacja",
+        "wykształcenie",
+        "edukacja",
         # SV/NO/DA/FI
-        "utbildning", "utdanning", "uddannelse", "koulutus",
+        "utbildning",
+        "utdanning",
+        "uddannelse",
+        "koulutus",
         # CS/HU/RO
-        "vzdělání", "végzettség", "educație", "studii",
+        "vzdělání",
+        "végzettség",
+        "educație",
+        "studii",
         # AR/ZH/JA/KO/HI
-        "التعليم", "教育", "学历", "学歴", "학력", "शिक्षा",
+        "التعليم",
+        "教育",
+        "学历",
+        "学歴",
+        "학력",
+        "शिक्षा",
         # ID/VI/TH
-        "pendidikan", "học vấn", "การศึกษา",
+        "pendidikan",
+        "học vấn",
+        "การศึกษา",
     },
     "skills": {
         "skills",
@@ -495,34 +579,62 @@ SECTION_ALIASES = {
         "competencies",
         "technologies",
         # TR
-        "beceriler", "yetenekler", "teknik beceriler", "yetkinlikler",
+        "beceriler",
+        "yetenekler",
+        "teknik beceriler",
+        "yetkinlikler",
         # FR
-        "compétences", "compétences techniques",
+        "compétences",
+        "compétences techniques",
         # DE
-        "fähigkeiten", "kenntnisse", "kompetenzen",
+        "fähigkeiten",
+        "kenntnisse",
+        "kompetenzen",
         # ES
-        "habilidades", "competencias",
+        "habilidades",
+        "competencias",
         # PT
         "competências",
         # IT
-        "competenze", "abilità",
+        "competenze",
+        "abilità",
         # NL
-        "vaardigheden", "competenties",
+        "vaardigheden",
+        "competenties",
         # RU
-        "навыки", "умения", "компетенции",
+        "навыки",
+        "умения",
+        "компетенции",
         # PL
-        "umiejętności", "kompetencje",
+        "umiejętności",
+        "kompetencje",
         # SV/NO/DA/FI
-        "färdigheter", "ferdigheter", "færdigheder", "taidot", "osaaminen",
+        "färdigheter",
+        "ferdigheter",
+        "færdigheder",
+        "taidot",
+        "osaaminen",
         # CS/HU/RO
-        "dovednosti", "készségek", "competențe",
+        "dovednosti",
+        "készségek",
+        "competențe",
         # AR/ZH/JA/KO/HI
-        "المهارات", "技能", "スキル", "기술", "कौशल",
+        "المهارات",
+        "技能",
+        "スキル",
+        "기술",
+        "कौशल",
         # ID/VI/TH
-        "keahlian", "keterampilan", "kỹ năng", "ทักษะ",
+        "keahlian",
+        "keterampilan",
+        "kỹ năng",
+        "ทักษะ",
     },
     "projects": {
-        "project", "projects", "project experience", "personal projects",
+        "project",
+        "projects",
+        "project experience",
+        "personal projects",
         # TR
         "projeler",
         # FR
@@ -532,47 +644,77 @@ SECTION_ALIASES = {
         # ES
         "proyectos",
         # PT/IT/NL
-        "projetos", "progetti", "projecten",
+        "projetos",
+        "progetti",
+        "projecten",
         # RU
         "проекты",
         # PL/CS/HU
-        "projekty", "projektek",
+        "projekty",
+        "projektek",
         # SV/DA/NO/FI/RO
-        "projekter", "prosjekter", "projektit", "proiecte",
+        "projekter",
+        "prosjekter",
+        "projektit",
+        "proiecte",
         # AR/ZH/JA/KO/HI
-        "المشاريع", "项目", "プロジェクト", "프로젝트", "परियोजनाएं",
+        "المشاريع",
+        "项目",
+        "プロジェクト",
+        "프로젝트",
+        "परियोजनाएं",
         # ID/VI/TH
-        "proyek", "dự án", "โครงการ",
+        "proyek",
+        "dự án",
+        "โครงการ",
     },
     "certifications": {
-        "certifications", "certificates", "licenses",
+        "certifications",
+        "certificates",
+        "licenses",
         # TR
-        "sertifikalar", "belgeler",
+        "sertifikalar",
+        "belgeler",
         # FR
         "diplômes",
         # DE
-        "zertifizierungen", "zertifikate",
+        "zertifizierungen",
+        "zertifikate",
         # ES
         "certificaciones",
         # PT
         "certificações",
         # IT/NL
-        "certificazioni", "certificeringen",
+        "certificazioni",
+        "certificeringen",
         # RU
         "сертификаты",
         # PL/CS/HU
-        "certyfikaty", "certifikáty", "tanúsítványok",
+        "certyfikaty",
+        "certifikáty",
+        "tanúsítványok",
         # SV/NO/DA/FI/RO
-        "certifieringar", "sertifiseringer", "sertifikaatit", "certificări",
+        "certifieringar",
+        "sertifiseringer",
+        "sertifikaatit",
+        "certificări",
         # AR/ZH/JA/KO/HI
-        "الشهادات", "证书", "資格", "자격증", "प्रमाणपत्र",
+        "الشهادات",
+        "证书",
+        "資格",
+        "자격증",
+        "प्रमाणपत्र",
         # ID/VI/TH
-        "sertifikasi", "chứng chỉ", "ใบรับรอง",
+        "sertifikasi",
+        "chứng chỉ",
+        "ใบรับรอง",
     },
     "languages": {
-        "languages", "language skills",
+        "languages",
+        "language skills",
         # TR
-        "diller", "yabancı diller",
+        "diller",
+        "yabancı diller",
         # FR
         "langues",
         # DE
@@ -594,26 +736,37 @@ SECTION_ALIASES = {
         # FI
         "kielet",
         # CS/HU
-        "jazyky", "nyelvek",
+        "jazyky",
+        "nyelvek",
         # RO
         "limbi",
         # AR/ZH/JA/KO/HI
-        "اللغات", "语言", "言語", "언어", "भाषाएं",
+        "اللغات",
+        "语言",
+        "言語",
+        "언어",
+        "भाषाएं",
         # ID/VI/TH
-        "bahasa", "ngôn ngữ", "ภาษา",
+        "bahasa",
+        "ngôn ngữ",
+        "ภาษา",
     },
     "contact": {
-        "contact", "contact information", "communication",
+        "contact",
+        "contact information",
+        "communication",
         # TR
         "iletişim",
         # FR
         "coordonnées",
         # DE
-        "kontakt", "kontaktdaten",
+        "kontakt",
+        "kontaktdaten",
         # ES
         "contacto",
         # PT/IT
-        "contato", "contatto",
+        "contato",
+        "contatto",
         # NL
         "contactgegevens",
         # RU
@@ -623,39 +776,64 @@ SECTION_ALIASES = {
         # FI
         "yhteystiedot",
         # HU
-        "kapcsolat", "elérhetőség",
+        "kapcsolat",
+        "elérhetőség",
         # AR/ZH/JA/KO/HI
-        "الاتصال", "联系方式", "連絡先", "연락처", "संपर्क",
+        "الاتصال",
+        "联系方式",
+        "連絡先",
+        "연락처",
+        "संपर्क",
         # ID/VI/TH
-        "kontak", "liên hệ", "ติดต่อ",
+        "kontak",
+        "liên hệ",
+        "ติดต่อ",
     },
     "interests": {
-        "interests", "hobbies", "personal interests",
+        "interests",
+        "hobbies",
+        "personal interests",
         # TR
-        "ilgi alanları", "hobiler",
+        "ilgi alanları",
+        "hobiler",
         # FR
-        "centres d'intérêt", "loisirs",
+        "centres d'intérêt",
+        "loisirs",
         # DE
-        "interessen", "hobbys",
+        "interessen",
+        "hobbys",
         # ES
-        "intereses", "aficiones",
+        "intereses",
+        "aficiones",
         # PT/IT
-        "interesses", "interessi",
+        "interesses",
+        "interessi",
         # NL
         "hobby's",
         # RU
-        "интересы", "хобби",
+        "интересы",
+        "хобби",
         # PL
         "zainteresowania",
         # SV/NO/DA
-        "intressen", "interesser",
+        "intressen",
+        "interesser",
         # FI
-        "kiinnostukset", "harrastukset",
+        "kiinnostukset",
+        "harrastukset",
         # CS/HU/RO
-        "zájmy", "érdeklődés", "interese",
+        "zájmy",
+        "érdeklődés",
+        "interese",
         # AR/ZH/JA/KO/HI
-        "الاهتمامات", "兴趣", "趣味", "취미", "रुचियां",
+        "الاهتمامات",
+        "兴趣",
+        "趣味",
+        "취미",
+        "रुचियां",
         # ID/VI/TH
-        "minat", "sở thích", "ความสนใจ",
+        "minat",
+        "sở thích",
+        "ความสนใจ",
     },
 }

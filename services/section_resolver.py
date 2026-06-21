@@ -32,9 +32,7 @@ _MAX_SECTION_LINES = 250 if _SAFE_MODE else 500
 _MAX_HEADER_LINES = 30 if _SAFE_MODE else 50
 _MAX_MISC_LINES = 50 if _SAFE_MODE else 100
 _MAX_ITERATIONS = 250 if _SAFE_MODE else 500
-_RESOLVER_TIMEOUT_SECONDS = float(
-    os.getenv("RESOLVER_TIMEOUT_SECONDS", "2" if _SAFE_MODE else "3") or "3"
-)
+_RESOLVER_TIMEOUT_SECONDS = float(os.getenv("RESOLVER_TIMEOUT_SECONDS", "2" if _SAFE_MODE else "3") or "3")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # SHARED PATTERNS
@@ -86,8 +84,8 @@ _INTEREST_RE = re.compile(
     re.I,
 )
 _CEFR_RE = re.compile(
-    r"\b(?:A[12]|B[12]|C[12]"               # CEFR levels
-    r"|N[1-5]"                                # JLPT levels
+    r"\b(?:A[12]|B[12]|C[12]"  # CEFR levels
+    r"|N[1-5]"  # JLPT levels
     r"|native|fluent|advanced|intermediate"
     r"|beginner|proficient|basic|elementary"
     r"|upper[\s-]?intermediate"
@@ -116,12 +114,14 @@ _CONTACT_LABEL_RE = re.compile(
     re.I,
 )
 _BIRTH_RE = re.compile(
-    r"\b(?:birth|do\u011fum|dob|geboren|date\s+of\s+birth)\b", re.I,
+    r"\b(?:birth|do\u011fum|dob|geboren|date\s+of\s+birth)\b",
+    re.I,
 )
 
 # ── Patterns for parsed-entry resolution ──────────────────────────────────
 _URL_RAW_RE = re.compile(
-    r"https?://|github\.com|gitlab\.com|bitbucket\.org", re.I,
+    r"https?://|github\.com|gitlab\.com|bitbucket\.org",
+    re.I,
 )
 _TECH_RAW_RE = re.compile(
     r"\b(?:python|java(?:script)?|typescript|react|angular|vue|node\.?js"
@@ -140,7 +140,8 @@ _ACTION_VERB_RE = re.compile(
 )
 # GPA / grade pattern
 _GPA_RE = re.compile(
-    r"\b(?:gpa|grade|cgpa|not\s*ortalamas[iı])\s*[:\-]?\s*\d", re.I,
+    r"\b(?:gpa|grade|cgpa|not\s*ortalamas[iı])\s*[:\-]?\s*\d",
+    re.I,
 )
 _CERT_KEYWORD_RE = re.compile(
     r"\b(?:certified|certification|certificate|credential|license|licence"
@@ -200,16 +201,19 @@ def _append_certification(data: Dict, text: str) -> None:
         data["certifications"] = cert_list
     years = _YEAR_RE.findall(text)
     issuer_match = _CERT_PROVIDER_RE.search(text)
-    cert_list.append({
-        "name": text.strip(),
-        "issuer": issuer_match.group(0) if issuer_match else "",
-        "date": years[-1] if years else "",
-    })
+    cert_list.append(
+        {
+            "name": text.strip(),
+            "issuer": issuer_match.group(0) if issuer_match else "",
+            "date": years[-1] if years else "",
+        }
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 # LEVEL 1 — RAW LINE-LIST RESOLUTION (pre-parser)
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def resolve_raw_sections(
     sections: Dict[str, List[str]],
@@ -243,12 +247,10 @@ def resolve_raw_sections(
     for _sk in list(sections.keys()):
         _sv = sections[_sk]
         if isinstance(_sv, list) and len(_sv) > _MAX_SECTION_LINES:
-            logger.warning("resolver: section %s truncated %d → %d lines",
-                           _sk, len(_sv), _MAX_SECTION_LINES)
+            logger.warning("resolver: section %s truncated %d → %d lines", _sk, len(_sv), _MAX_SECTION_LINES)
             sections[_sk] = _sv[:_MAX_SECTION_LINES]
     if len(header_lines) > _MAX_HEADER_LINES:
-        logger.warning("resolver: header truncated %d → %d lines",
-                       len(header_lines), _MAX_HEADER_LINES)
+        logger.warning("resolver: header truncated %d → %d lines", len(header_lines), _MAX_HEADER_LINES)
         header_lines[:] = header_lines[:_MAX_HEADER_LINES]
 
     _t0_resolve = time.perf_counter()
@@ -291,8 +293,7 @@ def resolve_raw_sections(
         if contact_out:
             sections[src_key] = keep
             header_lines.extend(contact_out)
-            logger.debug("rule0: moved %d contact lines from %s → header",
-                         len(contact_out), src_key)
+            logger.debug("rule0: moved %d contact lines from %s → header", len(contact_out), src_key)
 
     # ── Rule 1: Education rescue ──────────────────────────────────────
     # Require degree OR gpa keyword.  Institution alone is not enough.
@@ -348,8 +349,7 @@ def resolve_raw_sections(
             sections[src_key] = [l for l in keep if l.strip() or keep.index(l) < len(keep) - 1]
             sections.setdefault("education", [])
             sections["education"].extend(edu_lines)
-            logger.debug("rule1: moved %d education lines from %s",
-                         len(edu_lines), src_key)
+            logger.debug("rule1: moved %d education lines from %s", len(edu_lines), src_key)
 
     # Rule 1b: Certification rescue. Multi-page / multi-column extraction can
     # keep the previous active section alive too long; move only strong,
@@ -368,8 +368,7 @@ def resolve_raw_sections(
             sections[src_key] = keep
             sections.setdefault("certifications", [])
             sections["certifications"].extend(certs)
-            logger.debug("rule1b: moved %d certification lines from %s",
-                         len(certs), src_key)
+            logger.debug("rule1b: moved %d certification lines from %s", len(certs), src_key)
 
     # Rule 2: URL routing
     def _is_standalone_url_line(line: str) -> bool:
@@ -511,14 +510,12 @@ def resolve_raw_sections(
                 keep.append(line)
                 continue
             text_low = stripped.lower()
-            has_date = (bool(_DATE_RANGE_RE.search(text_low))
-                        or len(_YEAR_RE.findall(text_low)) >= 2)
+            has_date = bool(_DATE_RANGE_RE.search(text_low)) or len(_YEAR_RE.findall(text_low)) >= 2
             has_url = bool(_URL_RE.search(stripped))
             has_tech = bool(_TECH_RE.search(text_low))
             words = stripped.split()
             is_short = len(words) <= 8
-            if (not has_date and not has_url and not has_tech
-                    and is_short and _INTEREST_RE.search(text_low)):
+            if not has_date and not has_url and not has_tech and is_short and _INTEREST_RE.search(text_low):
                 interests.append(line)
             else:
                 keep.append(line)
@@ -557,7 +554,8 @@ def resolve_raw_sections(
             text_low = stripped.lower()
             # Education: require degree OR gpa (institution alone not enough)
             if (_DEGREE_RE.search(text_low) or _GPA_RE.search(text_low)) and (
-                    _INSTITUTION_RE.search(text_low) or _YEAR_RE.search(text_low)):
+                _INSTITUTION_RE.search(text_low) or _YEAR_RE.search(text_low)
+            ):
                 sections.setdefault("education", [])
                 sections["education"].append(line)
                 continue
@@ -597,8 +595,7 @@ def resolve_raw_sections(
                 sections["skills"] = valid_skills
                 sections.setdefault("misc", [])
                 sections["misc"].extend(ejected_from_skills)
-                logger.debug("rule8: ejected %d long items from skills → misc",
-                             len(ejected_from_skills))
+                logger.debug("rule8: ejected %d long items from skills → misc", len(ejected_from_skills))
 
     # ── Rule 9: Projects enforcement — must contain url or tech ───────
     # Only enforce on blocks that arrived from misc/other (not from an
@@ -632,7 +629,8 @@ def resolve_raw_sections(
             text_low = stripped.lower()
             # Education: degree OR gpa (institution alone not enough)
             if (_DEGREE_RE.search(text_low) or _GPA_RE.search(text_low)) and (
-                    _INSTITUTION_RE.search(text_low) or _YEAR_RE.search(text_low)):
+                _INSTITUTION_RE.search(text_low) or _YEAR_RE.search(text_low)
+            ):
                 sections.setdefault("education", [])
                 sections["education"].append(line)
                 continue
@@ -646,10 +644,12 @@ def resolve_raw_sections(
                 sections["skills"].append(line)
                 continue
             # Interests: hobby keywords
-            if (_INTEREST_RE.search(text_low)
-                    and len(stripped.split()) <= 8
-                    and not _URL_RE.search(stripped)
-                    and not _DATE_RANGE_RE.search(stripped)):
+            if (
+                _INTEREST_RE.search(text_low)
+                and len(stripped.split()) <= 8
+                and not _URL_RE.search(stripped)
+                and not _DATE_RANGE_RE.search(stripped)
+            ):
                 sections.setdefault("interests", [])
                 sections["interests"].append(line)
                 continue
@@ -660,15 +660,13 @@ def resolve_raw_sections(
                 continue
             rescued.append(line)
         if len(rescued) < len(misc):
-            logger.debug("misc_sweep: rescued %d of %d misc items",
-                         len(misc) - len(rescued), len(misc))
+            logger.debug("misc_sweep: rescued %d of %d misc items", len(misc) - len(rescued), len(misc))
         sections["misc"] = rescued
 
     # ── Security: cap misc size ──
     _misc = sections.get("misc", [])
     if len(_misc) > _MAX_MISC_LINES:
-        logger.warning("resolver: misc capped %d → %d lines",
-                       len(_misc), _MAX_MISC_LINES)
+        logger.warning("resolver: misc capped %d → %d lines", len(_misc), _MAX_MISC_LINES)
         sections["misc"] = _misc[:_MAX_MISC_LINES]
 
     # Remove empty sections
@@ -677,10 +675,8 @@ def resolve_raw_sections(
     # Log resolver summary
     _elapsed = time.perf_counter() - _t0_resolve
     if _elapsed > _RESOLVER_TIMEOUT_SECONDS:
-        logger.warning("resolver: slow execution %.2fs (limit %.1fs)",
-                       _elapsed, _RESOLVER_TIMEOUT_SECONDS)
-    logger.debug("resolver_moves: sections=%s (%.3fs)",
-                 {k: len(v) for k, v in sections.items()}, _elapsed)
+        logger.warning("resolver: slow execution %.2fs (limit %.1fs)", _elapsed, _RESOLVER_TIMEOUT_SECONDS)
+    logger.debug("resolver_moves: sections=%s (%.3fs)", {k: len(v) for k, v in sections.items()}, _elapsed)
 
     return sections
 
@@ -688,6 +684,7 @@ def resolve_raw_sections(
 # ═══════════════════════════════════════════════════════════════════════════
 # LEVEL 2 — PARSED-ENTRY RESOLUTION (post-parser)
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def _dict_text(d: dict) -> str:
     """Flatten a dict entry into searchable text."""
@@ -723,11 +720,11 @@ def resolve_parsed_entries(data: Dict) -> None:
     _eject_false_education(data)
     _elapsed = time.perf_counter() - _t0
     if _elapsed > _RESOLVER_TIMEOUT_SECONDS:
-        logger.warning("resolve_parsed: slow execution %.2fs (limit %.1fs)",
-                       _elapsed, _RESOLVER_TIMEOUT_SECONDS)
+        logger.warning("resolve_parsed: slow execution %.2fs (limit %.1fs)", _elapsed, _RESOLVER_TIMEOUT_SECONDS)
 
 
 # ── 1. Experience → Education ─────────────────────────────────────────────
+
 
 def _fixup_experience_to_certifications(data: Dict) -> None:
     """Move parsed experience entries that are standalone credentials."""
@@ -755,11 +752,7 @@ def _fixup_experience_to_certifications(data: Dict) -> None:
 
         should_move = False
         if cert_from_title and not has_action_bullets:
-            should_move = (
-                not has_company
-                or company_like_issuer
-                or bool(_CERT_KEYWORD_RE.search(title))
-            )
+            should_move = not has_company or company_like_issuer or bool(_CERT_KEYWORD_RE.search(title))
         elif cert_from_text and not has_action_bullets and not has_company:
             should_move = True
 
@@ -811,15 +804,17 @@ def _fixup_experience_to_education(data: Dict) -> None:
             is_edu = has_gpa and (has_institution or has_year)
         # institution alone without degree/gpa → NOT education
         if is_edu:
-            education.append({
-                "degree": exp.get("title", ""),
-                "school": exp.get("company", ""),
-                "location": exp.get("location", ""),
-                "start_date": exp.get("start_date", ""),
-                "end_date": exp.get("end_date", ""),
-                "gpa": "",
-                "field": "",
-            })
+            education.append(
+                {
+                    "degree": exp.get("title", ""),
+                    "school": exp.get("company", ""),
+                    "location": exp.get("location", ""),
+                    "start_date": exp.get("start_date", ""),
+                    "end_date": exp.get("end_date", ""),
+                    "gpa": "",
+                    "field": "",
+                }
+            )
             logger.debug("parsed: exp→edu %r", exp.get("title", ""))
         else:
             kept_exp.append(exp)
@@ -832,26 +827,31 @@ def _eject_false_education(data: Dict) -> None:
     education = data.get("education")
     if not isinstance(education, list) or not education:
         return
-        
+
     kept_edu = []
     misc_list = data.get("misc")
     if not isinstance(misc_list, list):
         misc_list = []
         data["misc"] = misc_list
-        
+
     for edu in education:
         if not isinstance(edu, dict):
             kept_edu.append(edu)
             continue
-            
+
         text = _dict_text(edu).lower()
-        
+
         # Activity/club signals
-        is_activity = bool(re.search(r"\b(member|club|band|volleyball|basketball|football|soccer|choir|intramural|society|association)\b", text))
-        
+        is_activity = bool(
+            re.search(
+                r"\b(member|club|band|volleyball|basketball|football|soccer|choir|intramural|society|association)\b",
+                text,
+            )
+        )
+
         has_degree = bool(_DEGREE_RE.search(text))
         has_gpa = bool(_GPA_RE.search(text))
-        
+
         if is_activity and not has_degree and not has_gpa:
             # Eject to misc
             flat = edu.get("school", "") or edu.get("degree", "") or _dict_text(edu)
@@ -859,13 +859,14 @@ def _eject_false_education(data: Dict) -> None:
                 misc_list.append(flat.strip())
             logger.debug("parsed: ejected false education %r", flat[:40])
             continue
-            
+
         kept_edu.append(edu)
-        
+
     data["education"] = kept_edu
 
 
 # ── 2. Skills cleanup ────────────────────────────────────────────────────
+
 
 def _cleanup_skills(data: Dict) -> None:
     """Remove skill items with URLs, years, or long sentences.
@@ -890,12 +891,12 @@ def _cleanup_skills(data: Dict) -> None:
             if len(words) <= 6 or has_delim or has_tech or has_colon:
                 cleaned.append(s)
             else:
-                logger.debug("parsed: ejected long skill %r (%d words)",
-                             s[:40], len(words))
+                logger.debug("parsed: ejected long skill %r (%d words)", s[:40], len(words))
         data["skills"] = cleaned
 
 
 # ── 2b. Projects enforcement — must contain url or tech ──────────────────
+
 
 def _enforce_projects(data: Dict) -> None:
     """Eject project entries that lack structural project signals → misc.
@@ -935,31 +936,36 @@ def _enforce_projects(data: Dict) -> None:
             flat = proj.get("name", "") or proj.get("description", "")
             if flat and flat.strip():
                 misc_list.append(flat.strip())
-            logger.debug("parsed: ejected project %r (no structural signal)",
-                         proj.get("name", "")[:40])
+            logger.debug("parsed: ejected project %r (no structural signal)", proj.get("name", "")[:40])
     data["projects"] = kept
 
 
 # ── 3. Language validation ───────────────────────────────────────────────
+
 
 def _validate_languages(data: Dict) -> None:
     """Keep only plausible language entries."""
     languages = data.get("languages")
     if isinstance(languages, list):
         data["languages"] = [
-            lang for lang in languages
+            lang
+            for lang in languages
             if isinstance(lang, (str, dict))
-            and (isinstance(lang, dict) or (
-                lang.strip()
-                and len(lang.strip()) > 1
-                and not re.match(r"^[\d\W]+$", lang.strip())
-                and "@" not in lang
-                and not re.match(r"https?://", lang, re.I)
-            ))
+            and (
+                isinstance(lang, dict)
+                or (
+                    lang.strip()
+                    and len(lang.strip()) > 1
+                    and not re.match(r"^[\d\W]+$", lang.strip())
+                    and "@" not in lang
+                    and not re.match(r"https?://", lang, re.I)
+                )
+            )
         ]
 
 
 # ── 4. Deduplication ────────────────────────────────────────────────────
+
 
 def _deduplicate_sections(data: Dict) -> None:
     """Merge duplicate entries in dict-list sections."""
@@ -970,8 +976,7 @@ def _deduplicate_sections(data: Dict) -> None:
         seen: set = set()
         deduped: list = []
         for item in items:
-            vals = [str(v).strip().lower() for v in item.values()
-                    if isinstance(v, str) and v.strip()][:2]
+            vals = [str(v).strip().lower() for v in item.values() if isinstance(v, str) and v.strip()][:2]
             k = "|".join(vals)
             if k and k not in seen:
                 seen.add(k)
@@ -983,12 +988,15 @@ def _deduplicate_sections(data: Dict) -> None:
 
 # ── 5. Score-based experience re-evaluation ──────────────────────────────
 
+
 def _rescore_experience_entries(data: Dict) -> None:
     """Re-score each experience entry; if it scores higher as education
     or contact, move it there."""
     from utils.section_scorer import (
-        score_dict_entry, locked_sections,
-        LOCKED_MIN_SCORE, LOCKED_MIN_MARGIN,
+        score_dict_entry,
+        locked_sections,
+        LOCKED_MIN_SCORE,
+        LOCKED_MIN_MARGIN,
     )
 
     experiences = data.get("experiences")
@@ -1009,25 +1017,23 @@ def _rescore_experience_entries(data: Dict) -> None:
         scores = score_dict_entry(exp)
         best = scores.best()
 
-        if (best == "education"
-                and scores.education >= min_s
-                and scores.education - scores.experience >= min_m):
+        if best == "education" and scores.education >= min_s and scores.education - scores.experience >= min_m:
             edu_list = data.get("education")
             if not isinstance(edu_list, list):
                 edu_list = []
                 data["education"] = edu_list
-            edu_list.append({
-                "degree": exp.get("title", ""),
-                "school": exp.get("company", ""),
-                "location": exp.get("location", ""),
-                "start_date": exp.get("start_date", ""),
-                "end_date": exp.get("end_date", ""),
-                "gpa": "",
-                "field": "",
-            })
-        elif (best == "contact"
-              and scores.contact >= min_s
-              and scores.contact - scores.experience >= min_m):
+            edu_list.append(
+                {
+                    "degree": exp.get("title", ""),
+                    "school": exp.get("company", ""),
+                    "location": exp.get("location", ""),
+                    "start_date": exp.get("start_date", ""),
+                    "end_date": exp.get("end_date", ""),
+                    "gpa": "",
+                    "field": "",
+                }
+            )
+        elif best == "contact" and scores.contact >= min_s and scores.contact - scores.experience >= min_m:
             # Let normalizer handle contact routing — just drop from experience
             pass
         else:
@@ -1038,11 +1044,14 @@ def _rescore_experience_entries(data: Dict) -> None:
 
 # ── 6. Score-based misc redistribution ────────────────────────────────────
 
+
 def _redistribute_misc(data: Dict) -> None:
     """Move misc items into proper sections using multi-signal scoring."""
     from utils.section_scorer import (
-        score_text, locked_sections,
-        LOCKED_MIN_SCORE, LOCKED_MIN_MARGIN,
+        score_text,
+        locked_sections,
+        LOCKED_MIN_SCORE,
+        LOCKED_MIN_MARGIN,
     )
 
     misc = data.get("misc")
@@ -1062,8 +1071,13 @@ def _redistribute_misc(data: Dict) -> None:
     _MARGIN = LOCKED_MIN_MARGIN if misc_locked else 0.08
 
     _ALLOWED_TARGETS = {
-        "education", "certifications", "projects", "interests",
-        "skills", "languages", "contact",
+        "education",
+        "certifications",
+        "projects",
+        "interests",
+        "skills",
+        "languages",
+        "contact",
     }
 
     kept_misc: list = []
@@ -1114,15 +1128,17 @@ def _route_misc_item(data: Dict, target: str, text: str) -> None:
         if not isinstance(edu_list, list):
             edu_list = []
             data["education"] = edu_list
-        edu_list.append({
-            "degree": (_DEGREE_RE.search(text).group(0) if _DEGREE_RE.search(text) else ""),
-            "school": text,
-            "start_date": _YEAR_RE.findall(text)[0] if _YEAR_RE.findall(text) else "",
-            "end_date": "",
-            "gpa": "",
-            "field": "",
-            "location": "",
-        })
+        edu_list.append(
+            {
+                "degree": (_DEGREE_RE.search(text).group(0) if _DEGREE_RE.search(text) else ""),
+                "school": text,
+                "start_date": _YEAR_RE.findall(text)[0] if _YEAR_RE.findall(text) else "",
+                "end_date": "",
+                "gpa": "",
+                "field": "",
+                "location": "",
+            }
+        )
     elif target == "certifications":
         _append_certification(data, text)
     elif target == "projects":
@@ -1194,6 +1210,7 @@ def _detect_structured_pattern(text: str, data: Dict) -> str | None:
 
     # Languages: structural detection (CEFR / level / sub-skill)
     from utils.section_scorer import is_language_entry
+
     if is_language_entry(text, strict=True) and word_count <= 8:
         _route_misc_item(data, "languages", text)
         return "languages"
@@ -1203,12 +1220,16 @@ def _detect_structured_pattern(text: str, data: Dict) -> str | None:
 
 # ── 7. Score-based section validation ────────────────────────────────────
 
+
 def _validate_section_placement(data: Dict) -> None:
     """Re-score items in education, skills, interests, languages.
     Move misplaced items to their best-scoring section."""
     from utils.section_scorer import (
-        score_text, score_dict_entry, locked_sections,
-        LOCKED_MIN_SCORE, LOCKED_MIN_MARGIN,
+        score_text,
+        score_dict_entry,
+        locked_sections,
+        LOCKED_MIN_SCORE,
+        LOCKED_MIN_MARGIN,
     )
 
     locked = locked_sections(data.get("section_titles"))
@@ -1234,21 +1255,21 @@ def _validate_section_placement(data: Dict) -> None:
                 continue
             scores = score_dict_entry(edu)
             best = scores.best()
-            if (best == "experience"
-                    and scores.experience >= min_s
-                    and scores.experience - scores.education >= min_m):
+            if best == "experience" and scores.experience >= min_s and scores.experience - scores.education >= min_m:
                 exp_list = data.get("experiences")
                 if not isinstance(exp_list, list):
                     exp_list = []
                     data["experiences"] = exp_list
-                exp_list.append({
-                    "title": edu.get("degree", ""),
-                    "company": edu.get("school", ""),
-                    "location": edu.get("location", ""),
-                    "start_date": edu.get("start_date", ""),
-                    "end_date": edu.get("end_date", ""),
-                    "bullets": [],
-                })
+                exp_list.append(
+                    {
+                        "title": edu.get("degree", ""),
+                        "company": edu.get("school", ""),
+                        "location": edu.get("location", ""),
+                        "start_date": edu.get("start_date", ""),
+                        "end_date": edu.get("end_date", ""),
+                        "bullets": [],
+                    }
+                )
             else:
                 kept_edu.append(edu)
         data["education"] = kept_edu
@@ -1264,8 +1285,7 @@ def _validate_section_placement(data: Dict) -> None:
         if not isinstance(items, list) or not items:
             continue
         if len(items) > _MAX_ITERATIONS:
-            logger.warning("validate_placement: %s capped %d → %d",
-                           section_key, len(items), _MAX_ITERATIONS)
+            logger.warning("validate_placement: %s capped %d → %d", section_key, len(items), _MAX_ITERATIONS)
             items = items[:_MAX_ITERATIONS]
             data[section_key] = items
         min_s, min_m = _thresholds(section_key)
@@ -1277,8 +1297,7 @@ def _validate_section_placement(data: Dict) -> None:
             best = scores.best()
             best_val = scores.best_score()
             margin = scores.margin()
-            if (best != section_key and best in allowed_targets
-                    and best_val >= min_s and margin >= min_m):
+            if best != section_key and best in allowed_targets and best_val >= min_s and margin >= min_m:
                 target_list = data.get(best)
                 if not isinstance(target_list, list):
                     target_list = []

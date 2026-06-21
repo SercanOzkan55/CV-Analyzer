@@ -1,4 +1,5 @@
 """Tests for services/naming_service.py — mock mode name generation."""
+
 import os
 import pytest
 from services.naming_service import generate_primary_name, generate_specialization_name

@@ -2,6 +2,7 @@
 
 Extracted from ``main.py`` to reduce monolith size.
 """
+
 from __future__ import annotations
 
 import json
@@ -31,6 +32,7 @@ def _env_bool(name: str, default: bool = False) -> bool:
 
 
 # ── Feedback ─────────────────────────────────────────────────────────────
+
 
 def _append_feedback_record(record: dict):
     """Persist feedback as JSONL for lightweight bug triage in dev/prod."""
@@ -79,17 +81,8 @@ def _read_feedback_records(
 
 
 def _feedback_email_recipients() -> list[str]:
-    raw = str(
-        os.getenv("FEEDBACK_EMAIL_TO")
-        or os.getenv("SUPPORT_EMAIL")
-        or DEFAULT_SUPPORT_EMAIL
-        or ""
-    ).strip()
-    return [
-        item.strip()
-        for item in raw.replace(";", ",").split(",")
-        if item.strip() and "@" in item
-    ]
+    raw = str(os.getenv("FEEDBACK_EMAIL_TO") or os.getenv("SUPPORT_EMAIL") or DEFAULT_SUPPORT_EMAIL or "").strip()
+    return [item.strip() for item in raw.replace(";", ",").split(",") if item.strip() and "@" in item]
 
 
 def _feedback_email_body(record: dict) -> str:
@@ -129,9 +122,7 @@ def _send_feedback_email(record: dict) -> bool:
         return False
 
     try:
-        subject = (
-            f"[CV Analyzer][Feedback] {record.get('category', 'other')} - {record.get('email', 'unknown')}"
-        )
+        subject = f"[CV Analyzer][Feedback] {record.get('category', 'other')} - {record.get('email', 'unknown')}"
         body = _feedback_email_body(record)
         reply_to = str(record.get("email") or "").strip()
         sent_results = [
@@ -151,6 +142,7 @@ def _send_feedback_email(record: dict) -> bool:
 
 # ── General email ────────────────────────────────────────────────────────
 
+
 def _do_send_email(to_email: str, subject: str, body: str, recruiter_email: str = "") -> bool:
     """Send email via SMTP or SendGrid with retry support (3 attempts, exponential backoff)."""
     from email.utils import formataddr
@@ -165,7 +157,7 @@ def _do_send_email(to_email: str, subject: str, body: str, recruiter_email: str 
 
     max_attempts = 3
     backoff = 2.0
-    
+
     for attempt in range(1, max_attempts + 1):
         try:
             # Try SendGrid first
@@ -190,7 +182,7 @@ def _do_send_email(to_email: str, subject: str, body: str, recruiter_email: str 
                     if recruiter_email:
                         mail.reply_to = Email(recruiter_email)
                     response = sg.client.mail.send.post(request_body=mail.get())
-                    
+
                     if response.status_code in (200, 201, 202):
                         _logger.info(
                             "sendgrid_sent to=%s reply_to=%s status=%s attempt=%d",
@@ -203,7 +195,12 @@ def _do_send_email(to_email: str, subject: str, body: str, recruiter_email: str 
                     else:
                         raise RuntimeError(f"SendGrid responded with status {response.status_code}")
                 except Exception as e:
-                    _logger.error("sendgrid_failed to=%s error=%s attempt=%d", redact_for_log(to_email, key="to_email"), e, attempt)
+                    _logger.error(
+                        "sendgrid_failed to=%s error=%s attempt=%d",
+                        redact_for_log(to_email, key="to_email"),
+                        e,
+                        attempt,
+                    )
                     if not os.environ.get("SMTP_HOST", ""):
                         raise e
 
@@ -251,15 +248,21 @@ def _do_send_email(to_email: str, subject: str, body: str, recruiter_email: str 
                     )
                     return True
                 except Exception as e:
-                    _logger.error("smtp_failed to=%s error=%s attempt=%d", redact_for_log(to_email, key="to_email"), e, attempt)
+                    _logger.error(
+                        "smtp_failed to=%s error=%s attempt=%d", redact_for_log(to_email, key="to_email"), e, attempt
+                    )
                     raise e
 
-            _logger.warning("no_email_backend configured, email not sent to=%s", redact_for_log(to_email, key="to_email"))
+            _logger.warning(
+                "no_email_backend configured, email not sent to=%s", redact_for_log(to_email, key="to_email")
+            )
             return False
 
         except Exception as exc:
             if attempt == max_attempts:
-                _logger.error("all_email_attempts_failed to=%s final_error=%s", redact_for_log(to_email, key="to_email"), exc)
+                _logger.error(
+                    "all_email_attempts_failed to=%s final_error=%s", redact_for_log(to_email, key="to_email"), exc
+                )
                 return False
             _logger.info("email_retry_pending to=%s backoff=%.1fs", redact_for_log(to_email, key="to_email"), backoff)
             time.sleep(backoff)
@@ -269,6 +272,7 @@ def _do_send_email(to_email: str, subject: str, body: str, recruiter_email: str 
 
 
 # ── Reminders ────────────────────────────────────────────────────────────
+
 
 def _validate_reminder_email(email: str) -> str:
     candidate_email = (email or "").strip()
@@ -309,15 +313,17 @@ def _render_reminder_body(reminder: Reminder, days_left: int) -> str:
     ]
     if reminder.description:
         body_lines.extend(["", "Notlar:", reminder.description.strip()])
-    body_lines.extend([
-        "",
-        "Kısa kontrol listesi:",
-        "- CV ve iş ilanını tekrar gözden geçir.",
-        "- Görüşme linkini, adresi veya son teklif tarihini kontrol et.",
-        "- Sorularını ve takip notlarını hazırla.",
-        "",
-        "Bu hatırlatma otomatik olarak gönderildi."
-    ])
+    body_lines.extend(
+        [
+            "",
+            "Kısa kontrol listesi:",
+            "- CV ve iş ilanını tekrar gözden geçir.",
+            "- Görüşme linkini, adresi veya son teklif tarihini kontrol et.",
+            "- Sorularını ve takip notlarını hazırla.",
+            "",
+            "Bu hatırlatma otomatik olarak gönderildi.",
+        ]
+    )
     return "\n".join(body_lines)
 
 
@@ -359,11 +365,7 @@ def _process_due_reminders(db):
                 db.add(reminder)
                 db.commit()
             continue
-        if (
-            reminder.notified_3d_at is None
-            and reminder.notified_1d_at is None
-            and days_left == 3
-        ):
+        if reminder.notified_3d_at is None and reminder.notified_1d_at is None and days_left == 3:
             if _send_reminder_email(reminder, 3, recipient):
                 reminder.notified_3d_at = now
                 db.add(reminder)

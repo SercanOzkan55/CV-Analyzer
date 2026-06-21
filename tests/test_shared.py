@@ -1,4 +1,5 @@
 """Tests for shared.py — metrics, alerts, circuit breaker."""
+
 import time
 import pytest
 from shared import (

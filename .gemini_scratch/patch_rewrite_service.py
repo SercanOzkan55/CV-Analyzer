@@ -2,7 +2,7 @@ import os
 
 file_path = r"c:\Users\ASUS\Desktop\cv-analyzer\services\rewrite_service.py"
 
-with open(file_path, 'r', encoding='utf-8') as f:
+with open(file_path, "r", encoding="utf-8") as f:
     content = f.read()
 
 # 1. Update _generate and ai_rewrite_available
@@ -155,7 +155,7 @@ for target, replacement, desc in checks:
     # Normalize line endings to avoid platform mismatch
     target_norm = target.replace("\r\n", "\n")
     modified_norm = modified.replace("\r\n", "\n")
-    
+
     if target_norm in modified_norm:
         modified_norm = modified_norm.replace(target_norm, replacement.replace("\r\n", "\n"))
         modified = modified_norm
@@ -163,5 +163,5 @@ for target, replacement, desc in checks:
     else:
         print(f"FAILED: Could not find match for {desc}")
 
-with open(file_path, 'w', encoding='utf-8', newline='') as f:
+with open(file_path, "w", encoding="utf-8", newline="") as f:
     f.write(modified)

@@ -2,6 +2,7 @@
 
 Extracted from ``main.py`` to reduce monolith size.
 """
+
 from __future__ import annotations
 
 import json
@@ -31,9 +32,7 @@ logger = logging.getLogger("app.quota")
 
 # ── Timezone-aware quota reset ───────────────────────────────────────────
 _QUOTA_RESET_TIMEZONE = (
-    os.getenv("QUOTA_RESET_TIMEZONE", os.getenv("APP_TIMEZONE", "Europe/Istanbul"))
-    .strip()
-    or "Europe/Istanbul"
+    os.getenv("QUOTA_RESET_TIMEZONE", os.getenv("APP_TIMEZONE", "Europe/Istanbul")).strip() or "Europe/Istanbul"
 )
 
 
@@ -146,9 +145,7 @@ ORG_PLAN_LIMITS_MONTHLY = {
     "enterprise": int(os.getenv("ORG_ENTERPRISE_MONTHLY", "50000")),
 }
 
-REDIS_FREE_DAILY_LIMIT = int(
-    os.getenv("REDIS_FREE_DAILY_LIMIT", str(USER_PLAN_LIMITS_DAILY["free"]))
-)
+REDIS_FREE_DAILY_LIMIT = int(os.getenv("REDIS_FREE_DAILY_LIMIT", str(USER_PLAN_LIMITS_DAILY["free"])))
 
 # ── Cost guard limits ────────────────────────────────────────────────────
 COST_OPTIMIZE_PER_DAY = int(os.getenv("COST_OPTIMIZE_PER_DAY", "500"))
@@ -183,6 +180,7 @@ def _resolve_daily_limit_for_plan(plan_type: str | None) -> int:
 def _get_redis_rate():
     """Get redis_rate from main module (avoids circular import)."""
     from core.runtime_bridge import redis_rate_client
+
     return redis_rate_client()
 
 
@@ -196,8 +194,12 @@ def _get_daily_quota_status(user_id: str, limit: int = REDIS_FREE_DAILY_LIMIT):
         used = int(_LOCAL_DAILY_QUOTA.get(key, 0))
         remaining = max(0, limit - used)
         return {
-            "key": key, "used": used, "remaining": remaining,
-            "limit": limit, "allowed": used < limit, "source": "memory",
+            "key": key,
+            "used": used,
+            "remaining": remaining,
+            "limit": limit,
+            "allowed": used < limit,
+            "source": "memory",
         }
 
     try:
@@ -205,15 +207,23 @@ def _get_daily_quota_status(user_id: str, limit: int = REDIS_FREE_DAILY_LIMIT):
         used = int(raw_used) if raw_used is not None else 0
         remaining = max(0, limit - used)
         return {
-            "key": key, "used": used, "remaining": remaining,
-            "limit": limit, "allowed": used < limit, "source": "redis",
+            "key": key,
+            "used": used,
+            "remaining": remaining,
+            "limit": limit,
+            "allowed": used < limit,
+            "source": "redis",
         }
     except Exception:
         used = int(_LOCAL_DAILY_QUOTA.get(key, 0))
         remaining = max(0, limit - used)
         return {
-            "key": key, "used": used, "remaining": remaining,
-            "limit": limit, "allowed": used < limit, "source": "memory",
+            "key": key,
+            "used": used,
+            "remaining": remaining,
+            "limit": limit,
+            "allowed": used < limit,
+            "source": "memory",
         }
 
 
@@ -230,8 +240,12 @@ def _consume_daily_quota(user_id: str, limit: int = REDIS_FREE_DAILY_LIMIT):
         _save_local_quota()
         remaining = max(0, limit - used)
         return {
-            "key": key, "used": used, "remaining": remaining,
-            "limit": limit, "allowed": used <= limit, "source": "memory",
+            "key": key,
+            "used": used,
+            "remaining": remaining,
+            "limit": limit,
+            "allowed": used <= limit,
+            "source": "memory",
         }
 
     try:
@@ -241,8 +255,12 @@ def _consume_daily_quota(user_id: str, limit: int = REDIS_FREE_DAILY_LIMIT):
             redis_rate.expire(key, _seconds_until_next_quota_day())
         remaining = max(0, limit - used)
         return {
-            "key": key, "used": used, "remaining": remaining,
-            "limit": limit, "allowed": used <= limit, "source": "redis",
+            "key": key,
+            "used": used,
+            "remaining": remaining,
+            "limit": limit,
+            "allowed": used <= limit,
+            "source": "redis",
         }
     except Exception:
         used = int(_LOCAL_DAILY_QUOTA.get(key, 0)) + 1
@@ -250,8 +268,12 @@ def _consume_daily_quota(user_id: str, limit: int = REDIS_FREE_DAILY_LIMIT):
         _save_local_quota()
         remaining = max(0, limit - used)
         return {
-            "key": key, "used": used, "remaining": remaining,
-            "limit": limit, "allowed": used <= limit, "source": "memory",
+            "key": key,
+            "used": used,
+            "remaining": remaining,
+            "limit": limit,
+            "allowed": used <= limit,
+            "source": "memory",
         }
 
 
@@ -279,9 +301,13 @@ def _consume_user_rate_limit(user_id: str, limit_per_minute: int, scope: str):
         _LOCAL_USER_THROTTLE[key] = used
         remaining = max(0, int(limit_per_minute) - used)
         return {
-            "key": key, "used": used, "limit": int(limit_per_minute),
-            "remaining": remaining, "allowed": used <= int(limit_per_minute),
-            "scope": scope, "source": "memory",
+            "key": key,
+            "used": used,
+            "limit": int(limit_per_minute),
+            "remaining": remaining,
+            "allowed": used <= int(limit_per_minute),
+            "scope": scope,
+            "source": "memory",
         }
 
     try:
@@ -291,18 +317,26 @@ def _consume_user_rate_limit(user_id: str, limit_per_minute: int, scope: str):
             redis_rate.expire(key, 60)
         remaining = max(0, int(limit_per_minute) - used)
         return {
-            "key": key, "used": used, "limit": int(limit_per_minute),
-            "remaining": remaining, "allowed": used <= int(limit_per_minute),
-            "scope": scope, "source": "redis",
+            "key": key,
+            "used": used,
+            "limit": int(limit_per_minute),
+            "remaining": remaining,
+            "allowed": used <= int(limit_per_minute),
+            "scope": scope,
+            "source": "redis",
         }
     except Exception:
         used = int(_LOCAL_USER_THROTTLE.get(key, 0)) + 1
         _LOCAL_USER_THROTTLE[key] = used
         remaining = max(0, int(limit_per_minute) - used)
         return {
-            "key": key, "used": used, "limit": int(limit_per_minute),
-            "remaining": remaining, "allowed": used <= int(limit_per_minute),
-            "scope": scope, "source": "memory",
+            "key": key,
+            "used": used,
+            "limit": int(limit_per_minute),
+            "remaining": remaining,
+            "allowed": used <= int(limit_per_minute),
+            "scope": scope,
+            "source": "memory",
         }
 
 
@@ -356,6 +390,7 @@ def _release_concurrent_slot(user_id: str) -> None:
 def _check_cost_guard(scope: str, limit: int) -> None:
     """Enforce a global per-day hard cap for costly operations."""
     from shared import _alert
+
     _cost_logger = logging.getLogger("app.cost")
     today = datetime.now().strftime("%Y%m%d")
     key = f"cost:{scope}:{today}"
@@ -365,13 +400,20 @@ def _check_cost_guard(scope: str, limit: int) -> None:
         if pct >= 80 and count <= limit:
             _cost_logger.warning(
                 "cost:high_usage scope=%s count=%d limit=%d pct=%.0f%% source=%s",
-                scope, count, limit, pct, source,
+                scope,
+                count,
+                limit,
+                pct,
+                source,
             )
             _alert("cost_high", f"Cost usage {scope} at {pct:.0f}% ({count}/{limit})", level="warning")
         if count > limit:
             _cost_logger.error(
                 "cost:blocked scope=%s count=%d limit=%d source=%s",
-                scope, count, limit, source,
+                scope,
+                count,
+                limit,
+                source,
             )
             _alert("cost_blocked", f"Cost limit exceeded for {scope}: {count}/{limit}")
             raise HTTPException(
@@ -415,16 +457,17 @@ def _consume_billable_usage(db, db_user, endpoint: str, response=None):
         if db_user.last_reset is None or db_user.last_reset.date() < quota_today:
             db_user.daily_usage = 0
             db_user.last_reset = now_utc
-        if db_user.updated_at is None or (db_user.updated_at.year, db_user.updated_at.month) != (quota_today.year, quota_today.month):
+        if db_user.updated_at is None or (db_user.updated_at.year, db_user.updated_at.month) != (
+            quota_today.year,
+            quota_today.month,
+        ):
             db_user.monthly_usage = 0
             db_user.updated_at = now_utc
     except Exception:
         pass
 
     daily_limit = _resolve_daily_limit_for_plan(plan_type)
-    monthly_limit = USER_PLAN_LIMITS_MONTHLY.get(
-        _normalize_plan(plan_type), USER_PLAN_LIMITS_MONTHLY["free"]
-    )
+    monthly_limit = USER_PLAN_LIMITS_MONTHLY.get(_normalize_plan(plan_type), USER_PLAN_LIMITS_MONTHLY["free"])
 
     quota = _consume_daily_quota(db_user.supabase_id or str(db_user.id), limit=daily_limit)
     _apply_daily_quota_headers(response, quota)
@@ -462,16 +505,23 @@ def _consume_billable_usage(db, db_user, endpoint: str, response=None):
     _record_ai_usage(
         endpoint=endpoint,
         user_id=getattr(db_user, "id", None),
-        used_ai=endpoint in {
-            "cv-auto-fix", "rewrite-cv", "rewrite-bullets",
-            "rewrite-cover-letter", "interview-questions",
-            "interview-evaluate", "linkedin-optimize",
-            "cv-builder-suggest-summary", "recruiter-scan-cv",
+        used_ai=endpoint
+        in {
+            "cv-auto-fix",
+            "rewrite-cv",
+            "rewrite-bullets",
+            "rewrite-cover-letter",
+            "interview-questions",
+            "interview-evaluate",
+            "linkedin-optimize",
+            "cv-builder-suggest-summary",
+            "recruiter-scan-cv",
         },
         billable_units=1,
     )
     _record_ops_event(
-        "billable_usage", "ok",
+        "billable_usage",
+        "ok",
         endpoint=endpoint,
         user_id=getattr(db_user, "id", None),
         daily_usage=getattr(db_user, "daily_usage", None),
@@ -485,12 +535,9 @@ def _record_usage_daily(db, user_id: int):
     """Upsert a row in usage_daily for today, incrementing count by 1."""
     try:
         from models import UsageDaily
+
         today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-        row = (
-            db.query(UsageDaily)
-            .filter(UsageDaily.user_id == user_id, UsageDaily.date == today)
-            .first()
-        )
+        row = db.query(UsageDaily).filter(UsageDaily.user_id == user_id, UsageDaily.date == today).first()
         if row:
             row.count = (row.count or 0) + 1
         else:
@@ -510,14 +557,11 @@ def _is_admin_user(db_user) -> bool:
 
 def _resolve_effective_plan(db, db_user) -> str:
     from models import Organization
+
     if _is_admin_user(db_user):
         return "admin"
     if db_user and db_user.role == "recruiter" and db_user.organization_id:
-        org = (
-            db.query(Organization)
-            .filter(Organization.id == db_user.organization_id)
-            .first()
-        )
+        org = db.query(Organization).filter(Organization.id == db_user.organization_id).first()
         if org and getattr(org, "plan_type", None):
             return _normalize_plan(str(org.plan_type))
     return _normalize_plan(str((db_user.plan_type or "free") if db_user else "free"))

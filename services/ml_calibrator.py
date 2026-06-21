@@ -5,6 +5,7 @@ a predict function that blends ML prediction with rule-based score.
 
 Feature-flagged: ML_CALIBRATOR_ENABLED=1 to activate (default: 0).
 """
+
 import json
 import logging
 import os
@@ -34,7 +35,8 @@ def _load_model():
 
     try:
         with open(_MODEL_PATH, "rb") as f:
-            _model_cache = pickle.load(f)
+            # The calibrator artifact is a local build-time model bundled with the app.
+            _model_cache = pickle.load(f)  # nosec B301
         logger.info(
             "ML calibrator loaded: R²=%.4f, MAE=%.3f, n=%d",
             _model_cache["metrics"]["r2"],
@@ -72,16 +74,18 @@ def predict_calibrated_score(
         return None
 
     try:
-        features = np.array([
-            float(keyword_score),
-            float(skill_score),
-            float(ats_score),
-            float(content_score),
-            float(layout_score),
-            int(missing_count),
-            float(cv_length) / 1000.0,
-            float(jd_length) / 1000.0,
-        ])
+        features = np.array(
+            [
+                float(keyword_score),
+                float(skill_score),
+                float(ats_score),
+                float(content_score),
+                float(layout_score),
+                int(missing_count),
+                float(cv_length) / 1000.0,
+                float(jd_length) / 1000.0,
+            ]
+        )
 
         # Ridge prediction: intercept + coefficients · features
         intercept = model["intercept"]

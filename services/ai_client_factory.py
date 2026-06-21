@@ -1,6 +1,7 @@
 import os
 from loguru import logger
 
+
 def get_ai_client_and_model():
     """Unified factory for AI Client (OpenAI-compatible) and the target Model Name.
     Supports OpenAI, Gemini Flash (direct or compatibility layer), and Mock/Dev modes.
@@ -35,7 +36,9 @@ def get_ai_client_and_model():
     # Handle Gemini Flash
     if provider == "gemini":
         if not gemini_key:
-            logger.warning("Gemini provider selected but GEMINI_API_KEY/GOOGLE_API_KEY not found. Falling back to OpenAI key if present.")
+            logger.warning(
+                "Gemini provider selected but GEMINI_API_KEY/GOOGLE_API_KEY not found. Falling back to OpenAI key if present."
+            )
             gemini_key = openai_key
 
         if not gemini_key:

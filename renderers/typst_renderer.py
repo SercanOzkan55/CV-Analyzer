@@ -10,7 +10,9 @@ from renderers.template_engine import fill_template, load_template_file
 from schemas.cv_model import CVModel
 
 
-def render_typst(cv_model: CVModel, template: str = "classic", compile_pdf: bool = False, font_override: str = "") -> tuple[BytesIO, dict]:
+def render_typst(
+    cv_model: CVModel, template: str = "classic", compile_pdf: bool = False, font_override: str = ""
+) -> tuple[BytesIO, dict]:
     template_file = load_template_file(template, "template.typ")
     typst_code = fill_template(template_file, cv_model, template, font_override=font_override)
 

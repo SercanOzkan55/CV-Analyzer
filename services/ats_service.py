@@ -8,6 +8,7 @@ This module operates on **raw text** (not CVModel) and provides:
 For the authoritative numeric scorer (CVModel-based), use
 ``ats_scoring.score_cv()`` instead.
 """
+
 import re
 from typing import Dict, List
 
@@ -185,162 +186,574 @@ ACTION_VERBS = [
 # Multilingual action verbs — keyed by language code
 ACTION_VERBS_I18N: dict[str, list[str]] = {
     "tr": [
-        "yönetti", "liderlik etti", "koordine etti", "geliştirdi", "oluşturdu",
-        "tasarladı", "uyguladı", "başlattı", "iyileştirdi", "optimize etti",
-        "analiz etti", "değerlendirdi", "araştırdı", "teslim etti", "çözdü",
-        "artırdı", "azalttı", "eğitti", "sundu", "otomatize etti",
-        "entegre etti", "yeniden yapılandırdı", "denetledi", "planladı",
-        "kurdu", "geliştirdim", "tasarladım", "uyguladım", "yönettim",
-        "optimize ettim", "analiz ettim", "iyileştirdim", "oluşturdum",
-        "yönetti", "liderlik etti", "koordine etti", "geliştirdi", "oluşturdu",
-        "tasarladı", "uyguladı", "başlattı", "iyileştirdi", "optimize etti",
-        "analiz etti", "değerlendirdi", "araştırdı", "teslim etti", "çözdü",
-        "artırdı", "azalttı", "eğitti", "sundu", "otomatize etti",
-        "entegre etti", "yeniden yapılandırdı", "denetledi", "planladı",
+        "yönetti",
+        "liderlik etti",
+        "koordine etti",
+        "geliştirdi",
+        "oluşturdu",
+        "tasarladı",
+        "uyguladı",
+        "başlattı",
+        "iyileştirdi",
+        "optimize etti",
+        "analiz etti",
+        "değerlendirdi",
+        "araştırdı",
+        "teslim etti",
+        "çözdü",
+        "artırdı",
+        "azalttı",
+        "eğitti",
+        "sundu",
+        "otomatize etti",
+        "entegre etti",
+        "yeniden yapılandırdı",
+        "denetledi",
+        "planladı",
+        "kurdu",
+        "geliştirdim",
+        "tasarladım",
+        "uyguladım",
+        "yönettim",
+        "optimize ettim",
+        "analiz ettim",
+        "iyileştirdim",
+        "oluşturdum",
+        "yönetti",
+        "liderlik etti",
+        "koordine etti",
+        "geliştirdi",
+        "oluşturdu",
+        "tasarladı",
+        "uyguladı",
+        "başlattı",
+        "iyileştirdi",
+        "optimize etti",
+        "analiz etti",
+        "değerlendirdi",
+        "araştırdı",
+        "teslim etti",
+        "çözdü",
+        "artırdı",
+        "azalttı",
+        "eğitti",
+        "sundu",
+        "otomatize etti",
+        "entegre etti",
+        "yeniden yapılandırdı",
+        "denetledi",
+        "planladı",
     ],
     "fr": [
-        "dirigé", "géré", "coordonné", "développé", "créé", "conçu",
-        "mis en œuvre", "lancé", "amélioré", "optimisé", "analysé",
-        "évalué", "livré", "résolu", "augmenté", "réduit", "formé",
-        "présenté", "automatisé", "intégré", "restructuré", "supervisé",
-        "planifié", "négocié", "collaboré", "documenté",
+        "dirigé",
+        "géré",
+        "coordonné",
+        "développé",
+        "créé",
+        "conçu",
+        "mis en œuvre",
+        "lancé",
+        "amélioré",
+        "optimisé",
+        "analysé",
+        "évalué",
+        "livré",
+        "résolu",
+        "augmenté",
+        "réduit",
+        "formé",
+        "présenté",
+        "automatisé",
+        "intégré",
+        "restructuré",
+        "supervisé",
+        "planifié",
+        "négocié",
+        "collaboré",
+        "documenté",
     ],
     "de": [
-        "geleitet", "geführt", "koordiniert", "entwickelt", "erstellt",
-        "entworfen", "implementiert", "gestartet", "verbessert", "optimiert",
-        "analysiert", "bewertet", "geliefert", "gelöst", "gesteigert",
-        "reduziert", "geschult", "präsentiert", "automatisiert", "integriert",
-        "umstrukturiert", "überwacht", "geplant", "verhandelt",
+        "geleitet",
+        "geführt",
+        "koordiniert",
+        "entwickelt",
+        "erstellt",
+        "entworfen",
+        "implementiert",
+        "gestartet",
+        "verbessert",
+        "optimiert",
+        "analysiert",
+        "bewertet",
+        "geliefert",
+        "gelöst",
+        "gesteigert",
+        "reduziert",
+        "geschult",
+        "präsentiert",
+        "automatisiert",
+        "integriert",
+        "umstrukturiert",
+        "überwacht",
+        "geplant",
+        "verhandelt",
     ],
     "es": [
-        "dirigió", "gestionó", "coordinó", "desarrolló", "creó", "diseñó",
-        "implementó", "lanzó", "mejoró", "optimizó", "analizó", "evaluó",
-        "entregó", "resolvió", "aumentó", "redujo", "capacitó", "presentó",
-        "automatizó", "integró", "reestructuró", "supervisó", "planificó",
-        "negoció", "colaboró", "documentó",
+        "dirigió",
+        "gestionó",
+        "coordinó",
+        "desarrolló",
+        "creó",
+        "diseñó",
+        "implementó",
+        "lanzó",
+        "mejoró",
+        "optimizó",
+        "analizó",
+        "evaluó",
+        "entregó",
+        "resolvió",
+        "aumentó",
+        "redujo",
+        "capacitó",
+        "presentó",
+        "automatizó",
+        "integró",
+        "reestructuró",
+        "supervisó",
+        "planificó",
+        "negoció",
+        "colaboró",
+        "documentó",
     ],
     "pt": [
-        "liderou", "gerenciou", "coordenou", "desenvolveu", "criou",
-        "projetou", "implementou", "lançou", "melhorou", "otimizou",
-        "analisou", "avaliou", "entregou", "resolveu", "aumentou",
-        "reduziu", "treinou", "apresentou", "automatizou", "integrou",
-        "reestruturou", "supervisionou", "planejou", "negociou",
+        "liderou",
+        "gerenciou",
+        "coordenou",
+        "desenvolveu",
+        "criou",
+        "projetou",
+        "implementou",
+        "lançou",
+        "melhorou",
+        "otimizou",
+        "analisou",
+        "avaliou",
+        "entregou",
+        "resolveu",
+        "aumentou",
+        "reduziu",
+        "treinou",
+        "apresentou",
+        "automatizou",
+        "integrou",
+        "reestruturou",
+        "supervisionou",
+        "planejou",
+        "negociou",
     ],
     "it": [
-        "diretto", "gestito", "coordinato", "sviluppato", "creato",
-        "progettato", "implementato", "lanciato", "migliorato", "ottimizzato",
-        "analizzato", "valutato", "consegnato", "risolto", "aumentato",
-        "ridotto", "formato", "presentato", "automatizzato", "integrato",
-        "ristrutturato", "supervisionato", "pianificato", "negoziato",
+        "diretto",
+        "gestito",
+        "coordinato",
+        "sviluppato",
+        "creato",
+        "progettato",
+        "implementato",
+        "lanciato",
+        "migliorato",
+        "ottimizzato",
+        "analizzato",
+        "valutato",
+        "consegnato",
+        "risolto",
+        "aumentato",
+        "ridotto",
+        "formato",
+        "presentato",
+        "automatizzato",
+        "integrato",
+        "ristrutturato",
+        "supervisionato",
+        "pianificato",
+        "negoziato",
     ],
     "nl": [
-        "geleid", "beheerd", "gecoördineerd", "ontwikkeld", "gecreëerd",
-        "ontworpen", "geïmplementeerd", "gelanceerd", "verbeterd",
-        "geoptimaliseerd", "geanalyseerd", "beoordeeld", "opgeleverd",
-        "opgelost", "verhoogd", "verlaagd", "getraind", "gepresenteerd",
-        "geautomatiseerd", "geïntegreerd", "geherstructureerd",
+        "geleid",
+        "beheerd",
+        "gecoördineerd",
+        "ontwikkeld",
+        "gecreëerd",
+        "ontworpen",
+        "geïmplementeerd",
+        "gelanceerd",
+        "verbeterd",
+        "geoptimaliseerd",
+        "geanalyseerd",
+        "beoordeeld",
+        "opgeleverd",
+        "opgelost",
+        "verhoogd",
+        "verlaagd",
+        "getraind",
+        "gepresenteerd",
+        "geautomatiseerd",
+        "geïntegreerd",
+        "geherstructureerd",
     ],
     "ru": [
-        "руководил", "управлял", "координировал", "разработал", "создал",
-        "спроектировал", "внедрил", "запустил", "улучшил", "оптимизировал",
-        "проанализировал", "оценил", "доставил", "решил", "увеличил",
-        "сократил", "обучил", "презентовал", "автоматизировал",
-        "интегрировал", "реструктуризировал", "контролировал",
+        "руководил",
+        "управлял",
+        "координировал",
+        "разработал",
+        "создал",
+        "спроектировал",
+        "внедрил",
+        "запустил",
+        "улучшил",
+        "оптимизировал",
+        "проанализировал",
+        "оценил",
+        "доставил",
+        "решил",
+        "увеличил",
+        "сократил",
+        "обучил",
+        "презентовал",
+        "автоматизировал",
+        "интегрировал",
+        "реструктуризировал",
+        "контролировал",
     ],
     "pl": [
-        "kierował", "zarządzał", "koordynował", "opracował", "stworzył",
-        "zaprojektował", "wdrożył", "uruchomił", "usprawnił", "zoptymalizował",
-        "przeanalizował", "ocenił", "dostarczył", "rozwiązał", "zwiększył",
-        "zmniejszył", "przeszkolił", "zaprezentował", "zautomatyzował",
+        "kierował",
+        "zarządzał",
+        "koordynował",
+        "opracował",
+        "stworzył",
+        "zaprojektował",
+        "wdrożył",
+        "uruchomił",
+        "usprawnił",
+        "zoptymalizował",
+        "przeanalizował",
+        "ocenił",
+        "dostarczył",
+        "rozwiązał",
+        "zwiększył",
+        "zmniejszył",
+        "przeszkolił",
+        "zaprezentował",
+        "zautomatyzował",
     ],
     "sv": [
-        "ledde", "hanterade", "koordinerade", "utvecklade", "skapade",
-        "designade", "implementerade", "lanserade", "förbättrade",
-        "optimerade", "analyserade", "utvärderade", "levererade",
-        "löste", "ökade", "minskade", "utbildade", "presenterade",
+        "ledde",
+        "hanterade",
+        "koordinerade",
+        "utvecklade",
+        "skapade",
+        "designade",
+        "implementerade",
+        "lanserade",
+        "förbättrade",
+        "optimerade",
+        "analyserade",
+        "utvärderade",
+        "levererade",
+        "löste",
+        "ökade",
+        "minskade",
+        "utbildade",
+        "presenterade",
     ],
     "no": [
-        "ledet", "administrerte", "koordinerte", "utviklet", "opprettet",
-        "designet", "implementerte", "lanserte", "forbedret",
-        "optimaliserte", "analyserte", "evaluerte", "leverte",
-        "løste", "økte", "reduserte", "trente", "presenterte",
+        "ledet",
+        "administrerte",
+        "koordinerte",
+        "utviklet",
+        "opprettet",
+        "designet",
+        "implementerte",
+        "lanserte",
+        "forbedret",
+        "optimaliserte",
+        "analyserte",
+        "evaluerte",
+        "leverte",
+        "løste",
+        "økte",
+        "reduserte",
+        "trente",
+        "presenterte",
     ],
     "da": [
-        "ledte", "styrede", "koordinerede", "udviklede", "skabte",
-        "designede", "implementerede", "lancerede", "forbedrede",
-        "optimerede", "analyserede", "evaluerede", "leverede",
-        "løste", "øgede", "reducerede", "uddannede", "præsenterede",
+        "ledte",
+        "styrede",
+        "koordinerede",
+        "udviklede",
+        "skabte",
+        "designede",
+        "implementerede",
+        "lancerede",
+        "forbedrede",
+        "optimerede",
+        "analyserede",
+        "evaluerede",
+        "leverede",
+        "løste",
+        "øgede",
+        "reducerede",
+        "uddannede",
+        "præsenterede",
     ],
     "fi": [
-        "johti", "hallinnoi", "koordinoi", "kehitti", "loi",
-        "suunnitteli", "toteutti", "käynnisti", "paransi", "optimoi",
-        "analysoi", "arvioi", "toimitti", "ratkaisi", "kasvatti",
-        "vähensi", "koulutti", "esitti", "automatisoi",
+        "johti",
+        "hallinnoi",
+        "koordinoi",
+        "kehitti",
+        "loi",
+        "suunnitteli",
+        "toteutti",
+        "käynnisti",
+        "paransi",
+        "optimoi",
+        "analysoi",
+        "arvioi",
+        "toimitti",
+        "ratkaisi",
+        "kasvatti",
+        "vähensi",
+        "koulutti",
+        "esitti",
+        "automatisoi",
     ],
     "cs": [
-        "vedl", "řídil", "koordinoval", "vyvinul", "vytvořil",
-        "navrhl", "implementoval", "spustil", "vylepšil", "optimalizoval",
-        "analyzoval", "vyhodnotil", "dodal", "vyřešil", "zvýšil",
-        "snížil", "vyškolil", "prezentoval", "automatizoval",
+        "vedl",
+        "řídil",
+        "koordinoval",
+        "vyvinul",
+        "vytvořil",
+        "navrhl",
+        "implementoval",
+        "spustil",
+        "vylepšil",
+        "optimalizoval",
+        "analyzoval",
+        "vyhodnotil",
+        "dodal",
+        "vyřešil",
+        "zvýšil",
+        "snížil",
+        "vyškolil",
+        "prezentoval",
+        "automatizoval",
     ],
     "hu": [
-        "vezette", "irányította", "koordinálta", "fejlesztette", "létrehozta",
-        "tervezte", "megvalósította", "elindította", "javította",
-        "optimalizálta", "elemezte", "értékelte", "szállította",
-        "megoldotta", "növelte", "csökkentette", "képezte", "bemutatta",
+        "vezette",
+        "irányította",
+        "koordinálta",
+        "fejlesztette",
+        "létrehozta",
+        "tervezte",
+        "megvalósította",
+        "elindította",
+        "javította",
+        "optimalizálta",
+        "elemezte",
+        "értékelte",
+        "szállította",
+        "megoldotta",
+        "növelte",
+        "csökkentette",
+        "képezte",
+        "bemutatta",
     ],
     "ro": [
-        "condus", "gestionat", "coordonat", "dezvoltat", "creat",
-        "proiectat", "implementat", "lansat", "îmbunătățit", "optimizat",
-        "analizat", "evaluat", "livrat", "rezolvat", "crescut",
-        "redus", "instruit", "prezentat", "automatizat",
+        "condus",
+        "gestionat",
+        "coordonat",
+        "dezvoltat",
+        "creat",
+        "proiectat",
+        "implementat",
+        "lansat",
+        "îmbunătățit",
+        "optimizat",
+        "analizat",
+        "evaluat",
+        "livrat",
+        "rezolvat",
+        "crescut",
+        "redus",
+        "instruit",
+        "prezentat",
+        "automatizat",
     ],
     "ar": [
-        "قاد", "أدار", "نسق", "طور", "أنشأ", "صمم",
-        "نفذ", "أطلق", "حسن", "حلل", "قيم",
-        "سلم", "حل", "زاد", "قلل", "درب", "قدم",
+        "قاد",
+        "أدار",
+        "نسق",
+        "طور",
+        "أنشأ",
+        "صمم",
+        "نفذ",
+        "أطلق",
+        "حسن",
+        "حلل",
+        "قيم",
+        "سلم",
+        "حل",
+        "زاد",
+        "قلل",
+        "درب",
+        "قدم",
     ],
     "zh": [
-        "领导", "管理", "协调", "开发", "创建", "设计",
-        "实施", "启动", "改进", "优化", "分析", "评估",
-        "交付", "解决", "提升", "降低", "培训", "展示",
-        "自动化", "集成", "重构", "监督", "规划",
+        "领导",
+        "管理",
+        "协调",
+        "开发",
+        "创建",
+        "设计",
+        "实施",
+        "启动",
+        "改进",
+        "优化",
+        "分析",
+        "评估",
+        "交付",
+        "解决",
+        "提升",
+        "降低",
+        "培训",
+        "展示",
+        "自动化",
+        "集成",
+        "重构",
+        "监督",
+        "规划",
     ],
     "ja": [
-        "主導", "管理", "調整", "開発", "構築", "設計",
-        "実装", "立ち上げ", "改善", "最適化", "分析", "評価",
-        "提供", "解決", "向上", "削減", "教育", "発表",
-        "自動化", "統合", "リファクタリング",
+        "主導",
+        "管理",
+        "調整",
+        "開発",
+        "構築",
+        "設計",
+        "実装",
+        "立ち上げ",
+        "改善",
+        "最適化",
+        "分析",
+        "評価",
+        "提供",
+        "解決",
+        "向上",
+        "削減",
+        "教育",
+        "発表",
+        "自動化",
+        "統合",
+        "リファクタリング",
     ],
     "ko": [
-        "리드", "관리", "조정", "개발", "구축", "설계",
-        "구현", "출시", "개선", "최적화", "분석", "평가",
-        "전달", "해결", "증가", "감소", "교육", "발표",
-        "자동화", "통합", "주도",
+        "리드",
+        "관리",
+        "조정",
+        "개발",
+        "구축",
+        "설계",
+        "구현",
+        "출시",
+        "개선",
+        "최적화",
+        "분석",
+        "평가",
+        "전달",
+        "해결",
+        "증가",
+        "감소",
+        "교육",
+        "발표",
+        "자동화",
+        "통합",
+        "주도",
     ],
     "hi": [
-        "नेतृत्व किया", "प्रबंधन किया", "समन्वय किया", "विकसित किया",
-        "बनाया", "डिज़ाइन किया", "लागू किया", "शुरू किया",
-        "सुधार किया", "अनुकूलित किया", "विश्लेषण किया", "मूल्यांकन किया",
-        "वितरित किया", "हल किया", "बढ़ाया", "कम किया", "प्रशिक्षित किया",
+        "नेतृत्व किया",
+        "प्रबंधन किया",
+        "समन्वय किया",
+        "विकसित किया",
+        "बनाया",
+        "डिज़ाइन किया",
+        "लागू किया",
+        "शुरू किया",
+        "सुधार किया",
+        "अनुकूलित किया",
+        "विश्लेषण किया",
+        "मूल्यांकन किया",
+        "वितरित किया",
+        "हल किया",
+        "बढ़ाया",
+        "कम किया",
+        "प्रशिक्षित किया",
     ],
     "id": [
-        "memimpin", "mengelola", "mengkoordinasi", "mengembangkan",
-        "membuat", "merancang", "mengimplementasi", "meluncurkan",
-        "meningkatkan", "mengoptimalkan", "menganalisis", "mengevaluasi",
-        "menyampaikan", "menyelesaikan", "melatih", "mempresentasikan",
+        "memimpin",
+        "mengelola",
+        "mengkoordinasi",
+        "mengembangkan",
+        "membuat",
+        "merancang",
+        "mengimplementasi",
+        "meluncurkan",
+        "meningkatkan",
+        "mengoptimalkan",
+        "menganalisis",
+        "mengevaluasi",
+        "menyampaikan",
+        "menyelesaikan",
+        "melatih",
+        "mempresentasikan",
     ],
     "vi": [
-        "lãnh đạo", "quản lý", "điều phối", "phát triển",
-        "tạo", "thiết kế", "triển khai", "khởi động",
-        "cải thiện", "tối ưu hóa", "phân tích", "đánh giá",
-        "giao", "giải quyết", "tăng", "giảm", "đào tạo",
+        "lãnh đạo",
+        "quản lý",
+        "điều phối",
+        "phát triển",
+        "tạo",
+        "thiết kế",
+        "triển khai",
+        "khởi động",
+        "cải thiện",
+        "tối ưu hóa",
+        "phân tích",
+        "đánh giá",
+        "giao",
+        "giải quyết",
+        "tăng",
+        "giảm",
+        "đào tạo",
     ],
     "th": [
-        "นำ", "บริหาร", "ประสานงาน", "พัฒนา", "สร้าง",
-        "ออกแบบ", "ดำเนินการ", "เปิดตัว", "ปรับปรุง",
-        "เพิ่มประสิทธิภาพ", "วิเคราะห์", "ประเมิน", "ส่งมอบ",
-        "แก้ไข", "เพิ่ม", "ลด", "ฝึกอบรม", "นำเสนอ",
+        "นำ",
+        "บริหาร",
+        "ประสานงาน",
+        "พัฒนา",
+        "สร้าง",
+        "ออกแบบ",
+        "ดำเนินการ",
+        "เปิดตัว",
+        "ปรับปรุง",
+        "เพิ่มประสิทธิภาพ",
+        "วิเคราะห์",
+        "ประเมิน",
+        "ส่งมอบ",
+        "แก้ไข",
+        "เพิ่ม",
+        "ลด",
+        "ฝึกอบรม",
+        "นำเสนอ",
     ],
 }
 
@@ -350,6 +763,7 @@ def get_action_verbs(lang: str = "en") -> list[str]:
     if lang == "en" or lang not in ACTION_VERBS_I18N:
         return ACTION_VERBS
     return ACTION_VERBS + ACTION_VERBS_I18N[lang]
+
 
 QUANTIFICATION_PATTERNS = [
     r"\b\d+%",  # 25%, 150%
@@ -394,10 +808,12 @@ def _contact_score(cv_text: str) -> float:
 
     # Compact header bonus: contacts in first 5 lines = better ATS parsing
     first_lines = "\n".join(text.split("\n")[:5])
-    contacts_in_header = sum([
-        bool(re.search(r"[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,}", first_lines)),
-        bool(re.search(r"(\+?\d[\d\s\-()]{6,}\d)", first_lines)),
-    ])
+    contacts_in_header = sum(
+        [
+            bool(re.search(r"[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,}", first_lines)),
+            bool(re.search(r"(\+?\d[\d\s\-()]{6,}\d)", first_lines)),
+        ]
+    )
     if contacts_in_header >= 2:
         score += 10
 
@@ -465,9 +881,7 @@ def _action_verb_score(cv_text: str, lang: str = "en") -> float:
             total_hits += hits
 
     # Score based on both diversity and frequency
-    diversity_score = min(
-        100.0, (len(found_verbs) / 10.0) * 100
-    )  # 10+ unique verbs = 100
+    diversity_score = min(100.0, (len(found_verbs) / 10.0) * 100)  # 10+ unique verbs = 100
     frequency_score = min(100.0, (total_hits / 15.0) * 100)  # 15+ uses = 100
 
     score = 0.6 * diversity_score + 0.4 * frequency_score
@@ -504,9 +918,7 @@ def _formatting_consistency_score(cv_text: str) -> float:
 
     # 1) Date format consistency — penalize mixing "Jan 2020" and "01/2020" etc.
     date_formats_found = set()
-    if re.search(
-        r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{4}", cv_text
-    ):
+    if re.search(r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{4}", cv_text):
         date_formats_found.add("month_word")
     if re.search(r"\b\d{1,2}/\d{4}\b", cv_text):
         date_formats_found.add("mm_yyyy")
@@ -548,10 +960,24 @@ def _formatting_consistency_score(cv_text: str) -> float:
     # 6) Standardised heading bonus — ALL CAPS standard headings score better.
     #    Real ATS parsers recognise these more reliably.
     standard_headings = [
-        "PROFESSIONAL SUMMARY", "EXPERIENCE", "EDUCATION", "SKILLS",
-        "PROJECTS", "CERTIFICATIONS", "LANGUAGES",
-        "ÖZET", "DENEYİM", "EĞİTİM", "YETENEKLER", "PROJELER", "SERTİFİKALAR", "DİLLER",
-        "İŞ DENEYİMİ", "MESLEKİ DENEYİM", "AKADEMİK GEÇMİŞ", "YETKİNLİKLER"
+        "PROFESSIONAL SUMMARY",
+        "EXPERIENCE",
+        "EDUCATION",
+        "SKILLS",
+        "PROJECTS",
+        "CERTIFICATIONS",
+        "LANGUAGES",
+        "ÖZET",
+        "DENEYİM",
+        "EĞİTİM",
+        "YETENEKLER",
+        "PROJELER",
+        "SERTİFİKALAR",
+        "DİLLER",
+        "İŞ DENEYİMİ",
+        "MESLEKİ DENEYİM",
+        "AKADEMİK GEÇMİŞ",
+        "YETKİNLİKLER",
     ]
     std_count = sum(1 for h in standard_headings if h in cv_text)
     if std_count >= 4:
@@ -561,10 +987,7 @@ def _formatting_consistency_score(cv_text: str) -> float:
 
     # 7) Compact contact header bonus (name + contacts in first 3 lines)
     first_lines = non_empty_lines[:3]
-    contact_in_header = sum(
-        1 for l in first_lines
-        if re.search(r"[@|]", l) or re.search(r"\+?\d[\d\s\-]{7,}", l)
-    )
+    contact_in_header = sum(1 for l in first_lines if re.search(r"[@|]", l) or re.search(r"\+?\d[\d\s\-]{7,}", l))
     if contact_in_header >= 1:
         score = min(100.0, score + 3.0)
 
@@ -616,7 +1039,9 @@ def _skills_section_score(cv_text: str, job_text: str = "") -> float:
     """Score the skills section quality."""
     text_lower = clean_lower(cv_text)
     has_skills = bool(
-        re.search(r"\b(?:skills|technical\s+skills|core\s+competencies|competencies|beceriler|yetenekler)\b", text_lower)
+        re.search(
+            r"\b(?:skills|technical\s+skills|core\s+competencies|competencies|beceriler|yetenekler)\b", text_lower
+        )
     )
     if not has_skills:
         return 25.0
@@ -624,7 +1049,10 @@ def _skills_section_score(cv_text: str, job_text: str = "") -> float:
     score = 50.0
 
     # Count skill-like items (comma/pipe separated or bullet listed)
-    skill_lines = re.findall(r"(?:skills|competencies|beceriler|yetenekler)[\s\S]{0,50}\n([\s\S]{10,1000}?)(?:\n\s*(?:experience|education|projects|certifications|deneyim|eğitim|projeler|sertifikalar)\b|\Z)", text_lower)
+    skill_lines = re.findall(
+        r"(?:skills|competencies|beceriler|yetenekler)[\s\S]{0,50}\n([\s\S]{10,1000}?)(?:\n\s*(?:experience|education|projects|certifications|deneyim|eğitim|projeler|sertifikalar)\b|\Z)",
+        text_lower,
+    )
     skill_text = skill_lines[0] if skill_lines else ""
 
     if skill_text:
@@ -641,13 +1069,17 @@ def _skills_section_score(cv_text: str, job_text: str = "") -> float:
             score += 10.0
 
         # Are skills categorized?
-        categories = re.findall(r"\b(?:languages?|frameworks?|databases?|tools?|platforms?|devops|cloud|frontend|backend|programming)\b", skill_text)
+        categories = re.findall(
+            r"\b(?:languages?|frameworks?|databases?|tools?|platforms?|devops|cloud|frontend|backend|programming)\b",
+            skill_text,
+        )
         if len(set(categories)) >= 2:
             score += 15.0
 
     # Keyword overlap with job description
     if job_text:
         from .keyword_service import keyword_match_score
+
         skill_keyword = keyword_match_score(skill_text or cv_text, job_text)
         score += min(20.0, skill_keyword * 0.2)
 
@@ -658,7 +1090,10 @@ def _work_experience_score(cv_text: str, lang: str = "en") -> float:
     """Score work experience section quality (structure, bullets, metrics)."""
     text_lower = clean_lower(cv_text)
     has_exp = bool(
-        re.search(r"\b(?:experience|work\s+experience|professional\s+experience|employment|deneyim|iş\s+deneyimi)\b", text_lower)
+        re.search(
+            r"\b(?:experience|work\s+experience|professional\s+experience|employment|deneyim|iş\s+deneyimi)\b",
+            text_lower,
+        )
     )
     if not has_exp:
         if not _has_project_based_experience(cv_text):
@@ -754,9 +1189,7 @@ def _work_experience_score(cv_text: str, lang: str = "en") -> float:
 def _education_score(cv_text: str) -> float:
     """Score education section presence and quality."""
     text_lower = clean_lower(cv_text)
-    has_edu = bool(
-        re.search(r"\b(?:education|academic|eğitim|öğrenim|university|üniversite)\b", text_lower)
-    )
+    has_edu = bool(re.search(r"\b(?:education|academic|eğitim|öğrenim|university|üniversite)\b", text_lower))
     if not has_edu:
         return 20.0
 
@@ -764,9 +1197,22 @@ def _education_score(cv_text: str) -> float:
 
     # Degree keywords
     degree_keywords = [
-        "bachelor", "master", "phd", "mba", "associate", "diploma",
-        "b.s.", "b.a.", "m.s.", "m.a.", "b.sc", "m.sc",
-        "lisans", "yüksek lisans", "doktora", "mühendislik",
+        "bachelor",
+        "master",
+        "phd",
+        "mba",
+        "associate",
+        "diploma",
+        "b.s.",
+        "b.a.",
+        "m.s.",
+        "m.a.",
+        "b.sc",
+        "m.sc",
+        "lisans",
+        "yüksek lisans",
+        "doktora",
+        "mühendislik",
     ]
     degree_found = sum(1 for d in degree_keywords if d in text_lower)
     if degree_found >= 1:
@@ -788,7 +1234,9 @@ def _education_score(cv_text: str) -> float:
         score += 10.0
 
     # Field of study
-    if re.search(r"\b(?:computer|software|engineering|science|business|management|bilgisayar|yazılım|mühendislik)\b", text_lower):
+    if re.search(
+        r"\b(?:computer|software|engineering|science|business|management|bilgisayar|yazılım|mühendislik)\b", text_lower
+    ):
         score += 10.0
 
     return min(100.0, score)
@@ -1036,7 +1484,10 @@ def _get_section_recommendations(section: str, score: float, lang: str = "en") -
     en_items = recs.get("en", [])
     tr_items = recs.get("tr", en_items)
     limit = 2 if score >= 70 else 3
-    return [{"en": en_items[i], "tr": tr_items[i] if i < len(tr_items) else en_items[i]} for i in range(min(limit, len(en_items)))]
+    return [
+        {"en": en_items[i], "tr": tr_items[i] if i < len(tr_items) else en_items[i]}
+        for i in range(min(limit, len(en_items)))
+    ]
 
 
 def compute_final_score(
@@ -1062,12 +1513,19 @@ def compute_final_score(
     """
     import os
     import logging as _logging
+
     _log = _logging.getLogger(__name__)
 
     # ── Input validation / safeguard ────────────────────────────────
     _DEFAULT = 60.0  # conservative fallback for missing scores
-    _inputs = {"keyword": keyword, "section": section, "exp": exp,
-               "skills": skills, "layout": layout, "contact": contact}
+    _inputs = {
+        "keyword": keyword,
+        "section": section,
+        "exp": exp,
+        "skills": skills,
+        "layout": layout,
+        "contact": contact,
+    }
     _overrides = []
     _input_warnings = []
     for _name, _val in _inputs.items():
@@ -1085,7 +1543,8 @@ def compute_final_score(
     if _overrides:
         _log.warning(
             "compute_final_score: missing/invalid inputs defaulted to %.0f: %s",
-            _DEFAULT, _overrides,
+            _DEFAULT,
+            _overrides,
         )
     # Score confidence: 1.0 when all inputs valid, drops per defaulted input
     _score_confidence = round(max(0.0, 1.0 - len(_overrides) * 0.12), 2)
@@ -1109,22 +1568,9 @@ def compute_final_score(
 
     # When keyword is effectively 0 (no job desc), redistribute weight
     if keyword < 1.0:
-        rule_score = (
-            section * 0.25
-            + exp * 0.25
-            + skills * 0.20
-            + layout * 0.18
-            + contact * 0.12
-        )
+        rule_score = section * 0.25 + exp * 0.25 + skills * 0.20 + layout * 0.18 + contact * 0.12
     else:
-        rule_score = (
-            keyword * 0.20
-            + section * 0.18
-            + exp * 0.22
-            + skills * 0.15
-            + layout * 0.15
-            + contact * 0.10
-        )
+        rule_score = keyword * 0.20 + section * 0.18 + exp * 0.22 + skills * 0.15 + layout * 0.15 + contact * 0.10
     # Decide whether to use ML blend or override with rule_score
     use_ml = True
     ml_reason = None
@@ -1188,7 +1634,9 @@ def _find_section_position(canonical_sec: str, clean_cv_text: str) -> int:
         if best_pos != -1:
             return best_pos
         # Fallback: email/phone presence
-        if re.search(r"[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,}", clean_cv_text) or re.search(r"(\+?\d[\d\s\-()]{6,}\d)", clean_cv_text):
+        if re.search(r"[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,}", clean_cv_text) or re.search(
+            r"(\+?\d[\d\s\-()]{6,}\d)", clean_cv_text
+        ):
             return 0
         return -1
 
@@ -1240,11 +1688,7 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
 
     # Layout / structure
     sections_found = _find_sections(cv_text)
-    required_found = [
-        s
-        for s in MIN_REQUIRED_SECTIONS
-        if s in sections_found
-    ]
+    required_found = [s for s in MIN_REQUIRED_SECTIONS if s in sections_found]
     if "experience" not in required_found and _has_project_based_experience(cv_text):
         required_found.append("experience")
     section_presence_score = (len(required_found) / len(MIN_REQUIRED_SECTIONS)) * 100
@@ -1252,12 +1696,7 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
     bullet_score = _bullet_ratio(cv_text)
     length_score = _length_score(cv_text)
 
-    layout_score = (
-        0.4 * section_presence_score
-        + 0.3 * contact_score
-        + 0.15 * bullet_score
-        + 0.15 * length_score
-    )
+    layout_score = 0.4 * section_presence_score + 0.3 * contact_score + 0.15 * bullet_score + 0.15 * length_score
 
     # Penalize CVs that include tables/graphics-like markers
     if "|" in cv_text or "\t" in cv_text:
@@ -1282,9 +1721,7 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
 
     # Content scoring
     if job_text and job_text.strip():
-        content_score = (
-            (0.6 * keyword_score) + (0.2 * action_score) + (0.2 * achievement_score)
-        )
+        content_score = (0.6 * keyword_score) + (0.2 * action_score) + (0.2 * achievement_score)
         content_score += penalty
     else:
         content_score = (0.5 * action_score) + (0.5 * achievement_score)
@@ -1411,15 +1848,18 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
 
     # Only include keywords section when a job description is provided
     if job_text and job_text.strip():
-        section_scores.insert(-1, {
-            "name": "keywords",
-            "icon": "🔍",
-            "label": {"en": "Keywords", "tr": "Anahtar Kelimeler"},
-            "score": round(keyword_score, 0),
-            "status": _get_section_status(keyword_score),
-            "message": _get_section_message("keywords", keyword_score, lang),
-            "recommendations": _get_section_recommendations("keywords", keyword_score, lang),
-        })
+        section_scores.insert(
+            -1,
+            {
+                "name": "keywords",
+                "icon": "🔍",
+                "label": {"en": "Keywords", "tr": "Anahtar Kelimeler"},
+                "score": round(keyword_score, 0),
+                "status": _get_section_status(keyword_score),
+                "message": _get_section_message("keywords", keyword_score, lang),
+                "recommendations": _get_section_recommendations("keywords", keyword_score, lang),
+            },
+        )
 
     # Aggregate counts
     passed_count = sum(1 for s in section_scores if s["status"] == "pass")
@@ -1432,31 +1872,67 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
     low_priority = []
 
     if summary_score < 70:
-        high_priority.append({"en": "Expand professional summary to clearly state career goals and key skills.", "tr": "Profesyonel özeti kariyer hedeflerini ve temel becerileri net olarak belirtecek şekilde genişletin."})
+        high_priority.append(
+            {
+                "en": "Expand professional summary to clearly state career goals and key skills.",
+                "tr": "Profesyonel özeti kariyer hedeflerini ve temel becerileri net olarak belirtecek şekilde genişletin.",
+            }
+        )
     if achievement_score < 40:
-        high_priority.append({"en": "Add quantifiable achievements or impact metrics in internship experience.", "tr": "Staj deneyimine ölçülebilir başarılar veya etki metrikleri ekleyin."})
+        high_priority.append(
+            {
+                "en": "Add quantifiable achievements or impact metrics in internship experience.",
+                "tr": "Staj deneyimine ölçülebilir başarılar veya etki metrikleri ekleyin.",
+            }
+        )
     if formatting_score < 80:
-        high_priority.append({"en": "Improve formatting consistency for better readability and ATS compatibility.", "tr": "Daha iyi okunabilirlik ve ATS uyumluluğu için biçimlendirme tutarlılığını iyileştirin."})
+        high_priority.append(
+            {
+                "en": "Improve formatting consistency for better readability and ATS compatibility.",
+                "tr": "Daha iyi okunabilirlik ve ATS uyumluluğu için biçimlendirme tutarlılığını iyileştirin.",
+            }
+        )
 
     if edu_score < 90:
-        medium_priority.append({"en": "Include expected graduation date in education section.", "tr": "Eğitim bölümüne beklenen mezuniyet tarihini ekleyin."})
+        medium_priority.append(
+            {
+                "en": "Include expected graduation date in education section.",
+                "tr": "Eğitim bölümüne beklenen mezuniyet tarihini ekleyin.",
+            }
+        )
     if skills_score < 85:
-        medium_priority.append({"en": "Add proficiency levels for technical skills.", "tr": "Teknik beceriler için yeterlilik düzeyleri ekleyin."})
+        medium_priority.append(
+            {
+                "en": "Add proficiency levels for technical skills.",
+                "tr": "Teknik beceriler için yeterlilik düzeyleri ekleyin.",
+            }
+        )
     if keyword_score < 70 and job_text:
-        medium_priority.append({"en": "Incorporate keywords from targeted job descriptions into resume content.", "tr": "Hedeflenen iş tanımlarının anahtar kelimelerini CV içeriğine ekleyin."})
+        medium_priority.append(
+            {
+                "en": "Incorporate keywords from targeted job descriptions into resume content.",
+                "tr": "Hedeflenen iş tanımlarının anahtar kelimelerini CV içeriğine ekleyin.",
+            }
+        )
 
     if contact_score < 100:
         low_priority.append({"en": "Add LinkedIn profile link.", "tr": "LinkedIn profil bağlantısı ekleyin."})
-    low_priority.append({"en": "Include soft skills or extracurricular activities if relevant.", "tr": "İlgiliyse sosyal becerileri veya ders dışı etkinlikleri ekleyin."})
-    low_priority.append({"en": "Use consistent formatting for dates.", "tr": "Tarihler için tutarlı biçimlendirme kullanın."})
+    low_priority.append(
+        {
+            "en": "Include soft skills or extracurricular activities if relevant.",
+            "tr": "İlgiliyse sosyal becerileri veya ders dışı etkinlikleri ekleyin.",
+        }
+    )
+    low_priority.append(
+        {"en": "Use consistent formatting for dates.", "tr": "Tarihler için tutarlı biçimlendirme kullanın."}
+    )
 
     # ── Industry-specific tips ───────────────────────────────────────
     industry_tips = _generate_industry_tips(cv_text, job_text, lang)
 
     # ── Next steps ───────────────────────────────────────────────────
     next_steps = _generate_next_steps(
-        summary_score, edu_score, formatting_score, work_exp_score,
-        skills_score, keyword_score, contact_score, lang
+        summary_score, edu_score, formatting_score, work_exp_score, skills_score, keyword_score, contact_score, lang
     )
 
     # ── Old-style suggestions (backward compat) ─────────────────────
@@ -1518,7 +1994,19 @@ def _generate_industry_tips(cv_text: str, job_text: str, lang: str = "en") -> li
     """Generate bilingual industry-specific tips based on CV and job description content."""
     text = (cv_text + " " + (job_text or "")).lower()
 
-    tech_keywords = ["software", "developer", "engineer", "programming", "api", "cloud", "devops", "database", "yazılım", "geliştirici", "mühendis"]
+    tech_keywords = [
+        "software",
+        "developer",
+        "engineer",
+        "programming",
+        "api",
+        "cloud",
+        "devops",
+        "database",
+        "yazılım",
+        "geliştirici",
+        "mühendis",
+    ]
     is_tech = any(kw in text for kw in tech_keywords)
 
     if is_tech:
@@ -1554,28 +2042,60 @@ def _generate_industry_tips(cv_text: str, job_text: str, lang: str = "en") -> li
 
 
 def _generate_next_steps(
-    summary_score: float, edu_score: float, formatting_score: float,
-    exp_score: float, skills_score: float, keyword_score: float,
-    contact_score: float, lang: str = "en",
+    summary_score: float,
+    edu_score: float,
+    formatting_score: float,
+    exp_score: float,
+    skills_score: float,
+    keyword_score: float,
+    contact_score: float,
+    lang: str = "en",
 ) -> list:
     """Generate ordered bilingual next steps based on weakest areas."""
     en_steps = [
-        (summary_score, "Add a professional summary or objective at the top to better capture attention and clarify career goals."),
-        (60.0, "Include dates for projects or specify if they were part of coursework or personal initiatives to provide timeline context."),
-        (formatting_score, "Improve formatting consistency, such as alignment and spacing, to enhance readability and professional appearance."),
+        (
+            summary_score,
+            "Add a professional summary or objective at the top to better capture attention and clarify career goals.",
+        ),
+        (
+            60.0,
+            "Include dates for projects or specify if they were part of coursework or personal initiatives to provide timeline context.",
+        ),
+        (
+            formatting_score,
+            "Improve formatting consistency, such as alignment and spacing, to enhance readability and professional appearance.",
+        ),
         (exp_score, "Add more quantifiable achievements or metrics in the experience section to demonstrate impact."),
         (edu_score, "Include relevant coursework or certifications to strengthen the education section."),
-        (skills_score, "Consider adding a section for soft skills or extracurricular activities if relevant to the role."),
-        (70.0, "Clarify language proficiency levels using a standard framework (e.g., CEFR) and consider adding certifications if available."),
+        (
+            skills_score,
+            "Consider adding a section for soft skills or extracurricular activities if relevant to the role.",
+        ),
+        (
+            70.0,
+            "Clarify language proficiency levels using a standard framework (e.g., CEFR) and consider adding certifications if available.",
+        ),
     ]
     tr_steps = [
-        (summary_score, "Dikkat çekmek ve kariyer hedeflerini netleştirmek için üst kısma profesyonel bir özet veya hedef ekleyin."),
-        (60.0, "Projeler için tarihler ekleyin veya ders çalışması ya da kişisel girişimlerin parçası olup olmadığını belirtin."),
-        (formatting_score, "Okunabilirliği ve profesyonel görünümü artırmak için hizalama ve boşluk gibi biçimlendirme tutarlılığını iyileştirin."),
+        (
+            summary_score,
+            "Dikkat çekmek ve kariyer hedeflerini netleştirmek için üst kısma profesyonel bir özet veya hedef ekleyin.",
+        ),
+        (
+            60.0,
+            "Projeler için tarihler ekleyin veya ders çalışması ya da kişisel girişimlerin parçası olup olmadığını belirtin.",
+        ),
+        (
+            formatting_score,
+            "Okunabilirliği ve profesyonel görünümü artırmak için hizalama ve boşluk gibi biçimlendirme tutarlılığını iyileştirin.",
+        ),
         (exp_score, "Etkiyi göstermek için deneyim bölümüne daha fazla ölçülebilir başarı veya metrik ekleyin."),
         (edu_score, "Eğitim bölümünü güçlendirmek için ilgili dersleri veya sertifikaları ekleyin."),
         (skills_score, "Rolle ilgiliyse sosyal beceriler veya ders dışı etkinlikler için bir bölüm eklemeyi düşünün."),
-        (70.0, "Dil yeterlilik düzeylerini standart bir çerçeve kullanarak netleştirin (ör. CEFR) ve varsa sertifika eklemeyi düşünün."),
+        (
+            70.0,
+            "Dil yeterlilik düzeylerini standart bir çerçeve kullanarak netleştirin (ör. CEFR) ve varsa sertifika eklemeyi düşünün.",
+        ),
     ]
     # Sort by score ascending (worst areas first)
     indices = sorted(range(len(en_steps)), key=lambda i: en_steps[i][0])
@@ -1619,12 +2139,14 @@ def generate_score_suggestions(
                 action = f"{skill_name} deneyimi ekleyin"
             else:
                 action = f"Add {skill_name} experience"
-            suggestions.append({
-                "action": action,
-                "impact": per_skill_impact,
-                "category": "skill",
-                "skill": skill_name,
-            })
+            suggestions.append(
+                {
+                    "action": action,
+                    "impact": per_skill_impact,
+                    "category": "skill",
+                    "skill": skill_name,
+                }
+            )
 
     # -- Keyword-based suggestions (medium impact) --
     kw_missing = keyword_gap.get("missing_keywords", []) if keyword_gap else []
@@ -1644,24 +2166,34 @@ def generate_score_suggestions(
                 action = f"CV'nizde '{kw_name}' ifadesini kullanın"
             else:
                 action = f"Mention '{kw_name}' in your CV"
-            suggestions.append({
-                "action": action,
-                "impact": per_kw_impact,
-                "category": "keyword",
-                "skill": kw_name,
-            })
+            suggestions.append(
+                {
+                    "action": action,
+                    "impact": per_kw_impact,
+                    "category": "keyword",
+                    "skill": kw_name,
+                }
+            )
 
     # -- ATS formatting suggestions (fixed impact estimates) --
     if final_score < 70:
         ats_suggestions = []
         if lang == "tr":
             ats_suggestions = [
-                {"action": "Ölçülebilir başarılar ekleyin (ör: '%25 artış sağladı')", "impact": 3.0, "category": "format"},
+                {
+                    "action": "Ölçülebilir başarılar ekleyin (ör: '%25 artış sağladı')",
+                    "impact": 3.0,
+                    "category": "format",
+                },
                 {"action": "Madde işaretleri kullanın (uzun paragraflar yerine)", "impact": 2.0, "category": "format"},
             ]
         else:
             ats_suggestions = [
-                {"action": "Add quantified achievements (e.g., 'Increased revenue by 25%')", "impact": 3.0, "category": "format"},
+                {
+                    "action": "Add quantified achievements (e.g., 'Increased revenue by 25%')",
+                    "impact": 3.0,
+                    "category": "format",
+                },
                 {"action": "Use bullet points instead of long paragraphs", "impact": 2.0, "category": "format"},
             ]
         suggestions.extend(ats_suggestions)

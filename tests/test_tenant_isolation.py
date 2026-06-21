@@ -36,6 +36,7 @@ def _analysis(db, owner: User, score: float = 72.0) -> Analysis:
 def _clear_rate_limit_state():
     """Clear all in-memory rate limit buckets to avoid 429 cascade across tests."""
     from core import http_runtime
+
     http_runtime._user_global_counts.clear()
     http_runtime._ip_global_counts.clear()
     http_runtime._user_embed_counts.clear()

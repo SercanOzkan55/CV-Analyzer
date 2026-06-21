@@ -19,9 +19,9 @@ import io
 import time
 
 # Fix Windows console encoding for Unicode output
-if sys.stdout.encoding and sys.stdout.encoding.lower() not in ('utf-8', 'utf8'):
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +35,7 @@ from services.ats_service import analyze_cv, compute_final_score
 
 # ── Metric Helpers ────────────────────────────────────────────────
 
+
 def _mae(errors: list[float]) -> float:
     """Mean Absolute Error."""
     if not errors:
@@ -46,7 +47,7 @@ def _mse(errors: list[float]) -> float:
     """Mean Squared Error."""
     if not errors:
         return 0.0
-    return sum(e ** 2 for e in errors) / len(errors)
+    return sum(e**2 for e in errors) / len(errors)
 
 
 def _rmse(errors: list[float]) -> float:
@@ -69,6 +70,7 @@ def _range_error(value: float, expected: dict) -> float:
 
 
 # ── Pipeline Runner ───────────────────────────────────────────────
+
 
 def run_single_entry(entry: dict) -> dict:
     """Run a single benchmark entry through the scoring pipeline.
@@ -163,6 +165,7 @@ def run_single_entry(entry: dict) -> dict:
 
 # ── Aggregate Report ─────────────────────────────────────────────
 
+
 def generate_report(results: list[dict]) -> dict:
     """Generate aggregate evaluation metrics from individual results."""
     total = len(results)
@@ -172,19 +175,9 @@ def generate_report(results: list[dict]) -> dict:
     # Per-metric aggregation
     metrics = {}
     for metric_name in ["keyword_score", "ats_score", "final_score"]:
-        range_errors = [
-            r["errors"].get(metric_name, 0.0)
-            for r in results
-            if metric_name in r.get("errors", {})
-        ]
-        in_range_count = sum(
-            1 for r in results
-            if r.get("checks", {}).get(metric_name, {}).get("in_range", False)
-        )
-        total_with_check = sum(
-            1 for r in results
-            if metric_name in r.get("checks", {})
-        )
+        range_errors = [r["errors"].get(metric_name, 0.0) for r in results if metric_name in r.get("errors", {})]
+        in_range_count = sum(1 for r in results if r.get("checks", {}).get(metric_name, {}).get("in_range", False))
+        total_with_check = sum(1 for r in results if metric_name in r.get("checks", {}))
 
         metrics[metric_name] = {
             "mae": round(_mae(range_errors), 2),
@@ -192,9 +185,7 @@ def generate_report(results: list[dict]) -> dict:
             "rmse": round(_rmse(range_errors), 2),
             "in_range_count": in_range_count,
             "total_checked": total_with_check,
-            "in_range_pct": round(
-                (in_range_count / max(1, total_with_check)) * 100, 1
-            ),
+            "in_range_pct": round((in_range_count / max(1, total_with_check)) * 100, 1),
         }
 
     # Category breakdown
@@ -205,13 +196,7 @@ def generate_report(results: list[dict]) -> dict:
 
     category_summary = {}
     for cat, entries in categories.items():
-        pass_count = sum(
-            1 for e in entries
-            if all(
-                c.get("in_range", False)
-                for c in e.get("checks", {}).values()
-            )
-        )
+        pass_count = sum(1 for e in entries if all(c.get("in_range", False) for c in e.get("checks", {}).values()))
         category_summary[cat] = {
             "total": len(entries),
             "all_in_range": pass_count,
@@ -244,33 +229,27 @@ def generate_report(results: list[dict]) -> dict:
     for r in results:
         for metric_name, check in r.get("checks", {}).items():
             if not check.get("in_range", True):
-                failures.append({
-                    "id": r["id"],
-                    "name": r["name"],
-                    "metric": metric_name,
-                    "actual": check["actual"],
-                    "expected_range": f"[{check['expected_min']}, {check['expected_max']}]",
-                    "deviation": check["range_error"],
-                })
+                failures.append(
+                    {
+                        "id": r["id"],
+                        "name": r["name"],
+                        "metric": metric_name,
+                        "actual": check["actual"],
+                        "expected_range": f"[{check['expected_min']}, {check['expected_max']}]",
+                        "deviation": check["range_error"],
+                    }
+                )
 
     return {
         "summary": {
             "total_entries": total,
             "all_metrics_in_range": sum(
-                1 for r in results
-                if all(
-                    c.get("in_range", False)
-                    for c in r.get("checks", {}).values()
-                )
+                1 for r in results if all(c.get("in_range", False) for c in r.get("checks", {}).values())
             ),
             "overall_pass_rate_pct": round(
-                sum(
-                    1 for r in results
-                    if all(
-                        c.get("in_range", False)
-                        for c in r.get("checks", {}).values()
-                    )
-                ) / total * 100,
+                sum(1 for r in results if all(c.get("in_range", False) for c in r.get("checks", {}).values()))
+                / total
+                * 100,
                 1,
             ),
         },
@@ -284,6 +263,7 @@ def generate_report(results: list[dict]) -> dict:
 
 # ── Console Printer ──────────────────────────────────────────────
 
+
 def print_report(results: list[dict], report: dict, verbose: bool = False) -> None:
     """Print a human-readable report to console."""
     print("\n" + "=" * 70)
@@ -291,8 +271,10 @@ def print_report(results: list[dict], report: dict, verbose: bool = False) -> No
     print("=" * 70)
 
     summary = report["summary"]
-    print(f"\n[SUMMARY] Overall: {summary['all_metrics_in_range']}/{summary['total_entries']}"
-          f" entries passed all checks ({summary['overall_pass_rate_pct']}%)\n")
+    print(
+        f"\n[SUMMARY] Overall: {summary['all_metrics_in_range']}/{summary['total_entries']}"
+        f" entries passed all checks ({summary['overall_pass_rate_pct']}%)\n"
+    )
 
     # Per-metric table
     print("┌─────────────────┬────────┬────────┬────────┬─────────────┐")
@@ -314,8 +296,10 @@ def print_report(results: list[dict], report: dict, verbose: bool = False) -> No
 
     # Keyword coverage
     cov = report["keyword_coverage_distribution"]
-    print(f"\n[KEYWORDS] Keyword Coverage (entries with JD): mean={cov['mean']}%, "
-          f"range=[{cov['min']}% - {cov['max']}%], n={cov['count']}")
+    print(
+        f"\n[KEYWORDS] Keyword Coverage (entries with JD): mean={cov['mean']}%, "
+        f"range=[{cov['min']}% - {cov['max']}%], n={cov['count']}"
+    )
 
     # Timing
     t = report["timing"]
@@ -325,8 +309,10 @@ def print_report(results: list[dict], report: dict, verbose: bool = False) -> No
     if report["failures"]:
         print(f"\n[FAIL] Failures ({len(report['failures'])}):")
         for f in report["failures"]:
-            print(f"   [{f['id']}] {f['name']}: {f['metric']}"
-                  f" = {f['actual']} (expected {f['expected_range']}, off by {f['deviation']})")
+            print(
+                f"   [{f['id']}] {f['name']}: {f['metric']}"
+                f" = {f['actual']} (expected {f['expected_range']}, off by {f['deviation']})"
+            )
     else:
         print("\n[OK] All entries within expected ranges!")
 
@@ -336,36 +322,46 @@ def print_report(results: list[dict], report: dict, verbose: bool = False) -> No
         print("  DETAILED RESULTS")
         print("-" * 70)
         for r in results:
-            status = "[PASS]" if all(
-                c.get("in_range", False) for c in r.get("checks", {}).values()
-            ) else "[FAIL]"
+            status = "[PASS]" if all(c.get("in_range", False) for c in r.get("checks", {}).values()) else "[FAIL]"
             print(f"\n{status} [{r['id']}] {r['name']} ({r['category']})")
-            print(f"   Scores: kw={r['scores']['keyword_score']}, "
-                  f"ats={r['scores']['ats_overall']}, final={r['scores']['final_score']}")
-            print(f"   Coverage: {r['scores']['keyword_coverage_pct']}%, "
-                  f"missing={r['scores']['missing_keywords_count']}, "
-                  f"strong={r['scores']['strong_keywords_count']}, "
-                  f"weak={r['scores']['weak_keywords_count']}")
+            print(
+                f"   Scores: kw={r['scores']['keyword_score']}, "
+                f"ats={r['scores']['ats_overall']}, final={r['scores']['final_score']}"
+            )
+            print(
+                f"   Coverage: {r['scores']['keyword_coverage_pct']}%, "
+                f"missing={r['scores']['missing_keywords_count']}, "
+                f"strong={r['scores']['strong_keywords_count']}, "
+                f"weak={r['scores']['weak_keywords_count']}"
+            )
             print(f"   Time: {r['timing_ms']['total']}ms")
             for metric, check in r.get("checks", {}).items():
                 icon = "[OK]" if check["in_range"] else "[X]"
                 range_err = check["range_error"]
                 status_msg = "OK" if check["in_range"] else f"off by {range_err}"
-                print(f"   {icon} {metric}: {check['actual']} "
-                      f"[{check['expected_min']}-{check['expected_max']}]"
-                      f" {status_msg}")
+                print(
+                    f"   {icon} {metric}: {check['actual']} "
+                    f"[{check['expected_min']}-{check['expected_max']}]"
+                    f" {status_msg}"
+                )
 
     print("\n" + "=" * 70 + "\n")
 
 
 # ── Main ─────────────────────────────────────────────────────────
 
+
 def main():
     parser = argparse.ArgumentParser(description="Run CV Analyzer benchmark evaluation")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show per-entry details")
     parser.add_argument("--output", "-o", type=str, help="Save results to JSON file")
-    parser.add_argument("--dataset", "-d", type=str, help="Path to benchmark dataset JSON",
-                        default=str(PROJECT_ROOT / "tests" / "benchmark" / "benchmark_dataset.json"))
+    parser.add_argument(
+        "--dataset",
+        "-d",
+        type=str,
+        help="Path to benchmark dataset JSON",
+        default=str(PROJECT_ROOT / "tests" / "benchmark" / "benchmark_dataset.json"),
+    )
     args = parser.parse_args()
 
     # Load dataset
@@ -387,22 +383,22 @@ def main():
         try:
             result = run_single_entry(entry)
             results.append(result)
-            status = "PASS" if all(
-                c.get("in_range", False) for c in result.get("checks", {}).values()
-            ) else "FAIL"
+            status = "PASS" if all(c.get("in_range", False) for c in result.get("checks", {}).values()) else "FAIL"
             print(f" [{status}] ({result['timing_ms']['total']}ms)")
         except Exception as e:
             print(f" [ERROR] {e}")
-            results.append({
-                "id": entry["id"],
-                "name": entry["name"],
-                "category": entry.get("category"),
-                "error": str(e),
-                "checks": {},
-                "errors": {},
-                "scores": {},
-                "timing_ms": {"total": 0},
-            })
+            results.append(
+                {
+                    "id": entry["id"],
+                    "name": entry["name"],
+                    "category": entry.get("category"),
+                    "error": str(e),
+                    "checks": {},
+                    "errors": {},
+                    "scores": {},
+                    "timing_ms": {"total": 0},
+                }
+            )
 
     # Generate report
     report = generate_report(results)

@@ -5,6 +5,7 @@ Usage:
 
 If `--jd` omitted, runs standalone CV analysis.
 """
+
 import argparse
 import json
 from services.ats_service import analyze_cv, compute_final_score
