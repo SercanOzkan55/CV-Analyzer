@@ -188,7 +188,30 @@ async def upload_cv(
     except HTTPException:
         raise
 
+    # ── Duplicate prevention: compute normalized-text fingerprint and check user's existing CVs
     try:
+        try:
+            from services.pdf_text_extractor import extract_pdf_text
+            import hashlib
+            from models import CVVersion
+
+            raw_text, _ = extract_pdf_text(contents, max_pages=20, max_chars=300000, ocr_extract_text=None)
+            fp = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
+
+            existing = db.query(CVVersion).filter(CVVersion.user_id == db_user.id).all()
+            for row in existing:
+                txt = (row.cv_text or row.optimized_cv_text or "")
+                if not txt:
+                    continue
+                existing_fp = hashlib.sha256(txt.encode("utf-8")).hexdigest()
+                if existing_fp == fp:
+                    raise HTTPException(status_code=409, detail=f"duplicate_cv: existing_cv_version_id={row.id}")
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("duplicate_check_failed user=%s", supabase_id)
+            # fall back to upload if duplicate check fails unexpectedly
+
         key = upload_original_cv(contents, supabase_id, content_type, file.filename)
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
