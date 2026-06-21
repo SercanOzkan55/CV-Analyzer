@@ -14,6 +14,7 @@ def _run_pipeline(cv_text, job_description, lang="en"):
         from services.pipeline_runtime import run_pipeline as pipeline
     return pipeline(cv_text, job_description, lang)
 
+
 try:
     from celery import Celery, Task
     from celery.exceptions import SoftTimeLimitExceeded
@@ -63,13 +64,19 @@ try:
             def on_retry(self, exc, task_id, args, kwargs, einfo):
                 _task_logger.warning(
                     "task:retry task=%s id=%s attempt=%d/%d error=%s",
-                    self.name, task_id, self.request.retries, self.max_retries, exc,
+                    self.name,
+                    task_id,
+                    self.request.retries,
+                    self.max_retries,
+                    exc,
                 )
 
             def on_failure(self, exc, task_id, args, kwargs, einfo):
                 _task_logger.error(
                     "task:failed task=%s id=%s error=%s",
-                    self.name, task_id, exc,
+                    self.name,
+                    task_id,
+                    exc,
                 )
                 try:
                     session = SessionLocal()
@@ -107,22 +114,22 @@ try:
 
         # ── Worker safety limits ──
         celery_app.conf.update(
-            worker_max_memory_per_child=512_000,   # 512 MB → recycle worker
-            worker_max_tasks_per_child=200,        # recycle after 200 tasks
-            task_default_rate_limit="30/m",         # max 30 tasks/min per worker
-            task_acks_late=True,                    # ack after execution
-            task_reject_on_worker_lost=True,        # re-queue if worker dies
-            worker_prefetch_multiplier=1,           # one task at a time
+            worker_max_memory_per_child=512_000,  # 512 MB → recycle worker
+            worker_max_tasks_per_child=200,  # recycle after 200 tasks
+            task_default_rate_limit="30/m",  # max 30 tasks/min per worker
+            task_acks_late=True,  # ack after execution
+            task_reject_on_worker_lost=True,  # re-queue if worker dies
+            worker_prefetch_multiplier=1,  # one task at a time
             broker_connection_retry_on_startup=True,
-            task_soft_time_limit=45,                # soft limit → SoftTimeLimitExceeded
-            task_time_limit=60,                     # hard kill after 60s
-            worker_hijack_root_logger=False,        # keep app logging config
+            task_soft_time_limit=45,  # soft limit → SoftTimeLimitExceeded
+            task_time_limit=60,  # hard kill after 60s
+            worker_hijack_root_logger=False,  # keep app logging config
             beat_schedule={
                 "cleanup-expired-worker-claims": {
                     "task": "cleanup_expired_claims",
                     "schedule": 300.0,
                 }
-            }
+            },
         )
 
         @celery_app.task(bind=True, name="analyze_pdf_task", queue="pdf_processing")
@@ -150,19 +157,19 @@ try:
                     cv_text = cv_data.get("text", "")
                     filename = cv_data.get("filename", "unknown.pdf")
                     candidate_name = cv_data.get("candidate_name")
-                    
+
                     # 1. Autofix & Structure
                     autofix = auto_fix_cv_text(cv_text=cv_text, job_description=job_description, use_ai=False)
                     normalized_text = autofix.get("optimized_cv_text") or cv_text
-                    
+
                     # 2. Match Pipeline
                     analysis = _run_pipeline(normalized_text, job_description)
-                    
+
                     # 3. Extract metadata if name is missing
                     if not candidate_name:
                         structured = extract_structured(cv_text)
                         candidate_name = structured.get("full_name") or filename
-                    
+
                     # 4. Save to Recruiter Dashboard
                     action = save_candidate_action(
                         db=db,
@@ -195,25 +202,29 @@ try:
             db = SessionLocal()
             try:
                 now = datetime.utcnow()
-                expired_claims = db.query(WorkerClaim).filter(
-                    WorkerClaim.status == "claimed",
-                    WorkerClaim.claim_expires_at < now
-                ).with_for_update(skip_locked=True).all()
+                expired_claims = (
+                    db.query(WorkerClaim)
+                    .filter(WorkerClaim.status == "claimed", WorkerClaim.claim_expires_at < now)
+                    .with_for_update(skip_locked=True)
+                    .all()
+                )
 
                 released = 0
                 for claim in expired_claims:
                     wk = db.query(WorkerKey).filter(WorkerKey.id == claim.worker_key_id).with_for_update().first()
                     if wk:
                         wk.quota_reserved = max(0, int(wk.quota_reserved or 0) - 1)
-                        db.add(QuotaEvent(
-                            worker_key_id=wk.id,
-                            organization_id=claim.organization_id,
-                            job_id=claim.job_id,
-                            cv_id=claim.cv_id,
-                            event_type="expired",
-                            amount=1,
-                            metadata_={"claim_id": claim.id},
-                        ))
+                        db.add(
+                            QuotaEvent(
+                                worker_key_id=wk.id,
+                                organization_id=claim.organization_id,
+                                job_id=claim.job_id,
+                                cv_id=claim.cv_id,
+                                event_type="expired",
+                                amount=1,
+                                metadata_={"claim_id": claim.id},
+                            )
+                        )
                     claim.status = "expired"
                     released += 1
                 if released > 0:
@@ -242,7 +253,7 @@ except Exception:
         def delay(self, *args, **kwargs):
             class DummyResult:
                 def __init__(self, res):
-                    self.id = f"local-{int(time.time()*1000)}"
+                    self.id = f"local-{int(time.time() * 1000)}"
                     self.status = "SUCCESS"
                     self.result = res
 
@@ -280,14 +291,21 @@ except Exception:
                 autofix = auto_fix_cv_text(cv_text=cv_text, job_description=job_description)
                 normalized_text = autofix.get("optimized_cv_text") or cv_text
                 analysis = _run_pipeline(normalized_text, job_description)
-                
+
                 structured = extract_structured(cv_text)
                 name = structured.get("full_name") or filename
-                
+
                 action = save_candidate_action(
-                    db, org_id, job_id, recruiter_id, name,
-                    analysis.get("candidate_email"), cv_text, 
-                    analysis.get("final_score"), analysis.get("ats_score"), "pending",
+                    db,
+                    org_id,
+                    job_id,
+                    recruiter_id,
+                    name,
+                    analysis.get("candidate_email"),
+                    cv_text,
+                    analysis.get("final_score"),
+                    analysis.get("ats_score"),
+                    "pending",
                     analysis,
                     cv_file_key=cv_data.get("cv_file_key") or cv_data.get("file_key"),
                     cv_file_name=cv_data.get("cv_file_name") or filename,
@@ -308,25 +326,26 @@ except Exception:
         db = SessionLocal()
         try:
             now = datetime.utcnow()
-            expired_claims = db.query(WorkerClaim).filter(
-                WorkerClaim.status == "claimed",
-                WorkerClaim.claim_expires_at < now
-            ).all()
+            expired_claims = (
+                db.query(WorkerClaim).filter(WorkerClaim.status == "claimed", WorkerClaim.claim_expires_at < now).all()
+            )
 
             released = 0
             for claim in expired_claims:
                 wk = db.query(WorkerKey).filter(WorkerKey.id == claim.worker_key_id).first()
                 if wk:
                     wk.quota_reserved = max(0, int(wk.quota_reserved or 0) - 1)
-                    db.add(QuotaEvent(
-                        worker_key_id=wk.id,
-                        organization_id=claim.organization_id,
-                        job_id=claim.job_id,
-                        cv_id=claim.cv_id,
-                        event_type="expired",
-                        amount=1,
-                        metadata_={"claim_id": claim.id},
-                    ))
+                    db.add(
+                        QuotaEvent(
+                            worker_key_id=wk.id,
+                            organization_id=claim.organization_id,
+                            job_id=claim.job_id,
+                            cv_id=claim.cv_id,
+                            event_type="expired",
+                            amount=1,
+                            metadata_={"claim_id": claim.id},
+                        )
+                    )
                 claim.status = "expired"
                 released += 1
             if released > 0:

@@ -44,6 +44,7 @@ limit_request_line = 8190
 limit_request_fields = 100
 limit_request_field_size = 8190
 
+
 # ── Server hooks ────────────────────────────────────────────────────
 def on_starting(server):
     server.log.info("Gunicorn master starting (workers=%d, timeout=%d)", workers, timeout)
@@ -53,6 +54,7 @@ def worker_exit(server, worker):
     server.log.info("Worker %s exited (pid=%d)", worker.pid, worker.pid)
     # Flush all log handlers on worker exit
     import logging
+
     for handler in logging.getLogger().handlers:
         try:
             handler.flush()

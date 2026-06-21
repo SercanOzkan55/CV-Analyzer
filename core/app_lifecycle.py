@@ -41,10 +41,7 @@ from services.email_service import _start_reminder_worker
 
 
 def _ensure_sqlite_column(connection, table_name: str, column_name: str, column_sql: str):
-    columns = {
-        row[1]
-        for row in connection.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
-    }
+    columns = {row[1] for row in connection.execute(text(f"PRAGMA table_info({table_name})")).fetchall()}
     if column_name not in columns:
         connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_sql}"))
 
@@ -194,6 +191,7 @@ def validate_startup_config():
     path_concurrency = main_value("_PATH_CONCURRENCY", {})
 
     if env_mode in ("production", "prod"):
+
         def _truthy(name: str) -> bool:
             return os.getenv(name, "").strip().lower() in ("1", "true", "yes", "on")
 
@@ -341,9 +339,7 @@ def validate_startup_config():
         for fatal in fatals:
             _logger.critical("startup:FATAL %s", fatal)
         if env_mode in ("production", "prod"):
-            raise RuntimeError(
-                f"Server cannot start: {len(fatals)} fatal config error(s): " + "; ".join(fatals)
-            )
+            raise RuntimeError(f"Server cannot start: {len(fatals)} fatal config error(s): " + "; ".join(fatals))
 
     _logger.info(
         "startup: validation complete (%d warnings), guards=%d, path_concurrency=%d, queue=%d",

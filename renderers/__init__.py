@@ -21,8 +21,8 @@ def render(cv_model: CVModel, template: str, output_format: str, font_override: 
     if fmt == "html":
         html = render_html_preview(safe_model, template, font_override=font_override)
         standalone = (
-            "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n"
-            "<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
+            '<!DOCTYPE html>\n<html lang="en">\n<head>\n'
+            '<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n'
             f"<title>{_html_escape(safe_model.full_name)} - CV</title>\n"
             "</head>\n<body>\n" + html + "\n</body>\n</html>"
         )

@@ -26,21 +26,22 @@ logger = logging.getLogger(__name__)
 # FAST TEXT EXTRACTION (3x faster)
 # ============================================================================
 
+
 def extract_text_fast(file_content: bytes, filename: str) -> str:
     """
     Fast text extraction - optimized for speed.
     Extracts only text, skips formatting, images, tables.
     """
     try:
-        if filename.lower().endswith('.pdf'):
+        if filename.lower().endswith(".pdf"):
             return extract_pdf_text_fast(file_content)
-        elif filename.lower().endswith('.txt'):
-            return file_content.decode('utf-8', errors='ignore')[:50000]
-        elif filename.lower().endswith('.docx'):
+        elif filename.lower().endswith(".txt"):
+            return file_content.decode("utf-8", errors="ignore")[:50000]
+        elif filename.lower().endswith(".docx"):
             return extract_docx_text_fast(file_content)
         else:
             # Try as plain text
-            return file_content.decode('utf-8', errors='ignore')[:50000]
+            return file_content.decode("utf-8", errors="ignore")[:50000]
     except Exception as e:
         logger.warning(f"Text extraction failed for {filename}: {str(e)}")
         return ""
@@ -92,6 +93,7 @@ def extract_pdf_text_fast(file_content: bytes) -> str:
         # Fallback to existing method if pdfplumber not available
         try:
             from utils.cv_text import extract_pdf_text
+
             text, _ = extract_pdf_text(file_content)
             return text[:50000]
         except Exception:
@@ -119,7 +121,7 @@ def extract_docx_text_fast(file_content: bytes) -> str:
 
     except ImportError:
         # Fallback to plain text
-        return file_content.decode('utf-8', errors='ignore')[:50000]
+        return file_content.decode("utf-8", errors="ignore")[:50000]
     except Exception as e:
         logger.warning(f"DOCX extraction failed: {str(e)}")
         return ""
@@ -128,6 +130,7 @@ def extract_docx_text_fast(file_content: bytes) -> str:
 # ============================================================================
 # PARALLEL PROCESSING (6-8x faster)
 # ============================================================================
+
 
 async def process_cv_batch_parallel(
     files: List[Dict[str, Any]],
@@ -151,27 +154,18 @@ async def process_cv_batch_parallel(
     # Auto-detect workers if not specified
     if workers is None:
         import multiprocessing
+
         workers = min(multiprocessing.cpu_count(), 8)  # Max 8 workers
 
     # Split into worker batches
     batch_size = max(1, len(files) // workers)
-    batches = [
-        files[i:i + batch_size]
-        for i in range(0, len(files), batch_size)
-    ]
+    batches = [files[i : i + batch_size] for i in range(0, len(files), batch_size)]
 
     # Process in parallel
     loop = asyncio.get_event_loop()
     with ProcessPoolExecutor(max_workers=workers) as executor:
         tasks = [
-            loop.run_in_executor(
-                executor,
-                _process_batch_worker,
-                batch,
-                job_description,
-                job_id
-            )
-            for batch in batches
+            loop.run_in_executor(executor, _process_batch_worker, batch, job_description, job_id) for batch in batches
         ]
 
         try:
@@ -191,7 +185,7 @@ async def process_cv_batch_parallel(
             results = await process_cv_batch(files, job_description, job_id, save_to_db=False)
 
     # Sort by score
-    results.sort(key=lambda x: x.get('final_score', 0), reverse=True)
+    results.sort(key=lambda x: x.get("final_score", 0), reverse=True)
 
     # Optionally persist to DB (synchronous helper — run in threadpool to avoid blocking)
     if persist and org_id is not None and recruiter_id is not None:
@@ -217,16 +211,18 @@ def _process_batch_worker(batch: List[Dict], job_description: str, job_id: int) 
     for file_data in batch:
         try:
             # Fast text extraction
-            text = extract_text_fast(file_data['content'], file_data['filename'])
+            text = extract_text_fast(file_data["content"], file_data["filename"])
 
             if not text or len(text.strip()) < 50:
-                results.append({
-                    'filename': file_data['filename'],
-                    'status': 'error',
-                    'error': 'No readable text found',
-                    'final_score': 0,
-                    'ats_score': 0
-                })
+                results.append(
+                    {
+                        "filename": file_data["filename"],
+                        "status": "error",
+                        "error": "No readable text found",
+                        "final_score": 0,
+                        "ats_score": 0,
+                    }
+                )
                 continue
 
             # Process CV (same logic as original)
@@ -237,37 +233,41 @@ def _process_batch_worker(batch: List[Dict], job_description: str, job_id: int) 
                 structured_data = extract_structured_data(text)
 
                 # Calculate scores
-                final_score, ats_score, details = calculate_final_score(
-                    text, structured_data, job_description
+                final_score, ats_score, details = calculate_final_score(text, structured_data, job_description)
+
+                results.append(
+                    {
+                        "filename": file_data["filename"],
+                        "status": "success",
+                        "final_score": round(final_score, 2),
+                        "ats_score": round(ats_score, 2),
+                        "details": details,
+                        "extracted_skills": structured_data.get("skills", []),
+                        "experience_years": structured_data.get("experience_years", 0),
+                    }
                 )
 
-                results.append({
-                    'filename': file_data['filename'],
-                    'status': 'success',
-                    'final_score': round(final_score, 2),
-                    'ats_score': round(ats_score, 2),
-                    'details': details,
-                    'extracted_skills': structured_data.get('skills', []),
-                    'experience_years': structured_data.get('experience_years', 0)
-                })
-
             except Exception as e:
-                results.append({
-                    'filename': file_data['filename'],
-                    'status': 'error',
-                    'error': f'Processing failed: {str(e)}',
-                    'final_score': 0,
-                    'ats_score': 0
-                })
+                results.append(
+                    {
+                        "filename": file_data["filename"],
+                        "status": "error",
+                        "error": f"Processing failed: {str(e)}",
+                        "final_score": 0,
+                        "ats_score": 0,
+                    }
+                )
 
         except Exception as e:
-            results.append({
-                'filename': file_data['filename'],
-                'status': 'error',
-                'error': f'File processing failed: {str(e)}',
-                'final_score': 0,
-                'ats_score': 0
-            })
+            results.append(
+                {
+                    "filename": file_data["filename"],
+                    "status": "error",
+                    "error": f"File processing failed: {str(e)}",
+                    "final_score": 0,
+                    "ats_score": 0,
+                }
+            )
 
     return results
 
@@ -275,6 +275,7 @@ def _process_batch_worker(batch: List[Dict], job_description: str, job_id: int) 
 # ============================================================================
 # CACHING SYSTEM (3-5x faster for repeats)
 # ============================================================================
+
 
 class CVProcessingCache:
     """
@@ -312,12 +313,7 @@ class CVProcessingCache:
     async def cache_score(self, cv_hash: str, job_id: int, result: Dict[str, Any], ttl: int = 86400):
         """Cache processing result"""
         cache_key = self._get_cache_key(cv_hash, job_id)
-        value = json.dumps({
-            **result,
-            'cached_at': time.time(),
-            'cv_hash': cv_hash,
-            'job_id': job_id
-        })
+        value = json.dumps({**result, "cached_at": time.time(), "cv_hash": cv_hash, "job_id": job_id})
 
         # Save to Redis (persistent)
         if self.redis:
@@ -334,6 +330,7 @@ class CVProcessingCache:
 # Global cache instance (lazy loaded)
 _cache_instance = None
 
+
 def get_cv_cache():
     """Get global cache instance"""
     global _cache_instance
@@ -341,12 +338,9 @@ def get_cv_cache():
         # Try to connect to Redis
         try:
             import redis.asyncio as redis
+
             redis_client = redis.Redis(
-                host='localhost',
-                port=6379,
-                decode_responses=True,
-                socket_timeout=1,
-                socket_connect_timeout=1
+                host="localhost", port=6379, decode_responses=True, socket_timeout=1, socket_connect_timeout=1
             )
             _cache_instance = CVProcessingCache(redis_client)
         except Exception:
@@ -360,12 +354,9 @@ def get_cv_cache():
 # ULTRA-FAST PROCESSING (Combined optimizations)
 # ============================================================================
 
+
 async def process_cv_batch_ultra_fast(
-    files: List[Dict[str, Any]],
-    job_description: str,
-    job_id: int,
-    use_cache: bool = True,
-    workers: int = None
+    files: List[Dict[str, Any]], job_description: str, job_id: int, use_cache: bool = True, workers: int = None
 ) -> List[Dict[str, Any]]:
     """
     Ultra-fast CV processing with all optimizations:
@@ -388,31 +379,24 @@ async def process_cv_batch_ultra_fast(
         uncached_files = []
 
         for file_data in files:
-            cv_hash = hashlib.md5(file_data['content']).hexdigest()
+            cv_hash = hashlib.md5(file_data["content"], usedforsecurity=False).hexdigest()
             cached = await cache.get_cached_score(cv_hash, job_id)
 
             if cached:
-                cached_results.append({
-                    **cached,
-                    'source': 'cache',
-                    'cached': True
-                })
+                cached_results.append({**cached, "source": "cache", "cached": True})
             else:
                 uncached_files.append(file_data)
 
         # Process uncached files in parallel
         if uncached_files:
             processed_results = await process_cv_batch_parallel(
-                uncached_files,
-                job_description,
-                job_id,
-                workers=workers
+                uncached_files, job_description, job_id, workers=workers
             )
 
             # Cache new results
             for i, result in enumerate(processed_results):
-                if result['status'] == 'success':
-                    cv_hash = hashlib.md5(uncached_files[i]['content']).hexdigest()
+                if result["status"] == "success":
+                    cv_hash = hashlib.md5(uncached_files[i]["content"], usedforsecurity=False).hexdigest()
                     await cache.cache_score(cv_hash, job_id, result)
 
             all_results = cached_results + processed_results
@@ -421,23 +405,15 @@ async def process_cv_batch_ultra_fast(
 
     else:
         # No caching, just parallel processing
-        all_results = await process_cv_batch_parallel(
-            files,
-            job_description,
-            job_id,
-            workers=workers
-        )
+        all_results = await process_cv_batch_parallel(files, job_description, job_id, workers=workers)
 
     # Sort by score
-    all_results.sort(key=lambda x: x.get('final_score', 0), reverse=True)
+    all_results.sort(key=lambda x: x.get("final_score", 0), reverse=True)
     return all_results
 
 
 async def process_cv_batch(
-    files: List[UploadFile],
-    job_description: str,
-    job_id: int,
-    save_to_db: bool = False
+    files: List[UploadFile], job_description: str, job_id: int, save_to_db: bool = False
 ) -> List[Dict[str, Any]]:
     """
     Process a batch of CVs and return results without saving to database.
@@ -459,8 +435,9 @@ async def process_cv_batch(
             content = await file.read()
 
             # Extract text (same logic as batch upload)
-            if file.filename.lower().endswith('.pdf'):
+            if file.filename.lower().endswith(".pdf"):
                 from utils.cv_text import extract_pdf_text
+
                 text, _ = extract_pdf_text(content)
             else:
                 # Plain text or DOCX
@@ -471,53 +448,57 @@ async def process_cv_batch(
 
             # Validate text
             if not text or len(text.strip()) < 50:
-                results.append({
-                    "filename": file.filename,
-                    "status": "error",
-                    "error": "Insufficient text content",
-                    "final_score": 0,
-                    "ats_score": 0
-                })
+                results.append(
+                    {
+                        "filename": file.filename,
+                        "status": "error",
+                        "error": "Insufficient text content",
+                        "final_score": 0,
+                        "ats_score": 0,
+                    }
+                )
                 continue
 
             # Process CV through pipeline
             try:
                 # Use existing pipeline but don't save
-                pipeline_result = extract_structured(
-                    cv_text=text,
-                    job_description=job_description,
-                    lang="en"
+                pipeline_result = extract_structured(cv_text=text, job_description=job_description, lang="en")
+
+                results.append(
+                    {
+                        "filename": file.filename,
+                        "status": "success",
+                        "final_score": pipeline_result.get("final_score", 0),
+                        "ats_score": pipeline_result.get("ats_score", 0),
+                        "skills_match": pipeline_result.get("skills_match", []),
+                        "experience_match": pipeline_result.get("experience_match", 0),
+                        "education_match": pipeline_result.get("education_match", 0),
+                        "processed_at": pipeline_result.get("processed_at"),
+                        "job_id": job_id,
+                    }
                 )
 
-                results.append({
-                    "filename": file.filename,
-                    "status": "success",
-                    "final_score": pipeline_result.get("final_score", 0),
-                    "ats_score": pipeline_result.get("ats_score", 0),
-                    "skills_match": pipeline_result.get("skills_match", []),
-                    "experience_match": pipeline_result.get("experience_match", 0),
-                    "education_match": pipeline_result.get("education_match", 0),
-                    "processed_at": pipeline_result.get("processed_at"),
-                    "job_id": job_id
-                })
-
             except Exception as e:
-                results.append({
-                    "filename": file.filename,
-                    "status": "error",
-                    "error": f"Processing failed: {str(e)}",
-                    "final_score": 0,
-                    "ats_score": 0
-                })
+                results.append(
+                    {
+                        "filename": file.filename,
+                        "status": "error",
+                        "error": f"Processing failed: {str(e)}",
+                        "final_score": 0,
+                        "ats_score": 0,
+                    }
+                )
 
         except Exception as e:
-            results.append({
-                "filename": file.filename,
-                "status": "error",
-                "error": f"File read failed: {str(e)}",
-                "final_score": 0,
-                "ats_score": 0
-            })
+            results.append(
+                {
+                    "filename": file.filename,
+                    "status": "error",
+                    "error": f"File read failed: {str(e)}",
+                    "final_score": 0,
+                    "ats_score": 0,
+                }
+            )
 
     # Sort by final_score descending
     results.sort(key=lambda x: x.get("final_score", 0), reverse=True)
@@ -543,7 +524,7 @@ async def validate_cv_files(files: List[UploadFile]) -> List[str]:
             errors.append(f"Unsupported format: {file.filename}")
 
         # Check file size (5MB max)
-        if hasattr(file, 'size') and file.size > 5_000_000:
+        if hasattr(file, "size") and file.size > 5_000_000:
             errors.append(f"File too large: {file.filename}")
 
     return errors
@@ -574,7 +555,7 @@ async def _save_and_validate_zip(zip_file: UploadFile) -> str:
                     break
                 total_bytes += len(chunk)
                 if total_bytes > MAX_ZIP_UPLOAD_SIZE:
-                    raise ValueError(f"ZIP archive size exceeds limit of {MAX_ZIP_UPLOAD_SIZE // (1024*1024)}MB")
+                    raise ValueError(f"ZIP archive size exceeds limit of {MAX_ZIP_UPLOAD_SIZE // (1024 * 1024)}MB")
                 f.write(chunk)
                 if not is_streaming:
                     break
@@ -600,11 +581,11 @@ async def extract_linkedin_zip(zip_file: UploadFile) -> List[Dict[str, Any]]:
     temp_path = await _save_and_validate_zip(zip_file)
 
     try:
-        with zipfile.ZipFile(temp_path, 'r') as zip_ref:
+        with zipfile.ZipFile(temp_path, "r") as zip_ref:
             for file_info in zip_ref.filelist:
                 # Only process CV files
                 filename = file_info.filename.lower()
-                if not any(filename.endswith(ext) for ext in ['.pdf', '.txt', '.docx']):
+                if not any(filename.endswith(ext) for ext in [".pdf", ".txt", ".docx"]):
                     continue
 
                 # Skip directories
@@ -616,11 +597,7 @@ async def extract_linkedin_zip(zip_file: UploadFile) -> List[Dict[str, Any]]:
                     content = f.read()
 
                 # Create file-like object
-                file_obj = {
-                    'filename': file_info.filename,
-                    'content': content,
-                    'size': len(content)
-                }
+                file_obj = {"filename": file_info.filename, "content": content, "size": len(content)}
 
                 extracted_files.append(file_obj)
 
@@ -639,11 +616,7 @@ async def extract_linkedin_zip(zip_file: UploadFile) -> List[Dict[str, Any]]:
     return extracted_files
 
 
-async def process_linkedin_export(
-    zip_file: UploadFile,
-    job_description: str,
-    job_id: int
-) -> List[Dict[str, Any]]:
+async def process_linkedin_export(zip_file: UploadFile, job_description: str, job_id: int) -> List[Dict[str, Any]]:
     """
     Process LinkedIn export ZIP containing multiple CVs.
     Extracts CVs from ZIP and processes them in batch.
@@ -655,8 +628,8 @@ async def process_linkedin_export(
     cv_files = []
     for file_data in extracted_files:
         # Create a file-like object
-        file_like = io.BytesIO(file_data['content'])
-        file_like.filename = file_data['filename']
+        file_like = io.BytesIO(file_data["content"])
+        file_like.filename = file_data["filename"]
 
         cv_files.append(file_like)
 
@@ -668,23 +641,23 @@ async def process_linkedin_export(
 # LARGE-SCALE PROCESSING (5000+ CVs)
 # ============================================================================
 
+
 def chunk_list(items: List[Any], chunk_size: int = 200) -> AsyncGenerator[List[Any], None]:
     """
     Generator to chunk items into smaller batches.
     Default: 200 CVs per batch (manageable memory footprint)
     """
     for i in range(0, len(items), chunk_size):
-        yield items[i:i + chunk_size]
+        yield items[i : i + chunk_size]
 
 
 async def extract_linkedin_zip_streaming(
-    zip_file: UploadFile,
-    chunk_size: int = 200
+    zip_file: UploadFile, chunk_size: int = 200
 ) -> AsyncGenerator[List[Dict[str, Any]], None]:
     """
     Stream-extract ZIP files in chunks without loading everything to memory.
     Yields chunks of file data instead of loading all at once.
-    
+
     Memory efficient for 1000+ CVs.
     """
     temp_path = await _save_and_validate_zip(zip_file)
@@ -693,11 +666,11 @@ async def extract_linkedin_zip_streaming(
         chunk_bytes = 0
         max_chunk_bytes = 500_000_000  # 500MB per chunk
 
-        with zipfile.ZipFile(temp_path, 'r') as zip_ref:
+        with zipfile.ZipFile(temp_path, "r") as zip_ref:
             for file_info in zip_ref.filelist:
                 # Only process CV files
                 filename = file_info.filename.lower()
-                if not any(filename.endswith(ext) for ext in ['.pdf', '.txt', '.docx']):
+                if not any(filename.endswith(ext) for ext in [".pdf", ".txt", ".docx"]):
                     continue
 
                 if file_info.is_dir():
@@ -707,11 +680,7 @@ async def extract_linkedin_zip_streaming(
                     with zip_ref.open(file_info.filename) as f:
                         content = f.read()
 
-                    file_obj = {
-                        'filename': file_info.filename,
-                        'content': content,
-                        'size': len(content)
-                    }
+                    file_obj = {"filename": file_info.filename, "content": content, "size": len(content)}
 
                     chunk.append(file_obj)
                     chunk_bytes += len(content)
@@ -741,25 +710,21 @@ async def extract_linkedin_zip_streaming(
 
 
 async def process_cv_batch_chunked(
-    zip_file: UploadFile,
-    job_description: str,
-    job_id: int,
-    chunk_size: int = 200,
-    progress_callback=None
+    zip_file: UploadFile, job_description: str, job_id: int, chunk_size: int = 200, progress_callback=None
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
     Process large CV batches in chunks (handles 5000+ CVs).
-    
+
     Yields control back to caller periodically to prevent timeouts.
     Tracks progress through callback.
-    
+
     Args:
         zip_file: LinkedIn export ZIP
         job_description: Job description for matching
         job_id: Job ID
         chunk_size: CVs per batch (default 200)
         progress_callback: Function to track progress
-        
+
     Returns:
         (all_results, summary_stats)
     """
@@ -773,27 +738,22 @@ async def process_cv_batch_chunked(
         chunk_num = 0
         async for file_chunk in extract_linkedin_zip_streaming(zip_file, chunk_size):
             chunk_num += 1
-            
+
             # Convert chunk to file-like objects
             cv_files = []
             for file_data in file_chunk:
-                file_like = io.BytesIO(file_data['content'])
-                file_like.filename = file_data['filename']
+                file_like = io.BytesIO(file_data["content"])
+                file_like.filename = file_data["filename"]
                 cv_files.append(file_like)
 
             # Process chunk
             try:
-                chunk_results = await process_cv_batch(
-                    cv_files,
-                    job_description,
-                    job_id,
-                    save_to_db=False
-                )
+                chunk_results = await process_cv_batch(cv_files, job_description, job_id, save_to_db=False)
 
                 all_results.extend(chunk_results)
-                successful = len([r for r in chunk_results if r.get('status') != 'error'])
+                successful = len([r for r in chunk_results if r.get("status") != "error"])
                 total_processed += successful
-                total_errors += len([r for r in chunk_results if r.get('status') == 'error'])
+                total_errors += len([r for r in chunk_results if r.get("status") == "error"])
 
             except Exception as e:
                 logger.error(f"Chunk {chunk_num} processing failed: {str(e)}")
@@ -801,27 +761,31 @@ async def process_cv_batch_chunked(
 
             # Progress tracking
             if progress_callback:
-                await progress_callback({
-                    'session_id': session_id,
-                    'chunk': chunk_num,
-                    'processed': total_processed,
-                    'errors': total_errors,
-                    'status': 'processing'
-                })
+                await progress_callback(
+                    {
+                        "session_id": session_id,
+                        "chunk": chunk_num,
+                        "processed": total_processed,
+                        "errors": total_errors,
+                        "status": "processing",
+                    }
+                )
 
             # Small delay to prevent CPU saturation
             await asyncio.sleep(0.1)
 
         # Sort final results by score
-        all_results.sort(key=lambda x: x.get('final_score', 0), reverse=True)
+        all_results.sort(key=lambda x: x.get("final_score", 0), reverse=True)
 
         summary = {
-            'session_id': session_id,
-            'total_processed': total_processed,
-            'total_errors': total_errors,
-            'success_rate': (total_processed / (total_processed + total_errors) * 100) if (total_processed + total_errors) > 0 else 0,
-            'chunks_processed': chunk_num,
-            'status': 'completed'
+            "session_id": session_id,
+            "total_processed": total_processed,
+            "total_errors": total_errors,
+            "success_rate": (total_processed / (total_processed + total_errors) * 100)
+            if (total_processed + total_errors) > 0
+            else 0,
+            "chunks_processed": chunk_num,
+            "status": "completed",
         }
 
         return all_results, summary
@@ -835,6 +799,7 @@ async def process_cv_batch_chunked(
 # BACKGROUND PROCESSING (Celery Tasks)
 # ============================================================================
 
+
 def create_celery_task(batch_id: str, cv_count: int, job_id: int) -> Dict[str, Any]:
     """
     Create background Celery task for massive batch processing.
@@ -842,19 +807,19 @@ def create_celery_task(batch_id: str, cv_count: int, job_id: int) -> Dict[str, A
     """
     try:
         from celery_app import celery_app
-        
+
         task = celery_app.send_task(
-            'tasks.process_cv_batch_async',
+            "tasks.process_cv_batch_async",
             args=[batch_id, cv_count, job_id],
             countdown=0,
-            expires=86400  # 24 hour expiry
+            expires=86400,  # 24 hour expiry
         )
-        
+
         return {
-            'task_id': task.id,
-            'batch_id': batch_id,
-            'status': 'queued',
-            'estimated_duration': cv_count * 0.5  # ~0.5s per CV
+            "task_id": task.id,
+            "batch_id": batch_id,
+            "status": "queued",
+            "estimated_duration": cv_count * 0.5,  # ~0.5s per CV
         }
     except Exception as e:
         logger.error(f"Failed to create Celery task: {str(e)}")
@@ -867,13 +832,14 @@ async def get_processing_status(session_id: str) -> Dict[str, Any]:
     """
     try:
         import redis
-        r = redis.Redis(host='localhost', port=6379, decode_responses=True)
-        
+
+        r = redis.Redis(host="localhost", port=6379, decode_responses=True)
+
         status = r.get(f"processing:{session_id}")
         if status:
             return json.loads(status)
-        
-        return {'status': 'not_found', 'session_id': session_id}
+
+        return {"status": "not_found", "session_id": session_id}
     except Exception as e:
         logger.warning(f"Redis status check failed: {str(e)}")
-        return {'status': 'unknown', 'error': str(e)}
+        return {"status": "unknown", "error": str(e)}

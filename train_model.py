@@ -154,8 +154,11 @@ def generate_cv_sample(profile: str, rng: np.random.Generator):
 
     # Layout presence (correlated with profile quality)
     p_section = {
-        "good": 0.92, "medium": 0.7, "bad": 0.4,
-        "student": 0.65, "senior": 0.95,
+        "good": 0.92,
+        "medium": 0.7,
+        "bad": 0.4,
+        "student": 0.65,
+        "senior": 0.95,
     }[profile]
     has_summary = int(rng.random() < p_section)
     has_skills = int(rng.random() < p_section * 1.05)
@@ -251,7 +254,7 @@ def generate_cv_sample(profile: str, rng: np.random.Generator):
         + keyword_density * 0.02
         + education_quality * 0.03
         + (semantic * skill / 300)  # non-linear interaction
-        + rng.normal(0, 2.5)       # realistic noise
+        + rng.normal(0, 2.5)  # realistic noise
     )
     target = _clamp(target)
 
@@ -259,15 +262,22 @@ def generate_cv_sample(profile: str, rng: np.random.Generator):
 
 
 def generate_dataset(
-    n_good=1000, n_medium=1000, n_bad=1000,
-    n_student=500, n_senior=500, seed=42,
+    n_good=1000,
+    n_medium=1000,
+    n_bad=1000,
+    n_student=500,
+    n_senior=500,
+    seed=42,
 ):
     rng = np.random.default_rng(seed)
     X, y = [], []
 
     for profile, count in [
-        ("good", n_good), ("medium", n_medium), ("bad", n_bad),
-        ("student", n_student), ("senior", n_senior),
+        ("good", n_good),
+        ("medium", n_medium),
+        ("bad", n_bad),
+        ("student", n_student),
+        ("senior", n_senior),
     ]:
         for _ in range(count):
             feats, target = generate_cv_sample(profile, rng)
@@ -296,9 +306,7 @@ def load_dataset_from_csv(path, hire_threshold=65):
     df = pd.read_csv(path)
     missing = [f for f in FEATURE_NAMES if f not in df.columns]
     if missing:
-        raise ValueError(
-            f"Missing required feature columns in CSV: {', '.join(missing)}"
-        )
+        raise ValueError(f"Missing required feature columns in CSV: {', '.join(missing)}")
 
     X = df[FEATURE_NAMES].astype(float).to_numpy(dtype=np.float32)
     y = None
@@ -344,9 +352,7 @@ def validate_dataset(
             )
         unique, counts = np.unique(hire_labels, return_counts=True)
         if len(unique) < 2:
-            raise ValueError(
-                "CSV dataset must contain both hire=0 and hire=1 examples for classifier training."
-            )
+            raise ValueError("CSV dataset must contain both hire=0 and hire=1 examples for classifier training.")
         if counts.min() < min_class_count:
             warnings.warn(
                 f"Class imbalance detected in CSV dataset: {dict(zip(unique.tolist(), counts.tolist()))}. "
@@ -356,8 +362,7 @@ def validate_dataset(
     else:
         if sample_count < min_samples:
             warnings.warn(
-                f"Synthetic dataset is small ({sample_count} samples). "
-                "Use more samples for stable model evaluation.",
+                f"Synthetic dataset is small ({sample_count} samples). Use more samples for stable model evaluation.",
                 UserWarning,
             )
 
@@ -379,10 +384,9 @@ def build_dataset(data_csv=None, hire_threshold=65):
 
 # ── Training ─────────────────────────────────────────────────────────────
 
+
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Train or validate the CV ATS score and hire models."
-    )
+    parser = argparse.ArgumentParser(description="Train or validate the CV ATS score and hire models.")
     parser.add_argument(
         "--data-csv",
         help="Optional CSV dataset path. Must contain the feature columns and either score or hire labels.",
@@ -431,9 +435,7 @@ def main():
 
     X, y, hire_labels = build_dataset(args.data_csv, args.hire_threshold)
     if hire_labels is None:
-        raise ValueError(
-            "Dataset must include a 'hire' column or score to derive hire labels."
-        )
+        raise ValueError("Dataset must include a 'hire' column or score to derive hire labels.")
 
     dataset_source = args.data_csv or "synthetic"
     print(f"Dataset:  {dataset_source}")
@@ -523,7 +525,9 @@ def main():
                 subsample=0.8,
                 colsample_bytree=0.8,
                 random_state=42,
-            ) if USE_XGBOOST else score_model,
+            )
+            if USE_XGBOOST
+            else score_model,
             X,
             y,
             cv=5,
@@ -580,25 +584,25 @@ def main():
         print("  ROC AUC:   n/a (only one class present in test labels)")
 
     if len(np.unique(hire_test)) == 1:
-        print(classification_report(
-            hire_test,
-            hire_pred,
-            labels=[0, 1],
-            target_names=["Reject", "Hire"],
-            zero_division=0,
-        ))
+        print(
+            classification_report(
+                hire_test,
+                hire_pred,
+                labels=[0, 1],
+                target_names=["Reject", "Hire"],
+                zero_division=0,
+            )
+        )
     else:
         print(classification_report(hire_test, hire_pred, target_names=["Reject", "Hire"]))
 
     if score_model is not None:
         importances = (
-            score_model.feature_importances_
-            if hasattr(score_model, "feature_importances_")
-            else np.zeros(N_FEATURES)
+            score_model.feature_importances_ if hasattr(score_model, "feature_importances_") else np.zeros(N_FEATURES)
         )
-        imp_df = pd.DataFrame(
-            {"feature": FEATURE_NAMES, "importance": importances}
-        ).sort_values(by="importance", ascending=False)
+        imp_df = pd.DataFrame({"feature": FEATURE_NAMES, "importance": importances}).sort_values(
+            by="importance", ascending=False
+        )
 
         print("=== Feature Importance (Score Model) ===")
         print(imp_df.to_string(index=False))

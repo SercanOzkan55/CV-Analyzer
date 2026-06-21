@@ -7,6 +7,7 @@ This tool is for local debugging: it loads each CV, extracts skills using
 `services.skill_service`, computes coverage against a provided job
 description, and prints structured output. It does not modify project state.
 """
+
 import argparse
 import json
 import os

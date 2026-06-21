@@ -10,7 +10,18 @@ import json
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    Query,
+    Request,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+    HTTPException,
+)
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -50,6 +61,7 @@ CANDIDATE_EXPORT_FIELDS = ["name", "email", "phone", "created_at"]
 # FEATURE 5: BULK EMAIL SEND
 # ════════════════════════════════════════════════════════════════════════════
 
+
 class BulkEmailRequest(BaseModel):
     template_id: int
     candidate_emails: list[str]  # List of email addresses
@@ -80,61 +92,49 @@ def recruiter_send_email_bulk(
 ) -> BulkEmailResponse:
     """
     Send email to multiple candidates at once.
-    
+
     **Parameters:**
     - `template_id`: Email template to use
     - `candidate_emails`: List of email addresses (max 100)
     - `job_id`: Optional job ID for context
     - `sender_email`: Optional sender email (defaults to recruiter email)
-    
+
     **Returns:**
     - Summary of sent emails with success/failure details for each recipient
-    
+
     **Raises:**
     - 400: Invalid request (too many emails, invalid template, empty list)
     - 404: Template not found
     """
     org_id = recruiter.organization_id
     if not org_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Recruiter profile is incomplete (no organization assigned)"
-        )
-    
+        raise HTTPException(status_code=400, detail="Recruiter profile is incomplete (no organization assigned)")
+
     # Validate emails list
     if not body.candidate_emails:
-        raise HTTPException(
-            status_code=400,
-            detail="At least one email address required"
-        )
-    
+        raise HTTPException(status_code=400, detail="At least one email address required")
+
     if len(body.candidate_emails) > 100:
-        raise HTTPException(
-            status_code=400,
-            detail="Maximum 100 email addresses per request"
-        )
-    
+        raise HTTPException(status_code=400, detail="Maximum 100 email addresses per request")
+
     # Validate template exists
     tpl = _rc_get_tpl(db, body.template_id, org_id)
     if not tpl:
-        raise HTTPException(
-            status_code=404,
-            detail="Email template not found or you do not have permission to use it"
-        )
-    
+        raise HTTPException(status_code=404, detail="Email template not found or you do not have permission to use it")
+
     # Send to each recipient
     results = []
     successful = 0
     failed = 0
     sender = body.sender_email or recruiter.email or ""
-    
+
     _log_event(
         "recruiter.bulk_email_start",
         org_id=org_id,
         template_id=body.template_id,
-        recipient_count=len(body.candidate_emails)
+        recipient_count=len(body.candidate_emails),
     )
-    
+
     for email in body.candidate_emails:
         try:
             # Validate email format
@@ -144,7 +144,7 @@ def recruiter_send_email_bulk(
                 failed += 1
                 logger.warning("bulk_email: invalid_email email=%s error=%s", email, err)
                 continue
-            
+
             # Render template with email variable
             try:
                 rendered = _rc_render(tpl.body, tpl.subject, {"email": email})
@@ -153,16 +153,13 @@ def recruiter_send_email_bulk(
                 failed += 1
                 logger.error("bulk_email: render_failed email=%s error=%s", email, e)
                 continue
-            
+
             # Send email
             try:
                 _send_ok = _do_send_email(
-                    to_email=email,
-                    subject=rendered["subject"],
-                    body=rendered["body"],
-                    recruiter_email=sender
+                    to_email=email, subject=rendered["subject"], body=rendered["body"], recruiter_email=sender
                 )
-                
+
                 if _send_ok:
                     results.append(BulkEmailResult(email=email, status="success"))
                     successful += 1
@@ -176,36 +173,35 @@ def recruiter_send_email_bulk(
                 results.append(BulkEmailResult(email=email, status="failed", error=f"Send error: {str(e)}"))
                 failed += 1
                 logger.error("bulk_email: send_failed email=%s error=%s", email, e)
-        
+
         except Exception as e:
             results.append(BulkEmailResult(email=email, status="failed", error=str(e)))
             failed += 1
             logger.error("bulk_email: unexpected_error email=%s error=%s", email, e)
-    
+
     _log_event(
         "recruiter.bulk_email_completed",
         org_id=org_id,
         total=len(body.candidate_emails),
         successful=successful,
-        failed=failed
+        failed=failed,
     )
-    
+
     logger.info(
         "bulk_email: completed total=%d successful=%d failed=%d org_id=%s",
-        len(body.candidate_emails), successful, failed, org_id
+        len(body.candidate_emails),
+        successful,
+        failed,
+        org_id,
     )
-    
-    return BulkEmailResponse(
-        total=len(body.candidate_emails),
-        successful=successful,
-        failed=failed,
-        results=results
-    )
+
+    return BulkEmailResponse(total=len(body.candidate_emails), successful=successful, failed=failed, results=results)
 
 
 # ════════════════════════════════════════════════════════════════════════════
 # FEATURE 6: EXPORT FEATURES (CSV/JSON)
 # ════════════════════════════════════════════════════════════════════════════
+
 
 @_get_limiter().limit("60/minute")
 @router.get("/export/rankings")
@@ -218,34 +214,28 @@ def recruiter_export_rankings(
 ):
     """
     Export ranked candidates as CSV or JSON.
-    
+
     **Parameters:**
     - `job_id`: ID of the job to export rankings for
     - `format`: Export format - "csv" or "json"
-    
+
     **Returns:**
     - File stream (CSV or JSON format)
-    
+
     **Raises:**
     - 404: Job not found or no candidates ranked for this job
     """
     org_id = recruiter.organization_id
     if not org_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Recruiter profile is incomplete (no organization assigned)"
-        )
-    
+        raise HTTPException(status_code=400, detail="Recruiter profile is incomplete (no organization assigned)")
+
     # Get ranked candidates (actions) for this job
     try:
         actions = _rc_get_actions(db, job_id, org_id)
     except Exception as e:
         logger.error("export_rankings: get_actions_failed job_id=%d org_id=%s error=%s", job_id, org_id, e)
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to retrieve rankings"
-        )
-    
+        raise HTTPException(status_code=500, detail="Failed to retrieve rankings")
+
     # Prepare data
     data = [
         {
@@ -258,30 +248,30 @@ def recruiter_export_rankings(
         }
         for a in actions
     ]
-    
+
     if format == "csv":
         # Generate CSV
         output = io.StringIO()
         writer = csv.DictWriter(output, fieldnames=RANKING_EXPORT_FIELDS)
         writer.writeheader()
         writer.writerows(data)
-        
+
         _log_event("recruiter.export_rankings", org_id=org_id, job_id=job_id, format="csv", count=len(data))
         logger.info("export_rankings: csv exported job_id=%d count=%d", job_id, len(data))
-        
+
         return StreamingResponse(
             iter([output.getvalue()]),
             media_type="text/csv",
-            headers={"Content-Disposition": f"attachment; filename=rankings_job_{job_id}.csv"}
+            headers={"Content-Disposition": f"attachment; filename=rankings_job_{job_id}.csv"},
         )
     else:  # JSON
         _log_event("recruiter.export_rankings", org_id=org_id, job_id=job_id, format="json", count=len(data))
         logger.info("export_rankings: json exported job_id=%d count=%d", job_id, len(data))
-        
+
         return StreamingResponse(
             iter([json.dumps(data, indent=2, default=str)]),
             media_type="application/json",
-            headers={"Content-Disposition": f"attachment; filename=rankings_job_{job_id}.json"}
+            headers={"Content-Disposition": f"attachment; filename=rankings_job_{job_id}.json"},
         )
 
 
@@ -295,32 +285,24 @@ def recruiter_export_candidates(
 ):
     """
     Export all candidates from recruiter's organization.
-    
+
     **Parameters:**
     - `format`: Export format - "csv" or "json"
-    
+
     **Returns:**
     - File stream (CSV or JSON format) with all candidates
     """
     org_id = recruiter.organization_id
     if not org_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Recruiter profile is incomplete (no organization assigned)"
-        )
-    
+        raise HTTPException(status_code=400, detail="Recruiter profile is incomplete (no organization assigned)")
+
     # Get all candidates for this organization
     try:
-        candidates = db.query(Candidate).filter(
-            Candidate.organization_id == org_id
-        ).all()
+        candidates = db.query(Candidate).filter(Candidate.organization_id == org_id).all()
     except Exception as e:
         logger.error("export_candidates: query_failed org_id=%s error=%s", org_id, e)
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to retrieve candidates"
-        )
-    
+        raise HTTPException(status_code=500, detail="Failed to retrieve candidates")
+
     # Prepare data
     data = [
         {
@@ -331,26 +313,26 @@ def recruiter_export_candidates(
         }
         for c in candidates
     ]
-    
+
     if format == "csv":
         # Generate CSV
         output = io.StringIO()
         writer = csv.DictWriter(output, fieldnames=CANDIDATE_EXPORT_FIELDS)
         writer.writeheader()
         writer.writerows(data)
-        
+
         _log_event("recruiter.export_candidates", org_id=org_id, format="csv", count=len(data))
         logger.info("export_candidates: csv exported org_id=%s count=%d", org_id, len(data))
-        
+
         return StreamingResponse(
             iter([output.getvalue()]),
             media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=candidates.csv"}
+            headers={"Content-Disposition": "attachment; filename=candidates.csv"},
         )
     else:  # JSON
         _log_event("recruiter.export_candidates", org_id=org_id, format="json", count=len(data))
         logger.info("export_candidates: json exported org_id=%s count=%d", org_id, len(data))
-        
+
         return data
 
 
@@ -358,15 +340,16 @@ def recruiter_export_candidates(
 # FEATURE 13: PROGRESS TRACKING - WebSocket for batch upload
 # ════════════════════════════════════════════════════════════════════════════
 
+
 @router.websocket("/ws/batch-upload/{task_id}")
 async def websocket_batch_upload_progress(websocket: WebSocket, task_id: str):
     """
     WebSocket endpoint for real-time batch upload progress tracking.
-    
+
     **Usage:**
     - Connect to ws://localhost:8001/api/v1/recruiter/ws/batch-upload/{task_id}
     - Receive JSON progress updates every second
-    
+
     **Response format:**
     ```json
     {
@@ -378,7 +361,7 @@ async def websocket_batch_upload_progress(websocket: WebSocket, task_id: str):
         "error": null
     }
     ```
-    
+
     **Connection closes when:**
     - Task completes (SUCCESS or FAILURE)
     - Client disconnects
@@ -399,11 +382,7 @@ async def websocket_batch_upload_progress(websocket: WebSocket, task_id: str):
 
         db_user = db.query(User).filter(User.supabase_id == user_payload.get("user_id")).first()
         owner = _get_batch_task_owner(task_id)
-        if (
-            not db_user
-            or not owner
-            or int(owner.get("organization_id") or 0) != int(db_user.organization_id or 0)
-        ):
+        if not db_user or not owner or int(owner.get("organization_id") or 0) != int(db_user.organization_id or 0):
             await websocket.close(code=1008)
             return
     finally:
@@ -411,63 +390,68 @@ async def websocket_batch_upload_progress(websocket: WebSocket, task_id: str):
 
     await websocket.accept()
     logger.info("websocket: batch_upload progress connected task_id=%s", task_id)
-    
+
     try:
         # Import here to avoid circular dependencies
         from services.tasks import batch_recruiter_task
-        
+
         max_iterations = 3600  # Max 1 hour of polling
         iteration = 0
-        
+
         while iteration < max_iterations:
             iteration += 1
-            
+
             try:
                 # Get task status from Celery
                 task = batch_recruiter_task.AsyncResult(task_id)
-                
+
                 progress = {
                     "status": task.state,  # PENDING, PROGRESS, SUCCESS, FAILURE
                     "processed": 0,
                     "total": 0,
                     "percent": 0.0,
                     "current_file": None,
-                    "error": None
+                    "error": None,
                 }
-                
+
                 # Extract progress from task result
                 if task.result:
                     if isinstance(task.result, dict):
                         progress["processed"] = task.result.get("processed", 0)
                         progress["total"] = task.result.get("total", 0)
                         progress["current_file"] = task.result.get("current_file")
-                        
+
                         if progress["total"] > 0:
                             progress["percent"] = (progress["processed"] / progress["total"]) * 100
-                
+
                 # Include error if task failed
                 if task.state == "FAILURE":
                     progress["error"] = str(task.info)
                     logger.warning("websocket: batch_upload failed task_id=%s error=%s", task_id, task.info)
-                
+
                 # Send progress to client
                 await websocket.send_json(progress)
-                logger.debug("websocket: progress sent task_id=%s status=%s progress=%d/%d", 
-                           task_id, task.state, progress["processed"], progress["total"])
-                
+                logger.debug(
+                    "websocket: progress sent task_id=%s status=%s progress=%d/%d",
+                    task_id,
+                    task.state,
+                    progress["processed"],
+                    progress["total"],
+                )
+
                 # Stop when task completes
                 if task.state in ["SUCCESS", "FAILURE"]:
                     logger.info("websocket: batch_upload completed task_id=%s status=%s", task_id, task.state)
                     break
-                
+
                 # Check every 1 second
                 await asyncio.sleep(1)
-                
+
             except Exception as e:
                 logger.error("websocket: error polling task task_id=%s error=%s", task_id, e)
                 await websocket.send_json({"error": f"Polling error: {str(e)}"})
                 break
-    
+
     except WebSocketDisconnect:
         logger.info("websocket: client disconnected task_id=%s", task_id)
     except Exception as e:

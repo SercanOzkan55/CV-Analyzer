@@ -32,8 +32,6 @@ _MAX_LINES = 1_000 if _SAFE_MODE else 2_000
 _MAX_TOTAL_WORDS = 25_000 if _SAFE_MODE else 50_000
 
 
-
-
 def _get_autofix_helpers():
     """Lazy import to avoid circular dependency with cv_autofix_service."""
     from services.cv_autofix_service import (
@@ -46,6 +44,7 @@ def _get_autofix_helpers():
         _normalize_skill_lines,
         _normalize_language_lines,
     )
+
     return (
         _extract_contact_block,
         _parse_experience_entries,
@@ -58,7 +57,9 @@ def _get_autofix_helpers():
     )
 
 
-def _sections_from_classifier(text: str) -> tuple[List[str], Dict[str, List[str]], List[str], Dict[str, str], Dict[str, str]]:
+def _sections_from_classifier(
+    text: str,
+) -> tuple[List[str], Dict[str, List[str]], List[str], Dict[str, str], Dict[str, str]]:
     """Build section buckets using the new pipeline:
 
     layout_analyzer → section_classifier → section_resolver
@@ -69,16 +70,31 @@ def _sections_from_classifier(text: str) -> tuple[List[str], Dict[str, List[str]
     # ── Step 1: Layout analysis (multi-column detection + structural metadata) ──
     layout_info = analyze_layout(text)
     text = layout_info.linearized_text  # guaranteed single-column
-    logger.debug("layout_type=%s  lines=%d  header_style=%s",
-                 layout_info.layout_type, layout_info.line_count,
-                 layout_info.header_style)
+    logger.debug(
+        "layout_type=%s  lines=%d  header_style=%s",
+        layout_info.layout_type,
+        layout_info.line_count,
+        layout_info.header_style,
+    )
 
     # ── Step 2: Section classification (receives layout_type) ──
     detected, section_titles, section_sources = get_parser()(text, layout_type=layout_info.layout_type)
 
     # Remap any non-canonical keys from classifier into known buckets
-    _KNOWN = {"summary", "experience", "education", "skills", "projects",
-              "certifications", "languages", "interests", "contact", "header", "noise", "misc"}
+    _KNOWN = {
+        "summary",
+        "experience",
+        "education",
+        "skills",
+        "projects",
+        "certifications",
+        "languages",
+        "interests",
+        "contact",
+        "header",
+        "noise",
+        "misc",
+    }
     remapped: Dict[str, List[str]] = {}
     for k, v in detected.items():
         canonical = canonicalize_section_key(k)
@@ -136,10 +152,7 @@ def _sections_from_classifier(text: str) -> tuple[List[str], Dict[str, List[str]
             for key in list(sections.keys()):
                 if key == "contact":
                     continue
-                sections[key] = [
-                    line for line in sections.get(key, [])
-                    if line.strip().lower() not in leading_set
-                ]
+                sections[key] = [line for line in sections.get(key, []) if line.strip().lower() not in leading_set]
 
     # Enforce canonical section order regardless of PDF layout
     _SECTION_ORDER = [
@@ -181,14 +194,14 @@ def _sections_from_classifier(text: str) -> tuple[List[str], Dict[str, List[str]
             dropped_sections.append(line)
 
     # ── Clean noise tokens from every section ──
-    _NOISE_CHARS = set(' \t|–—-:,;/*\\•*"\'`')
+    _NOISE_CHARS = set(" \t|–—-:,;/*\\•*\"'`")
     for _sec_key in list(sections.keys()):
         _sec_lines = sections.get(_sec_key, [])
         if _sec_lines:
             sections[_sec_key] = [
-                l for l in _sec_lines
-                if l.strip() and l.strip() not in _NOISE_TOKENS
-                and not all(ch in _NOISE_CHARS for ch in l.strip())
+                l
+                for l in _sec_lines
+                if l.strip() and l.strip() not in _NOISE_TOKENS and not all(ch in _NOISE_CHARS for ch in l.strip())
             ]
 
     # ── Step 3: Section resolution (fix cross-section misclassifications) ──
@@ -201,6 +214,7 @@ def _sections_from_classifier(text: str) -> tuple[List[str], Dict[str, List[str]
     logger.debug("sections_after_resolver=%s", sections_after)
 
     return header_lines, sections, dropped_sections, section_titles, section_sources
+
 
 EXTRACT_PROMPT = """
 Extract CV data.
@@ -265,6 +279,7 @@ _MERGE_EDUCATION_START_RE = re.compile(
     re.I,
 )
 
+
 def _is_fullname(line: str) -> bool:
     words = line.strip().split()
     if not (2 <= len(words) <= 4):
@@ -278,6 +293,7 @@ def _is_fullname(line: str) -> bool:
     if all(len(w) >= 2 and w[0].isupper() and w[1:].islower() for w in words):
         return True
     return False
+
 
 def _is_colon_label(line: str) -> bool:
     if ":" not in line:
@@ -319,12 +335,14 @@ def _merge_wrapped_lines(text: str) -> str:
             if buffer:
                 merged.append(buffer)
                 buffer = ""
-            merged.append("")          # ← preserve blank line as section separator
+            merged.append("")  # ← preserve blank line as section separator
             last_was_header = False
             continue
 
         # Bullet lines are never merged
-        if _BULLET_RE.match(line) or line.startswith(("-", "\u2022", "*", "\u2023", "\u2013 ", "\u2014 ", "\u25aa", "\u25a0")):
+        if _BULLET_RE.match(line) or line.startswith(
+            ("-", "\u2022", "*", "\u2023", "\u2013 ", "\u2014 ", "\u25aa", "\u25a0")
+        ):
             if buffer:
                 merged.append(buffer)
                 buffer = ""
@@ -332,11 +350,7 @@ def _merge_wrapped_lines(text: str) -> str:
             continue
 
         # Section headers (all caps, short, no email/url/digits) are never merged
-        if (
-            line.isupper()
-            and len(line.split()) <= 5
-            and not re.search(r"@|https?://|\.\.com|\.io|\d{3,}", line, re.I)
-        ):
+        if line.isupper() and len(line.split()) <= 5 and not re.search(r"@|https?://|\.\.com|\.io|\d{3,}", line, re.I):
             if buffer:
                 merged.append(buffer)
                 buffer = ""
@@ -347,6 +361,7 @@ def _merge_wrapped_lines(text: str) -> str:
         # Title Case section headers (1-2 words, capitalized, in header hints)
         if len(line.split()) <= 3 and line[0].isupper():
             from services.section_classifier import _sniff_header
+
             if _sniff_header(line):
                 if buffer:
                     merged.append(buffer)
@@ -438,16 +453,18 @@ def _merge_wrapped_lines(text: str) -> str:
 
         # Structural: capitalized multi-word line with a year → standalone
         # (catches institution/company names in any language)
-        if (re.search(r"\b(?:19|20)\d{2}\b", line)
-            and line[0].isupper()
-            and len(line.split()) >= 2):
+        if re.search(r"\b(?:19|20)\d{2}\b", line) and line[0].isupper() and len(line.split()) >= 2:
             if buffer:
                 merged.append(buffer)
             buffer = line
             continue
 
         # Lines that look like degree names are standalone
-        if re.search(r"^\s*(?:B\.?S\.?c?|M\.?S\.?c?|B\.?A|M\.?A|Ph\.?D|M\.?B\.?A|Bachelor|Master|Diploma|Associate|Degree)\b", line, re.I):
+        if re.search(
+            r"^\s*(?:B\.?S\.?c?|M\.?S\.?c?|B\.?A|M\.?A|Ph\.?D|M\.?B\.?A|Bachelor|Master|Diploma|Associate|Degree)\b",
+            line,
+            re.I,
+        ):
             if buffer:
                 merged.append(buffer)
             buffer = line
@@ -464,10 +481,7 @@ def _merge_wrapped_lines(text: str) -> str:
         if buffer:
             first_char = line[0] if line else ""
             continuation_words = ("and", "with", "of", "to", "for", "in", "the", "a", "an", "or", "at", "by", "as")
-            is_continuation = (
-                first_char.islower()
-                or line.split()[0].lower() in continuation_words
-            )
+            is_continuation = first_char.islower() or line.split()[0].lower() in continuation_words
             if is_continuation and not buffer.endswith((".", ":", ";")):
                 buffer += " " + line
             else:
@@ -483,10 +497,10 @@ def _merge_wrapped_lines(text: str) -> str:
 
 
 # ── Noise tokens that carry no semantic value ─────────────────────────────
-_NOISE_TOKENS = frozenset({'""', '|', '||', ':', ',', '-', '–', '—', '•', '*', '/', '\\'})
+_NOISE_TOKENS = frozenset({'""', "|", "||", ":", ",", "-", "–", "—", "•", "*", "/", "\\"})
 
 
-_NOISE_CHARS = set(' \t|–—-:,;/*\\•*"\'`')
+_NOISE_CHARS = set(" \t|–—-:,;/*\\•*\"'`")
 
 
 _BULLET_PREFIX_RE = re.compile(r"^\s*[-*•\u2013\u2014\u2023\u25aa\u25a0►]\s+\S")
@@ -505,8 +519,8 @@ def _clean_noise_lines(text: str) -> str:
             continue
         # Preserve bullet markers – only strip leading noise on non-bullet lines
         if not _BULLET_PREFIX_RE.match(stripped):
-            stripped = re.sub(r'^[\s|–—\-:,;]+', '', stripped)
-        stripped = re.sub(r'[\s|–—\-:,;]+$', '', stripped)
+            stripped = re.sub(r"^[\s|–—\-:,;]+", "", stripped)
+        stripped = re.sub(r"[\s|–—\-:,;]+$", "", stripped)
         cleaned.append(stripped)
     return "\n".join(cleaned)
 
@@ -534,7 +548,7 @@ def extract_structured(cv_text: str) -> Dict:
 
     # Strip upstream multi-column marker if present
     if raw.startswith("multi_col_fixed"):
-        raw = raw[len("multi_col_fixed"):].lstrip("\n")
+        raw = raw[len("multi_col_fixed") :].lstrip("\n")
 
     # Security: cap total word count
     _words = raw.split()
@@ -576,13 +590,12 @@ def extract_structured(cv_text: str) -> Dict:
         text = re.sub(r"[ \t]+", " ", text).strip()
         header_lines, sections, dropped, section_titles, section_sources = _sections_from_classifier(text)
 
-    name, title_lines, contacts, leftover = _extract_contact_block(
-        header_lines, sections.get("contact", [])
-    )
+    name, title_lines, contacts, leftover = _extract_contact_block(header_lines, sections.get("contact", []))
 
     # ── Name rescue: if name still missing, scan raw first lines ──
     if not name:
         from services.cv_autofix_service import guess_name_from_lines
+
         first_raw = [l.strip() for l in raw.split("\n")[:8] if l.strip()]
         name = guess_name_from_lines(first_raw, limit=8)
 
@@ -614,9 +627,17 @@ def extract_structured(cv_text: str) -> Dict:
         raw_lines = [l.strip() for l in raw.split("\n") if l.strip()]
         known_headers = {str(v).strip().lower() for v in (section_titles or {}).values()}
         skip_headers = known_headers | {
-            "multi_col_fixed", "communication", "skills", "languages",
-            "education", "projects", "personal information", "personal profile",
-            "summary", "experience", "work background",
+            "multi_col_fixed",
+            "communication",
+            "skills",
+            "languages",
+            "education",
+            "projects",
+            "personal information",
+            "personal profile",
+            "summary",
+            "experience",
+            "work background",
         }
         for idx, candidate in enumerate(raw_lines[:60]):
             if candidate.lower() in skip_headers:
@@ -630,7 +651,8 @@ def extract_structured(cv_text: str) -> Dict:
                     title_lines = [next_line]
                 for sec_key in ("interests", "misc", "education", "skills"):
                     sections[sec_key] = [
-                        line for line in sections.get(sec_key, [])
+                        line
+                        for line in sections.get(sec_key, [])
                         if line.strip().lower() not in {candidate.lower(), next_line.lower()}
                     ]
                 break

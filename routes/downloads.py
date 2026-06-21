@@ -4,10 +4,12 @@ Serves CSV/JSON exports with automatic cleanup.
 """
 
 from datetime import datetime
+import hashlib
+import io
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from fastapi.responses import StreamingResponse
-import io
+from sqlalchemy import or_
 
 from database import get_db
 from models import APISubscription
@@ -29,11 +31,30 @@ def _require_download_owner(download_data: dict, x_api_key: str | None, db) -> N
     if not api_key:
         raise HTTPException(status_code=401, detail="Download API key required")
 
-    subscription = (
+    legacy_hash = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+    display_tail = api_key[-8:] if len(api_key) > 8 else "****"
+    candidates = (
         db.query(APISubscription)
-        .filter(APISubscription.api_key == api_key, APISubscription.is_active == True)
-        .first()
+        .filter(
+            APISubscription.is_active == True,
+            or_(
+                APISubscription.api_key_display == display_tail,
+                APISubscription.api_key_hash == legacy_hash,
+                APISubscription.api_key_hash == api_key,
+            ),
+        )
+        .all()
     )
+    subscription = None
+    for candidate in candidates:
+        try:
+            verified = candidate.verify_api_key(api_key)
+        except Exception:
+            verified = False
+        if candidate.api_key_hash in {legacy_hash, api_key} or verified:
+            subscription = candidate
+            break
+
     if not subscription:
         raise HTTPException(status_code=401, detail="Invalid or inactive API key")
     if subscription.expires_at and subscription.expires_at < datetime.utcnow():
@@ -71,17 +92,15 @@ async def download_file(
     _require_download_owner(download_data, x_api_key, db)
 
     # Create streaming response
-    content_bytes = download_data['content'].encode('utf-8')
+    content_bytes = download_data["content"].encode("utf-8")
 
     def iter_content():
         yield content_bytes
 
     return StreamingResponse(
         iter_content(),
-        media_type=download_data['content_type'],
-        headers={
-            "Content-Disposition": f'attachment; filename="{download_data["filename"]}"'
-        }
+        media_type=download_data["content_type"],
+        headers={"Content-Disposition": f'attachment; filename="{download_data["filename"]}"'},
     )
 
 
@@ -105,5 +124,5 @@ async def cleanup_expired(request: Request):
     return {
         "message": f"Cleaned up {csv_cleaned + json_cleaned} expired downloads",
         "csv_files": csv_cleaned,
-        "json_files": json_cleaned
+        "json_files": json_cleaned,
     }

@@ -3,6 +3,7 @@
 This is the single bridge between normalize_agent output and the
 typed CVSchema.  No text re-parsing happens here; we only map fields.
 """
+
 from __future__ import annotations
 
 import json as _json
@@ -24,6 +25,7 @@ def _structured_log(
     """Emit a structured JSON log line with standardised fields."""
     payload = {"event": event, **fields}
     _logger.log(level, _json.dumps(payload, default=str, ensure_ascii=False))
+
 
 from schemas.cv_schema import (
     CVSchema,
@@ -160,12 +162,35 @@ def _iter_payload_strings(value: Any):
 
 def _find_name_candidate(data: Dict[str, Any]) -> str:
     bad_words = {
-        "RESUME", "SUMMARY", "PROFESSIONAL", "EDUCATION", "EXPERIENCE",
-        "SKILLS", "PROJECTS", "BACHELOR", "MASTER", "DEGREE", "TECH",
-        "UNIVERSITY", "SCHOOL", "INSTITUTE", "ENGINEERING", "ENGINEER",
-        "COMPUTER", "SOFTWARE", "DEVELOPER", "TECHNOLOGY", "GAME",
-        "BLOG", "APP", "APPLICATION", "PROJECT", "PERSONAL", "MILLIONAIRE",
-        "WHO", "WANTS",
+        "RESUME",
+        "SUMMARY",
+        "PROFESSIONAL",
+        "EDUCATION",
+        "EXPERIENCE",
+        "SKILLS",
+        "PROJECTS",
+        "BACHELOR",
+        "MASTER",
+        "DEGREE",
+        "TECH",
+        "UNIVERSITY",
+        "SCHOOL",
+        "INSTITUTE",
+        "ENGINEERING",
+        "ENGINEER",
+        "COMPUTER",
+        "SOFTWARE",
+        "DEVELOPER",
+        "TECHNOLOGY",
+        "GAME",
+        "BLOG",
+        "APP",
+        "APPLICATION",
+        "PROJECT",
+        "PERSONAL",
+        "MILLIONAIRE",
+        "WHO",
+        "WANTS",
     }
 
     priority_texts: list[str] = []
@@ -204,7 +229,11 @@ def _find_name_candidate(data: Dict[str, Any]) -> str:
                 continue
             if any(w.strip(".'â€™").upper() in bad_words for w in words):
                 continue
-            if _BAD_NAME_RE.search(candidate) or _NAME_TECH_RE.search(candidate) or _INSTITUTION_WORD_RE.search(candidate):
+            if (
+                _BAD_NAME_RE.search(candidate)
+                or _NAME_TECH_RE.search(candidate)
+                or _INSTITUTION_WORD_RE.search(candidate)
+            ):
                 continue
             if re.search(r"[@:/]|\d", candidate):
                 continue
@@ -289,7 +318,7 @@ def _clean_summary_text(summary: str, full_name: str = "") -> str:
     text = _URL_SUMMARY_RE.sub("", text)
     starter = re.search(r"\b(?:to\s+\w+|seeking|objective|profile)\b", text, re.I)
     if starter and starter.start() <= 120:
-        text = text[starter.start():].strip()
+        text = text[starter.start() :].strip()
     chunks = re.split(r"(?<=[.!?])\s+|(?:\s+[•\uf0b7]\s+)", text)
     kept = [chunk.strip() for chunk in chunks if chunk.strip() and not _SUMMARY_NOISE_RE.search(chunk)]
     return _enforce_summary_rules(" ".join(kept))
@@ -451,11 +480,13 @@ def _repair_schema(schema: CVSchema, data: Dict[str, Any]) -> None:
 
     expanded_edu: list[EducationEntry] = []
     for edu in schema.education:
-        raw_edu_text = _clean(" ".join(
-            _strip_bullet_prefix(getattr(edu, attr, ""))
-            for attr in ("degree", "field", "school", "location", "start_date", "end_date", "gpa")
-            if getattr(edu, attr, "")
-        ))
+        raw_edu_text = _clean(
+            " ".join(
+                _strip_bullet_prefix(getattr(edu, attr, ""))
+                for attr in ("degree", "field", "school", "location", "start_date", "end_date", "gpa")
+                if getattr(edu, attr, "")
+            )
+        )
         _normalize_education_entry(edu)
         school_level_entries = _extract_school_level_education_entries(raw_edu_text)
         if school_level_entries and not (_DEGREE_WORD_RE.search(edu.degree) and edu.school):
@@ -467,6 +498,7 @@ def _repair_schema(schema: CVSchema, data: Dict[str, Any]) -> None:
     deduped_edu: list[EducationEntry] = []
     seen_edu: set[str] = set()
     seen_edu_period: dict[str, int] = {}
+
     def _weak_edu_degree(value: str) -> bool:
         return bool(re.search(r"\b(?:student|year)\b", value or "", re.I))
 
@@ -503,7 +535,9 @@ def _repair_schema(schema: CVSchema, data: Dict[str, Any]) -> None:
         kept_bullets: list[str] = []
         for bullet in exp.bullets:
             clean_bullet = _strip_bullet_prefix(bullet)
-            label_match = re.match(r"^(organization|company|employer|duration|project\s+title|synopsis)\s*:\s*(.+)$", clean_bullet, re.I)
+            label_match = re.match(
+                r"^(organization|company|employer|duration|project\s+title|synopsis)\s*:\s*(.+)$", clean_bullet, re.I
+            )
             if label_match:
                 labels[label_match.group(1).lower()] = label_match.group(2).strip()
             else:
@@ -582,7 +616,13 @@ def _repair_schema(schema: CVSchema, data: Dict[str, Any]) -> None:
 
     merged_projects: list[ProjectEntry] = []
     for proj in schema.projects:
-        if merged_projects and not proj.description and not proj.bullets and len(proj.name.split()) >= 5 and not proj.name.isupper():
+        if (
+            merged_projects
+            and not proj.description
+            and not proj.bullets
+            and len(proj.name.split()) >= 5
+            and not proj.name.isupper()
+        ):
             target = merged_projects[-1]
             if target.bullets:
                 target.bullets[-1] = f"{target.bullets[-1]} {proj.name}".strip()
@@ -620,7 +660,8 @@ def _repair_schema(schema: CVSchema, data: Dict[str, Any]) -> None:
         schema.skills_categorized = cleaned_cat
 
     schema.languages = [
-        lang for lang in (_strip_bullet_prefix(item).strip(" .") for item in schema.languages)
+        lang
+        for lang in (_strip_bullet_prefix(item).strip(" .") for item in schema.languages)
         if lang and _is_valid_language(lang)
     ]
 
@@ -628,14 +669,46 @@ def _repair_schema(schema: CVSchema, data: Dict[str, Any]) -> None:
 def _is_language_item(text: str) -> bool:
     """Return True if *text* looks like a spoken-language entry, not a skill."""
     import re as _re
+
     _names = {
-        "english", "turkish", "german", "french", "spanish", "italian",
-        "portuguese", "russian", "arabic", "chinese", "japanese", "korean",
-        "dutch", "swedish", "norwegian", "danish", "finnish", "polish",
-        "czech", "hungarian", "greek", "romanian", "hebrew", "hindi",
-        "türkçe", "ingilizce", "almanca", "fransızca", "ispanyolca",
-        "italyanca", "portekizce", "rusça", "arapça",
-        "deutsch", "français", "español", "italiano", "português",
+        "english",
+        "turkish",
+        "german",
+        "french",
+        "spanish",
+        "italian",
+        "portuguese",
+        "russian",
+        "arabic",
+        "chinese",
+        "japanese",
+        "korean",
+        "dutch",
+        "swedish",
+        "norwegian",
+        "danish",
+        "finnish",
+        "polish",
+        "czech",
+        "hungarian",
+        "greek",
+        "romanian",
+        "hebrew",
+        "hindi",
+        "türkçe",
+        "ingilizce",
+        "almanca",
+        "fransızca",
+        "ispanyolca",
+        "italyanca",
+        "portekizce",
+        "rusça",
+        "arapça",
+        "deutsch",
+        "français",
+        "español",
+        "italiano",
+        "português",
     }
     _LEVEL_RE = _re.compile(
         r"\b(?:A[12]|B[12]|C[12]|native|fluent|advanced|intermediate"
@@ -750,6 +823,7 @@ def build_schema(normalized: Dict[str, Any]) -> CVSchema:
 
     # Pre-pass: remap any non-canonical keys so nothing is lost
     from services.section_classifier import canonicalize_section_key
+
     _REMAP = {
         "summary": "summary",
         "experience": "experiences",
@@ -762,10 +836,29 @@ def build_schema(normalized: Dict[str, Any]) -> CVSchema:
         "misc": "misc",
     }
     _SKIP = {
-        "full_name", "title", "email", "phone", "location", "linkedin",
-        "summary", "experiences", "education", "skills", "skills_categorized",
-        "projects", "certifications", "languages", "interests", "misc", "language",
-        "section_titles", "format_hints", "contact", "raw_text", "text", "content",
+        "full_name",
+        "title",
+        "email",
+        "phone",
+        "location",
+        "linkedin",
+        "summary",
+        "experiences",
+        "education",
+        "skills",
+        "skills_categorized",
+        "projects",
+        "certifications",
+        "languages",
+        "interests",
+        "misc",
+        "language",
+        "section_titles",
+        "format_hints",
+        "contact",
+        "raw_text",
+        "text",
+        "content",
     }
     for key in list(data.keys()):
         if key.startswith("_") or key in _SKIP:
@@ -947,7 +1040,7 @@ def build_schema(normalized: Dict[str, Any]) -> CVSchema:
     _sanitize_schema(schema)
     _purge_empty_entries(schema)
     _cap_misc(schema)
-    _normalize_layout(schema)          # re-run after compliance moves
+    _normalize_layout(schema)  # re-run after compliance moves
 
     # ── Section lock: snapshot after compliance, verify after freeze ──
     _lock_snapshot = _snapshot_sections(schema)
@@ -984,7 +1077,9 @@ def build_schema(normalized: Dict[str, Any]) -> CVSchema:
         len(schema.skills) + len(schema.skills_categorized),
     )
     _structured_log(
-        logger, logging.INFO, "build_schema",
+        logger,
+        logging.INFO,
+        "build_schema",
         latency=round(_elapsed, 3),
         sanity=sanity,
         experiences=len(schema.experiences),
@@ -999,7 +1094,7 @@ def build_schema(normalized: Dict[str, Any]) -> CVSchema:
 
 _INVALID_LANG_RE = re.compile(
     r"^[\d\W]+$"  # pure digits / punctuation
-    r"|^.{0,1}$"   # single char or empty
+    r"|^.{0,1}$"  # single char or empty
 )
 
 
@@ -1018,11 +1113,9 @@ def _sanitize_schema(schema: CVSchema) -> None:
 
     # ── Languages: keep only plausible spoken-language items ──
     schema.languages = [
-        lang for lang in schema.languages
-        if lang
-        and not _INVALID_LANG_RE.match(lang)
-        and "@" not in lang
-        and not re.match(r"https?://", lang, re.I)
+        lang
+        for lang in schema.languages
+        if lang and not _INVALID_LANG_RE.match(lang) and "@" not in lang and not re.match(r"https?://", lang, re.I)
     ]
     # Also reject bare ISO codes
     schema.languages = filter_language_codes(schema.languages)
@@ -1044,24 +1137,17 @@ def _sanitize_schema(schema: CVSchema) -> None:
         schema.email = _fix_url_string(schema.email)
 
     # ── Education: drop entries without any meaningful content ──
-    schema.education = [
-        edu for edu in schema.education
-        if edu.degree or edu.school
-    ]
+    schema.education = [edu for edu in schema.education if edu.degree or edu.school]
 
     # ── Skills: remove items that are really dates or URLs ──
     _date_like = re.compile(r"^\d{4}\s*[-–]\s*\d{4}$|^\d{1,2}/\d{4}$")
-    schema.skills = [
-        s for s in schema.skills
-        if s
-        and not _date_like.match(s)
-        and not re.match(r"https?://", s, re.I)
-    ]
+    schema.skills = [s for s in schema.skills if s and not _date_like.match(s) and not re.match(r"https?://", s, re.I)]
     # Reflect into skills_categorized too
     if schema.skills_categorized:
         for cat in list(schema.skills_categorized):
             cleaned = [
-                s for s in schema.skills_categorized[cat]
+                s
+                for s in schema.skills_categorized[cat]
                 if s and not _date_like.match(s) and not re.match(r"https?://", s, re.I)
             ]
             if cleaned:
@@ -1099,8 +1185,7 @@ _TECH_CROSS_RE = re.compile(
 
 
 def _exp_text(entry: ExperienceEntry) -> str:
-    parts = [entry.title, entry.company, entry.location,
-             entry.start_date, entry.end_date]
+    parts = [entry.title, entry.company, entry.location, entry.start_date, entry.end_date]
     parts.extend(entry.bullets)
     return " ".join(parts)
 
@@ -1214,13 +1299,15 @@ def _cross_section_fixup(schema: CVSchema) -> None:
         has_year = bool(_YEAR_RE.search(text))
         is_edu_like = (has_degree or has_institution) and has_year and not exp.bullets
         if is_edu_like:
-            schema.education.append(EducationEntry(
-                degree=exp.title,
-                school=exp.company,
-                location=exp.location,
-                start_date=exp.start_date,
-                end_date=exp.end_date,
-            ))
+            schema.education.append(
+                EducationEntry(
+                    degree=exp.title,
+                    school=exp.company,
+                    location=exp.location,
+                    start_date=exp.start_date,
+                    end_date=exp.end_date,
+                )
+            )
         else:
             kept_exp.append(exp)
     schema.experiences = kept_exp
@@ -1236,32 +1323,30 @@ def _cross_section_fixup(schema: CVSchema) -> None:
         new_skills: list[str] = []
         for skill in schema.skills:
             if _URL_CROSS_RE.search(skill) and _TECH_CROSS_RE.search(skill):
-                schema.projects.append(ProjectEntry(
-                    name=skill[:80],
-                    description="",
-                    bullets=[],
-                ))
+                schema.projects.append(
+                    ProjectEntry(
+                        name=skill[:80],
+                        description="",
+                        bullets=[],
+                    )
+                )
             else:
                 new_skills.append(skill)
         schema.skills = new_skills
 
     # 4. Skills cleanup: remove items with URLs, years, or long sentences
     schema.skills = [
-        s for s in schema.skills
-        if s
-        and not _URL_CROSS_RE.search(s)
-        and not re.match(r"^\d{4}\s*[-–]\s*", s)
-        and len(s.split()) <= 15
+        s
+        for s in schema.skills
+        if s and not _URL_CROSS_RE.search(s) and not re.match(r"^\d{4}\s*[-–]\s*", s) and len(s.split()) <= 15
     ]
     # Same for skills_categorized
     if schema.skills_categorized:
         for cat in list(schema.skills_categorized):
             cleaned = [
-                s for s in schema.skills_categorized[cat]
-                if s
-                and not _URL_CROSS_RE.search(s)
-                and not re.match(r"^\d{4}\s*[-–]\s*", s)
-                and len(s.split()) <= 15
+                s
+                for s in schema.skills_categorized[cat]
+                if s and not _URL_CROSS_RE.search(s) and not re.match(r"^\d{4}\s*[-–]\s*", s) and len(s.split()) <= 15
             ]
             if cleaned:
                 schema.skills_categorized[cat] = cleaned
@@ -1269,10 +1354,7 @@ def _cross_section_fixup(schema: CVSchema) -> None:
                 del schema.skills_categorized[cat]
 
     # 5. Language validation: keep only plausible spoken-language entries
-    schema.languages = [
-        lang for lang in schema.languages
-        if _is_valid_language(lang)
-    ]
+    schema.languages = [lang for lang in schema.languages if _is_valid_language(lang)]
 
     # 6. Deduplicate education (same school + degree)
     seen_edu: set[str] = set()
@@ -1350,11 +1432,15 @@ def _document_level_validation(schema: CVSchema, summary_source: str = "") -> No
             has_degree = bool(_DEGREE_RE_CROSS.search(text))
             has_institution = bool(_INSTITUTION_RE.search(text))
             if (has_degree or has_institution) and not exp.bullets:
-                schema.education.append(EducationEntry(
-                    degree=exp.title, school=exp.company,
-                    location=exp.location,
-                    start_date=exp.start_date, end_date=exp.end_date,
-                ))
+                schema.education.append(
+                    EducationEntry(
+                        degree=exp.title,
+                        school=exp.company,
+                        location=exp.location,
+                        start_date=exp.start_date,
+                        end_date=exp.end_date,
+                    )
+                )
             else:
                 keep_exp.append(exp)
         schema.experiences = keep_exp
@@ -1396,12 +1482,7 @@ def _document_level_validation(schema: CVSchema, summary_source: str = "") -> No
         # Misc as first section → promote long items to summary ONLY if
         # no real summary was extracted from the top of the CV AND misc
         # is near the top (first non-empty section).
-        if (
-            first_section == "misc"
-            and schema.misc
-            and not schema.summary
-            and summary_source != "top"
-        ):
+        if first_section == "misc" and schema.misc and not schema.summary and summary_source != "top":
             promoted: list[str] = []
             kept_misc: list[str] = []
             for item in schema.misc:
@@ -1427,9 +1508,12 @@ def _document_level_validation(schema: CVSchema, summary_source: str = "") -> No
             if recovered_exp:
                 schema.skills = kept_skills
                 for text in recovered_exp:
-                    schema.experiences.append(ExperienceEntry(
-                        title=text[:120], bullets=[],
-                    ))
+                    schema.experiences.append(
+                        ExperienceEntry(
+                            title=text[:120],
+                            bullets=[],
+                        )
+                    )
 
     # ── 3. Education existence check ──
     # Scan experiences for entries that contain degree + year
@@ -1439,11 +1523,15 @@ def _document_level_validation(schema: CVSchema, summary_source: str = "") -> No
         for exp in schema.experiences:
             text = _exp_text(exp)
             if _DEGREE_RE_CROSS.search(text) and _YEAR_RE.search(text) and not exp.bullets:
-                schema.education.append(EducationEntry(
-                    degree=exp.title, school=exp.company,
-                    location=exp.location,
-                    start_date=exp.start_date, end_date=exp.end_date,
-                ))
+                schema.education.append(
+                    EducationEntry(
+                        degree=exp.title,
+                        school=exp.company,
+                        location=exp.location,
+                        start_date=exp.start_date,
+                        end_date=exp.end_date,
+                    )
+                )
             else:
                 remaining_exp.append(exp)
         schema.experiences = remaining_exp
@@ -1458,12 +1546,15 @@ def _document_level_validation(schema: CVSchema, summary_source: str = "") -> No
             has_institution = bool(_INSTITUTION_RE.search(text))
             # Education without degree AND without institution → suspicious
             if not has_degree and not has_institution and _YEAR_RE.search(text):
-                schema.experiences.append(ExperienceEntry(
-                    title=edu.degree or edu.school,
-                    company=edu.school if edu.degree else "",
-                    location=edu.location,
-                    start_date=edu.start_date, end_date=edu.end_date,
-                ))
+                schema.experiences.append(
+                    ExperienceEntry(
+                        title=edu.degree or edu.school,
+                        company=edu.school if edu.degree else "",
+                        location=edu.location,
+                        start_date=edu.start_date,
+                        end_date=edu.end_date,
+                    )
+                )
             else:
                 remaining_edu.append(edu)
         schema.education = remaining_edu
@@ -1520,7 +1611,7 @@ _SKILLS_MAX = 100
 _MISC_MAX = 10
 _CONTACT_MAX_LEN = 300
 _LANG_MAX = 15
-_MAX_DESCRIPTION_LEN = 2000    # max chars in project description / summary
+_MAX_DESCRIPTION_LEN = 2000  # max chars in project description / summary
 
 
 def _anomaly_detection(schema: CVSchema) -> None:
@@ -1557,21 +1648,26 @@ def _anomaly_detection(schema: CVSchema) -> None:
 
         # Scan summary for degree + institution + year
         if schema.summary:
-            if (_DEGREE_RE_CROSS.search(schema.summary)
-                    and _INSTITUTION_RE.search(schema.summary)
-                    and _YEAR_RE.search(schema.summary)):
+            if (
+                _DEGREE_RE_CROSS.search(schema.summary)
+                and _INSTITUTION_RE.search(schema.summary)
+                and _YEAR_RE.search(schema.summary)
+            ):
                 from utils.cv_normalizer import _extract_institution_name
+
                 deg_m = _DEGREE_RE_CROSS.search(schema.summary)
                 years = _YEAR_RE.findall(schema.summary)
                 inst = _extract_institution_name(schema.summary)
                 key = f"{(deg_m.group(0) if deg_m else '').lower()}|{inst.lower()}"
                 if key not in _edu_keys:
-                    schema.education.append(EducationEntry(
-                        degree=deg_m.group(0) if deg_m else "",
-                        school=inst,
-                        start_date=years[0] if years else "",
-                        end_date=years[1] if len(years) > 1 else "",
-                    ))
+                    schema.education.append(
+                        EducationEntry(
+                            degree=deg_m.group(0) if deg_m else "",
+                            school=inst,
+                            start_date=years[0] if years else "",
+                            end_date=years[1] if len(years) > 1 else "",
+                        )
+                    )
                     _edu_keys.add(key)
 
         # Scan experiences — create education but KEEP the experience
@@ -1585,11 +1681,15 @@ def _anomaly_detection(schema: CVSchema) -> None:
             if has_degree and has_institution and has_year:
                 key = f"{exp.title.lower()}|{exp.company.lower()}"
                 if key not in _edu_keys:
-                    schema.education.append(EducationEntry(
-                        degree=exp.title, school=exp.company,
-                        location=exp.location,
-                        start_date=exp.start_date, end_date=exp.end_date,
-                    ))
+                    schema.education.append(
+                        EducationEntry(
+                            degree=exp.title,
+                            school=exp.company,
+                            location=exp.location,
+                            start_date=exp.start_date,
+                            end_date=exp.end_date,
+                        )
+                    )
                     _edu_keys.add(key)
 
         # Scan misc for degree-like text
@@ -1598,9 +1698,11 @@ def _anomaly_detection(schema: CVSchema) -> None:
             for item in schema.misc:
                 low = item.lower()
                 if _DEGREE_RE_CROSS.search(low) and _YEAR_RE.search(item):
-                    schema.education.append(EducationEntry(
-                        degree=item[:120],
-                    ))
+                    schema.education.append(
+                        EducationEntry(
+                            degree=item[:120],
+                        )
+                    )
                 else:
                     kept_misc.append(item)
             schema.misc = kept_misc
@@ -1659,13 +1761,13 @@ def _anomaly_detection(schema: CVSchema) -> None:
 
     # ── 6. Description / summary length cap ──
     if schema.summary and len(schema.summary) > _MAX_DESCRIPTION_LEN:
-        logger.warning("anomaly: summary truncated %d → %d chars",
-                       len(schema.summary), _MAX_DESCRIPTION_LEN)
+        logger.warning("anomaly: summary truncated %d → %d chars", len(schema.summary), _MAX_DESCRIPTION_LEN)
         schema.summary = schema.summary[:_MAX_DESCRIPTION_LEN]
     for proj in schema.projects:
         if proj.description and len(proj.description) > _MAX_DESCRIPTION_LEN:
-            logger.warning("anomaly: project description truncated %d → %d chars",
-                           len(proj.description), _MAX_DESCRIPTION_LEN)
+            logger.warning(
+                "anomaly: project description truncated %d → %d chars", len(proj.description), _MAX_DESCRIPTION_LEN
+            )
             proj.description = proj.description[:_MAX_DESCRIPTION_LEN]
 
 
@@ -1677,16 +1779,18 @@ _MIN_MEANINGFUL_SECTIONS = 2
 def _schema_needs_fallback(schema: CVSchema) -> bool:
     """Return True when the schema is too empty to render a useful CV."""
     # Count non-empty content sections (exclude contact-level fields)
-    section_count = sum([
-        bool(schema.summary),
-        bool(schema.experiences),
-        bool(schema.education),
-        bool(schema.skills or schema.skills_categorized),
-        bool(schema.projects),
-        bool(schema.certifications),
-        bool(schema.languages),
-        bool(schema.interests),
-    ])
+    section_count = sum(
+        [
+            bool(schema.summary),
+            bool(schema.experiences),
+            bool(schema.education),
+            bool(schema.skills or schema.skills_categorized),
+            bool(schema.projects),
+            bool(schema.certifications),
+            bool(schema.languages),
+            bool(schema.interests),
+        ]
+    )
     # No meaningful text at all
     total_text = (
         len(schema.summary)
@@ -1723,8 +1827,16 @@ def _fallback_from_raw(
     logger.info("_fallback_from_raw activated: schema too sparse for structured render")
 
     _SKIP_KEYS = {
-        "full_name", "title", "email", "phone", "location", "linkedin",
-        "language", "section_titles", "format_hints", "contact",
+        "full_name",
+        "title",
+        "email",
+        "phone",
+        "location",
+        "linkedin",
+        "language",
+        "section_titles",
+        "format_hints",
+        "contact",
     }
 
     collected: list[str] = []
@@ -1775,8 +1887,15 @@ def _fallback_from_raw(
 # ── Final layout normalization ────────────────────────────────────────────
 
 _CANONICAL_ORDER = [
-    "summary", "experience", "projects", "education", "skills",
-    "certifications", "languages", "interests", "misc",
+    "summary",
+    "experience",
+    "projects",
+    "education",
+    "skills",
+    "certifications",
+    "languages",
+    "interests",
+    "misc",
 ]
 
 _SECTION_TO_FIELD = {
@@ -1922,9 +2041,11 @@ def _ats_compliance_check(schema: CVSchema, summary_source: str = "") -> None:
             continue
 
         entry_dict = {
-            "title": exp.title, "company": exp.company,
+            "title": exp.title,
+            "company": exp.company,
             "location": exp.location,
-            "start_date": exp.start_date, "end_date": exp.end_date,
+            "start_date": exp.start_date,
+            "end_date": exp.end_date,
             "bullets": exp.bullets,
         }
         scores = score_dict_entry(entry_dict)
@@ -1943,15 +2064,18 @@ def _ats_compliance_check(schema: CVSchema, summary_source: str = "") -> None:
             and scores.best() == "education"
             and scores.is_confident()
         ):
-            existing = {f"{e.school.lower().strip()}|{e.degree.lower().strip()}"
-                        for e in schema.education}
+            existing = {f"{e.school.lower().strip()}|{e.degree.lower().strip()}" for e in schema.education}
             dup_key = f"{exp.company.lower().strip()}|{exp.title.lower().strip()}"
             if dup_key not in existing:
-                schema.education.append(EducationEntry(
-                    degree=exp.title, school=exp.company,
-                    location=exp.location,
-                    start_date=exp.start_date, end_date=exp.end_date,
-                ))
+                schema.education.append(
+                    EducationEntry(
+                        degree=exp.title,
+                        school=exp.company,
+                        location=exp.location,
+                        start_date=exp.start_date,
+                        end_date=exp.end_date,
+                    )
+                )
                 _moved.add(ek)
             else:
                 kept_exp.append(exp)
@@ -1968,9 +2092,12 @@ def _ats_compliance_check(schema: CVSchema, summary_source: str = "") -> None:
             continue
 
         entry_dict = {
-            "degree": edu.degree, "school": edu.school,
-            "field": edu.field, "location": edu.location,
-            "start_date": edu.start_date, "end_date": edu.end_date,
+            "degree": edu.degree,
+            "school": edu.school,
+            "field": edu.field,
+            "location": edu.location,
+            "start_date": edu.start_date,
+            "end_date": edu.end_date,
         }
         scores = score_dict_entry(entry_dict)
         text = f"{edu.degree} {edu.school} {edu.field} {edu.location} {edu.start_date} {edu.end_date}"
@@ -1979,22 +2106,21 @@ def _ats_compliance_check(schema: CVSchema, summary_source: str = "") -> None:
 
         # Move to experience only when scorer agrees AND entry has no
         # degree/institution + company/verb signals.
-        if (
-            not has_degree
-            and not has_institution
-            and scores.best() == "experience"
-            and scores.is_confident()
-        ):
-            existing = {f"{e.title.lower().strip()}|{e.company.lower().strip()}"
-                        for e in schema.experiences}
-            dup_key = f"{(edu.degree or edu.school).lower().strip()}|{(edu.school if edu.degree else '').lower().strip()}"
+        if not has_degree and not has_institution and scores.best() == "experience" and scores.is_confident():
+            existing = {f"{e.title.lower().strip()}|{e.company.lower().strip()}" for e in schema.experiences}
+            dup_key = (
+                f"{(edu.degree or edu.school).lower().strip()}|{(edu.school if edu.degree else '').lower().strip()}"
+            )
             if dup_key not in existing:
-                schema.experiences.append(ExperienceEntry(
-                    title=edu.degree or edu.school,
-                    company=edu.school if edu.degree else "",
-                    location=edu.location,
-                    start_date=edu.start_date, end_date=edu.end_date,
-                ))
+                schema.experiences.append(
+                    ExperienceEntry(
+                        title=edu.degree or edu.school,
+                        company=edu.school if edu.degree else "",
+                        location=edu.location,
+                        start_date=edu.start_date,
+                        end_date=edu.end_date,
+                    )
+                )
                 _moved.add(ek)
             else:
                 kept_edu.append(edu)
@@ -2004,23 +2130,22 @@ def _ats_compliance_check(schema: CVSchema, summary_source: str = "") -> None:
 
     # ── Rule 3: Skills — reject long prose while preserving merged skill phrases ──
     schema.skills = [
-        s for s in schema.skills
-        if s and (len(s.split()) <= 8 or (len(s.split()) <= 18 and re.search(r"[,;/&]", s)))
+        s for s in schema.skills if s and (len(s.split()) <= 8 or (len(s.split()) <= 18 and re.search(r"[,;/&]", s)))
     ]
     if schema.skills_categorized:
         for cat in list(schema.skills_categorized):
-            cleaned = [s for s in schema.skills_categorized[cat]
-                       if s and (len(s.split()) <= 8 or (len(s.split()) <= 18 and re.search(r"[,;/&]", s)))]
+            cleaned = [
+                s
+                for s in schema.skills_categorized[cat]
+                if s and (len(s.split()) <= 8 or (len(s.split()) <= 18 and re.search(r"[,;/&]", s)))
+            ]
             if cleaned:
                 schema.skills_categorized[cat] = cleaned
             else:
                 del schema.skills_categorized[cat]
 
     # ── Rule 4: Languages — final spoken-language enforcement ──
-    schema.languages = [
-        lang for lang in schema.languages
-        if _is_valid_language(lang)
-    ]
+    schema.languages = [lang for lang in schema.languages if _is_valid_language(lang)]
 
     # ── Rule 5: Misc — score-backed rescue attempt ──
     if schema.misc:
@@ -2044,24 +2169,21 @@ def _ats_compliance_check(schema: CVSchema, summary_source: str = "") -> None:
                 and _DEGREE_RE_CROSS.search(text)
                 and _YEAR_RE.search(text)
             ):
-                if not any(text[:80].lower() in f"{e.degree} {e.school}".lower()
-                           for e in schema.education):
+                if not any(text[:80].lower() in f"{e.degree} {e.school}".lower() for e in schema.education):
                     schema.education.append(EducationEntry(degree=text[:120]))
                     _moved.add(misc_key)
                     continue
 
             # Experience rescue: scorer says experience + enough words
-            if (
-                best == "experience"
-                and scores.is_confident()
-                and len(text.split()) >= 5
-            ):
+            if best == "experience" and scores.is_confident() and len(text.split()) >= 5:
                 years = _YEAR_RE.findall(text)
-                schema.experiences.append(ExperienceEntry(
-                    title=text[:80],
-                    start_date=years[0] if years else "",
-                    end_date=years[1] if len(years) > 1 else "",
-                ))
+                schema.experiences.append(
+                    ExperienceEntry(
+                        title=text[:80],
+                        start_date=years[0] if years else "",
+                        end_date=years[1] if len(years) > 1 else "",
+                    )
+                )
                 _moved.add(misc_key)
                 continue
 
@@ -2139,32 +2261,48 @@ def _ats_compliance_check(schema: CVSchema, summary_source: str = "") -> None:
 
 # ── Stability guards ─────────────────────────────────────────────────────
 
+
 def _purge_empty_entries(schema: CVSchema) -> None:
     """Remove education/experience entries that have no meaningful content.
 
     An entry is empty when all its text fields are blank/whitespace.
     """
     schema.experiences = [
-        exp for exp in schema.experiences
-        if any(v.strip() for v in (
-            exp.title, exp.company, exp.location,
-            exp.start_date, exp.end_date,
-        )) or exp.bullets
+        exp
+        for exp in schema.experiences
+        if any(
+            v.strip()
+            for v in (
+                exp.title,
+                exp.company,
+                exp.location,
+                exp.start_date,
+                exp.end_date,
+            )
+        )
+        or exp.bullets
     ]
     schema.education = [
-        edu for edu in schema.education
-        if any(v.strip() for v in (
-            edu.degree, edu.school, edu.field,
-            edu.location, edu.start_date, edu.end_date, edu.gpa,
-        ))
+        edu
+        for edu in schema.education
+        if any(
+            v.strip()
+            for v in (
+                edu.degree,
+                edu.school,
+                edu.field,
+                edu.location,
+                edu.start_date,
+                edu.end_date,
+                edu.gpa,
+            )
+        )
     ]
     schema.projects = [
-        proj for proj in schema.projects
-        if proj.name.strip() or proj.description.strip() or proj.bullets
+        proj for proj in schema.projects if proj.name.strip() or proj.description.strip() or proj.bullets
     ]
     schema.certifications = [
-        cert for cert in schema.certifications
-        if cert.name.strip() or cert.issuer.strip() or cert.date.strip()
+        cert for cert in schema.certifications if cert.name.strip() or cert.issuer.strip() or cert.date.strip()
     ]
     schema.skills = [s for s in schema.skills if s and s.strip()]
     schema.languages = [l for l in schema.languages if l and l.strip()]
@@ -2201,7 +2339,9 @@ def _assert_section_lock(
         if count_before != count_after:
             logger.warning(
                 "section_lock_violation: %s changed from %d to %d after lock",
-                section, count_before, count_after,
+                section,
+                count_before,
+                count_after,
             )
 
 
@@ -2230,11 +2370,13 @@ def _cap_misc(schema: CVSchema) -> None:
                 continue
         if best == "experience" and scores.is_confident() and len(text.split()) >= 5:
             years = _YEAR_RE.findall(text)
-            schema.experiences.append(ExperienceEntry(
-                title=text[:80],
-                start_date=years[0] if years else "",
-                end_date=years[1] if len(years) > 1 else "",
-            ))
+            schema.experiences.append(
+                ExperienceEntry(
+                    title=text[:80],
+                    start_date=years[0] if years else "",
+                    end_date=years[1] if len(years) > 1 else "",
+                )
+            )
             continue
         if best == "skills" and scores.is_confident() and len(text.split()) <= 8:
             schema.skills.append(text)
@@ -2263,8 +2405,11 @@ def _freeze_schema(schema: CVSchema) -> None:
 
     logger.info(
         "freeze_schema: exp=%d edu=%d skills=%d proj=%d certs=%d lang=%d misc=%d",
-        len(schema.experiences), len(schema.education),
+        len(schema.experiences),
+        len(schema.education),
         len(schema.skills) + len(schema.skills_categorized),
-        len(schema.projects), len(schema.certifications),
-        len(schema.languages), len(schema.misc),
+        len(schema.projects),
+        len(schema.certifications),
+        len(schema.languages),
+        len(schema.misc),
     )

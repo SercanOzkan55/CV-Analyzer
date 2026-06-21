@@ -19,6 +19,7 @@ except Exception:  # pragma: no cover - exercised when optional AWS deps are abs
     class ClientError(Exception):
         pass
 
+
 from config.aws import (
     AWS_ACCESS_KEY_ID,
     AWS_SECRET_ACCESS_KEY,
@@ -40,10 +41,12 @@ def _s3_error():
     """Increment S3 error metric and alert (best-effort)."""
     try:
         from shared import S3_ERRORS_TOTAL, _alert
+
         S3_ERRORS_TOTAL.inc()
         _alert("s3_error", "S3 operation failed", level="warning")
     except Exception:
         pass
+
 
 # ── S3 client (lazy singleton) ──────────────────────────────────────
 _client = None
@@ -90,6 +93,7 @@ def validate_key(key: str) -> None:
 
 # ── Core operations ─────────────────────────────────────────────────
 
+
 def upload(file_bytes: bytes, key: str, content_type: str = "application/pdf", _retries: int = 3) -> str:
     """Upload bytes to S3.  Returns the key on success. Retries transient errors."""
     validate_key(key)
@@ -121,7 +125,7 @@ def upload(file_bytes: bytes, key: str, content_type: str = "application/pdf", _
             _s3_error()
             last_exc = exc
         if attempt < _retries:
-            time.sleep(min(2 ** attempt, 8))
+            time.sleep(min(2**attempt, 8))
     raise last_exc  # type: ignore[misc]
 
 
@@ -192,7 +196,9 @@ def check_permissions() -> dict:
     test_key = "user_healthcheck/original/healthcheck.pdf"
     try:
         _get_client().put_object(
-            Bucket=S3_BUCKET, Key=test_key, Body=b"ok",
+            Bucket=S3_BUCKET,
+            Key=test_key,
+            Body=b"ok",
             ContentType="text/plain",
             **_encryption_args(),
         )

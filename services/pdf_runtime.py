@@ -19,10 +19,7 @@ CLAMAV_PORT = int(os.getenv("CLAMAV_PORT", "3310") or "3310")
 OCR_PROVIDER = os.getenv("OCR_PROVIDER", "auto").lower()
 OCR_SERVICE_URL = os.getenv("OCR_SERVICE_URL", "").strip()
 OCR_SERVICE_KEY = os.getenv("OCR_SERVICE_KEY", "").strip()
-TESSERACT_CMD = (
-    os.getenv("TESSERACT_CMD", "").strip()
-    or r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-)
+TESSERACT_CMD = os.getenv("TESSERACT_CMD", "").strip() or r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 _LANG_TO_TESSERACT: dict[str, str] = {
     "en": "eng",
     "tr": "tur",
@@ -104,9 +101,7 @@ def _extract_pdf_text(contents: bytes) -> tuple[str, bool]:
         with pdfplumber.open(io.BytesIO(contents)) as pdf:
             # ── Security: reject PDFs with too many pages ──
             if len(pdf.pages) > _MAX_PDF_PAGES:
-                logging.getLogger("app.security").warning(
-                    "pdf_pages_limit: %d > %d", len(pdf.pages), _MAX_PDF_PAGES
-                )
+                logging.getLogger("app.security").warning("pdf_pages_limit: %d > %d", len(pdf.pages), _MAX_PDF_PAGES)
                 raise HTTPException(
                     status_code=400,
                     detail=f"PDF too large (max {_MAX_PDF_PAGES} pages)",
@@ -317,9 +312,7 @@ def _extract_pdf_text(contents: bytes) -> tuple[str, bool]:
     # Security: cap extracted text length
     truncated = len(raw) > _MAX_PDF_EXTRACTED_CHARS
     if truncated:
-        logging.getLogger("app.security").warning(
-            "pdf_text_truncated: %d > %d", len(raw), _MAX_PDF_EXTRACTED_CHARS
-        )
+        logging.getLogger("app.security").warning("pdf_text_truncated: %d > %d", len(raw), _MAX_PDF_EXTRACTED_CHARS)
         raw = raw[:_MAX_PDF_EXTRACTED_CHARS]
     return fix_decomposed_diacritics(raw), truncated
 
@@ -348,20 +341,14 @@ def _validate_pdf_upload(contents: bytes, content_type: str | None) -> None:
     # Malicious PDF: too many internal objects
     obj_count = contents.count(b" obj")
     if obj_count > _MAX_PDF_OBJECTS:
-        logging.getLogger("app.security").warning(
-            "pdf_rejected: too many objects %d > %d", obj_count, _MAX_PDF_OBJECTS
-        )
+        logging.getLogger("app.security").warning("pdf_rejected: too many objects %d > %d", obj_count, _MAX_PDF_OBJECTS)
         raise HTTPException(status_code=400, detail="PDF too complex (too many objects)")
 
     # Malicious PDF: too many pages (quick heuristic via cross-ref)
     page_count = contents.count(b"/Type /Page") - contents.count(b"/Type /Pages")
     if page_count > _MAX_PDF_PAGES:
-        logging.getLogger("app.security").warning(
-            "pdf_rejected: too many pages %d > %d", page_count, _MAX_PDF_PAGES
-        )
-        raise HTTPException(
-            status_code=400, detail=f"PDF too large (max {_MAX_PDF_PAGES} pages)"
-        )
+        logging.getLogger("app.security").warning("pdf_rejected: too many pages %d > %d", page_count, _MAX_PDF_PAGES)
+        raise HTTPException(status_code=400, detail=f"PDF too large (max {_MAX_PDF_PAGES} pages)")
 
     try:
         _scan_upload_for_viruses(contents)
@@ -372,9 +359,7 @@ def _validate_pdf_upload(contents: bytes, content_type: str | None) -> None:
             raise HTTPException(status_code=500, detail="Virus scanner error")
 
 
-async def _resolve_job_description_text(
-    job_description: str = "", jd_file: UploadFile | None = None
-) -> str:
+async def _resolve_job_description_text(job_description: str = "", jd_file: UploadFile | None = None) -> str:
     """Resolve JD text from direct input or uploaded file (txt/pdf)."""
 
     direct = (job_description or "").strip()
@@ -423,7 +408,6 @@ def require_captcha(request: Request):
     if not bool(main_value("CAPTCHA_ENABLED", CAPTCHA_ENABLED)):
         return None
 
-        
     token = request.headers.get("X-Captcha-Token")
     if not token:
         raise HTTPException(status_code=400, detail="Missing CAPTCHA token")
@@ -485,10 +469,7 @@ def _ocr_extract_text_remote(image_bytes: bytes, lang: str = "en") -> str:
     if not OCR_SERVICE_URL:
         raise HTTPException(
             status_code=503,
-            detail=(
-                "OCR service not configured. Set OCR_SERVICE_URL or install "
-                "Tesseract-OCR on the server."
-            ),
+            detail=("OCR service not configured. Set OCR_SERVICE_URL or install Tesseract-OCR on the server."),
         )
 
     import requests
@@ -725,6 +706,7 @@ def _generate_scanned_pdf_from_text(text: str, source_images: list[bytes] | None
     if source_images:
         from PIL import Image
         import tempfile
+
         for idx, img_bytes in enumerate(source_images):
             try:
                 img = Image.open(io.BytesIO(img_bytes))
@@ -781,5 +763,3 @@ def _generate_scanned_pdf(
                 exc_info=True,
             )
     return _generate_scanned_pdf_from_text(fallback_text, source_images)
-
-

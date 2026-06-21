@@ -2,29 +2,30 @@ import os
 import sys
 import subprocess
 
+
 def generate_comparison_report(figma_url: str, app_url: str, output_html: str = "tools/design_comparison_report.html"):
     print("\n[=] Starting Figma vs App Design Comparison...")
-    
+
     figma_img = "tools/figma_target.png"
     app_img = "tools/app_actual.png"
-    
+
     # 1. Fetch Figma Target
     print("\n[1/3] Fetching Figma target design...")
-    figma_cmd = ["python", "tools/fetch_figma.py", figma_url, figma_img]
-    subprocess.run(figma_cmd, shell=True)
-    
+    figma_cmd = [sys.executable, "tools/fetch_figma.py", figma_url, figma_img]
+    subprocess.run(figma_cmd)
+
     # 2. Capture Local App State
     print("\n[2/3] Capturing actual running application state...")
-    app_cmd = ["python", "tools/screenshot.py", app_url, app_img]
-    subprocess.run(app_cmd, shell=True)
-    
+    app_cmd = [sys.executable, "tools/screenshot.py", app_url, app_img]
+    subprocess.run(app_cmd)
+
     if not os.path.exists(figma_img) or not os.path.exists(app_img):
         print("Error: Could not obtain both figma design and application screenshots.")
         return False
-        
+
     # 3. Create Side-by-Side and Overlay HTML comparison report
     print("\n[3/3] Generating visual comparison HTML report...")
-    
+
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -193,20 +194,21 @@ def generate_comparison_report(figma_url: str, app_url: str, output_html: str = 
 </body>
 </html>
 """
-    
+
     with open(output_html, "w", encoding="utf-8") as f:
         f.write(html_content)
-        
+
     print(f"\n[+] SUCCESS: Visual design comparison report generated successfully!")
     print(f"    Report Path: {os.path.abspath(output_html)}")
     print(f"    You can open this HTML file in your browser to inspect pixel-perfect design alignment.")
     return True
 
+
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("Usage: python tools/figma_implement_design.py <figma_url> <app_url> [output_html]")
         sys.exit(1)
-        
+
     fig_url = sys.argv[1]
     app_url = sys.argv[2]
     out_html = sys.argv[3] if len(sys.argv) > 3 else "tools/design_comparison_report.html"

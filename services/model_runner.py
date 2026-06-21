@@ -125,11 +125,7 @@ def main():
                     dmat = xgb.DMatrix([features])
                     n_trees = model.get_booster().num_boosted_rounds()
                     if n_trees > 10:
-                        early_pred = float(
-                            model.get_booster().predict(
-                                dmat, iteration_range=(0, n_trees // 2)
-                            )[0]
-                        )
+                        early_pred = float(model.get_booster().predict(dmat, iteration_range=(0, n_trees // 2))[0])
                         std = abs(pred - early_pred) * 0.5
                 except Exception:
                     pass

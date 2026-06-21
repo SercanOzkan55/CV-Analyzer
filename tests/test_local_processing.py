@@ -9,22 +9,26 @@ from io import BytesIO
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
+
 @pytest.fixture(autouse=True)
 def mock_cv_processing():
     """Mock CV processing to avoid ProcessPoolExecutor spawn issue on Windows."""
+
     async def mock_ultra_fast(files, job_description, job_id, use_cache=True, workers=None):
         results = []
         for f in files:
-            results.append({
-                "filename": f["filename"],
-                "status": "success",
-                "final_score": 85.0,
-                "ats_score": 90.0,
-                "skills_match": ["Python"],
-                "experience_match": 5,
-                "education_match": 4,
-                "processed_at": "2026-05-17T12:00:00"
-            })
+            results.append(
+                {
+                    "filename": f["filename"],
+                    "status": "success",
+                    "final_score": 85.0,
+                    "ats_score": 90.0,
+                    "skills_match": ["Python"],
+                    "experience_match": 5,
+                    "education_match": 4,
+                    "processed_at": "2026-05-17T12:00:00",
+                }
+            )
         return results
 
     with patch("utils.cv_processor.process_cv_batch_ultra_fast", new=mock_ultra_fast):
@@ -37,12 +41,7 @@ def recruiter_user(db_session):
     from models import User, Organization
 
     # Create organization
-    org = Organization(
-        name="Test Organization",
-        domain="testcompany.com",
-        plan_type="pro",
-        billing_status="active"
-    )
+    org = Organization(name="Test Organization", domain="testcompany.com", plan_type="pro", billing_status="active")
     db_session.add(org)
     db_session.commit()
 
@@ -63,7 +62,7 @@ def recruiter_user(db_session):
         "supabase_id": user.supabase_id,
         "email": user.email,
         "organization_id": user.organization_id,
-        "token": "mock-jwt-token"
+        "token": "mock-jwt-token",
     }
 
 
@@ -180,7 +179,8 @@ def test_generate_api_key_existing(client, recruiter_user, db):
         headers={"Authorization": f"Bearer {recruiter_user['token']}"},
     )
     assert response2.status_code == 200
-    assert response2.json()["api_key"] == api_key
+    assert response2.json()["api_key"].startswith("cv_***")
+    assert response2.json()["api_key"].endswith(api_key[-8:])
     assert "Existing active subscription" in response2.json()["message"]
 
 
@@ -284,9 +284,10 @@ def test_process_local_quota_exceeded(client, recruiter_user, test_job, sample_p
 
     # Set usage to exceed limit
     from models import APISubscription
-    subscription = db.query(APISubscription).filter(
-        APISubscription.api_key == api_key
-    ).first()
+
+    subscription = db.query(APISubscription).filter(APISubscription.api_key_display == api_key[-8:]).first()
+    assert subscription is not None
+    assert subscription.verify_api_key(api_key)
     subscription.monthly_usage = subscription.monthly_limit
     db.commit()
 
@@ -447,8 +448,13 @@ def test_download_expired(client):
     assert "not found or expired" in response.json()["detail"]
 
 
-def test_reset_usage_admin(client, recruiter_user, db):
+def test_reset_usage_admin(client, recruiter_user, db, monkeypatch):
     """Test admin usage reset."""
+    import main
+
+    admin_token = "test-admin-token"
+    monkeypatch.setattr(main, "_ADMIN_TOKEN", admin_token)
+
     # Generate API key and use some quota
     response = client.post(
         "/api/v1/recruiter/subscriptions/generate-key",
@@ -458,16 +464,20 @@ def test_reset_usage_admin(client, recruiter_user, db):
 
     # Manually set usage
     from models import APISubscription
-    subscription = db.query(APISubscription).filter(
-        APISubscription.api_key == api_key
-    ).first()
+
+    subscription = db.query(APISubscription).filter(APISubscription.api_key_display == api_key[-8:]).first()
+    assert subscription is not None
+    assert subscription.verify_api_key(api_key)
     subscription.monthly_usage = 100
     db.commit()
 
     # Reset usage
     response = client.post(
         "/api/v1/recruiter/subscriptions/reset-usage",
-        headers={"Authorization": f"Bearer {recruiter_user['token']}"},
+        headers={
+            "Authorization": f"Bearer {recruiter_user['token']}",
+            "X-Admin-Token": admin_token,
+        },
     )
 
     assert response.status_code == 200

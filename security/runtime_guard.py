@@ -47,6 +47,7 @@ def _get_redis():
             return None
         try:
             from redis import Redis
+
             client = Redis.from_url(
                 _redis_url,
                 decode_responses=True,
@@ -60,6 +61,7 @@ def _get_redis():
             logger.info("redis:reconnected via runtime_guard")
             try:
                 from main import REDIS_CONNECTED
+
                 REDIS_CONNECTED.set(1)
             except Exception:
                 pass
@@ -85,11 +87,13 @@ def _redis_op(fn):
         # SRE: alert on redis disconnect
         try:
             from main import _alert, REDIS_CONNECTED
+
             _alert("redis_down", f"Redis disconnected: {exc}")
             REDIS_CONNECTED.set(0)
         except Exception:
             pass
         return None  # signal caller to use local fallback
+
 
 # ── Per-user optimize concurrency ───────────────────────────────────
 _MAX_USER_OPTIMIZE_CONCURRENT = int(os.getenv("MAX_USER_OPTIMIZE_CONCURRENT", "2"))
@@ -121,12 +125,11 @@ class OptimizeConcurrencyGuard:
             if _user_optimize_counts[self.user_id] >= _MAX_USER_OPTIMIZE_CONCURRENT:
                 logger.warning(
                     "runtime:user_optimize_concurrency user=%s count=%d limit=%d",
-                    self.user_id, _user_optimize_counts[self.user_id],
+                    self.user_id,
+                    _user_optimize_counts[self.user_id],
                     _MAX_USER_OPTIMIZE_CONCURRENT,
                 )
-                raise ValueError(
-                    f"Too many concurrent optimize requests (max {_MAX_USER_OPTIMIZE_CONCURRENT})"
-                )
+                raise ValueError(f"Too many concurrent optimize requests (max {_MAX_USER_OPTIMIZE_CONCURRENT})")
             _user_optimize_counts[self.user_id] += 1
             self._user_acquired = True
 
@@ -197,7 +200,9 @@ def check_download_rate(user_id: str) -> None:
         if len(ts) >= _DOWNLOAD_LIMIT_PER_MIN:
             logger.warning(
                 "runtime:download_rate user=%s count=%d limit=%d",
-                user_id, len(ts), _DOWNLOAD_LIMIT_PER_MIN,
+                user_id,
+                len(ts),
+                _DOWNLOAD_LIMIT_PER_MIN,
             )
             raise ValueError(f"Download rate limit exceeded ({_DOWNLOAD_LIMIT_PER_MIN}/min)")
         ts.append(now)
@@ -244,7 +249,9 @@ def check_signed_url_rate(user_id: str) -> None:
         if len(ts) >= _SIGNED_URL_LIMIT_PER_MIN:
             logger.warning(
                 "runtime:signed_url_rate user=%s count=%d limit=%d",
-                user_id, len(ts), _SIGNED_URL_LIMIT_PER_MIN,
+                user_id,
+                len(ts),
+                _SIGNED_URL_LIMIT_PER_MIN,
             )
             raise ValueError(f"Signed URL rate limit exceeded ({_SIGNED_URL_LIMIT_PER_MIN}/min)")
         ts.append(now)

@@ -1,5 +1,3 @@
-
-
 def test_xss_payload(client):
     """XSS payloads should be neutralized."""
     payload = {

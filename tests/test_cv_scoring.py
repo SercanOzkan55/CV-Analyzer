@@ -6,8 +6,9 @@ from utils.cv_scoring import (
     _calculate_title_match,
     _calculate_seniority_match,
     _calculate_ats_score,
-    _identify_weak_signals
+    _identify_weak_signals,
 )
+
 
 def test_calculate_final_score():
     cv_text = """
@@ -19,47 +20,51 @@ def test_calculate_final_score():
     - Managed deployments.
     Education: Bachelor of Science.
     """
-    
+
     structured_data = {
-        'skills': ['Python', 'Django', 'Docker', 'SQL', 'DevOps'],
-        'experience_years': 5,
-        'education_level': 'Bachelor'
+        "skills": ["Python", "Django", "Docker", "SQL", "DevOps"],
+        "experience_years": 5,
+        "education_level": "Bachelor",
     }
-    
+
     job_description = """
     Looking for a Senior Python Developer with 5+ years of experience.
     Must have React, Python, Django, Docker, SQL, Kubernetes, DevOps.
     Role: Python Developer
     """
-    
+
     score, ats, details = calculate_final_score(cv_text, structured_data, job_description)
     assert 0.0 <= score <= 100.0
     assert 0.0 <= ats <= 100.0
-    assert 'keyword_coverage_pct' in details
-    assert 'experience_score' in details
-    assert 'skills_found' in details
-    assert details['experience_years'] == 5
+    assert "keyword_coverage_pct" in details
+    assert "experience_score" in details
+    assert "skills_found" in details
+    assert details["experience_years"] == 5
+
 
 def test_analyze_keywords():
     # Regular path (some common tech keywords match)
     cv_text = "Experienced in Python and Django."
     jd_text = "Hiring a developer with knowledge of Python, Django, AWS, Kubernetes."
-    
+
     res = _analyze_keywords(cv_text, jd_text)
-    assert res['coverage_pct'] == 60.0  # Python, Django and 'go' (substring of django) found, AWS and Kubernetes missing
-    assert 'python' in res['found_keywords']
-    assert 'django' in res['found_keywords']
-    assert 'aws' in res['missing_keywords']
-    
+    assert (
+        res["coverage_pct"] == 60.0
+    )  # Python, Django and 'go' (substring of django) found, AWS and Kubernetes missing
+    assert "python" in res["found_keywords"]
+    assert "django" in res["found_keywords"]
+    assert "aws" in res["missing_keywords"]
+
     # Fallback path (no standard tech keywords match, extracting words)
     cv_text = "CustomWordA CustomWordB"
     jd_text = "CustomWordA CustomWordB CustomWordC"
-    
+
     # Here tech_keywords contains python etc. If jd has no tech keywords,
     # jd_keywords will be empty. It falls back to extracting basic words that overlap with tech_keywords.
     # But if there are no tech keywords at all, max(len(jd_keywords), 1) will be 1.
     res2 = _analyze_keywords(cv_text, jd_text)
-    assert res2['coverage_pct'] == 0.0
+    assert res2["coverage_pct"] == 0.0
+
 
 def test_calculate_experience_score():
     # Matched from pattern 1
@@ -72,13 +77,14 @@ def test_calculate_experience_score():
     assert _calculate_experience_score(3, "Requires 5+ years of experience") == 50.0
     # Underqualified by >2 years
     assert _calculate_experience_score(1, "Requires 5+ years of experience") == 30.0
-    
+
     # Matched from pattern 2
     assert _calculate_experience_score(4, "Requires 3+ years of Python development") == 90.0
     assert _calculate_experience_score(6, "Requires 3+ years of Python development") == 100.0
-    
+
     # Default required years (3) if no pattern matches
     assert _calculate_experience_score(3, "Just a simple job description with no years mentioned") == 90.0
+
 
 def test_calculate_title_match():
     # Exact match
@@ -90,6 +96,7 @@ def test_calculate_title_match():
     # No job title found in JD lines (less than 5 chars or empty)
     assert _calculate_title_match("Python Developer", "Short") == 50.0
 
+
 def test_calculate_seniority_match():
     # Senior match
     assert _calculate_seniority_match("I am a Senior Engineer", "We need a lead developer") == 100.0
@@ -100,12 +107,13 @@ def test_calculate_seniority_match():
     # Fallback to mid
     assert _calculate_seniority_match("No keywords", "No keywords") == 100.0
 
+
 def test_calculate_ats_score():
     # Minimal text, minimal score
     cv = "John"
     res = _calculate_ats_score(cv, {})
     assert res == 50.0
-    
+
     # Text with everything
     cv_full = """
     John Doe
@@ -128,8 +136,9 @@ def test_calculate_ats_score():
     word word word word word word word word word word word word word word word word word word word word
     word word word word word word word word word word word word word word word word word word word word.
     """
-    res_full = _calculate_ats_score(cv_full, {'skills': ['Python']})
+    res_full = _calculate_ats_score(cv_full, {"skills": ["Python"]})
     assert res_full == 100.0
+
 
 def test_identify_weak_signals():
     # All signals weak
@@ -138,6 +147,6 @@ def test_identify_weak_signals():
     assert "Experience evidence is weak" in weak
     assert "Title alignment is weak" in weak
     assert "Seniority mismatch" in weak
-    
+
     # No signals weak
     assert len(_identify_weak_signals(60, 70, 70, 70)) == 0

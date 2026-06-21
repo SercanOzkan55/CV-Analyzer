@@ -1,4 +1,5 @@
 """Tests for services/rewrite_service.py — text rewriting (mock provider)."""
+
 import os
 import pytest
 from services.rewrite_service import (

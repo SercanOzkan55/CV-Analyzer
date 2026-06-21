@@ -1,4 +1,5 @@
 """Tests for services/ats_service.py — ATS text analysis."""
+
 import pytest
 from services.ats_service import (
     _find_sections,
@@ -25,7 +26,9 @@ class TestFindSections:
         assert _find_sections("") == []
 
     def test_detects_turkish_sections(self):
-        text = "İLETİŞİM\neda@example.com\nÖZET\nBackend geliştirici\nDENEYİM\nPython\nEĞİTİM\nÜniversite\nYETENEKLER\nSQL"
+        text = (
+            "İLETİŞİM\neda@example.com\nÖZET\nBackend geliştirici\nDENEYİM\nPython\nEĞİTİM\nÜniversite\nYETENEKLER\nSQL"
+        )
         sections = _find_sections(text)
         assert "contact" in sections
         assert "summary" in sections
@@ -132,15 +135,25 @@ class TestAnalyzeCv:
 class TestComputeFinalScore:
     def test_returns_float(self):
         result = compute_final_score(
-            keyword=80, section=70, exp=65,
-            skills=75, layout=60, contact=80, ml_score=55,
+            keyword=80,
+            section=70,
+            exp=65,
+            skills=75,
+            layout=60,
+            contact=80,
+            ml_score=55,
         )
         assert isinstance(result, (int, float))
         assert 0 <= result <= 100
 
     def test_no_keyword(self):
         result = compute_final_score(
-            keyword=0, section=70, exp=65,
-            skills=75, layout=60, contact=80, ml_score=55,
+            keyword=0,
+            section=70,
+            exp=65,
+            skills=75,
+            layout=60,
+            contact=80,
+            ml_score=55,
         )
         assert 0 <= result <= 100

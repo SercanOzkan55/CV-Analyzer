@@ -1,4 +1,5 @@
 """Unit tests for services/scoring_service.py"""
+
 import pytest
 from services.scoring_service import calculate_similarity
 
@@ -33,6 +34,7 @@ class TestCalculateSimilarity:
 
     def test_high_dimensional(self):
         import random
+
         random.seed(42)
         vec1 = [random.random() for _ in range(1536)]
         sim = calculate_similarity(vec1, vec1)

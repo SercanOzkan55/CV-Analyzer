@@ -6,12 +6,14 @@ CVs are processed and results returned without saving to database.
 import secrets
 import os
 import logging
+import hashlib
 
 logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta
 from typing import List
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Header, UploadFile, Request
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from config.aws import MAX_UPLOAD_BYTES
@@ -46,17 +48,31 @@ def validate_api_key(api_key: str, db: Session, lock: bool = False) -> APISubscr
     if not api_key or not api_key.startswith("cv_"):
         raise HTTPException(status_code=401, detail="Invalid API key format")
 
-    import hashlib
-    hashed_key = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+    legacy_hash = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+    display_tail = api_key[-8:] if len(api_key) > 8 else "****"
 
     query = db.query(APISubscription)
     if lock:
         query = query.with_for_update()
 
-    subscription = query.filter(
-        (APISubscription.api_key == hashed_key) | (APISubscription.api_key == api_key),
-        APISubscription.is_active == True
-    ).first()
+    candidates = query.filter(
+        APISubscription.is_active == True,
+        or_(
+            APISubscription.api_key_display == display_tail,
+            APISubscription.api_key_hash == legacy_hash,
+            APISubscription.api_key_hash == api_key,
+        ),
+    ).all()
+
+    subscription = None
+    for candidate in candidates:
+        try:
+            verified = candidate.verify_api_key(api_key)
+        except Exception:
+            verified = False
+        if candidate.api_key_hash in {legacy_hash, api_key} or verified:
+            subscription = candidate
+            break
 
     if not subscription:
         raise HTTPException(status_code=401, detail="Invalid or inactive API key")
@@ -73,8 +89,7 @@ def check_monthly_quota(subscription: APISubscription, requested_cvs: int):
     remaining = subscription.monthly_limit - subscription.monthly_usage
     if remaining < requested_cvs:
         raise HTTPException(
-            status_code=429,
-            detail=f"Monthly quota exceeded. Remaining: {remaining}, Requested: {requested_cvs}"
+            status_code=429, detail=f"Monthly quota exceeded. Remaining: {remaining}, Requested: {requested_cvs}"
         )
 
 
@@ -89,40 +104,34 @@ async def generate_subscription_key(
     """
     org_id = recruiter.organization_id
     if not org_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Recruiter profile is incomplete (no organization assigned)"
-        )
+        raise HTTPException(status_code=400, detail="Recruiter profile is incomplete (no organization assigned)")
 
     # Check if organization already has an active subscription
-    existing = db.query(APISubscription).filter(
-        APISubscription.organization_id == org_id,
-        APISubscription.is_active == True
-    ).first()
+    existing = (
+        db.query(APISubscription)
+        .filter(APISubscription.organization_id == org_id, APISubscription.is_active == True)
+        .first()
+    )
 
     if existing:
-        masked_key = "cv_***"
-        if len(existing.api_key) > 8:
-            masked_key = f"cv_***{existing.api_key[-6:]}"
+        masked_key = f"cv_***{existing.api_key_display}" if existing.api_key_display else "cv_***"
         return {
             "api_key": masked_key,
             "monthly_limit": existing.monthly_limit,
             "monthly_usage": existing.monthly_usage,
             "expires_at": existing.expires_at.isoformat() if existing.expires_at else None,
-            "message": "Existing active subscription found. API key is hidden for security."
+            "message": "Existing active subscription found. API key is hidden for security.",
         }
 
     # Create new subscription
     raw_key = generate_api_key()
-    import hashlib
-    hashed_key = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
 
     subscription = APISubscription(
         organization_id=org_id,
-        api_key=hashed_key,
         monthly_limit=1000,  # Default 1000 CVs/month
         expires_at=datetime.utcnow() + timedelta(days=365),  # 1 year
     )
+    subscription.set_api_key(raw_key)
 
     db.add(subscription)
     db.commit()
@@ -133,7 +142,7 @@ async def generate_subscription_key(
         "monthly_limit": subscription.monthly_limit,
         "monthly_usage": subscription.monthly_usage,
         "expires_at": subscription.expires_at.isoformat(),
-        "message": "New API key generated successfully. Please copy it now as it won't be shown again."
+        "message": "New API key generated successfully. Please copy it now as it won't be shown again.",
     }
 
 
@@ -152,21 +161,18 @@ async def rotate_subscription_key(
 
     # Deactivate all existing subscriptions for this org
     db.query(APISubscription).filter(
-        APISubscription.organization_id == org_id,
-        APISubscription.is_active == True
+        APISubscription.organization_id == org_id, APISubscription.is_active == True
     ).update({"is_active": False})
 
     # Generate new key
     raw_key = generate_api_key()
-    import hashlib
-    hashed_key = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
 
     subscription = APISubscription(
         organization_id=org_id,
-        api_key=hashed_key,
         monthly_limit=1000,
         expires_at=datetime.utcnow() + timedelta(days=365),
     )
+    subscription.set_api_key(raw_key)
     db.add(subscription)
     db.commit()
     db.refresh(subscription)
@@ -176,7 +182,7 @@ async def rotate_subscription_key(
         "monthly_limit": subscription.monthly_limit,
         "monthly_usage": subscription.monthly_usage,
         "expires_at": subscription.expires_at.isoformat(),
-        "message": "New API key generated and old keys deactivated. Please copy it now as it won't be shown again."
+        "message": "New API key generated and old keys deactivated. Please copy it now as it won't be shown again.",
     }
 
 
@@ -192,14 +198,14 @@ async def revoke_subscription_key(
     if not org_id:
         raise HTTPException(status_code=400, detail="No organization assigned")
 
-    updated = db.query(APISubscription).filter(
-        APISubscription.organization_id == org_id,
-        APISubscription.is_active == True
-    ).update({"is_active": False})
+    updated = (
+        db.query(APISubscription)
+        .filter(APISubscription.organization_id == org_id, APISubscription.is_active == True)
+        .update({"is_active": False})
+    )
 
     db.commit()
     return {"message": f"Revoked {updated} API key(s)"}
-
 
 
 @router.get("/subscriptions/usage")
@@ -215,7 +221,7 @@ async def get_subscription_usage(
         "monthly_usage": subscription.monthly_usage,
         "remaining": subscription.monthly_limit - subscription.monthly_usage,
         "expires_at": subscription.expires_at.isoformat() if subscription.expires_at else None,
-        "is_active": subscription.is_active
+        "is_active": subscription.is_active,
     }
 
 
@@ -251,16 +257,14 @@ async def process_cvs_local_mode(
     check_monthly_quota(subscription, len(files))
 
     # Validate job belongs to organization
-    job = db.query(RecruiterJob).filter(
-        RecruiterJob.id == job_id,
-        RecruiterJob.organization_id == subscription.organization_id
-    ).first()
+    job = (
+        db.query(RecruiterJob)
+        .filter(RecruiterJob.id == job_id, RecruiterJob.organization_id == subscription.organization_id)
+        .first()
+    )
 
     if not job:
-        raise HTTPException(
-            status_code=404,
-            detail="Job not found or you do not have permission to access it"
-        )
+        raise HTTPException(status_code=404, detail="Job not found or you do not have permission to access it")
 
     # Validate files
     if not files or len(files) == 0:
@@ -268,8 +272,7 @@ async def process_cvs_local_mode(
 
     if len(files) > _MAX_LOCAL_BATCH_FILES:
         raise HTTPException(
-            status_code=400,
-            detail=f"Maximum {_MAX_LOCAL_BATCH_FILES} files per request (you provided {len(files)})"
+            status_code=400, detail=f"Maximum {_MAX_LOCAL_BATCH_FILES} files per request (you provided {len(files)})"
         )
 
     # Process CVs (no database save)
@@ -288,25 +291,18 @@ async def process_cvs_local_mode(
                     status_code=400,
                     detail=f"File too large (max {_format_bytes(MAX_UPLOAD_BYTES)}): {file.filename}",
                 )
-            cv_files.append({
-                'filename': file.filename,
-                'content': content,
-                'size': len(content)
-            })
+            cv_files.append({"filename": file.filename, "content": content, "size": len(content)})
 
         results = await process_cv_batch_ultra_fast(
             files=cv_files,
             job_description=job.description,
             job_id=job_id,
             use_cache=True,
-            workers=None  # Auto-detect CPU cores
+            workers=None,  # Auto-detect CPU cores
         )
     except Exception as e:
         logger.exception("Large batch processing failed: %s", str(e))
-        raise HTTPException(
-            status_code=500,
-            detail="Large batch processing failed due to an unexpected error"
-        )
+        raise HTTPException(status_code=500, detail="Large batch processing failed due to an unexpected error")
 
     # Update usage
     subscription.monthly_usage += len(files)
@@ -334,17 +330,14 @@ async def process_cvs_local_mode(
             "total_cvs": len(results),
             "job_id": job_id,
             "job_title": job.title,
-            "processed_at": datetime.utcnow().isoformat()
+            "processed_at": datetime.utcnow().isoformat(),
         },
-        "downloads": {
-            "json": json_url,
-            "csv": csv_url
-        },
+        "downloads": {"json": json_url, "csv": csv_url},
         "usage": {
             "monthly_limit": subscription.monthly_limit,
             "monthly_usage": subscription.monthly_usage,
-            "remaining": subscription.monthly_limit - subscription.monthly_usage
-        }
+            "remaining": subscription.monthly_limit - subscription.monthly_usage,
+        },
     }
 
 
@@ -379,14 +372,15 @@ async def process_linkedin_export_zip(
     subscription = validate_api_key(api_key, db, lock=True)
 
     # Validate ZIP file
-    if not zip_file.filename.lower().endswith('.zip'):
+    if not zip_file.filename.lower().endswith(".zip"):
         raise HTTPException(status_code=400, detail="Only ZIP files are supported")
 
     # Get job details
-    job = db.query(RecruiterJob).filter(
-        RecruiterJob.id == job_id,
-        RecruiterJob.organization_id == subscription.organization_id
-    ).first()
+    job = (
+        db.query(RecruiterJob)
+        .filter(RecruiterJob.id == job_id, RecruiterJob.organization_id == subscription.organization_id)
+        .first()
+    )
 
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -399,21 +393,19 @@ async def process_linkedin_export_zip(
     # Process LinkedIn export
     try:
         from utils.cv_processor import process_cv_batch_chunked
+
         results, summary = await process_cv_batch_chunked(
             zip_file=zip_file,
             job_description=job.description,
             job_id=job_id,
             chunk_size=chunk_size,
-            progress_callback=None  # Could integrate with WebSocket
+            progress_callback=None,  # Could integrate with WebSocket
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception("Large batch processing failed: %s", str(e))
-        raise HTTPException(
-            status_code=500,
-            detail="Large batch processing failed due to an unexpected error"
-        )
+        raise HTTPException(status_code=500, detail="Large batch processing failed due to an unexpected error")
 
     # Update usage with actual count
     actual_cvs = len(results)
@@ -445,17 +437,14 @@ async def process_linkedin_export_zip(
             "job_id": job_id,
             "job_title": job.title,
             "source": "LinkedIn Export",
-            "processed_at": datetime.utcnow().isoformat()
+            "processed_at": datetime.utcnow().isoformat(),
         },
-        "downloads": {
-            "json": json_url,
-            "csv": csv_url
-        },
+        "downloads": {"json": json_url, "csv": csv_url},
         "usage": {
             "monthly_limit": subscription.monthly_limit,
             "monthly_usage": subscription.monthly_usage,
-            "remaining": subscription.monthly_limit - subscription.monthly_usage
-        }
+            "remaining": subscription.monthly_limit - subscription.monthly_usage,
+        },
     }
 
 
@@ -491,14 +480,15 @@ async def process_linkedin_export_large(
     subscription = validate_api_key(api_key, db, lock=True)
 
     # Validate ZIP file
-    if not zip_file.filename.lower().endswith('.zip'):
+    if not zip_file.filename.lower().endswith(".zip"):
         raise HTTPException(status_code=400, detail="Only ZIP files are supported")
 
     # Get job details
-    job = db.query(RecruiterJob).filter(
-        RecruiterJob.id == job_id,
-        RecruiterJob.organization_id == subscription.organization_id
-    ).first()
+    job = (
+        db.query(RecruiterJob)
+        .filter(RecruiterJob.id == job_id, RecruiterJob.organization_id == subscription.organization_id)
+        .first()
+    )
 
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -508,12 +498,12 @@ async def process_linkedin_export_large(
     if subscription.monthly_limit - subscription.monthly_usage < max_csv_estimate:
         raise HTTPException(
             status_code=429,
-            detail=f"Insufficient quota for large batch processing. Remaining: {subscription.monthly_limit - subscription.monthly_usage}"
+            detail=f"Insufficient quota for large batch processing. Remaining: {subscription.monthly_limit - subscription.monthly_usage}",
         )
 
     # Process in chunks
     from utils.cv_processor import process_cv_batch_chunked
-    
+
     session_id = str(datetime.utcnow().timestamp())
 
     try:
@@ -522,7 +512,7 @@ async def process_linkedin_export_large(
             job_description=job.description,
             job_id=job_id,
             chunk_size=chunk_size,
-            progress_callback=None  # Could integrate with WebSocket
+            progress_callback=None,  # Could integrate with WebSocket
         )
 
         # Update usage with actual count
@@ -555,30 +545,23 @@ async def process_linkedin_export_large(
                 **summary,
                 "job_id": job_id,
                 "job_title": job.title,
-                "processed_at": datetime.utcnow().isoformat()
+                "processed_at": datetime.utcnow().isoformat(),
             },
             "results": results[:100],  # Return top 100 for preview
             "total_results": len(results),
-            "downloads": {
-                "json": json_url,
-                "csv": csv_url,
-                "note": "Full results available in JSON/CSV downloads"
-            },
+            "downloads": {"json": json_url, "csv": csv_url, "note": "Full results available in JSON/CSV downloads"},
             "usage": {
                 "monthly_limit": subscription.monthly_limit,
                 "monthly_usage": subscription.monthly_usage,
-                "remaining": subscription.monthly_limit - subscription.monthly_usage
-            }
+                "remaining": subscription.monthly_limit - subscription.monthly_usage,
+            },
         }
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception("Large batch processing failed: %s", str(e))
-        raise HTTPException(
-            status_code=500,
-            detail="Large batch processing failed due to an unexpected error"
-        )
+        raise HTTPException(status_code=500, detail="Large batch processing failed due to an unexpected error")
 
 
 @router.get("/processing-status/{session_id}")
@@ -589,7 +572,7 @@ async def get_processing_status(
 ):
     """
     Get status of large batch processing.
-    
+
     **Returns:**
     - `status`: 'processing' | 'completed' | 'failed'
     - `progress`: Current progress info
@@ -599,14 +582,14 @@ async def get_processing_status(
     validate_api_key(api_key, db)
 
     from utils.cv_processor import get_processing_status
-    
+
     status = await get_processing_status(session_id)
 
     return {
         "session_id": session_id,
-        "status": status.get('status', 'unknown'),
+        "status": status.get("status", "unknown"),
         "progress": status,
-        "eta_seconds": status.get('eta', 'unknown')
+        "eta_seconds": status.get("eta", "unknown"),
     }
 
 
@@ -621,6 +604,7 @@ async def reset_monthly_usage(
     Normally this would be automated, but manual reset for testing.
     """
     from core.http_runtime import _admin_access_error
+
     admin_error = _admin_access_error(request)
     if admin_error:
         return admin_error
@@ -630,9 +614,7 @@ async def reset_monthly_usage(
         raise HTTPException(status_code=400, detail="No organization assigned")
 
     # Reset all subscriptions for this org
-    updated = db.query(APISubscription).filter(
-        APISubscription.organization_id == org_id
-    ).update({"monthly_usage": 0})
+    updated = db.query(APISubscription).filter(APISubscription.organization_id == org_id).update({"monthly_usage": 0})
 
     db.commit()
 

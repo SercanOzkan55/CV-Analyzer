@@ -1,4 +1,5 @@
 """Tests for services/feature_engineering_service.py."""
+
 import pytest
 from services.feature_engineering_service import build_feature_vector, FEATURE_NAMES, N_FEATURES
 
@@ -6,8 +7,11 @@ from services.feature_engineering_service import build_feature_vector, FEATURE_N
 class TestBuildFeatureVector:
     def _base_args(self, **overrides):
         defaults = dict(
-            semantic_score=70, keyword_score=60, skill_score=65,
-            exp_score=50, missing_skills=["python", "sql"],
+            semantic_score=70,
+            keyword_score=60,
+            skill_score=65,
+            exp_score=50,
+            missing_skills=["python", "sql"],
             total_required_skills=10,
         )
         defaults.update(overrides)
@@ -58,8 +62,8 @@ class TestBuildFeatureVector:
             },
         }
         vec = build_feature_vector(**self._base_args(), ats_details=ats_details)
-        assert vec[9] == 85.0   # bullet_score
-        assert vec[10] == 3     # section_count
+        assert vec[9] == 85.0  # bullet_score
+        assert vec[10] == 3  # section_count
         assert vec[15] == 75.0  # action_verb_score
 
     def test_section_presence_flags(self):
@@ -85,8 +89,8 @@ class TestBuildFeatureVector:
             keyword_density=0.05,
             education_quality=80.0,
         )
-        assert vec[22] == 0.8   # domain_similarity
-        assert vec[23] == 0.9   # title_match
+        assert vec[22] == 0.8  # domain_similarity
+        assert vec[23] == 0.9  # title_match
         assert vec[28] == 80.0  # education_quality
 
     def test_feature_names_count_matches(self):

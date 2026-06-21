@@ -1,4 +1,5 @@
 """Unit tests for services/keyword_service.py"""
+
 import pytest
 from services.keyword_service import (
     compute_keyword_gap,
@@ -9,6 +10,7 @@ from services.keyword_service import (
 
 
 # ── keyword_match_score ──────────────────────────────────────
+
 
 class TestKeywordMatchScore:
     def test_identical_text_returns_high_score(self):
@@ -49,6 +51,7 @@ class TestKeywordMatchScore:
 
 # ── compute_keyword_gap ──────────────────────────────────────
 
+
 class TestComputeKeywordGap:
     def test_missing_words_detected(self):
         cv = "Python developer"
@@ -70,12 +73,17 @@ class TestComputeKeywordGap:
 
 # ── compare ──────────────────────────────────────────────────
 
+
 class TestCompare:
     def test_returns_all_keys(self):
         result = compare("Python", "Python Django")
         expected_keys = {
-            "missing_keywords", "weak_keywords", "strong_keywords",
-            "suggested_keywords", "extra_keywords", "keyword_coverage_pct",
+            "missing_keywords",
+            "weak_keywords",
+            "strong_keywords",
+            "suggested_keywords",
+            "extra_keywords",
+            "keyword_coverage_pct",
         }
         assert set(result.keys()) == expected_keys
 
@@ -115,6 +123,7 @@ class TestCompare:
 
 
 # ── _extract_meaningful_words ────────────────────────────────
+
 
 class TestExtractMeaningfulWords:
     def test_filters_stop_words(self):

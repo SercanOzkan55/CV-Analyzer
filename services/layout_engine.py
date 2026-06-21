@@ -30,6 +30,7 @@ def _wrap_line(value: str, width: int = 0) -> str:
 #  NEW schema-based layout engine
 # =====================================================================
 
+
 def build_layout(schema, section_order: List[str] | None = None) -> Dict[str, Any]:
     """Convert a CVSchema into ordered layout blocks for renderers.
 
@@ -101,13 +102,15 @@ def _build_experience_block(schema) -> Dict[str, Any] | None:
     items = []
     for exp in schema.experiences:
         date = " – ".join([p for p in [exp.start_date, exp.end_date] if p])
-        items.append({
-            "role": exp.title,
-            "company": exp.company,
-            "location": exp.location,
-            "date": date,
-            "bullets": [b for b in exp.bullets if b],
-        })
+        items.append(
+            {
+                "role": exp.title,
+                "company": exp.company,
+                "location": exp.location,
+                "date": date,
+                "bullets": [b for b in exp.bullets if b],
+            }
+        )
     return {"type": "experience", "items": items}
 
 
@@ -116,11 +119,13 @@ def _build_projects_block(schema) -> Dict[str, Any] | None:
         return None
     items = []
     for proj in schema.projects:
-        items.append({
-            "name": proj.name,
-            "description": proj.description,
-            "bullets": [b for b in proj.bullets if b],
-        })
+        items.append(
+            {
+                "name": proj.name,
+                "description": proj.description,
+                "bullets": [b for b in proj.bullets if b],
+            }
+        )
     return {"type": "projects", "items": items}
 
 
@@ -130,14 +135,16 @@ def _build_education_block(schema) -> Dict[str, Any] | None:
     items = []
     for edu in schema.education:
         date = " – ".join([p for p in [edu.start_date, edu.end_date] if p])
-        items.append({
-            "degree": edu.degree,
-            "field": edu.field,
-            "school": edu.school,
-            "location": edu.location,
-            "date": date,
-            "gpa": edu.gpa,
-        })
+        items.append(
+            {
+                "degree": edu.degree,
+                "field": edu.field,
+                "school": edu.school,
+                "location": edu.location,
+                "date": date,
+                "gpa": edu.gpa,
+            }
+        )
     return {"type": "education", "items": items}
 
 
@@ -174,7 +181,8 @@ def build_layout_schema(cv_data: Dict[str, Any]) -> Dict[str, Any]:
         "name": _clean_text(data.get("full_name", "")),
         "title": _clean_text(data.get("title", "")),
         "contacts": [
-            v for v in [
+            v
+            for v in [
                 _clean_text(data.get("email", "")),
                 _clean_text(data.get("phone", "")),
                 _clean_text(data.get("location", "")),

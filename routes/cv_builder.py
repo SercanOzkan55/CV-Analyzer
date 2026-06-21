@@ -54,7 +54,9 @@ def audit_log(*args, **kwargs):
 def _max_response_body_bytes() -> int:
     return int(getattr(_main_module(), "_MAX_RESPONSE_BODY_BYTES", 50 * 1024 * 1024))
 
+
 router = APIRouter(tags=["cv-builder"])
+
 
 class CVBuilderRequest(BaseModel):
     full_name: str
@@ -275,5 +277,3 @@ def cv_builder_suggest_summary(
         raise HTTPException(status_code=400, detail=str(exc))
 
     return {"suggestions": suggestions, "plan": plan}
-
-

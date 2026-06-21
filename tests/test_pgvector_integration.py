@@ -7,11 +7,7 @@ PG_URL = os.getenv("DATABASE_URL", "")
 
 
 def make_vec(val, dim=1536):
-    return (
-        "['" + ",".join([str(val)] * dim) + "']"
-        if False
-        else "[" + ",".join([str(val)] * dim) + "]"
-    )
+    return "['" + ",".join([str(val)] * dim) + "']" if False else "[" + ",".join([str(val)] * dim) + "]"
 
 
 @pytest.mark.skipif(
@@ -28,16 +24,8 @@ def test_pgvector_similarity(db_session):
     q = make_vec(0.0105)
 
     # Use literal vector notation to avoid driver parameter quirks in test
-    db_session.execute(
-        text(
-            f"INSERT INTO candidates (cv_text, cv_embedding) VALUES ('candA', '{v1}'::vector)"
-        )
-    )
-    db_session.execute(
-        text(
-            f"INSERT INTO candidates (cv_text, cv_embedding) VALUES ('candB', '{v2}'::vector)"
-        )
-    )
+    db_session.execute(text(f"INSERT INTO candidates (cv_text, cv_embedding) VALUES ('candA', '{v1}'::vector)"))
+    db_session.execute(text(f"INSERT INTO candidates (cv_text, cv_embedding) VALUES ('candB', '{v2}'::vector)"))
     db_session.commit()
 
     res = db_session.execute(

@@ -58,25 +58,27 @@ def rank_candidates(analyses: list[dict]) -> list[dict]:
             cv_text = item.get("cv_text") or ""
             summary_text = cv_text[:200].strip()
 
-        ranked.append({
-            "rank": i,
-            "candidate_name": item.get("candidate_name", f"Candidate {i}"),
-            "candidate_email": item.get("candidate_email", ""),
-            "final_score": round(float(item.get("final_score") or 0), 2),
-            "ats_score": round(float(item.get("ats_score") or 0), 2),
-            "skill_score": round(float(item.get("skill_score") or 0), 2),
-            "experience_count": item["_sort_key"][1],
-            "skills_count": item["_sort_key"][2],
-            "preview": summary_text[:200],
-            "detected_skills": (item.get("detected_skills") or [])[:15],
-            "missing_skills": (item.get("missing_skills") or [])[:10],
-            "score_breakdown": item.get("score_breakdown") or {},
-            "job_description_quality": item.get("job_description_quality") or {},
-            "warnings": item.get("warnings") or [],
-            "score_version": item.get("score_version") or "",
-            "file_name": item.get("file_name", ""),
-            "cv_text": item.get("cv_text", ""),
-        })
+        ranked.append(
+            {
+                "rank": i,
+                "candidate_name": item.get("candidate_name", f"Candidate {i}"),
+                "candidate_email": item.get("candidate_email", ""),
+                "final_score": round(float(item.get("final_score") or 0), 2),
+                "ats_score": round(float(item.get("ats_score") or 0), 2),
+                "skill_score": round(float(item.get("skill_score") or 0), 2),
+                "experience_count": item["_sort_key"][1],
+                "skills_count": item["_sort_key"][2],
+                "preview": summary_text[:200],
+                "detected_skills": (item.get("detected_skills") or [])[:15],
+                "missing_skills": (item.get("missing_skills") or [])[:10],
+                "score_breakdown": item.get("score_breakdown") or {},
+                "job_description_quality": item.get("job_description_quality") or {},
+                "warnings": item.get("warnings") or [],
+                "score_version": item.get("score_version") or "",
+                "file_name": item.get("file_name", ""),
+                "cv_text": item.get("cv_text", ""),
+            }
+        )
         del item["_sort_key"]
 
     return ranked
@@ -406,9 +408,7 @@ def get_email_templates(db: Session, org_id: int) -> list[EmailTemplate]:
 
 def get_email_template(db: Session, template_id: int, org_id: int) -> EmailTemplate | None:
     return (
-        db.query(EmailTemplate)
-        .filter(EmailTemplate.id == template_id, EmailTemplate.organization_id == org_id)
-        .first()
+        db.query(EmailTemplate).filter(EmailTemplate.id == template_id, EmailTemplate.organization_id == org_id).first()
     )
 
 

@@ -9,6 +9,7 @@ All functions accept a ``CVModel`` and optional job text.  No external
 API calls are required for keyword matching; semantic match uses the
 existing ``embedding_service`` when OpenAI is configured.
 """
+
 from __future__ import annotations
 
 import logging
@@ -33,12 +34,14 @@ logger = logging.getLogger("app.job_match")
 # 1. JOB MATCHING
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @dataclass(frozen=True, slots=True)
 class MatchResult:
     """Result of matching a CV against a job description."""
-    match_score: float          # 0-100
-    keyword_score: float        # 0-100
-    semantic_score: float       # 0-100  (0 when embedding unavailable)
+
+    match_score: float  # 0-100
+    keyword_score: float  # 0-100
+    semantic_score: float  # 0-100  (0 when embedding unavailable)
     missing_keywords: list[str] = field(default_factory=list)
     weak_keywords: list[str] = field(default_factory=list)
     strong_keywords: list[str] = field(default_factory=list)
@@ -70,6 +73,7 @@ def _semantic_match(cv_text_str: str, job_text: str) -> float:
     """
     try:
         from services.embedding_service import get_embedding
+
         cv_emb = get_embedding(cv_text_str)
         job_emb = get_embedding(job_text)
         if cv_emb is None or job_emb is None:
@@ -128,10 +132,11 @@ def match_cv_to_job(model: CVModel, job_text: str) -> MatchResult:
 # 2. FEEDBACK GENERATOR
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @dataclass(frozen=True, slots=True)
 class FeedbackItem:
-    category: str       # "skills" | "experience" | "education" | "structure" | "content"
-    priority: str       # "high" | "medium" | "low"
+    category: str  # "skills" | "experience" | "education" | "structure" | "content"
+    priority: str  # "high" | "medium" | "low"
     message: str
 
 
@@ -166,16 +171,24 @@ def generate_feedback(
 
     # ── Structure feedback ────────────────────────────────────────────
     if not (model.summary or "").strip():
-        items.append(FeedbackItem("structure", "high", "Add a professional summary — most ATS systems look for this section"))
+        items.append(
+            FeedbackItem("structure", "high", "Add a professional summary — most ATS systems look for this section")
+        )
         potential_boost += 5
     if not model.experiences:
-        items.append(FeedbackItem("structure", "high", "Add work experience — this is the most important section for ATS ranking"))
+        items.append(
+            FeedbackItem(
+                "structure", "high", "Add work experience — this is the most important section for ATS ranking"
+            )
+        )
         potential_boost += 10
     if not model.education:
         items.append(FeedbackItem("structure", "medium", "Add education details to improve completeness"))
         potential_boost += 4
     if not model.languages:
-        items.append(FeedbackItem("structure", "low", "Consider adding languages to stand out in international markets"))
+        items.append(
+            FeedbackItem("structure", "low", "Consider adding languages to stand out in international markets")
+        )
         potential_boost += 2
     if not model.projects and not model.certifications:
         items.append(FeedbackItem("structure", "low", "Add projects or certifications to demonstrate practical skills"))
@@ -184,10 +197,16 @@ def generate_feedback(
     # ── Skills feedback ───────────────────────────────────────────────
     skills = _all_skills(model)
     if len(skills) == 0:
-        items.append(FeedbackItem("skills", "high", "Add technical skills — ATS systems rely heavily on skill keywords"))
+        items.append(
+            FeedbackItem("skills", "high", "Add technical skills — ATS systems rely heavily on skill keywords")
+        )
         potential_boost += 8
     elif len(skills) < 5:
-        items.append(FeedbackItem("skills", "medium", f"You have only {len(skills)} skills listed — aim for 8-15 relevant skills"))
+        items.append(
+            FeedbackItem(
+                "skills", "medium", f"You have only {len(skills)} skills listed — aim for 8-15 relevant skills"
+            )
+        )
         potential_boost += 5
 
     # ── Experience quality ────────────────────────────────────────────
@@ -195,20 +214,24 @@ def generate_feedback(
         total_bullets = sum(len(e.bullets) for e in model.experiences)
         avg_bullets = total_bullets / len(model.experiences)
         if avg_bullets < 2:
-            items.append(FeedbackItem("experience", "high", "Add more bullet points to your roles — aim for 3-5 per position"))
+            items.append(
+                FeedbackItem("experience", "high", "Add more bullet points to your roles — aim for 3-5 per position")
+            )
             potential_boost += 6
 
         # Check for quantified achievements
-        quant_count = sum(
-            1 for e in model.experiences
-            for b in e.bullets
-            if re.search(r"\d+[%$€£]|\d{2,}", b)
-        )
+        quant_count = sum(1 for e in model.experiences for b in e.bullets if re.search(r"\d+[%$€£]|\d{2,}", b))
         if quant_count == 0 and total_bullets > 0:
-            items.append(FeedbackItem("content", "high", "Add quantified achievements (e.g. 'Reduced costs by 30%', 'Managed team of 8')"))
+            items.append(
+                FeedbackItem(
+                    "content", "high", "Add quantified achievements (e.g. 'Reduced costs by 30%', 'Managed team of 8')"
+                )
+            )
             potential_boost += 5
         elif quant_count < 3 and total_bullets >= 5:
-            items.append(FeedbackItem("content", "medium", "Add more measurable results — numbers make your impact concrete"))
+            items.append(
+                FeedbackItem("content", "medium", "Add more measurable results — numbers make your impact concrete")
+            )
             potential_boost += 3
 
     # ── Contact info ──────────────────────────────────────────────────
@@ -223,19 +246,25 @@ def generate_feedback(
     if match_result and match_result.missing_keywords:
         top_missing = match_result.missing_keywords[:10]
         kw_list = ", ".join(top_missing)
-        items.append(FeedbackItem(
-            "skills", "high",
-            f"Add these keywords from the job description: {kw_list}",
-        ))
+        items.append(
+            FeedbackItem(
+                "skills",
+                "high",
+                f"Add these keywords from the job description: {kw_list}",
+            )
+        )
         potential_boost += min(10, len(top_missing))
 
     if match_result and match_result.weak_keywords:
         top_weak = match_result.weak_keywords[:5]
         kw_list = ", ".join(top_weak)
-        items.append(FeedbackItem(
-            "content", "medium",
-            f"Strengthen these keywords (mentioned only once): {kw_list}",
-        ))
+        items.append(
+            FeedbackItem(
+                "content",
+                "medium",
+                f"Strengthen these keywords (mentioned only once): {kw_list}",
+            )
+        )
         potential_boost += 3
 
     potential = min(100, score.overall + potential_boost)
@@ -251,11 +280,13 @@ def generate_feedback(
 # 3. RECRUITER SCORE
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @dataclass(frozen=True, slots=True)
 class RecruiterScoreResult:
     """Recruiter-facing assessment of a candidate."""
-    recruiter_interest: int     # 0-100  — would a recruiter open this CV?
-    hireability: int            # 0-100  — could this person get hired?
+
+    recruiter_interest: int  # 0-100  — would a recruiter open this CV?
+    hireability: int  # 0-100  — could this person get hired?
     shortlist_probability: int  # 0-100  — chance of making the shortlist
     strengths: list[str] = field(default_factory=list)
     concerns: list[str] = field(default_factory=list)
@@ -358,11 +389,7 @@ def recruiter_score(
         hireability += 5
 
     # Quantified achievements signal impact
-    quant = sum(
-        1 for e in model.experiences
-        for b in e.bullets
-        if re.search(r"\d+[%$€£]|\d{2,}", b)
-    )
+    quant = sum(1 for e in model.experiences for b in e.bullets if re.search(r"\d+[%$€£]|\d{2,}", b))
     if quant >= 3:
         hireability += 10
         strengths.append("Quantified achievements")

@@ -106,6 +106,7 @@ def iter_supported_local_files(folder: Path, output: Path) -> list[Path]:
             continue
     return sorted(files, key=lambda item: str(item).lower())
 
+
 def _should_verify_ssl(api_url: str) -> bool:
     """SSL verification is bypassed only for local development servers."""
     try:
@@ -113,6 +114,7 @@ def _should_verify_ssl(api_url: str) -> bool:
     except ValueError:
         return True
     return not _is_local_host(parsed.hostname)
+
 
 VERIFY_SSL = _should_verify_ssl(API_BASE_URL)
 WORKER_VERSION = "1.2.0"
@@ -134,8 +136,34 @@ SKILL_SYNONYMS = {
     "google cloud": ["gcp", "google cloud platform"],
     "microsoft azure": ["azure"],
     "object oriented programming": ["oop", "oops"],
-    "backend": ["django", "fastapi", "flask", "spring boot", "asp.net", "expressjs", "laravel", "symfony", "back-end", "database", "api", "node"],
-    "frontend": ["react", "angular", "vue", "nextjs", "html", "css", "javascript", "typescript", "front-end", "ui", "ux", "tailwind"],
+    "backend": [
+        "django",
+        "fastapi",
+        "flask",
+        "spring boot",
+        "asp.net",
+        "expressjs",
+        "laravel",
+        "symfony",
+        "back-end",
+        "database",
+        "api",
+        "node",
+    ],
+    "frontend": [
+        "react",
+        "angular",
+        "vue",
+        "nextjs",
+        "html",
+        "css",
+        "javascript",
+        "typescript",
+        "front-end",
+        "ui",
+        "ux",
+        "tailwind",
+    ],
     "database": ["sql", "postgresql", "mysql", "mongodb", "redis", "sqlite", "oracle", "mssql", "db"],
     "mobile": ["flutter", "react native", "android", "ios", "swift", "kotlin", "objective-c"],
     "devops": ["docker", "kubernetes", "jenkins", "ci/cd", "terraform", "ansible", "aws", "gcp", "azure"],
@@ -151,34 +179,198 @@ def csv_safe(value):
         return "'" + value
     return value
 
+
 STOPWORDS = {
     # English
-    "the", "and", "for", "are", "but", "not", "you", "all", "can", "her",
-    "was", "one", "our", "out", "with", "that", "this", "have", "from",
-    "they", "will", "each", "make", "like", "been", "has", "its", "who",
-    "did", "get", "may", "him", "his", "how", "let", "say", "she", "too",
-    "use", "way", "about", "would", "there", "their", "what", "could",
-    "other", "than", "then", "them", "these", "some", "which", "into",
-    "over", "under", "between", "within", "without", "your", "role",
-    "team", "work", "job", "experience", "years", "looking", "candidate",
-    "ability", "skills", "must", "should",
+    "the",
+    "and",
+    "for",
+    "are",
+    "but",
+    "not",
+    "you",
+    "all",
+    "can",
+    "her",
+    "was",
+    "one",
+    "our",
+    "out",
+    "with",
+    "that",
+    "this",
+    "have",
+    "from",
+    "they",
+    "will",
+    "each",
+    "make",
+    "like",
+    "been",
+    "has",
+    "its",
+    "who",
+    "did",
+    "get",
+    "may",
+    "him",
+    "his",
+    "how",
+    "let",
+    "say",
+    "she",
+    "too",
+    "use",
+    "way",
+    "about",
+    "would",
+    "there",
+    "their",
+    "what",
+    "could",
+    "other",
+    "than",
+    "then",
+    "them",
+    "these",
+    "some",
+    "which",
+    "into",
+    "over",
+    "under",
+    "between",
+    "within",
+    "without",
+    "your",
+    "role",
+    "team",
+    "work",
+    "job",
+    "experience",
+    "years",
+    "looking",
+    "candidate",
+    "ability",
+    "skills",
+    "must",
+    "should",
     # Turkish
-    "ve", "veya", "ile", "için", "icin", "bir", "bu", "şu", "su", "da",
-    "de", "mi", "mı", "mu", "mü", "olan", "olarak", "gibi", "çok", "cok",
-    "daha", "en", "her", "tüm", "tum", "ise", "hem", "ya", "ki",
+    "ve",
+    "veya",
+    "ile",
+    "için",
+    "icin",
+    "bir",
+    "bu",
+    "şu",
+    "su",
+    "da",
+    "de",
+    "mi",
+    "mı",
+    "mu",
+    "mü",
+    "olan",
+    "olarak",
+    "gibi",
+    "çok",
+    "cok",
+    "daha",
+    "en",
+    "her",
+    "tüm",
+    "tum",
+    "ise",
+    "hem",
+    "ya",
+    "ki",
     # German
-    "und", "oder", "mit", "für", "fur", "der", "die", "das", "ein", "eine",
-    "einen", "einem", "zu", "im", "in", "von", "den", "dem", "des", "als",
+    "und",
+    "oder",
+    "mit",
+    "für",
+    "fur",
+    "der",
+    "die",
+    "das",
+    "ein",
+    "eine",
+    "einen",
+    "einem",
+    "zu",
+    "im",
+    "in",
+    "von",
+    "den",
+    "dem",
+    "des",
+    "als",
     # French
-    "et", "ou", "avec", "pour", "les", "des", "une", "un", "du", "de",
-    "la", "le", "dans", "sur", "par", "aux", "au", "ce", "cette",
+    "et",
+    "ou",
+    "avec",
+    "pour",
+    "les",
+    "des",
+    "une",
+    "un",
+    "du",
+    "de",
+    "la",
+    "le",
+    "dans",
+    "sur",
+    "par",
+    "aux",
+    "au",
+    "ce",
+    "cette",
     # Spanish
-    "y", "o", "con", "para", "los", "las", "una", "uno", "del", "de",
-    "el", "la", "en", "por", "como", "que", "este", "esta",
+    "y",
+    "o",
+    "con",
+    "para",
+    "los",
+    "las",
+    "una",
+    "uno",
+    "del",
+    "de",
+    "el",
+    "la",
+    "en",
+    "por",
+    "como",
+    "que",
+    "este",
+    "esta",
     # Portuguese / Italian / Dutch
-    "e", "com", "para", "os", "as", "um", "uma", "do", "da", "no", "na",
-    "il", "lo", "gli", "le", "di", "per", "che", "een", "het", "van",
-    "voor", "met", "op", "aan", "als",
+    "e",
+    "com",
+    "para",
+    "os",
+    "as",
+    "um",
+    "uma",
+    "do",
+    "da",
+    "no",
+    "na",
+    "il",
+    "lo",
+    "gli",
+    "le",
+    "di",
+    "per",
+    "che",
+    "een",
+    "het",
+    "van",
+    "voor",
+    "met",
+    "op",
+    "aan",
+    "als",
 }
 MOJIBAKE_MARKERS = ("Ã", "Ä", "Å", "â€™", "â€œ", "â€", "Â")
 
@@ -342,9 +534,11 @@ def _extract_pdf_with_pdfplumber(file_bytes: bytes) -> str:
                     center = (float(word.get("x0", 0)) + float(word.get("x1", 0))) / 2.0
                     chosen = min(
                         range(len(columns)),
-                        key=lambda idx: 0
-                        if columns[idx][0] <= center <= columns[idx][1]
-                        else min(abs(center - columns[idx][0]), abs(center - columns[idx][1])),
+                        key=lambda idx: (
+                            0
+                            if columns[idx][0] <= center <= columns[idx][1]
+                            else min(abs(center - columns[idx][0]), abs(center - columns[idx][1]))
+                        ),
                     )
                     buckets[chosen].append(word)
                 page_lines = []
@@ -397,13 +591,13 @@ def extract_text(file_bytes: bytes, file_type: str, file_name: str = "") -> str:
                 pass
         if text.strip():
             return text
-            
+
         # OCR Fallback path (Phase 7)
         try:
             from PIL import Image
             import fitz  # PyMuPDF
             import pytesseract
-            
+
             doc = fitz.open(stream=file_bytes, filetype="pdf")
             try:
                 ocr_pages = []
@@ -423,11 +617,14 @@ def extract_text(file_bytes: bytes, file_type: str, file_name: str = "") -> str:
         except Exception:
             pass
 
-        raise LocalWorkerError("PDF extraction failed: no text could be extracted (scanned PDF without OCR or invalid file)")
+        raise LocalWorkerError(
+            "PDF extraction failed: no text could be extracted (scanned PDF without OCR or invalid file)"
+        )
 
     if kind == "docx":
         try:
             from docx import Document
+
             doc = Document(BytesIO(file_bytes))
             paragraphs = []
             for paragraph_index, paragraph in enumerate(doc.paragraphs):
@@ -488,9 +685,8 @@ def score_cv(cv_text: str, config: dict) -> dict:
         confidence = "medium"
 
     matched_skills = matched_required + matched_nice
-    summary = (
-        f"Matched {len(matched_required)}/{len(required)} required skills"
-        + (f" and {len(matched_nice)}/{len(nice)} nice-to-have skills." if nice else ".")
+    summary = f"Matched {len(matched_required)}/{len(required)} required skills" + (
+        f" and {len(matched_nice)}/{len(nice)} nice-to-have skills." if nice else "."
     )
     explanation = summary
     if missing_required:
@@ -613,7 +809,7 @@ def _generate_html_report(ranked_rows: list[dict], config: dict, html_path: Path
     rows_json = _script_safe_json(ranked_rows)
     config_json = _script_safe_json(config)
     title = html.escape(str(config.get("title") or "Yerel Değerlendirme"), quote=True)
-    
+
     html_content = f"""<!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -1164,7 +1360,7 @@ def _generate_html_report(ranked_rows: list[dict], config: dict, html_path: Path
 <body>
   <header>
     <div class="header-content">
-      <div class="job-badge" id="jobTitleBadge">Kriter: {config.get('title', 'Yerel Değerlendirme')}</div>
+      <div class="job-badge" id="jobTitleBadge">Kriter: {config.get("title", "Yerel Değerlendirme")}</div>
       <h1 id="mainTitle">CV Değerlendirme Raporu</h1>
       <p class="job-desc" id="jobDescText"></p>
     </div>
@@ -1514,7 +1710,7 @@ def _generate_html_report(ranked_rows: list[dict], config: dict, html_path: Path
   </script>
 </body>
 </html>"""
-    
+
     html_path.write_text(html_content, encoding="utf-8")
 
 
@@ -1562,24 +1758,29 @@ class LocalWorker:
                     self.login()
                     resp = self.session.request(method, url, timeout=timeout, **kwargs)
                 if resp.status_code in {429, 500, 502, 503, 504} and attempt < 3:
-                    time.sleep(2 ** attempt)
+                    time.sleep(2**attempt)
                     continue
                 return resp
             except requests.RequestException as exc:
                 last_error = exc
                 if attempt < 3:
-                    time.sleep(2 ** attempt)
+                    time.sleep(2**attempt)
                     continue
         raise LocalWorkerError(f"Request failed: {last_error}")
 
     def login(self):
         if not self.api_key:
             raise LocalWorkerError("Missing API key. Pass --api-key or set CV_WORKER_API_KEY.")
-        resp = self._request("POST", "/auth", allow_reauth=False, json={
-            "api_key": self.api_key,
-            "device_name": self.device_name,
-            "worker_version": WORKER_VERSION,
-        })
+        resp = self._request(
+            "POST",
+            "/auth",
+            allow_reauth=False,
+            json={
+                "api_key": self.api_key,
+                "device_name": self.device_name,
+                "worker_version": WORKER_VERSION,
+            },
+        )
         if resp.status_code != 200:
             raise LocalWorkerError(f"Login failed: {resp.text}")
 
@@ -1725,7 +1926,9 @@ class LocalWorker:
             "explanation": message,
         }
 
-    def _run_local_folder(self, job_id: int, folder_path: str | None, config: dict | None = None, output_folder: str | None = None):
+    def _run_local_folder(
+        self, job_id: int, folder_path: str | None, config: dict | None = None, output_folder: str | None = None
+    ):
         if not folder_path:
             raise LocalWorkerError("--local-folder is required with local_folder mode")
         config = config or {
@@ -1750,8 +1953,7 @@ class LocalWorker:
             raise LocalWorkerError("No remaining CV scan quota. Renew your worker key or wait for quota reset.")
         if len(files) > self.quota_remaining:
             raise LocalWorkerError(
-                f"Folder has {len(files)} CV file(s), but this worker key has "
-                f"{self.quota_remaining} scan(s) left."
+                f"Folder has {len(files)} CV file(s), but this worker key has {self.quota_remaining} scan(s) left."
             )
         rows = []
         failed_files = []
@@ -1796,12 +1998,17 @@ class LocalWorker:
             }
             row = enrich_row_with_owner_workflow(row, config, actor_name=self.device_name or "Local Worker")
             rows.append(row)
-            print(json.dumps({
-                "file": str(path),
-                "score": row["score"],
-                "decision": row["decision"],
-                "candidate_status": row["candidate_status"],
-            }, ensure_ascii=False))
+            print(
+                json.dumps(
+                    {
+                        "file": str(path),
+                        "score": row["score"],
+                        "decision": row["decision"],
+                        "candidate_status": row["candidate_status"],
+                    },
+                    ensure_ascii=False,
+                )
+            )
 
         ranked_rows = sorted(rows, key=lambda item: float(item.get("score") or 0), reverse=True)
         for rank, row in enumerate(ranked_rows, start=1):
@@ -1819,11 +2026,28 @@ class LocalWorker:
             writer = csv.DictWriter(
                 fh,
                 fieldnames=[
-                    "rank", "file", "score", "decision", "confidence", "is_duplicate",
-                    "candidate_status", "notification_event_type",
-                    "duplicate_of", "file_hash", "worker_version", "engine_version", "sync_status",
-                    "summary", "score_breakdown", "matched_skills", "missing_skills",
-                    "risk_flags", "explanation", "notification_title", "notification_message", "processed_at",
+                    "rank",
+                    "file",
+                    "score",
+                    "decision",
+                    "confidence",
+                    "is_duplicate",
+                    "candidate_status",
+                    "notification_event_type",
+                    "duplicate_of",
+                    "file_hash",
+                    "worker_version",
+                    "engine_version",
+                    "sync_status",
+                    "summary",
+                    "score_breakdown",
+                    "matched_skills",
+                    "missing_skills",
+                    "risk_flags",
+                    "explanation",
+                    "notification_title",
+                    "notification_message",
+                    "processed_at",
                 ],
                 extrasaction="ignore",
             )
@@ -1864,7 +2088,9 @@ class LocalWorker:
         )
         store = WorkspaceStore(workspace_path)
         saved_job_id = store.save_job(config.get("title") or f"Local job {job_id}", config)
-        run_id = store.create_run(saved_job_id, config.get("title") or f"Local job {job_id}", str(folder), str(output), len(files))
+        run_id = store.create_run(
+            saved_job_id, config.get("title") or f"Local job {job_id}", str(folder), str(output), len(files)
+        )
         notification_count = 0
         for row in ranked_rows:
             result_id = store.add_result(run_id, row)
@@ -1914,9 +2140,17 @@ class LocalWorker:
 
 def _add_common_args(parser):
     parser.add_argument("--api-key", default=None, help="Worker API key. Defaults to CV_WORKER_API_KEY.")
-    parser.add_argument("--save-api-key", action="store_true", help="Save the provided API key to the OS credential store.")
-    parser.add_argument("--device-name", default=os.environ.get("COMPUTERNAME") or os.environ.get("HOSTNAME") or "Local Worker")
-    parser.add_argument("--no-verify-ssl", action="store_true", help="(Deprecated, ignored.) SSL bypass is now automatic for localhost only.")
+    parser.add_argument(
+        "--save-api-key", action="store_true", help="Save the provided API key to the OS credential store."
+    )
+    parser.add_argument(
+        "--device-name", default=os.environ.get("COMPUTERNAME") or os.environ.get("HOSTNAME") or "Local Worker"
+    )
+    parser.add_argument(
+        "--no-verify-ssl",
+        action="store_true",
+        help="(Deprecated, ignored.) SSL bypass is now automatic for localhost only.",
+    )
 
 
 def _split_cli_terms(value: str | None) -> list[str]:
@@ -1944,11 +2178,14 @@ def _load_local_config(args) -> dict:
     config["review_threshold"] = args.review_threshold
     config.setdefault("ai_max_reviews", int(os.environ.get("CV_WORKER_AI_MAX_REVIEWS", "25") or "25"))
     config.setdefault("reject_threshold", 30)
-    config.setdefault("scoring_weights", {
-        "required_skills": 70.0,
-        "nice_to_have_skills": 20.0,
-        "content_quality": 10.0,
-    })
+    config.setdefault(
+        "scoring_weights",
+        {
+            "required_skills": 70.0,
+            "nice_to_have_skills": 20.0,
+            "content_quality": 10.0,
+        },
+    )
     return config
 
 
@@ -1970,9 +2207,15 @@ def main():
     run_parser.add_argument("--output-folder", type=str)
     run_parser.add_argument("--job-config", type=str, help="JSON file with local job criteria for local_folder mode.")
     run_parser.add_argument("--job-description", type=str, help="Local job description for local_folder mode.")
-    run_parser.add_argument("--required-skills", type=str, help="Comma-separated required skills for local_folder mode.")
-    run_parser.add_argument("--nice-to-have-skills", type=str, help="Comma-separated nice-to-have skills for local_folder mode.")
-    run_parser.add_argument("--hard-reject-criteria", type=str, help="Comma-separated rejection criteria for local_folder mode.")
+    run_parser.add_argument(
+        "--required-skills", type=str, help="Comma-separated required skills for local_folder mode."
+    )
+    run_parser.add_argument(
+        "--nice-to-have-skills", type=str, help="Comma-separated nice-to-have skills for local_folder mode."
+    )
+    run_parser.add_argument(
+        "--hard-reject-criteria", type=str, help="Comma-separated rejection criteria for local_folder mode."
+    )
     run_parser.add_argument("--accept-threshold", type=int, default=75)
     run_parser.add_argument("--review-threshold", type=int, default=50)
     run_parser.add_argument("--max-empty-polls", type=int, default=1)
@@ -1983,7 +2226,9 @@ def main():
     api_key = args.api_key or os.environ.get("CV_WORKER_API_KEY") or load_worker_api_key()
     if args.api_key and args.save_api_key:
         saved = save_worker_api_key(args.api_key)
-        print("API key saved to OS credential store." if saved else "API key could not be saved to OS credential store.")
+        print(
+            "API key saved to OS credential store." if saved else "API key could not be saved to OS credential store."
+        )
     try:
         verify_ssl = VERIFY_SSL
         worker = LocalWorker(api_key, args.processing_mode, args.ai_mode, args.device_name, verify_ssl=verify_ssl)
@@ -2008,13 +2253,18 @@ def main():
                 worker.run(args.job_id, args.batch_size, args.local_folder, args.max_empty_polls)
         elif args.command == "status":
             worker.login()
-            print(json.dumps({
-                "company_id": worker.company_id,
-                "allowed_jobs": worker.allowed_jobs,
-                "quota_remaining": worker.quota_remaining,
-                "processing_mode": worker.processing_mode,
-                "ai_mode": worker.ai_mode,
-            }, indent=2))
+            print(
+                json.dumps(
+                    {
+                        "company_id": worker.company_id,
+                        "allowed_jobs": worker.allowed_jobs,
+                        "quota_remaining": worker.quota_remaining,
+                        "processing_mode": worker.processing_mode,
+                        "ai_mode": worker.ai_mode,
+                    },
+                    indent=2,
+                )
+            )
     except LocalWorkerError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)

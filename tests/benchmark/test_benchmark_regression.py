@@ -3,6 +3,7 @@
 These tests use the benchmark dataset to ensure that scoring changes
 don't silently break expected behavior across diverse CV+JD pairs.
 """
+
 import json
 import os
 import pytest
@@ -40,6 +41,7 @@ def _get_entry(entries, entry_id: str):
 
 # ── Keyword Service: Fuzzy Matching Edge Cases ────────────────────
 
+
 class TestKeywordFuzzyMatching:
     """Tests for difflib fuzzy matching behavior in keyword_service."""
 
@@ -76,8 +78,9 @@ class TestKeywordFuzzyMatching:
         score_strict = keyword_match_score(cv, jd)
         os.environ.pop("FUZZY_MATCH_THRESHOLD", None)
 
-        assert score_default >= score_strict, \
+        assert score_default >= score_strict, (
             f"Stricter threshold should not increase score: default={score_default}, strict={score_strict}"
+        )
 
     def test_hyphenated_terms_normalized(self):
         """Hyphenated terms like 'real-time' should normalize properly."""
@@ -139,14 +142,19 @@ class TestBestFuzzyMatch:
 
 # ── ATS Service: ML Override Edge Cases ──────────────────────────
 
+
 class TestComputeFinalScoreOverride:
     """Tests for ML-confidence override mechanism in compute_final_score."""
 
     def test_low_confidence_forces_rule_based(self):
         """When ml_confidence < threshold, ML should be overridden."""
         result = compute_final_score(
-            keyword=80, section=70, exp=65,
-            skills=75, layout=60, contact=80,
+            keyword=80,
+            section=70,
+            exp=65,
+            skills=75,
+            layout=60,
+            contact=80,
             ml_score=20,  # Very different from rule-based
             ml_confidence=0.3,  # Below default 0.6 threshold
             debug=True,
@@ -158,8 +166,12 @@ class TestComputeFinalScoreOverride:
     def test_high_confidence_uses_ml_blend(self):
         """When ml_confidence >= threshold and scores close, use ML blend."""
         result = compute_final_score(
-            keyword=80, section=70, exp=65,
-            skills=75, layout=60, contact=80,
+            keyword=80,
+            section=70,
+            exp=65,
+            skills=75,
+            layout=60,
+            contact=80,
             ml_score=75,  # Close to rule-based
             ml_confidence=0.9,
             debug=True,
@@ -170,8 +182,12 @@ class TestComputeFinalScoreOverride:
     def test_large_discrepancy_overrides_ml(self):
         """When ML score is wildly different from rule-based, override."""
         result = compute_final_score(
-            keyword=80, section=70, exp=65,
-            skills=75, layout=60, contact=80,
+            keyword=80,
+            section=70,
+            exp=65,
+            skills=75,
+            layout=60,
+            contact=80,
             ml_score=10,  # Very far from rule score
             ml_confidence=0.9,  # High confidence but wrong
             debug=True,
@@ -183,8 +199,12 @@ class TestComputeFinalScoreOverride:
     def test_no_confidence_provided_uses_ml(self):
         """When ml_confidence is None, ML blend should be used (if close)."""
         result = compute_final_score(
-            keyword=80, section=70, exp=65,
-            skills=75, layout=60, contact=80,
+            keyword=80,
+            section=70,
+            exp=65,
+            skills=75,
+            layout=60,
+            contact=80,
             ml_score=75,
             ml_confidence=None,
             debug=True,
@@ -195,8 +215,12 @@ class TestComputeFinalScoreOverride:
     def test_non_numeric_ml_score_overrides(self):
         """Non-numeric ml_score should gracefully override to rule-based."""
         result = compute_final_score(
-            keyword=80, section=70, exp=65,
-            skills=75, layout=60, contact=80,
+            keyword=80,
+            section=70,
+            exp=65,
+            skills=75,
+            layout=60,
+            contact=80,
             ml_score="not_a_number",
             ml_confidence=0.9,
             debug=True,
@@ -208,14 +232,24 @@ class TestComputeFinalScoreOverride:
     def test_no_keyword_redistributes_weight(self):
         """When keyword=0 (no JD), weight should be redistributed."""
         with_jd = compute_final_score(
-            keyword=80, section=70, exp=65,
-            skills=75, layout=60, contact=80,
-            ml_score=0, ml_confidence=0.0,
+            keyword=80,
+            section=70,
+            exp=65,
+            skills=75,
+            layout=60,
+            contact=80,
+            ml_score=0,
+            ml_confidence=0.0,
         )
         without_jd = compute_final_score(
-            keyword=0, section=70, exp=65,
-            skills=75, layout=60, contact=80,
-            ml_score=0, ml_confidence=0.0,
+            keyword=0,
+            section=70,
+            exp=65,
+            skills=75,
+            layout=60,
+            contact=80,
+            ml_score=0,
+            ml_confidence=0.0,
         )
         # Both should be valid scores
         assert 0 <= with_jd <= 100
@@ -227,8 +261,12 @@ class TestComputeFinalScoreOverride:
         """ML_CONFIDENCE_THRESHOLD env var should control the threshold."""
         os.environ["ML_CONFIDENCE_THRESHOLD"] = "0.95"
         result = compute_final_score(
-            keyword=80, section=70, exp=65,
-            skills=75, layout=60, contact=80,
+            keyword=80,
+            section=70,
+            exp=65,
+            skills=75,
+            layout=60,
+            contact=80,
             ml_score=75,
             ml_confidence=0.8,  # Below 0.95
             debug=True,
@@ -239,6 +277,7 @@ class TestComputeFinalScoreOverride:
 
 
 # ── Benchmark Dataset Regression Tests ────────────────────────────
+
 
 class TestBenchmarkRegression:
     """Regression tests ensuring benchmark entries stay within expected ranges.
@@ -251,31 +290,35 @@ class TestBenchmarkRegression:
         entry = _get_entry(benchmark_entries, "B001")
         score = keyword_match_score(entry["cv_text"], entry["job_description"])
         expected = entry["expected"]["keyword_score"]
-        assert expected["min"] <= score <= expected["max"], \
+        assert expected["min"] <= score <= expected["max"], (
             f"B001 keyword_score={score}, expected [{expected['min']}-{expected['max']}]"
+        )
 
     def test_low_match_keyword_score(self, benchmark_entries):
         entry = _get_entry(benchmark_entries, "B002")
         score = keyword_match_score(entry["cv_text"], entry["job_description"])
         expected = entry["expected"]["keyword_score"]
-        assert expected["min"] <= score <= expected["max"], \
+        assert expected["min"] <= score <= expected["max"], (
             f"B002 keyword_score={score}, expected [{expected['min']}-{expected['max']}]"
+        )
 
     def test_spam_cv_ats_score(self, benchmark_entries):
         entry = _get_entry(benchmark_entries, "B007")
         result = analyze_cv(entry["cv_text"], job_text=entry["job_description"])
         ats_score = result.get("overall_score", 0)
         expected = entry["expected"]["ats_score"]
-        assert expected["min"] <= ats_score <= expected["max"], \
+        assert expected["min"] <= ats_score <= expected["max"], (
             f"B007 ats_score={ats_score}, expected [{expected['min']}-{expected['max']}]"
+        )
 
     def test_minimal_cv_low_scores(self, benchmark_entries):
         entry = _get_entry(benchmark_entries, "B008")
         result = analyze_cv(entry["cv_text"], job_text=entry["job_description"])
         ats_score = result.get("overall_score", 0)
         expected = entry["expected"]["ats_score"]
-        assert expected["min"] <= ats_score <= expected["max"], \
+        assert expected["min"] <= ats_score <= expected["max"], (
             f"B008 ats_score={ats_score}, expected [{expected['min']}-{expected['max']}]"
+        )
 
     def test_no_jd_keyword_zero(self, benchmark_entries):
         entry = _get_entry(benchmark_entries, "B009")
@@ -287,26 +330,30 @@ class TestBenchmarkRegression:
         result = analyze_cv(entry["cv_text"], job_text="")
         ats_score = result.get("overall_score", 0)
         expected = entry["expected"]["ats_score"]
-        assert expected["min"] <= ats_score <= expected["max"], \
+        assert expected["min"] <= ats_score <= expected["max"], (
             f"B009 ats_score={ats_score}, expected [{expected['min']}-{expected['max']}]"
+        )
 
     def test_turkish_cv_keyword_improved(self, benchmark_entries):
         """Turkish CV with long JD — calibrated from actual benchmark run."""
         entry = _get_entry(benchmark_entries, "B010")
         score = keyword_match_score(entry["cv_text"], entry["job_description"])
         expected = entry["expected"]["keyword_score"]
-        assert expected["min"] <= score <= expected["max"], \
+        assert expected["min"] <= score <= expected["max"], (
             f"B010 keyword_score={score}, expected [{expected['min']}-{expected['max']}]"
+        )
 
     def test_career_changer_medium_match(self, benchmark_entries):
         entry = _get_entry(benchmark_entries, "B006")
         score = keyword_match_score(entry["cv_text"], entry["job_description"])
         expected = entry["expected"]["keyword_score"]
-        assert expected["min"] <= score <= expected["max"], \
+        assert expected["min"] <= score <= expected["max"], (
             f"B006 keyword_score={score}, expected [{expected['min']}-{expected['max']}]"
+        )
 
 
 # ── Compare Function Coverage Tests ──────────────────────────────
+
 
 class TestCompareKeywordCoverage:
     """Tests for the compare() function's keyword coverage reporting."""
@@ -314,8 +361,9 @@ class TestCompareKeywordCoverage:
     def test_coverage_100_with_identical_text(self):
         text = "Python Django PostgreSQL Docker Kubernetes"
         result = compare(text, text)
-        assert result["keyword_coverage_pct"] >= 80, \
+        assert result["keyword_coverage_pct"] >= 80, (
             f"Identical text should have high coverage, got {result['keyword_coverage_pct']}"
+        )
 
     def test_coverage_zero_with_no_overlap(self):
         result = compare("painting sculpture ceramics", "Python Django PostgreSQL")
@@ -328,8 +376,9 @@ class TestCompareKeywordCoverage:
         result = compare(cv, jd)
         # Without fuzzy, "optimize" and "database" would be missing
         # With fuzzy, they should be promoted to weak
-        assert len(result["missing_keywords"]) < 4, \
+        assert len(result["missing_keywords"]) < 4, (
             f"Fuzzy should reduce missing keywords, got {len(result['missing_keywords'])} missing"
+        )
 
     def test_extra_keywords_detected(self):
         result = compare("Python Django PostgreSQL React TypeScript", "Python Django")

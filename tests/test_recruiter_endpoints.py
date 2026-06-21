@@ -11,6 +11,7 @@ from auth import verify_supabase_jwt
 import main as main_module
 from models import Analysis, Organization, User
 
+
 @pytest.fixture(autouse=True)
 def _stable_recruiter_runtime(monkeypatch):
     # Keep recruiter endpoint tests independent from local Redis availability.
@@ -279,9 +280,7 @@ def test_top_candidates_filters(client, db_session):
     now = datetime.utcnow()
     start = (now - timedelta(hours=1)).isoformat()
     end = (now + timedelta(hours=1)).isoformat()
-    resp = client.get(
-        f"/api/v1/recruiter/top_candidates?start_date={start}&end_date={end}"
-    )
+    resp = client.get(f"/api/v1/recruiter/top_candidates?start_date={start}&end_date={end}")
     assert resp.status_code == 200
 
 

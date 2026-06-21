@@ -94,13 +94,11 @@ def test_batch_upload_success(client, recruiter_user, test_job, sample_pdf_file)
     assert "message" in data
     task_id = data.get("task_id")
     assert task_id
-    
+
     return task_id
 
 
-def test_batch_upload_multiple_files(
-    client, recruiter_user, test_job, sample_pdf_file, sample_txt_file
-):
+def test_batch_upload_multiple_files(client, recruiter_user, test_job, sample_pdf_file, sample_txt_file):
     """Test batch upload with multiple files."""
     files = [
         ("files", ("cv1.pdf", sample_pdf_file, "application/pdf")),
@@ -121,10 +119,7 @@ def test_batch_upload_multiple_files(
 
 def test_batch_upload_exceeds_max_files(client, recruiter_user, test_job):
     """Test batch upload fails when exceeding 50 file limit."""
-    files = [
-        ("files", (f"cv{i}.pdf", BytesIO(b"%PDF dummy content"), "application/pdf"))
-        for i in range(51)
-    ]
+    files = [("files", (f"cv{i}.pdf", BytesIO(b"%PDF dummy content"), "application/pdf")) for i in range(51)]
 
     response = client.post(
         "/api/v1/recruiter/dashboard/batch-upload",
@@ -166,9 +161,7 @@ def test_batch_upload_empty_file(client, recruiter_user, test_job):
     assert "File is empty" in data.get("detail", "")
 
 
-def test_batch_upload_insufficient_credits(
-    client, recruiter_user, test_job, sample_pdf_file, db
-):
+def test_batch_upload_insufficient_credits(client, recruiter_user, test_job, sample_pdf_file, db):
     """Test batch upload fails when organization lacks credits."""
     # Set org credits to 0
     org = recruiter_user["org"]

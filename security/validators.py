@@ -53,7 +53,8 @@ def sanitize_text(text: str, field_name: str = "text", max_length: int = 100_000
         if pattern in text_lower:
             logger.warning(
                 "security:prompt_injection_detected field=%s pattern=%s",
-                field_name, pattern,
+                field_name,
+                pattern,
             )
             text = text.replace(pattern, "")
             text = text.replace(pattern.upper(), "")
@@ -87,61 +88,140 @@ def check_path_traversal(value: str, field_name: str = "key") -> None:
 # ── CV detection heuristic ──────────────────────────────────────────
 _CV_KEYWORDS = (
     # EN
-    "experience", "education", "skills", "summary", "work history",
-    "phone", "email", "linkedin", "github", "objective",
-    "references", "certification", "languages", "proficiency",
+    "experience",
+    "education",
+    "skills",
+    "summary",
+    "work history",
+    "phone",
+    "email",
+    "linkedin",
+    "github",
+    "objective",
+    "references",
+    "certification",
+    "languages",
+    "proficiency",
     # TR
-    "deneyim", "eğitim", "beceri", "özet", "telefon",
+    "deneyim",
+    "eğitim",
+    "beceri",
+    "özet",
+    "telefon",
     # FR
-    "expérience", "compétences", "formation",
+    "expérience",
+    "compétences",
+    "formation",
     # DE
-    "erfahrung", "ausbildung", "fähigkeiten",
+    "erfahrung",
+    "ausbildung",
+    "fähigkeiten",
     # ES
-    "experiencia", "educación", "habilidades",
+    "experiencia",
+    "educación",
+    "habilidades",
     # PT
-    "experiência", "educação", "habilidades", "competências",
+    "experiência",
+    "educação",
+    "habilidades",
+    "competências",
     # IT
-    "esperienza", "istruzione", "competenze",
+    "esperienza",
+    "istruzione",
+    "competenze",
     # NL
-    "ervaring", "opleiding", "vaardigheden",
+    "ervaring",
+    "opleiding",
+    "vaardigheden",
     # RU
-    "опыт", "образование", "навыки", "резюме",
+    "опыт",
+    "образование",
+    "навыки",
+    "резюме",
     # PL
-    "doświadczenie", "wykształcenie", "umiejętności",
+    "doświadczenie",
+    "wykształcenie",
+    "umiejętności",
     # SV/NO/DA
-    "erfarenhet", "utbildning", "färdigheter",
-    "erfaring", "utdanning", "uddannelse",
+    "erfarenhet",
+    "utbildning",
+    "färdigheter",
+    "erfaring",
+    "utdanning",
+    "uddannelse",
     # FI
-    "kokemus", "koulutus", "taidot",
+    "kokemus",
+    "koulutus",
+    "taidot",
     # CS/HU/RO
-    "zkušenosti", "vzdělání", "dovednosti",
-    "tapasztalat", "végzettség", "készségek",
-    "experiență", "educație", "competențe",
+    "zkušenosti",
+    "vzdělání",
+    "dovednosti",
+    "tapasztalat",
+    "végzettség",
+    "készségek",
+    "experiență",
+    "educație",
+    "competențe",
     # AR
-    "الخبرة", "التعليم", "المهارات", "الشهادات",
+    "الخبرة",
+    "التعليم",
+    "المهارات",
+    "الشهادات",
     # ZH
-    "工作经验", "教育", "技能", "个人简介",
+    "工作经验",
+    "教育",
+    "技能",
+    "个人简介",
     # JA
-    "職歴", "学歴", "スキル", "資格",
+    "職歴",
+    "学歴",
+    "スキル",
+    "資格",
     # KO
-    "경력", "학력", "기술", "자격증",
+    "경력",
+    "학력",
+    "기술",
+    "자격증",
     # HI
-    "अनुभव", "शिक्षा", "कौशल",
+    "अनुभव",
+    "शिक्षा",
+    "कौशल",
     # ID
-    "pengalaman", "pendidikan", "keahlian",
+    "pengalaman",
+    "pendidikan",
+    "keahlian",
     # VI
-    "kinh nghiệm", "học vấn", "kỹ năng",
+    "kinh nghiệm",
+    "học vấn",
+    "kỹ năng",
     # TH
-    "ประสบการณ์", "การศึกษา", "ทักษะ",
+    "ประสบการณ์",
+    "การศึกษา",
+    "ทักษะ",
 )
 
 _NON_CV_KEYWORDS = (
-    "introduction", "methodology", "diagram", "uml", "chapter",
-    "abstract", "conclusion", "assignment", "report", "bibliography",
-    "hypothesis", "literature review", "appendix", "table of contents",
-    "acknowledgements", "thesis", "dissertation",
+    "introduction",
+    "methodology",
+    "diagram",
+    "uml",
+    "chapter",
+    "abstract",
+    "conclusion",
+    "assignment",
+    "report",
+    "bibliography",
+    "hypothesis",
+    "literature review",
+    "appendix",
+    "table of contents",
+    "acknowledgements",
+    "thesis",
+    "dissertation",
     # Task 5 — additional non-CV filter words
-    "table of figures", "list of tables",
+    "table of figures",
+    "list of tables",
 )
 
 # ── Contact signal regex (shared with header safety) ─────────────────
@@ -181,10 +261,7 @@ def is_probably_cv(text: str, min_score: int = 2) -> bool:
         score += 2
 
     # Section-line count bonus (cap at +3)
-    section_count = sum(
-        1 for line in text.splitlines()
-        if _SECTION_LIKE_RE.match(line)
-    )
+    section_count = sum(1 for line in text.splitlines() if _SECTION_LIKE_RE.match(line))
     score += min(section_count, 3)
 
     # Very short text penalty
@@ -201,30 +278,24 @@ def validate_zip_safety(
     max_compression_ratio: int = 10,
 ) -> None:
     """Validate ZIP file safety before extraction.
-    
+
     Prevents ZIP bombs by checking:
     - Archive size doesn't exceed max_archive_bytes
     - File count doesn't exceed max_files
     - Compression ratio doesn't exceed max_compression_ratio
-    
+
     Raises ValueError if validation fails.
     """
     if len(file_content) > max_archive_bytes:
-        raise ValueError(
-            f"ZIP archive too large: {len(file_content)} bytes "
-            f"(max {max_archive_bytes} bytes)"
-        )
-    
+        raise ValueError(f"ZIP archive too large: {len(file_content)} bytes (max {max_archive_bytes} bytes)")
+
     try:
-        with zipfile.ZipFile(BytesIO(file_content), 'r') as zf:
+        with zipfile.ZipFile(BytesIO(file_content), "r") as zf:
             # Check file count
             file_list = zf.filelist
             if len(file_list) > max_files:
-                raise ValueError(
-                    f"ZIP contains too many files: {len(file_list)} "
-                    f"(max {max_files})"
-                )
-            
+                raise ValueError(f"ZIP contains too many files: {len(file_list)} (max {max_files})")
+
             # Check compression ratios for each file
             for zinfo in file_list:
                 if zinfo.compress_size > 0:
@@ -232,7 +303,9 @@ def validate_zip_safety(
                     if ratio > max_compression_ratio:
                         logger.warning(
                             "security:zip_bomb_detected file=%s ratio=%.1f max=%d",
-                            zinfo.filename, ratio, max_compression_ratio
+                            zinfo.filename,
+                            ratio,
+                            max_compression_ratio,
                         )
                         raise ValueError(
                             f"Suspicious compression ratio in {zinfo.filename}: "

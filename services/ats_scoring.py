@@ -13,6 +13,7 @@ Usage::
     result = score_cv(cv_model)
     print(result.overall, result.structure, ...)
 """
+
 from __future__ import annotations
 
 import os
@@ -25,6 +26,7 @@ from utils.cv_text import build_cv_text
 
 
 # ── Result model ──────────────────────────────────────────────────────────
+
 
 @dataclass(frozen=True, slots=True)
 class ScoreResult:
@@ -77,6 +79,7 @@ _WEIGHTS: dict[str, float] = _load_weights()
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────
+
 
 def _clamp(value: int, lo: int = 0, hi: int = 100) -> int:
     return max(lo, min(hi, value))
@@ -138,6 +141,7 @@ _full_text = build_cv_text
 
 # ── Individual scorers ────────────────────────────────────────────────────
 
+
 def _score_structure(model: CVModel) -> int:
     """Reward presence of canonical sections. Max 100."""
     score = 0
@@ -187,10 +191,7 @@ def _score_ats(model: CVModel) -> int:
     text = _full_text(model)
 
     # Penalty: icon / emoji / special characters that ATS can't parse
-    icon_count = sum(
-        1 for ch in text
-        if unicodedata.category(ch).startswith(("So", "Sk"))
-    )
+    icon_count = sum(1 for ch in text if unicodedata.category(ch).startswith(("So", "Sk")))
     if icon_count > 0:
         score -= min(25, icon_count * 5)
 
@@ -270,11 +271,7 @@ def _score_experience(model: CVModel) -> int:
         base += 5
 
     # Quantified results bonus: numbers in bullets suggest measurable impact
-    quant_count = sum(
-        1 for e in model.experiences
-        for b in e.bullets
-        if re.search(r"\d+[%$€£]|\d{2,}", b)
-    )
+    quant_count = sum(1 for e in model.experiences for b in e.bullets if re.search(r"\d+[%$€£]|\d{2,}", b))
     if quant_count >= 3:
         base += 5
 
@@ -290,24 +287,17 @@ def _score_education(model: CVModel) -> int:
     base = 50 if n == 1 else 65
 
     # Degree bonus
-    has_degree = any(
-        (e.degree or "").strip() for e in model.education
-    )
+    has_degree = any((e.degree or "").strip() for e in model.education)
     if has_degree:
         base += 20
 
     # Field of study bonus
-    has_field = any(
-        (e.field or "").strip() for e in model.education
-    )
+    has_field = any((e.field or "").strip() for e in model.education)
     if has_field:
         base += 10
 
     # Date bonus
-    has_dates = any(
-        (e.start_date or "").strip() or (e.end_date or "").strip()
-        for e in model.education
-    )
+    has_dates = any((e.start_date or "").strip() or (e.end_date or "").strip() for e in model.education)
     if has_dates:
         base += 5
 
@@ -329,12 +319,24 @@ def _score_languages(model: CVModel) -> int:
 # ── Soft skills scoring ───────────────────────────────────────────────────
 
 _SOFT_SKILL_PATTERNS = [
-    r"\bleadership\b", r"\bteamwork\b", r"\bcommunication\b",
-    r"\bcollaboration\b", r"\bproblem.solving\b", r"\btime.management\b",
-    r"\bcritical.thinking\b", r"\badaptability\b", r"\bcreativity\b",
-    r"\bmentoring\b", r"\bnegotiation\b", r"\bpresentation\b",
-    r"\bstakeholder\b", r"\bcross.functional\b", r"\bstrategic\b",
-    r"\binitiative\b", r"\bempathy\b", r"\bconflict.resolution\b",
+    r"\bleadership\b",
+    r"\bteamwork\b",
+    r"\bcommunication\b",
+    r"\bcollaboration\b",
+    r"\bproblem.solving\b",
+    r"\btime.management\b",
+    r"\bcritical.thinking\b",
+    r"\badaptability\b",
+    r"\bcreativity\b",
+    r"\bmentoring\b",
+    r"\bnegotiation\b",
+    r"\bpresentation\b",
+    r"\bstakeholder\b",
+    r"\bcross.functional\b",
+    r"\bstrategic\b",
+    r"\binitiative\b",
+    r"\bempathy\b",
+    r"\bconflict.resolution\b",
 ]
 
 
@@ -357,6 +359,7 @@ def _score_soft_skills(model: CVModel) -> int:
 
 
 # ── Main entry point ──────────────────────────────────────────────────────
+
 
 def score_cv(model: CVModel) -> ScoreResult:
     """Score a CV model across all categories.

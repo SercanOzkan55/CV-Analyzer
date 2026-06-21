@@ -1,4 +1,5 @@
 """Tests for services/recruiter_service.py — ranking, strength/weakness, preview."""
+
 import pytest
 from services.recruiter_service import (
     rank_candidates,

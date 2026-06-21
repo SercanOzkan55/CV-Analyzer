@@ -5,6 +5,7 @@ Usage:
     python -m pytest tests/golden/test_golden_cv.py -v
     python tests/golden/test_golden_cv.py  (standalone)
 """
+
 import json
 import os
 import sys
@@ -27,6 +28,7 @@ def _run_pipeline(cv_text: str) -> dict:
     """Run the extract + normalize pipeline on raw text."""
     from agents.extract_agent import extract_structured
     from agents.normalize_agent import normalize
+
     structured = extract_structured(cv_text)
     normalized = normalize(structured)
     return normalized
@@ -114,8 +116,7 @@ def _validate_against_expectations(
 
     # Education content check
     edu_all_text = " ".join(
-        f"{e.get('degree', '')} {e.get('school', '')} {e.get('field', '')}"
-        for e in (extracted.get("education") or [])
+        f"{e.get('degree', '')} {e.get('school', '')} {e.get('field', '')}" for e in (extracted.get("education") or [])
     ).lower()
     for must_edu in expect.get("education_must_contain", []):
         if must_edu.lower() not in edu_all_text:
@@ -123,8 +124,7 @@ def _validate_against_expectations(
 
     # Experience content check
     exp_all_text = " ".join(
-        f"{e.get('title', '')} {e.get('company', '')}"
-        for e in (extracted.get("experiences") or [])
+        f"{e.get('title', '')} {e.get('company', '')}" for e in (extracted.get("experiences") or [])
     ).lower()
     for must_exp in expect.get("experience_must_contain", []):
         if must_exp.lower() not in exp_all_text:
@@ -138,8 +138,7 @@ def _validate_against_expectations(
 
     # Projects content check
     proj_all_text = " ".join(
-        str(p.get("name", "") or p.get("title", ""))
-        for p in (extracted.get("projects") or [])
+        str(p.get("name", "") or p.get("title", "")) for p in (extracted.get("projects") or [])
     ).lower()
     for must_proj in expect.get("projects_must_contain", []):
         if must_proj.lower() not in proj_all_text:
@@ -167,9 +166,9 @@ def run_golden_tests(verbose: bool = True) -> dict:
             continue
 
         if verbose:
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print(f"  Testing: {case_id}")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
 
         # Run pipeline
         try:
@@ -189,6 +188,7 @@ def run_golden_tests(verbose: bool = True) -> dict:
 
         # Run quality validator
         from services.extraction_validator import validate_extraction
+
         quality = validate_extraction(case["original_text"], extracted)
 
         results[case_id] = {
@@ -221,16 +221,18 @@ def run_golden_tests(verbose: bool = True) -> dict:
 
     # Summary
     if verbose:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         total = len(results)
         passed = sum(1 for r in results.values() if r["status"] == "PASS")
         print(f"  SUMMARY: {passed}/{total} passed")
         for cid, r in results.items():
             emoji = "✅" if r["status"] == "PASS" else "❌"
-            print(f"    {emoji} {cid}: score={r['quality_score']}, "
-                  f"failures={len(r['failures'])}, "
-                  f"hard_fails={len(r['hard_fails'])}")
-        print(f"{'='*60}")
+            print(
+                f"    {emoji} {cid}: score={r['quality_score']}, "
+                f"failures={len(r['failures'])}, "
+                f"hard_fails={len(r['hard_fails'])}"
+            )
+        print(f"{'=' * 60}")
 
     return results
 

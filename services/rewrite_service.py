@@ -72,16 +72,66 @@ def _extract_keywords(text: str, max_items: int = 12) -> List[str]:
     source = str(text or "").lower()
     tokens = re.findall(r"[\w+#.\-]{3,}", source, flags=re.UNICODE)
     stop = {
-        "and", "with", "for", "the", "this", "that", "are", "from", "you",
-        "your", "job", "role", "cv", "experience", "work", "using", "have",
-        "will", "can", "our", "their", "skills", "years", "plus",
-        "summary", "name", "highlights", "highlight",
-        "computer", "engineering", "student", "junior", "senior", "developer",
-        "engineer", "position",
-        "bir", "ve", "ile", "için", "olan", "gibi", "iş", "cv", "deneyim",
-        "beceri", "yıl", "aday", "pozisyon", "aranan", "nitelikler",
-        "bilgisayar", "mühendisliği", "öğrencisiyim", "geliştirme", "gerçek",
-        "muhendisligi", "ogrencisiyim", "gelistirme", "gercek",
+        "and",
+        "with",
+        "for",
+        "the",
+        "this",
+        "that",
+        "are",
+        "from",
+        "you",
+        "your",
+        "job",
+        "role",
+        "cv",
+        "experience",
+        "work",
+        "using",
+        "have",
+        "will",
+        "can",
+        "our",
+        "their",
+        "skills",
+        "years",
+        "plus",
+        "summary",
+        "name",
+        "highlights",
+        "highlight",
+        "computer",
+        "engineering",
+        "student",
+        "junior",
+        "senior",
+        "developer",
+        "engineer",
+        "position",
+        "bir",
+        "ve",
+        "ile",
+        "için",
+        "olan",
+        "gibi",
+        "iş",
+        "cv",
+        "deneyim",
+        "beceri",
+        "yıl",
+        "aday",
+        "pozisyon",
+        "aranan",
+        "nitelikler",
+        "bilgisayar",
+        "mühendisliği",
+        "öğrencisiyim",
+        "geliştirme",
+        "gerçek",
+        "muhendisligi",
+        "ogrencisiyim",
+        "gelistirme",
+        "gercek",
     }
     seen = set()
     out = []
@@ -140,7 +190,9 @@ def _infer_role(job_description: str) -> str:
     for line in text.splitlines():
         candidate = re.sub(r"[*#:_]+", " ", line).strip()
         candidate = re.split(r"[.!?]", candidate, maxsplit=1)[0]
-        candidate = re.sub(r"\b(job description|iş tanımı|position|role|pozisyonu?)\b", "", candidate, flags=re.I).strip(" -|")
+        candidate = re.sub(
+            r"\b(job description|iş tanımı|position|role|pozisyonu?)\b", "", candidate, flags=re.I
+        ).strip(" -|")
         if 4 <= len(candidate) <= 90:
             return candidate
     return "the role"
@@ -300,7 +352,8 @@ def _compact_job_context(job_description: str) -> str:
         if len(lines) >= 8:
             break
     return "\n".join(
-        part for part in (
+        part
+        for part in (
             f"Target role: {role}",
             "Important job keywords: " + ", ".join(keywords[:12]) if keywords else "",
             "Relevant job context:\n- " + "\n- ".join(lines[:6]) if lines else "",
@@ -349,9 +402,7 @@ def _compact_builder_context(builder_payload: dict, fallback_text: str = "") -> 
 
 
 def _cover_letter_cache_key(payload: dict) -> str:
-    return hashlib.sha256(
-        json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
-    ).hexdigest()
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
 
 
 def _cover_letter_cache_get(payload: dict) -> str | None:
@@ -371,6 +422,7 @@ def _cover_letter_cache_set(payload: dict, value: str) -> None:
 
 def _generate(prompt: str, max_tokens: int = 512) -> str:
     from services.ai_client_factory import get_ai_client_and_model
+
     client, model = get_ai_client_and_model()
     if not client:
         return _mock_generate(prompt, max_tokens=max_tokens)
@@ -392,6 +444,7 @@ def _generate(prompt: str, max_tokens: int = 512) -> str:
 
 def ai_rewrite_available() -> bool:
     from services.ai_client_factory import get_ai_client_and_model
+
     client, _ = get_ai_client_and_model()
     return client is not None
 
@@ -806,6 +859,7 @@ def ai_review_cv_payload(payload: dict, job_description: str = "", lang: str = "
 
     source_payload = dict(payload)
     from services.ai_client_factory import get_ai_client_and_model
+
     client, default_model = get_ai_client_and_model()
     if not client:
         return source_payload
@@ -815,7 +869,7 @@ def ai_review_cv_payload(payload: dict, job_description: str = "", lang: str = "
 
     safe_payload = json.dumps(source_payload, ensure_ascii=False)
     safe_payload = safe_payload[: MAX_INPUT_CHARS * 2]
-    safe_jd = str(job_description or "")[: MAX_INPUT_CHARS]
+    safe_jd = str(job_description or "")[:MAX_INPUT_CHARS]
 
     prompt = (
         "You are an ATS CV final reviewer. Review the JSON CV payload and fix only missing/format issues.\n"
@@ -862,6 +916,7 @@ def suggest_summaries(
     job_description = (job_description or "").strip()
 
     from services.ai_client_factory import get_ai_client_and_model
+
     client, default_model = get_ai_client_and_model()
     if not client:
         return _mock_suggest_summaries(summary, job_description, lang, count)
@@ -978,12 +1033,14 @@ def generate_interview_questions(
             result = []
             for item in parsed[:count]:
                 if isinstance(item, dict) and item.get("question"):
-                    result.append({
-                        "question": str(item.get("question", "")).strip(),
-                        "category": str(item.get("category", "behavioral")).strip().lower(),
-                        "difficulty": str(item.get("difficulty", "medium")).strip().lower(),
-                        "tip": str(item.get("tip", "")).strip(),
-                    })
+                    result.append(
+                        {
+                            "question": str(item.get("question", "")).strip(),
+                            "category": str(item.get("category", "behavioral")).strip().lower(),
+                            "difficulty": str(item.get("difficulty", "medium")).strip().lower(),
+                            "tip": str(item.get("tip", "")).strip(),
+                        }
+                    )
             if result:
                 return result
     except Exception:
@@ -1009,39 +1066,264 @@ def _mock_interview_questions(
 
     mode_questions = {
         "junior": [
-            {"question": f"Tell me about a project where you used {kw1}. What was your contribution?" if not is_tr else f"{kw1} kullandığınız bir proje hakkında bana anlatır mısınız? Katkınız neydi?", "category": "behavioral", "difficulty": "easy", "tip": "Use the STAR method: Situation, Task, Action, Result." if not is_tr else "STAR yöntemini kullanın: Durum, Görev, Eylem, Sonuç."},
-            {"question": f"How do you approach learning a new technology like {kw2}?" if not is_tr else f"{kw2} gibi yeni bir teknolojiyi öğrenmeye nasıl yaklaşırsınız?", "category": "competency", "difficulty": "easy", "tip": "Show curiosity and structured approach to learning." if not is_tr else "Merak ve yapılandırılmış öğrenme yaklaşımınızı gösterin."},
-            {"question": f"Describe a challenging bug you encountered. How did you debug it?" if not is_tr else "Karşılaştığınız zorlu bir hatayı anlatın. Nasıl hata ayıkladınız?", "category": "technical", "difficulty": "medium", "tip": "Walk through your systematic debugging process." if not is_tr else "Sistematik hata ayıklama sürecinizi anlatın."},
-            {"question": "How do you handle feedback from senior team members?" if not is_tr else "Kıdemli ekip üyelerinden gelen geri bildirimleri nasıl karşılarsınız?", "category": "behavioral", "difficulty": "easy", "tip": "Show openness and growth mindset." if not is_tr else "Açıklık ve gelişim odaklı düşünce yapınızı gösterin."},
-            {"question": f"What excites you most about {kw3} in your career?" if not is_tr else f"Kariyerinizde {kw3} konusunda sizi en çok ne heyecanlandırıyor?", "category": "behavioral", "difficulty": "easy", "tip": "Be genuine and connect to your career goals." if not is_tr else "Samimi olun ve kariyer hedeflerinizle bağlantı kurun."},
+            {
+                "question": f"Tell me about a project where you used {kw1}. What was your contribution?"
+                if not is_tr
+                else f"{kw1} kullandığınız bir proje hakkında bana anlatır mısınız? Katkınız neydi?",
+                "category": "behavioral",
+                "difficulty": "easy",
+                "tip": "Use the STAR method: Situation, Task, Action, Result."
+                if not is_tr
+                else "STAR yöntemini kullanın: Durum, Görev, Eylem, Sonuç.",
+            },
+            {
+                "question": f"How do you approach learning a new technology like {kw2}?"
+                if not is_tr
+                else f"{kw2} gibi yeni bir teknolojiyi öğrenmeye nasıl yaklaşırsınız?",
+                "category": "competency",
+                "difficulty": "easy",
+                "tip": "Show curiosity and structured approach to learning."
+                if not is_tr
+                else "Merak ve yapılandırılmış öğrenme yaklaşımınızı gösterin.",
+            },
+            {
+                "question": f"Describe a challenging bug you encountered. How did you debug it?"
+                if not is_tr
+                else "Karşılaştığınız zorlu bir hatayı anlatın. Nasıl hata ayıkladınız?",
+                "category": "technical",
+                "difficulty": "medium",
+                "tip": "Walk through your systematic debugging process."
+                if not is_tr
+                else "Sistematik hata ayıklama sürecinizi anlatın.",
+            },
+            {
+                "question": "How do you handle feedback from senior team members?"
+                if not is_tr
+                else "Kıdemli ekip üyelerinden gelen geri bildirimleri nasıl karşılarsınız?",
+                "category": "behavioral",
+                "difficulty": "easy",
+                "tip": "Show openness and growth mindset."
+                if not is_tr
+                else "Açıklık ve gelişim odaklı düşünce yapınızı gösterin.",
+            },
+            {
+                "question": f"What excites you most about {kw3} in your career?"
+                if not is_tr
+                else f"Kariyerinizde {kw3} konusunda sizi en çok ne heyecanlandırıyor?",
+                "category": "behavioral",
+                "difficulty": "easy",
+                "tip": "Be genuine and connect to your career goals."
+                if not is_tr
+                else "Samimi olun ve kariyer hedeflerinizle bağlantı kurun.",
+            },
         ],
         "senior": [
-            {"question": f"Describe a complex system you designed using {kw1}. What trade-offs did you consider?" if not is_tr else f"{kw1} kullanarak tasarladığınız karmaşık bir sistemi anlatın. Hangi trade-off'ları değerlendirdiniz?", "category": "technical", "difficulty": "hard", "tip": "Focus on architectural decisions, scalability, and real constraints." if not is_tr else "Mimari kararlar, ölçeklenebilirlik ve gerçek kısıtlamalara odaklanın."},
-            {"question": f"Tell me about a time you mentored a junior developer on {kw2}." if not is_tr else f"{kw2} konusunda bir junior geliştiriciye mentorluk yaptığınız bir deneyimi anlatın.", "category": "behavioral", "difficulty": "medium", "tip": "Show leadership and knowledge transfer ability." if not is_tr else "Liderlik ve bilgi aktarım becerilerinizi gösterin."},
-            {"question": "How do you handle technical debt in a fast-paced environment?" if not is_tr else "Hızlı tempolu bir ortamda teknik borçları nasıl yönetirsiniz?", "category": "situational", "difficulty": "hard", "tip": "Balance between shipping features and maintaining code quality." if not is_tr else "Özellik çıkarma ve kod kalitesini koruma arasındaki dengeyi anlatın."},
-            {"question": f"Walk me through how you'd optimize a slow {kw3} query/process." if not is_tr else f"Yavaş bir {kw3} sorgusu/sürecini nasıl optimize edersiniz, adım adım anlatın.", "category": "technical", "difficulty": "hard", "tip": "Show systematic profiling, measurement, and iterative improvement." if not is_tr else "Sistematik profil çıkarma, ölçüm ve iteratif iyileştirme gösterin."},
-            {"question": "Describe a production incident you handled. What was your approach?" if not is_tr else "Üstlendiğiniz bir production kesintisini anlatın. Yaklaşımınız neydi?", "category": "situational", "difficulty": "medium", "tip": "Demonstrate calm under pressure and post-mortem thinking." if not is_tr else "Baskı altında sakinliğinizi ve post-mortem düşünce yapınızı gösterin."},
+            {
+                "question": f"Describe a complex system you designed using {kw1}. What trade-offs did you consider?"
+                if not is_tr
+                else f"{kw1} kullanarak tasarladığınız karmaşık bir sistemi anlatın. Hangi trade-off'ları değerlendirdiniz?",
+                "category": "technical",
+                "difficulty": "hard",
+                "tip": "Focus on architectural decisions, scalability, and real constraints."
+                if not is_tr
+                else "Mimari kararlar, ölçeklenebilirlik ve gerçek kısıtlamalara odaklanın.",
+            },
+            {
+                "question": f"Tell me about a time you mentored a junior developer on {kw2}."
+                if not is_tr
+                else f"{kw2} konusunda bir junior geliştiriciye mentorluk yaptığınız bir deneyimi anlatın.",
+                "category": "behavioral",
+                "difficulty": "medium",
+                "tip": "Show leadership and knowledge transfer ability."
+                if not is_tr
+                else "Liderlik ve bilgi aktarım becerilerinizi gösterin.",
+            },
+            {
+                "question": "How do you handle technical debt in a fast-paced environment?"
+                if not is_tr
+                else "Hızlı tempolu bir ortamda teknik borçları nasıl yönetirsiniz?",
+                "category": "situational",
+                "difficulty": "hard",
+                "tip": "Balance between shipping features and maintaining code quality."
+                if not is_tr
+                else "Özellik çıkarma ve kod kalitesini koruma arasındaki dengeyi anlatın.",
+            },
+            {
+                "question": f"Walk me through how you'd optimize a slow {kw3} query/process."
+                if not is_tr
+                else f"Yavaş bir {kw3} sorgusu/sürecini nasıl optimize edersiniz, adım adım anlatın.",
+                "category": "technical",
+                "difficulty": "hard",
+                "tip": "Show systematic profiling, measurement, and iterative improvement."
+                if not is_tr
+                else "Sistematik profil çıkarma, ölçüm ve iteratif iyileştirme gösterin.",
+            },
+            {
+                "question": "Describe a production incident you handled. What was your approach?"
+                if not is_tr
+                else "Üstlendiğiniz bir production kesintisini anlatın. Yaklaşımınız neydi?",
+                "category": "situational",
+                "difficulty": "medium",
+                "tip": "Demonstrate calm under pressure and post-mortem thinking."
+                if not is_tr
+                else "Baskı altında sakinliğinizi ve post-mortem düşünce yapınızı gösterin.",
+            },
         ],
         "manager": [
-            {"question": f"How do you build and scale engineering teams in {kw1} domain?" if not is_tr else f"{kw1} alanında mühendislik ekiplerini nasıl kurar ve büyütürsünüz?", "category": "competency", "difficulty": "hard", "tip": "Cover hiring, culture, and team structure." if not is_tr else "İşe alım, kültür ve ekip yapısını kapsayın."},
-            {"question": "Tell me about a time you resolved a conflict between team members." if not is_tr else "Ekip üyeleri arasındaki bir çatışmayı çözdüğünüz bir zamanı anlatın.", "category": "behavioral", "difficulty": "medium", "tip": "Show empathy, active listening, and resolution skills." if not is_tr else "Empati, aktif dinleme ve çözüm becerilerinizi gösterin."},
-            {"question": "How do you align technical roadmap with business objectives?" if not is_tr else "Teknik yol haritasını iş hedefleriyle nasıl hizalarsınız?", "category": "situational", "difficulty": "hard", "tip": "Demonstrate strategic thinking and stakeholder communication." if not is_tr else "Stratejik düşünme ve paydaş iletişimi gösterin."},
-            {"question": "Describe how you handle underperforming team members." if not is_tr else "Düşük performans gösteren ekip üyelerini nasıl yönetirsiniz?", "category": "behavioral", "difficulty": "hard", "tip": "Show coaching approach, clear expectations, and support." if not is_tr else "Koçluk yaklaşımı, net beklentiler ve destek gösterin."},
-            {"question": f"How do you evaluate new {kw2} technologies for your team?" if not is_tr else f"Ekibiniz için yeni {kw2} teknolojilerini nasıl değerlendirirsiniz?", "category": "competency", "difficulty": "medium", "tip": "Balance innovation with stability and team capacity." if not is_tr else "İnovasyonu stabilite ve ekip kapasitesiyle dengeleyin."},
+            {
+                "question": f"How do you build and scale engineering teams in {kw1} domain?"
+                if not is_tr
+                else f"{kw1} alanında mühendislik ekiplerini nasıl kurar ve büyütürsünüz?",
+                "category": "competency",
+                "difficulty": "hard",
+                "tip": "Cover hiring, culture, and team structure."
+                if not is_tr
+                else "İşe alım, kültür ve ekip yapısını kapsayın.",
+            },
+            {
+                "question": "Tell me about a time you resolved a conflict between team members."
+                if not is_tr
+                else "Ekip üyeleri arasındaki bir çatışmayı çözdüğünüz bir zamanı anlatın.",
+                "category": "behavioral",
+                "difficulty": "medium",
+                "tip": "Show empathy, active listening, and resolution skills."
+                if not is_tr
+                else "Empati, aktif dinleme ve çözüm becerilerinizi gösterin.",
+            },
+            {
+                "question": "How do you align technical roadmap with business objectives?"
+                if not is_tr
+                else "Teknik yol haritasını iş hedefleriyle nasıl hizalarsınız?",
+                "category": "situational",
+                "difficulty": "hard",
+                "tip": "Demonstrate strategic thinking and stakeholder communication."
+                if not is_tr
+                else "Stratejik düşünme ve paydaş iletişimi gösterin.",
+            },
+            {
+                "question": "Describe how you handle underperforming team members."
+                if not is_tr
+                else "Düşük performans gösteren ekip üyelerini nasıl yönetirsiniz?",
+                "category": "behavioral",
+                "difficulty": "hard",
+                "tip": "Show coaching approach, clear expectations, and support."
+                if not is_tr
+                else "Koçluk yaklaşımı, net beklentiler ve destek gösterin.",
+            },
+            {
+                "question": f"How do you evaluate new {kw2} technologies for your team?"
+                if not is_tr
+                else f"Ekibiniz için yeni {kw2} teknolojilerini nasıl değerlendirirsiniz?",
+                "category": "competency",
+                "difficulty": "medium",
+                "tip": "Balance innovation with stability and team capacity."
+                if not is_tr
+                else "İnovasyonu stabilite ve ekip kapasitesiyle dengeleyin.",
+            },
         ],
         "tech": [
-            {"question": f"Design a scalable architecture for a {kw1}-based system handling 100K requests/sec." if not is_tr else f"Saniyede 100K istek işleyen {kw1} tabanlı bir sistem için ölçeklenebilir mimari tasarlayın.", "category": "technical", "difficulty": "hard", "tip": "Cover load balancing, caching, database sharding, and failure modes." if not is_tr else "Yük dengeleme, önbellek, veritabanı parçalama ve hata modlarını kapsayın."},
-            {"question": f"Explain the difference between {kw1} and {kw2} at a deep level." if not is_tr else f"{kw1} ve {kw2} arasındaki farkları derin düzeyde açıklayın.", "category": "technical", "difficulty": "medium", "tip": "Show depth of understanding beyond surface-level comparisons." if not is_tr else "Yüzeysel karşılaştırmaların ötesinde derin anlayış gösterin."},
-            {"question": "How do you ensure code quality in a microservices environment?" if not is_tr else "Mikroservis ortamında kod kalitesini nasıl sağlarsınız?", "category": "technical", "difficulty": "medium", "tip": "Cover testing strategies, CI/CD, code review, and observability." if not is_tr else "Test stratejileri, CI/CD, kod inceleme ve gözlemlenebilirlik konularını kapsayın."},
-            {"question": f"Describe a performance bottleneck in {kw3} that you identified and resolved." if not is_tr else f"{kw3}'daki tespit edip çözdüğünüz bir performans darboğazını anlatın.", "category": "technical", "difficulty": "hard", "tip": "Show profiling methodology and measurable improvements." if not is_tr else "Profil çıkarma metodolojisi ve ölçülebilir iyileştirmeleri gösterin."},
-            {"question": "What's your approach to API design and versioning?" if not is_tr else "API tasarımı ve sürümlendirme konusundaki yaklaşımınız nedir?", "category": "technical", "difficulty": "medium", "tip": "Cover RESTful principles, backward compatibility, and documentation." if not is_tr else "RESTful ilkeleri, geriye dönük uyumluluk ve dokümantasyonu kapsayın."},
+            {
+                "question": f"Design a scalable architecture for a {kw1}-based system handling 100K requests/sec."
+                if not is_tr
+                else f"Saniyede 100K istek işleyen {kw1} tabanlı bir sistem için ölçeklenebilir mimari tasarlayın.",
+                "category": "technical",
+                "difficulty": "hard",
+                "tip": "Cover load balancing, caching, database sharding, and failure modes."
+                if not is_tr
+                else "Yük dengeleme, önbellek, veritabanı parçalama ve hata modlarını kapsayın.",
+            },
+            {
+                "question": f"Explain the difference between {kw1} and {kw2} at a deep level."
+                if not is_tr
+                else f"{kw1} ve {kw2} arasındaki farkları derin düzeyde açıklayın.",
+                "category": "technical",
+                "difficulty": "medium",
+                "tip": "Show depth of understanding beyond surface-level comparisons."
+                if not is_tr
+                else "Yüzeysel karşılaştırmaların ötesinde derin anlayış gösterin.",
+            },
+            {
+                "question": "How do you ensure code quality in a microservices environment?"
+                if not is_tr
+                else "Mikroservis ortamında kod kalitesini nasıl sağlarsınız?",
+                "category": "technical",
+                "difficulty": "medium",
+                "tip": "Cover testing strategies, CI/CD, code review, and observability."
+                if not is_tr
+                else "Test stratejileri, CI/CD, kod inceleme ve gözlemlenebilirlik konularını kapsayın.",
+            },
+            {
+                "question": f"Describe a performance bottleneck in {kw3} that you identified and resolved."
+                if not is_tr
+                else f"{kw3}'daki tespit edip çözdüğünüz bir performans darboğazını anlatın.",
+                "category": "technical",
+                "difficulty": "hard",
+                "tip": "Show profiling methodology and measurable improvements."
+                if not is_tr
+                else "Profil çıkarma metodolojisi ve ölçülebilir iyileştirmeleri gösterin.",
+            },
+            {
+                "question": "What's your approach to API design and versioning?"
+                if not is_tr
+                else "API tasarımı ve sürümlendirme konusundaki yaklaşımınız nedir?",
+                "category": "technical",
+                "difficulty": "medium",
+                "tip": "Cover RESTful principles, backward compatibility, and documentation."
+                if not is_tr
+                else "RESTful ilkeleri, geriye dönük uyumluluk ve dokümantasyonu kapsayın.",
+            },
         ],
         "academic": [
-            {"question": f"Describe your research methodology in {kw1}." if not is_tr else f"{kw1} konusundaki araştırma metodolojinizi anlatın.", "category": "competency", "difficulty": "hard", "tip": "Cover hypothesis formation, data collection, and validation." if not is_tr else "Hipotez oluşturma, veri toplama ve doğrulamayı kapsayın."},
-            {"question": "How do you handle conflicting findings in your research?" if not is_tr else "Araştırmanızdaki çelişkili bulguları nasıl ele alırsınız?", "category": "behavioral", "difficulty": "medium", "tip": "Show intellectual honesty and rigorous analysis." if not is_tr else "Entelektüel dürüstlük ve titiz analiz gösterin."},
-            {"question": f"Explain how {kw2} impacts your field of study." if not is_tr else f"{kw2}'nin çalışma alanınızı nasıl etkilediğini açıklayın.", "category": "technical", "difficulty": "medium", "tip": "Connect theoretical knowledge to practical implications." if not is_tr else "Teorik bilgiyi pratik etkilerle bağlantılandırın."},
-            {"question": "How do you communicate complex findings to non-expert stakeholders?" if not is_tr else "Karmaşık bulguları uzman olmayan paydaşlara nasıl iletirsiniz?", "category": "behavioral", "difficulty": "medium", "tip": "Show ability to simplify without oversimplifying." if not is_tr else "Aşırı basitleştirmeden sadeleştirme yeteneğinizi gösterin."},
-            {"question": "Describe a collaborative research project and your role in it." if not is_tr else "İşbirliğine dayalı bir araştırma projesini ve bu projedeki rolünüzü anlatın.", "category": "behavioral", "difficulty": "easy", "tip": "Highlight teamwork, your unique contribution, and outcomes." if not is_tr else "Takım çalışması, özgün katkınız ve sonuçları vurgulayın."},
+            {
+                "question": f"Describe your research methodology in {kw1}."
+                if not is_tr
+                else f"{kw1} konusundaki araştırma metodolojinizi anlatın.",
+                "category": "competency",
+                "difficulty": "hard",
+                "tip": "Cover hypothesis formation, data collection, and validation."
+                if not is_tr
+                else "Hipotez oluşturma, veri toplama ve doğrulamayı kapsayın.",
+            },
+            {
+                "question": "How do you handle conflicting findings in your research?"
+                if not is_tr
+                else "Araştırmanızdaki çelişkili bulguları nasıl ele alırsınız?",
+                "category": "behavioral",
+                "difficulty": "medium",
+                "tip": "Show intellectual honesty and rigorous analysis."
+                if not is_tr
+                else "Entelektüel dürüstlük ve titiz analiz gösterin.",
+            },
+            {
+                "question": f"Explain how {kw2} impacts your field of study."
+                if not is_tr
+                else f"{kw2}'nin çalışma alanınızı nasıl etkilediğini açıklayın.",
+                "category": "technical",
+                "difficulty": "medium",
+                "tip": "Connect theoretical knowledge to practical implications."
+                if not is_tr
+                else "Teorik bilgiyi pratik etkilerle bağlantılandırın.",
+            },
+            {
+                "question": "How do you communicate complex findings to non-expert stakeholders?"
+                if not is_tr
+                else "Karmaşık bulguları uzman olmayan paydaşlara nasıl iletirsiniz?",
+                "category": "behavioral",
+                "difficulty": "medium",
+                "tip": "Show ability to simplify without oversimplifying."
+                if not is_tr
+                else "Aşırı basitleştirmeden sadeleştirme yeteneğinizi gösterin.",
+            },
+            {
+                "question": "Describe a collaborative research project and your role in it."
+                if not is_tr
+                else "İşbirliğine dayalı bir araştırma projesini ve bu projedeki rolünüzü anlatın.",
+                "category": "behavioral",
+                "difficulty": "easy",
+                "tip": "Highlight teamwork, your unique contribution, and outcomes."
+                if not is_tr
+                else "Takım çalışması, özgün katkınız ve sonuçları vurgulayın.",
+            },
         ],
     }
 
@@ -1121,7 +1403,11 @@ def _mock_evaluate_answer(question: str, answer: str, lang: str) -> dict:
             "score": score,
             "feedback": f"Yanıtınız {word_count} kelime içeriyor. {'İyi detay seviyesi.' if word_count >= 50 else 'Daha fazla detay ve örnek ekleyerek geliştirebilirsiniz.'}",
             "strengths": ["Konuya odaklanmış yanıt", "Net iletişim", "İlgili deneyimlerden bahsetme"],
-            "improvements": ["STAR yöntemini daha aktif kullanın", "Somut örnekler ve metrikler ekleyin", "Sonuçları ölçülebilir şekilde ifade edin"],
+            "improvements": [
+                "STAR yöntemini daha aktif kullanın",
+                "Somut örnekler ve metrikler ekleyin",
+                "Sonuçları ölçülebilir şekilde ifade edin",
+            ],
             "sample_answer": f"[Örnek yanıt] '{question[:60]}...' sorusu için ideal bir yanıt, belirli bir proje veya deneyimle başlamalı, attığınız adımları açıklamalı ve ölçülebilir bir sonuçla bitmelidir.",
         }
 
@@ -1129,6 +1415,10 @@ def _mock_evaluate_answer(question: str, answer: str, lang: str) -> dict:
         "score": score,
         "feedback": f"Your answer contains {word_count} words. {'Good level of detail.' if word_count >= 50 else 'Consider adding more specific examples and measurable results.'}",
         "strengths": ["Focused response to the question", "Clear communication", "Relevant experience mentioned"],
-        "improvements": ["Use the STAR method more actively", "Add specific metrics and numbers", "End with measurable outcomes"],
+        "improvements": [
+            "Use the STAR method more actively",
+            "Add specific metrics and numbers",
+            "End with measurable outcomes",
+        ],
         "sample_answer": f"[Sample answer] For '{question[:60]}...', an ideal response should start with a specific project or experience, explain the actions you took, and end with a measurable result.",
     }

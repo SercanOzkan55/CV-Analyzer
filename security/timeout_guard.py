@@ -44,10 +44,14 @@ def run_with_timeout(
 
 def timeout_decorator(seconds: float = TIMEOUT_OPTIMIZE, label: str = ""):
     """Decorator that wraps a sync function with a timeout guard."""
+
     def decorator(fn: Callable[..., T]) -> Callable[..., T]:
         op_label = label or fn.__name__
+
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             return run_with_timeout(fn, args, kwargs, timeout=seconds, label=op_label)
+
         return wrapper
+
     return decorator

@@ -1,4 +1,5 @@
 """Tests for services/billing_service.py — plan normalization and entitlements."""
+
 import pytest
 from services.billing_service import normalize_plan, get_entitlements, is_feature_enabled
 

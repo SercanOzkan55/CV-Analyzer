@@ -1,4 +1,4 @@
-﻿import secrets
+import secrets
 import hashlib
 import hmac
 import base64
@@ -14,11 +14,27 @@ from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, func
 from database import get_db
-from models import WorkerKey, WorkerSession, WorkerClaim, WorkerAnalysisResult, QuotaEvent, RecruiterJob, Candidate, CandidateAction
+from models import (
+    WorkerKey,
+    WorkerSession,
+    WorkerClaim,
+    WorkerAnalysisResult,
+    QuotaEvent,
+    RecruiterJob,
+    Candidate,
+    CandidateAction,
+)
 from schemas.worker import (
-    WorkerKeyCreate, WorkerKeyResponse, WorkerKeyCreateResponse,
-    WorkerAuthRequest, WorkerAuthResponse, JobConfigResponse,
-    ClaimRequest, ClaimResponse, ClaimItem, AnalysisResultRequest
+    WorkerKeyCreate,
+    WorkerKeyResponse,
+    WorkerKeyCreateResponse,
+    WorkerAuthRequest,
+    WorkerAuthResponse,
+    JobConfigResponse,
+    ClaimRequest,
+    ClaimResponse,
+    ClaimItem,
+    AnalysisResultRequest,
 )
 from routes.recruiter import recruiter_required
 from core.http_runtime import audit_log, limiter
@@ -39,6 +55,7 @@ LOCAL_WORKER_PLAN_LIMITS = {
     "enterprise": int(os.getenv("LOCAL_WORKER_MONTHLY_LIMIT_ENTERPRISE", "4000")),
 }
 
+
 def hash_key(api_key: str) -> str:
     return hashlib.sha256(api_key.encode("utf-8")).hexdigest()
 
@@ -56,11 +73,40 @@ def _download_token_ttl_seconds() -> int:
 
 _DOWNLOAD_TOKEN_TTL_SECONDS = _download_token_ttl_seconds()
 _KNOWN_SKILLS = [
-    "python", "javascript", "typescript", "react", "node", "fastapi", "django",
-    "flask", "sql", "postgresql", "mysql", "mongodb", "redis", "docker",
-    "kubernetes", "aws", "azure", "gcp", "linux", "git", "ci/cd", "machine learning",
-    "data analysis", "excel", "power bi", "tableau", "salesforce", "seo", "crm",
-    "project management", "agile", "scrum", "communication", "leadership",
+    "python",
+    "javascript",
+    "typescript",
+    "react",
+    "node",
+    "fastapi",
+    "django",
+    "flask",
+    "sql",
+    "postgresql",
+    "mysql",
+    "mongodb",
+    "redis",
+    "docker",
+    "kubernetes",
+    "aws",
+    "azure",
+    "gcp",
+    "linux",
+    "git",
+    "ci/cd",
+    "machine learning",
+    "data analysis",
+    "excel",
+    "power bi",
+    "tableau",
+    "salesforce",
+    "seo",
+    "crm",
+    "project management",
+    "agile",
+    "scrum",
+    "communication",
+    "leadership",
 ]
 
 
@@ -69,13 +115,7 @@ def _download_signing_secret() -> bytes:
     if explicit:
         return explicit.encode("utf-8")
 
-    app_env = (
-        os.getenv("APP_ENV")
-        or os.getenv("ENV")
-        or os.getenv("ENVIRONMENT")
-        or os.getenv("STAGE")
-        or ""
-    ).lower()
+    app_env = (os.getenv("APP_ENV") or os.getenv("ENV") or os.getenv("ENVIRONMENT") or os.getenv("STAGE") or "").lower()
     if app_env in {"prod", "production"}:
         raise RuntimeError("WORKER_DOWNLOAD_SIGNING_SECRET is required in production")
 
@@ -136,6 +176,7 @@ def _storage_download_url(action: CandidateAction) -> str | None:
         return None
     try:
         from services.storage_service import get_download_url
+
         url = get_download_url(key, str(action.recruiter_id), expires=_DOWNLOAD_TOKEN_TTL_SECONDS)
         if isinstance(url, str) and url.lower().startswith(("http://", "https://")):
             return url
@@ -158,10 +199,14 @@ def _ensure_candidate_for_action(db: Session, action: CandidateAction) -> Candid
     email = (action.candidate_email or "").strip().lower()
     candidate = None
     if email:
-        candidate = db.query(Candidate).filter(
-            Candidate.organization_id == action.organization_id,
-            func.lower(Candidate.email) == email,
-        ).first()
+        candidate = (
+            db.query(Candidate)
+            .filter(
+                Candidate.organization_id == action.organization_id,
+                func.lower(Candidate.email) == email,
+            )
+            .first()
+        )
     if not candidate:
         candidate = Candidate(
             organization_id=action.organization_id,
@@ -237,33 +282,35 @@ def _month_start(now: datetime | None = None) -> datetime:
 def _completed_this_month_for_keys(db: Session, organization_id: int, key_ids: set[int], now: datetime) -> int:
     if not key_ids:
         return 0
-    amount = db.query(func.coalesce(func.sum(QuotaEvent.amount), 0)).filter(
-        QuotaEvent.organization_id == organization_id,
-        QuotaEvent.worker_key_id.in_(key_ids),
-        QuotaEvent.event_type == "completed",
-        QuotaEvent.created_at >= _month_start(now),
-    ).scalar()
+    amount = (
+        db.query(func.coalesce(func.sum(QuotaEvent.amount), 0))
+        .filter(
+            QuotaEvent.organization_id == organization_id,
+            QuotaEvent.worker_key_id.in_(key_ids),
+            QuotaEvent.event_type == "completed",
+            QuotaEvent.created_at >= _month_start(now),
+        )
+        .scalar()
+    )
     return int(amount or 0)
 
 
-def _worker_quota_snapshot(db: Session, organization_id: int, plan: str | None = None, now: datetime | None = None) -> dict:
+def _worker_quota_snapshot(
+    db: Session, organization_id: int, plan: str | None = None, now: datetime | None = None
+) -> dict:
     now = now or datetime.utcnow()
     normalized_plan = _normalize_worker_plan(plan)
     monthly_limit = int(LOCAL_WORKER_PLAN_LIMITS.get(normalized_plan, 0))
 
     all_keys = db.query(WorkerKey).filter(WorkerKey.organization_id == organization_id).all()
     active_keys = [
-        key for key in all_keys
-        if key.revoked_at is None and (key.expires_at is None or key.expires_at > now)
+        key for key in all_keys if key.revoked_at is None and (key.expires_at is None or key.expires_at > now)
     ]
     active_key_ids = {key.id for key in active_keys}
     inactive_key_ids = {key.id for key in all_keys if key.id not in active_key_ids}
 
     active_quota_limit = sum(int(key.quota_limit or 0) for key in active_keys)
-    active_used_reserved = sum(
-        int(key.quota_used or 0) + int(key.quota_reserved or 0)
-        for key in active_keys
-    )
+    active_used_reserved = sum(int(key.quota_used or 0) + int(key.quota_reserved or 0) for key in active_keys)
     inactive_completed_this_month = _completed_this_month_for_keys(db, organization_id, inactive_key_ids, now)
 
     allocated = active_quota_limit + inactive_completed_this_month
@@ -458,31 +505,40 @@ def _worker_config_example(api_base_url: str) -> str:
         indent=2,
     )
 
+
 def _release_expired_claims(db: Session, organization_id: int, now: datetime | None = None) -> int:
     now = now or datetime.utcnow()
-    expired_claims = db.query(WorkerClaim).filter(
-        WorkerClaim.organization_id == organization_id,
-        WorkerClaim.status == "claimed",
-        WorkerClaim.claim_expires_at < now
-    ).with_for_update().all()
+    expired_claims = (
+        db.query(WorkerClaim)
+        .filter(
+            WorkerClaim.organization_id == organization_id,
+            WorkerClaim.status == "claimed",
+            WorkerClaim.claim_expires_at < now,
+        )
+        .with_for_update()
+        .all()
+    )
 
     released = 0
     for claim in expired_claims:
         wk = db.query(WorkerKey).filter(WorkerKey.id == claim.worker_key_id).with_for_update().first()
         if wk:
             wk.quota_reserved = max(0, int(wk.quota_reserved or 0) - 1)
-            db.add(QuotaEvent(
-                worker_key_id=wk.id,
-                organization_id=claim.organization_id,
-                job_id=claim.job_id,
-                cv_id=claim.cv_id,
-                event_type="expired",
-                amount=1,
-                metadata_={"claim_id": claim.id},
-            ))
+            db.add(
+                QuotaEvent(
+                    worker_key_id=wk.id,
+                    organization_id=claim.organization_id,
+                    job_id=claim.job_id,
+                    cv_id=claim.cv_id,
+                    event_type="expired",
+                    amount=1,
+                    metadata_={"claim_id": claim.id},
+                )
+            )
         claim.status = "expired"
         released += 1
     return released
+
 
 def get_current_worker(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     session_hash = hash_key(credentials.credentials)
@@ -497,13 +553,11 @@ def get_current_worker(credentials: HTTPAuthorizationCredentials = Depends(secur
     db.commit()
     return {"session": ws, "key": wk}
 
+
 @router.post("/worker-keys", response_model=WorkerKeyCreateResponse)
 @limiter.limit("5/minute")
 def create_worker_key(
-    request: Request,
-    req: WorkerKeyCreate,
-    db: Session = Depends(get_db),
-    recruiter = Depends(recruiter_required)
+    request: Request, req: WorkerKeyCreate, db: Session = Depends(get_db), recruiter=Depends(recruiter_required)
 ):
     org_id = req.company_id or recruiter.organization_id
     if org_id != recruiter.organization_id:
@@ -511,10 +565,14 @@ def create_worker_key(
     if not recruiter.organization_id:
         raise HTTPException(status_code=400, detail="Recruiter profile is incomplete")
     if req.job_id:
-        job = db.query(RecruiterJob).filter(
-            RecruiterJob.id == req.job_id,
-            RecruiterJob.organization_id == recruiter.organization_id,
-        ).first()
+        job = (
+            db.query(RecruiterJob)
+            .filter(
+                RecruiterJob.id == req.job_id,
+                RecruiterJob.organization_id == recruiter.organization_id,
+            )
+            .first()
+        )
         if not job:
             raise HTTPException(status_code=404, detail="Job not found for this company")
 
@@ -557,11 +615,9 @@ def create_worker_key(
 
     return {**_worker_key_payload(new_key), "api_key": raw_key}
 
+
 @router.get("/worker-keys", response_model=list[WorkerKeyResponse])
-def list_worker_keys(
-    db: Session = Depends(get_db),
-    recruiter = Depends(recruiter_required)
-):
+def list_worker_keys(db: Session = Depends(get_db), recruiter=Depends(recruiter_required)):
     keys = db.query(WorkerKey).filter(WorkerKey.organization_id == recruiter.organization_id).all()
     return [_worker_key_payload(k) for k in keys]
 
@@ -569,7 +625,7 @@ def list_worker_keys(
 @router.get("/worker/quota")
 def worker_quota_summary(
     db: Session = Depends(get_db),
-    recruiter = Depends(recruiter_required),
+    recruiter=Depends(recruiter_required),
 ):
     if not recruiter.organization_id:
         raise HTTPException(status_code=400, detail="Recruiter profile is incomplete")
@@ -585,7 +641,7 @@ def worker_quota_summary(
 @limiter.limit("10/minute")
 def download_worker_package(
     request: Request,
-    recruiter = Depends(recruiter_required),
+    recruiter=Depends(recruiter_required),
 ):
     """Return a self-contained Local Worker ZIP for employers.
 
@@ -647,7 +703,7 @@ def download_worker_package(
 @limiter.limit("10/minute")
 def download_worker_exe(
     request: Request,
-    recruiter = Depends(recruiter_required),
+    recruiter=Depends(recruiter_required),
 ):
     """Return the prebuilt one-file Windows Local Worker executable."""
     exe_path = _worker_exe_path()
@@ -676,13 +732,14 @@ def download_worker_exe(
         },
     )
 
+
 @router.post("/worker-keys/{key_id}/revoke")
-def revoke_worker_key(
-    key_id: int,
-    db: Session = Depends(get_db),
-    recruiter = Depends(recruiter_required)
-):
-    wk = db.query(WorkerKey).filter(WorkerKey.id == key_id, WorkerKey.organization_id == recruiter.organization_id).first()
+def revoke_worker_key(key_id: int, db: Session = Depends(get_db), recruiter=Depends(recruiter_required)):
+    wk = (
+        db.query(WorkerKey)
+        .filter(WorkerKey.id == key_id, WorkerKey.organization_id == recruiter.organization_id)
+        .first()
+    )
     if not wk:
         raise HTTPException(status_code=404, detail="Key not found")
 
@@ -725,6 +782,7 @@ def list_worker_sessions(
         ]
     }
 
+
 @router.post("/worker/auth", response_model=WorkerAuthResponse)
 @limiter.limit("10/minute")
 def worker_auth(request: Request, req: WorkerAuthRequest, db: Session = Depends(get_db)):
@@ -749,7 +807,7 @@ def worker_auth(request: Request, req: WorkerAuthRequest, db: Session = Depends(
         device_name=req.device_name,
         worker_version=req.worker_version,
         access_token_hash=session_hash,
-        expires_at=expires_at
+        expires_at=expires_at,
     )
     wk.last_used_at = datetime.utcnow()
     db.add(ws)
@@ -762,7 +820,16 @@ def worker_auth(request: Request, req: WorkerAuthRequest, db: Session = Depends(
         worker_version=req.worker_version,
     )
 
-    allowed_jobs = [wk.job_id] if wk.job_id else [j.id for j in db.query(RecruiterJob).filter(RecruiterJob.organization_id == wk.organization_id, RecruiterJob.is_active == True).all()]
+    allowed_jobs = (
+        [wk.job_id]
+        if wk.job_id
+        else [
+            j.id
+            for j in db.query(RecruiterJob)
+            .filter(RecruiterJob.organization_id == wk.organization_id, RecruiterJob.is_active == True)
+            .all()
+        ]
+    )
     quota_remaining = max(0, int(wk.quota_limit or 0) - int(wk.quota_used or 0) - int(wk.quota_reserved or 0))
 
     return WorkerAuthResponse(
@@ -774,20 +841,30 @@ def worker_auth(request: Request, req: WorkerAuthRequest, db: Session = Depends(
         permissions=_safe_permissions(wk.permissions),
     )
 
+
 @router.get("/worker/jobs")
 def worker_get_jobs(worker=Depends(get_current_worker), db: Session = Depends(get_db)):
     wk = worker["key"]
     if wk.job_id:
         return {"jobs": [wk.job_id]}
-    jobs = db.query(RecruiterJob).filter(RecruiterJob.organization_id == wk.organization_id, RecruiterJob.is_active == True).all()
+    jobs = (
+        db.query(RecruiterJob)
+        .filter(RecruiterJob.organization_id == wk.organization_id, RecruiterJob.is_active == True)
+        .all()
+    )
     return {"jobs": [j.id for j in jobs]}
+
 
 @router.get("/worker/jobs/{jobId}/config", response_model=JobConfigResponse)
 def worker_job_config(jobId: int, worker=Depends(get_current_worker), db: Session = Depends(get_db)):
     wk = worker["key"]
     if wk.job_id and wk.job_id != jobId:
         raise HTTPException(status_code=403, detail="Key not allowed for this job")
-    job = db.query(RecruiterJob).filter(RecruiterJob.id == jobId, RecruiterJob.organization_id == wk.organization_id).first()
+    job = (
+        db.query(RecruiterJob)
+        .filter(RecruiterJob.id == jobId, RecruiterJob.organization_id == wk.organization_id)
+        .first()
+    )
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -801,20 +878,27 @@ def worker_job_config(jobId: int, worker=Depends(get_current_worker), db: Sessio
         scoring_weights={"required_skills": 0.7, "nice_to_have_skills": 0.2, "hard_reject": 0.1},
     )
 
+
 @router.post("/worker/jobs/{jobId}/claim", response_model=ClaimResponse)
 @limiter.limit("60/minute")
-def worker_claim(jobId: int, request: Request, req: ClaimRequest, worker=Depends(get_current_worker), db: Session = Depends(get_db)):
+def worker_claim(
+    jobId: int, request: Request, req: ClaimRequest, worker=Depends(get_current_worker), db: Session = Depends(get_db)
+):
     wk = worker["key"]
     ws = worker["session"]
     if wk.job_id and wk.job_id != jobId:
         raise HTTPException(status_code=403, detail="Not authorized for this job")
     if not (wk.permissions or {}).get("claim", True):
         raise HTTPException(status_code=403, detail="Worker key cannot claim CVs")
-    job = db.query(RecruiterJob).filter(
-        RecruiterJob.id == jobId,
-        RecruiterJob.organization_id == wk.organization_id,
-        RecruiterJob.is_active == True,
-    ).first()
+    job = (
+        db.query(RecruiterJob)
+        .filter(
+            RecruiterJob.id == jobId,
+            RecruiterJob.organization_id == wk.organization_id,
+            RecruiterJob.is_active == True,
+        )
+        .first()
+    )
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -823,7 +907,7 @@ def worker_claim(jobId: int, request: Request, req: ClaimRequest, worker=Depends
 
     # Atomically reserve quota
     quota_remaining = max(0, int(wk.quota_limit or 0) - int(wk.quota_used or 0) - int(wk.quota_reserved or 0))
-    claim_count = min(req.limit, 50, quota_remaining) # max 50 per batch
+    claim_count = min(req.limit, 50, quota_remaining)  # max 50 per batch
     if claim_count <= 0:
         raise HTTPException(status_code=402, detail="Quota exceeded")
 
@@ -842,16 +926,23 @@ def worker_claim(jobId: int, request: Request, req: ClaimRequest, worker=Depends
         WorkerAnalysisResult.candidate_action_id != None,
     )
 
-    actions = db.query(CandidateAction).filter(
-        CandidateAction.organization_id == wk.organization_id,
-        CandidateAction.job_id == jobId,
-        or_(
-            and_(CandidateAction.cv_text != None, func.length(func.trim(CandidateAction.cv_text)) > 0),
-            CandidateAction.cv_file_key != None,
-        ),
-        CandidateAction.id.notin_(active_action_subq),
-        CandidateAction.id.notin_(completed_action_subq),
-    ).order_by(CandidateAction.created_at.asc()).with_for_update(skip_locked=True).limit(claim_count).all()
+    actions = (
+        db.query(CandidateAction)
+        .filter(
+            CandidateAction.organization_id == wk.organization_id,
+            CandidateAction.job_id == jobId,
+            or_(
+                and_(CandidateAction.cv_text != None, func.length(func.trim(CandidateAction.cv_text)) > 0),
+                CandidateAction.cv_file_key != None,
+            ),
+            CandidateAction.id.notin_(active_action_subq),
+            CandidateAction.id.notin_(completed_action_subq),
+        )
+        .order_by(CandidateAction.created_at.asc())
+        .with_for_update(skip_locked=True)
+        .limit(claim_count)
+        .all()
+    )
 
     if not actions:
         return ClaimResponse(items=[], claim_expires_at=datetime.utcnow())
@@ -861,20 +952,26 @@ def worker_claim(jobId: int, request: Request, req: ClaimRequest, worker=Depends
 
     candidate_ids = [candidate.id for candidate, _ in candidates]
     active_candidate_ids = {
-        row[0] for row in db.query(WorkerClaim.candidate_id).filter(
+        row[0]
+        for row in db.query(WorkerClaim.candidate_id)
+        .filter(
             WorkerClaim.job_id == jobId,
             WorkerClaim.organization_id == wk.organization_id,
             WorkerClaim.candidate_id.in_(candidate_ids),
             WorkerClaim.status == "claimed",
             WorkerClaim.claim_expires_at >= datetime.utcnow(),
-        ).all()
+        )
+        .all()
     }
     completed_candidate_ids = {
-        row[0] for row in db.query(WorkerAnalysisResult.candidate_id).filter(
+        row[0]
+        for row in db.query(WorkerAnalysisResult.candidate_id)
+        .filter(
             WorkerAnalysisResult.job_id == jobId,
             WorkerAnalysisResult.organization_id == wk.organization_id,
             WorkerAnalysisResult.candidate_id.in_(candidate_ids),
-        ).all()
+        )
+        .all()
     }
     candidates = [
         (candidate, action)
@@ -900,14 +997,16 @@ def worker_claim(jobId: int, request: Request, req: ClaimRequest, worker=Depends
         )
 
     # Atomic quota check and reserve
-    updated_rows = db.query(WorkerKey).filter(
-        WorkerKey.id == wk.id,
-        WorkerKey.revoked_at == None,
-        or_(WorkerKey.expires_at == None, WorkerKey.expires_at > datetime.utcnow()),
-        (WorkerKey.quota_used + WorkerKey.quota_reserved + actual_count) <= WorkerKey.quota_limit
-    ).update({
-        WorkerKey.quota_reserved: WorkerKey.quota_reserved + actual_count
-    }, synchronize_session=False)
+    updated_rows = (
+        db.query(WorkerKey)
+        .filter(
+            WorkerKey.id == wk.id,
+            WorkerKey.revoked_at == None,
+            or_(WorkerKey.expires_at == None, WorkerKey.expires_at > datetime.utcnow()),
+            (WorkerKey.quota_used + WorkerKey.quota_reserved + actual_count) <= WorkerKey.quota_limit,
+        )
+        .update({WorkerKey.quota_reserved: WorkerKey.quota_reserved + actual_count}, synchronize_session=False)
+    )
 
     if updated_rows == 0:
         db.rollback()
@@ -924,37 +1023,49 @@ def worker_claim(jobId: int, request: Request, req: ClaimRequest, worker=Depends
             candidate_id=c.id,
             candidate_action_id=action.id,
             cv_id=c.id,
-            claim_expires_at=claim_expires_at
+            claim_expires_at=claim_expires_at,
         )
         db.add(wc)
         db.flush()
 
         download_url = _storage_download_url(action)
         if download_url:
-            file_name = _safe_file_name(action.cv_file_name, f"candidate_{c.id}.{_file_type_from_name(action.cv_file_name, 'pdf')}")
+            file_name = _safe_file_name(
+                action.cv_file_name, f"candidate_{c.id}.{_file_type_from_name(action.cv_file_name, 'pdf')}"
+            )
             file_type = action.cv_file_type or _file_type_from_name(file_name, "pdf")
         else:
-            signed_expires_at = min(claim_expires_at, datetime.utcnow() + timedelta(seconds=_DOWNLOAD_TOKEN_TTL_SECONDS))
+            signed_expires_at = min(
+                claim_expires_at, datetime.utcnow() + timedelta(seconds=_DOWNLOAD_TOKEN_TTL_SECONDS)
+            )
             download_token = _sign_download_token(wc.id, c.id, signed_expires_at)
             download_url = f"{request.url_for('worker_download_cv', claim_id=wc.id)}?token={download_token}"
             file_name = _safe_download_filename(action.candidate_name, wc.id)
             file_type = "txt"
 
-        items.append(ClaimItem(
-            claim_id=wc.id,
-            candidate_id=c.id,
-            candidate_action_id=action.id,
-            cv_id=c.id,
-            download_url=download_url,
-            file_name=file_name,
-            file_type=file_type
-        ))
+        items.append(
+            ClaimItem(
+                claim_id=wc.id,
+                candidate_id=c.id,
+                candidate_action_id=action.id,
+                cv_id=c.id,
+                download_url=download_url,
+                file_name=file_name,
+                file_type=file_type,
+            )
+        )
 
     # Log quota event
-    db.add(QuotaEvent(
-        worker_key_id=wk.id, organization_id=wk.organization_id, job_id=jobId,
-        event_type="reserved", amount=actual_count, metadata_={"session_id": ws.id}
-    ))
+    db.add(
+        QuotaEvent(
+            worker_key_id=wk.id,
+            organization_id=wk.organization_id,
+            job_id=jobId,
+            event_type="reserved",
+            amount=actual_count,
+            metadata_={"session_id": ws.id},
+        )
+    )
 
     db.commit()
     audit_log(
@@ -967,6 +1078,7 @@ def worker_claim(jobId: int, request: Request, req: ClaimRequest, worker=Depends
     )
 
     return ClaimResponse(items=items, claim_expires_at=claim_expires_at)
+
 
 @router.get("/worker/download/{claim_id}", name="worker_download_cv")
 def worker_download_cv(claim_id: int, token: str, db: Session = Depends(get_db)):
@@ -995,15 +1107,23 @@ def worker_download_cv(claim_id: int, token: str, db: Session = Depends(get_db))
 
     action = None
     if claim.candidate_action_id:
-        action = db.query(CandidateAction).filter(
-            CandidateAction.id == claim.candidate_action_id,
-            CandidateAction.organization_id == claim.organization_id,
-            CandidateAction.job_id == claim.job_id,
-        ).first()
-    candidate = db.query(Candidate).filter(
-        Candidate.id == claim.candidate_id,
-        Candidate.organization_id == claim.organization_id,
-    ).first()
+        action = (
+            db.query(CandidateAction)
+            .filter(
+                CandidateAction.id == claim.candidate_action_id,
+                CandidateAction.organization_id == claim.organization_id,
+                CandidateAction.job_id == claim.job_id,
+            )
+            .first()
+        )
+    candidate = (
+        db.query(Candidate)
+        .filter(
+            Candidate.id == claim.candidate_id,
+            Candidate.organization_id == claim.organization_id,
+        )
+        .first()
+    )
 
     cv_text = (action.cv_text if action else None) or (candidate.cv_text if candidate else None)
     if not cv_text or not cv_text.strip():
@@ -1023,29 +1143,45 @@ def worker_download_cv(claim_id: int, token: str, db: Session = Depends(get_db))
         },
     )
 
+
 @router.post("/worker/jobs/{jobId}/results")
 @limiter.limit("120/minute")
-def worker_submit_results(jobId: int, request: Request, req: AnalysisResultRequest, worker=Depends(get_current_worker), db: Session = Depends(get_db)):
+def worker_submit_results(
+    jobId: int,
+    request: Request,
+    req: AnalysisResultRequest,
+    worker=Depends(get_current_worker),
+    db: Session = Depends(get_db),
+):
     wk = worker["key"]
     ws = worker["session"]
     if not (wk.permissions or {}).get("submit_results", True):
         raise HTTPException(status_code=403, detail="Worker key cannot submit results")
 
     # Verify active claim
-    claim = db.query(WorkerClaim).filter(
-        WorkerClaim.candidate_id == req.candidate_id,
-        WorkerClaim.job_id == jobId,
-        WorkerClaim.worker_key_id == wk.id,
-        WorkerClaim.worker_session_id == ws.id,
-        WorkerClaim.status == "claimed"
-    ).with_for_update().first()
+    claim = (
+        db.query(WorkerClaim)
+        .filter(
+            WorkerClaim.candidate_id == req.candidate_id,
+            WorkerClaim.job_id == jobId,
+            WorkerClaim.worker_key_id == wk.id,
+            WorkerClaim.worker_session_id == ws.id,
+            WorkerClaim.status == "claimed",
+        )
+        .with_for_update()
+        .first()
+    )
 
     if not claim:
-        existing_result = db.query(WorkerAnalysisResult).filter(
-            WorkerAnalysisResult.candidate_id == req.candidate_id,
-            WorkerAnalysisResult.job_id == jobId,
-            WorkerAnalysisResult.organization_id == wk.organization_id,
-        ).first()
+        existing_result = (
+            db.query(WorkerAnalysisResult)
+            .filter(
+                WorkerAnalysisResult.candidate_id == req.candidate_id,
+                WorkerAnalysisResult.job_id == jobId,
+                WorkerAnalysisResult.organization_id == wk.organization_id,
+            )
+            .first()
+        )
         if existing_result:
             return {"status": "already_processed"}
         raise HTTPException(status_code=400, detail="No active claim found for candidate")
@@ -1056,33 +1192,39 @@ def worker_submit_results(jobId: int, request: Request, req: AnalysisResultReque
         wk_locked = db.query(WorkerKey).filter(WorkerKey.id == wk.id).with_for_update().first()
         if wk_locked:
             wk_locked.quota_reserved = max(0, int(wk_locked.quota_reserved or 0) - 1)
-            db.add(QuotaEvent(
-                worker_key_id=wk.id,
-                organization_id=wk.organization_id,
-                job_id=jobId,
-                cv_id=req.cv_id,
-                event_type="expired",
-                amount=1,
-                metadata_={"claim_id": claim.id, "reason": "late_result"},
-            ))
+            db.add(
+                QuotaEvent(
+                    worker_key_id=wk.id,
+                    organization_id=wk.organization_id,
+                    job_id=jobId,
+                    cv_id=req.cv_id,
+                    event_type="expired",
+                    amount=1,
+                    metadata_={"claim_id": claim.id, "reason": "late_result"},
+                )
+            )
         db.commit()
         raise HTTPException(status_code=409, detail="Claim expired; request a new claim")
 
     # Check if duplicate completion
-    existing_result = db.query(WorkerAnalysisResult).filter(
-        WorkerAnalysisResult.job_id == jobId,
-        WorkerAnalysisResult.organization_id == wk.organization_id,
-        or_(
-            and_(
-                WorkerAnalysisResult.candidate_action_id != None,
-                WorkerAnalysisResult.candidate_action_id == claim.candidate_action_id,
+    existing_result = (
+        db.query(WorkerAnalysisResult)
+        .filter(
+            WorkerAnalysisResult.job_id == jobId,
+            WorkerAnalysisResult.organization_id == wk.organization_id,
+            or_(
+                and_(
+                    WorkerAnalysisResult.candidate_action_id != None,
+                    WorkerAnalysisResult.candidate_action_id == claim.candidate_action_id,
+                ),
+                and_(
+                    WorkerAnalysisResult.candidate_action_id == None,
+                    WorkerAnalysisResult.candidate_id == req.candidate_id,
+                ),
             ),
-            and_(
-                WorkerAnalysisResult.candidate_action_id == None,
-                WorkerAnalysisResult.candidate_id == req.candidate_id,
-            ),
-        ),
-    ).first()
+        )
+        .first()
+    )
 
     if existing_result:
         # Already processed, maybe by another crashed worker that recovered, just mark claim expired to refund.
@@ -1090,15 +1232,17 @@ def worker_submit_results(jobId: int, request: Request, req: AnalysisResultReque
         wk_locked = db.query(WorkerKey).filter(WorkerKey.id == wk.id).with_for_update().first()
         if wk_locked:
             wk_locked.quota_reserved = max(0, int(wk_locked.quota_reserved or 0) - 1)
-            db.add(QuotaEvent(
-                worker_key_id=wk.id,
-                organization_id=wk.organization_id,
-                job_id=jobId,
-                cv_id=req.cv_id,
-                event_type="refunded",
-                amount=1,
-                metadata_={"claim_id": claim.id, "reason": "already_processed"},
-            ))
+            db.add(
+                QuotaEvent(
+                    worker_key_id=wk.id,
+                    organization_id=wk.organization_id,
+                    job_id=jobId,
+                    cv_id=req.cv_id,
+                    event_type="refunded",
+                    amount=1,
+                    metadata_={"claim_id": claim.id, "reason": "already_processed"},
+                )
+            )
         db.commit()
         audit_log(
             "worker_quota_refunded",
@@ -1128,23 +1272,31 @@ def worker_submit_results(jobId: int, request: Request, req: AnalysisResultReque
         explanation=req.explanation,
         worker_key_id=wk.id,
         worker_version=req.worker_version,
-        engine_version=req.engine_version
+        engine_version=req.engine_version,
     )
     db.add(result)
     db.flush()
     candidate_name = None
     if claim.candidate_action_id:
-        action = db.query(CandidateAction).filter(
-            CandidateAction.id == claim.candidate_action_id,
-            CandidateAction.organization_id == wk.organization_id,
-        ).first()
+        action = (
+            db.query(CandidateAction)
+            .filter(
+                CandidateAction.id == claim.candidate_action_id,
+                CandidateAction.organization_id == wk.organization_id,
+            )
+            .first()
+        )
         if action:
             candidate_name = action.candidate_name
     if not candidate_name:
-        candidate = db.query(Candidate).filter(
-            Candidate.id == req.candidate_id,
-            Candidate.organization_id == wk.organization_id,
-        ).first()
+        candidate = (
+            db.query(Candidate)
+            .filter(
+                Candidate.id == req.candidate_id,
+                Candidate.organization_id == wk.organization_id,
+            )
+            .first()
+        )
         candidate_name = candidate.name if candidate else None
     record_candidate_status_event(
         db,
@@ -1171,21 +1323,29 @@ def worker_submit_results(jobId: int, request: Request, req: AnalysisResultReque
     claim.completed_at = datetime.utcnow()
 
     # Atomic transfer from reserved to used
-    updated = db.query(WorkerKey).filter(
-        WorkerKey.id == wk.id,
-        WorkerKey.quota_reserved > 0
-    ).update({
-        WorkerKey.quota_reserved: WorkerKey.quota_reserved - 1,
-        WorkerKey.quota_used: WorkerKey.quota_used + 1
-    }, synchronize_session=False)
+    updated = (
+        db.query(WorkerKey)
+        .filter(WorkerKey.id == wk.id, WorkerKey.quota_reserved > 0)
+        .update(
+            {WorkerKey.quota_reserved: WorkerKey.quota_reserved - 1, WorkerKey.quota_used: WorkerKey.quota_used + 1},
+            synchronize_session=False,
+        )
+    )
 
     if updated == 0:
         db.rollback()
         raise HTTPException(status_code=409, detail="Reserved quota not found for this claim")
-    db.add(QuotaEvent(
-        worker_key_id=wk.id, organization_id=wk.organization_id, job_id=jobId, cv_id=req.cv_id,
-        event_type="completed", amount=1, metadata_={"claim_id": claim.id}
-    ))
+    db.add(
+        QuotaEvent(
+            worker_key_id=wk.id,
+            organization_id=wk.organization_id,
+            job_id=jobId,
+            cv_id=req.cv_id,
+            event_type="completed",
+            amount=1,
+            metadata_={"claim_id": claim.id},
+        )
+    )
     db.commit()
     audit_log(
         "worker_result_submitted",
@@ -1200,6 +1360,7 @@ def worker_submit_results(jobId: int, request: Request, req: AnalysisResultReque
 
     return {"status": "ok"}
 
+
 @router.post("/worker/heartbeat")
 def worker_heartbeat(worker=Depends(get_current_worker), db: Session = Depends(get_db)):
     ws = worker["session"]
@@ -1207,74 +1368,96 @@ def worker_heartbeat(worker=Depends(get_current_worker), db: Session = Depends(g
     db.commit()
     return {"status": "ok"}
 
+
 @router.get("/worker/dashboard-progress/{job_id}")
-def worker_dashboard_progress(
-    job_id: int,
-    db: Session = Depends(get_db),
-    recruiter = Depends(recruiter_required)
-):
+def worker_dashboard_progress(job_id: int, db: Session = Depends(get_db), recruiter=Depends(recruiter_required)):
     # Verify job belongs to org
-    job = db.query(RecruiterJob).filter(RecruiterJob.id == job_id, RecruiterJob.organization_id == recruiter.organization_id).first()
+    job = (
+        db.query(RecruiterJob)
+        .filter(RecruiterJob.id == job_id, RecruiterJob.organization_id == recruiter.organization_id)
+        .first()
+    )
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    total_cvs = db.query(CandidateAction).filter(
-        CandidateAction.organization_id == recruiter.organization_id,
-        CandidateAction.job_id == job_id,
-        or_(
-            and_(CandidateAction.cv_text != None, func.length(func.trim(CandidateAction.cv_text)) > 0),
-            CandidateAction.cv_file_key != None,
-        ),
-    ).count()
-    claimed = db.query(WorkerClaim).filter(
-        WorkerClaim.organization_id == recruiter.organization_id,
-        WorkerClaim.job_id == job_id,
-        WorkerClaim.status == "claimed",
-        WorkerClaim.claim_expires_at >= datetime.utcnow(),
-    ).count()
+    total_cvs = (
+        db.query(CandidateAction)
+        .filter(
+            CandidateAction.organization_id == recruiter.organization_id,
+            CandidateAction.job_id == job_id,
+            or_(
+                and_(CandidateAction.cv_text != None, func.length(func.trim(CandidateAction.cv_text)) > 0),
+                CandidateAction.cv_file_key != None,
+            ),
+        )
+        .count()
+    )
+    claimed = (
+        db.query(WorkerClaim)
+        .filter(
+            WorkerClaim.organization_id == recruiter.organization_id,
+            WorkerClaim.job_id == job_id,
+            WorkerClaim.status == "claimed",
+            WorkerClaim.claim_expires_at >= datetime.utcnow(),
+        )
+        .count()
+    )
 
-    results = db.query(WorkerAnalysisResult).filter(
-        WorkerAnalysisResult.organization_id == recruiter.organization_id,
-        WorkerAnalysisResult.job_id == job_id,
-    ).all()
+    results = (
+        db.query(WorkerAnalysisResult)
+        .filter(
+            WorkerAnalysisResult.organization_id == recruiter.organization_id,
+            WorkerAnalysisResult.job_id == job_id,
+        )
+        .all()
+    )
     processed = len(results)
-    failed = db.query(WorkerClaim).filter(
-        WorkerClaim.organization_id == recruiter.organization_id,
-        WorkerClaim.job_id == job_id,
-        WorkerClaim.status == "failed",
-    ).count()
+    failed = (
+        db.query(WorkerClaim)
+        .filter(
+            WorkerClaim.organization_id == recruiter.organization_id,
+            WorkerClaim.job_id == job_id,
+            WorkerClaim.status == "failed",
+        )
+        .count()
+    )
 
     rec_accept = sum(1 for r in results if r.decision == "recommended_accept")
     rec_review = sum(1 for r in results if r.decision == "recommended_review")
     rec_reject = sum(1 for r in results if r.decision == "recommended_reject")
 
-    keys = db.query(WorkerKey).filter(
-        WorkerKey.organization_id == recruiter.organization_id,
-        or_(WorkerKey.job_id == job_id, WorkerKey.job_id == None),
-    ).all()
+    keys = (
+        db.query(WorkerKey)
+        .filter(
+            WorkerKey.organization_id == recruiter.organization_id,
+            or_(WorkerKey.job_id == job_id, WorkerKey.job_id == None),
+        )
+        .all()
+    )
     quota_limit = sum(k.quota_limit for k in keys)
     quota_used = sum(k.quota_used for k in keys)
     quota_reserved = sum(k.quota_reserved for k in keys)
     quota_remaining = max(0, quota_limit - quota_used - quota_reserved)
 
     return {
-      "total_cvs": total_cvs,
-      "total": total_cvs,
-      "claimed": claimed,
-      "processed": processed,
-      "failed": failed,
-      "recommended_accept": rec_accept,
-      "recommended_review": rec_review,
-      "recommended_reject": rec_reject,
-      "quota_limit": quota_limit,
-      "quota_used": quota_used,
-      "quota_reserved": quota_reserved,
-      "quota_remaining": quota_remaining
+        "total_cvs": total_cvs,
+        "total": total_cvs,
+        "claimed": claimed,
+        "processed": processed,
+        "failed": failed,
+        "recommended_accept": rec_accept,
+        "recommended_review": rec_review,
+        "recommended_reject": rec_reject,
+        "quota_limit": quota_limit,
+        "quota_used": quota_used,
+        "quota_reserved": quota_reserved,
+        "quota_remaining": quota_remaining,
     }
 
 
 from pydantic import BaseModel
 from typing import List, Optional
+
 
 class OfflineSyncResultItem(BaseModel):
     file_name: str
@@ -1295,27 +1478,26 @@ class OfflineSyncResultItem(BaseModel):
     worker_version: Optional[str] = None
     engine_version: Optional[str] = None
 
+
 class OfflineSyncRequest(BaseModel):
     job_id: int
     results: List[OfflineSyncResultItem]
 
+
 @router.post("/worker/offline-sync")
 @limiter.limit("10/minute")
-def worker_offline_sync(
-    req: OfflineSyncRequest,
-    worker = Depends(get_current_worker),
-    db: Session = Depends(get_db)
-):
+def worker_offline_sync(req: OfflineSyncRequest, worker=Depends(get_current_worker), db: Session = Depends(get_db)):
     wk = worker["key"]
     ws = worker["session"]
 
     if not (wk.permissions or {}).get("submit_results", True):
         raise HTTPException(status_code=403, detail="Worker key cannot submit results")
 
-    job = db.query(RecruiterJob).filter(
-        RecruiterJob.id == req.job_id,
-        RecruiterJob.organization_id == wk.organization_id
-    ).first()
+    job = (
+        db.query(RecruiterJob)
+        .filter(RecruiterJob.id == req.job_id, RecruiterJob.organization_id == wk.organization_id)
+        .first()
+    )
     if not job:
         raise HTTPException(status_code=404, detail="Job description not found on server")
 
@@ -1336,14 +1518,16 @@ def worker_offline_sync(
         )
 
     # Atomic quota check and increment
-    updated_rows = db.query(WorkerKey).filter(
-        WorkerKey.id == wk.id,
-        WorkerKey.revoked_at == None,
-        or_(WorkerKey.expires_at == None, WorkerKey.expires_at > datetime.utcnow()),
-        (WorkerKey.quota_used + WorkerKey.quota_reserved + actual_count) <= WorkerKey.quota_limit
-    ).update({
-        WorkerKey.quota_used: WorkerKey.quota_used + actual_count
-    }, synchronize_session=False)
+    updated_rows = (
+        db.query(WorkerKey)
+        .filter(
+            WorkerKey.id == wk.id,
+            WorkerKey.revoked_at == None,
+            or_(WorkerKey.expires_at == None, WorkerKey.expires_at > datetime.utcnow()),
+            (WorkerKey.quota_used + WorkerKey.quota_reserved + actual_count) <= WorkerKey.quota_limit,
+        )
+        .update({WorkerKey.quota_used: WorkerKey.quota_used + actual_count}, synchronize_session=False)
+    )
 
     if updated_rows == 0:
         raise HTTPException(status_code=402, detail="Quota limit exceeded or key revoked")
@@ -1352,10 +1536,11 @@ def worker_offline_sync(
     for item in req.results:
         candidate = None
         if item.candidate_email:
-            candidate = db.query(Candidate).filter(
-                Candidate.organization_id == wk.organization_id,
-                Candidate.email == item.candidate_email
-            ).first()
+            candidate = (
+                db.query(Candidate)
+                .filter(Candidate.organization_id == wk.organization_id, Candidate.email == item.candidate_email)
+                .first()
+            )
 
         if not candidate:
             candidate = Candidate(
@@ -1367,11 +1552,17 @@ def worker_offline_sync(
             db.flush()
 
         # Check if CandidateAction exists
-        action_record = db.query(CandidateAction).filter(
-            CandidateAction.job_id == req.job_id,
-            CandidateAction.organization_id == wk.organization_id,
-            CandidateAction.candidate_email == item.candidate_email
-        ).first() if item.candidate_email else None
+        action_record = (
+            db.query(CandidateAction)
+            .filter(
+                CandidateAction.job_id == req.job_id,
+                CandidateAction.organization_id == wk.organization_id,
+                CandidateAction.candidate_email == item.candidate_email,
+            )
+            .first()
+            if item.candidate_email
+            else None
+        )
 
         if not action_record:
             stage = "pending"
@@ -1389,16 +1580,19 @@ def worker_offline_sync(
                 final_score=item.score,
                 ats_score=item.score,
                 action=stage,
-                analysis_snapshot=json.dumps({
-                    "score": item.score,
-                    "decision": item.decision,
-                    "confidence": item.confidence,
-                    "summary": item.summary,
-                    "matched_skills": item.matched_skills,
-                    "missing_skills": item.missing_skills,
-                    "risk_flags": item.risk_flags,
-                    "explanation": item.explanation,
-                }, default=str),
+                analysis_snapshot=json.dumps(
+                    {
+                        "score": item.score,
+                        "decision": item.decision,
+                        "confidence": item.confidence,
+                        "summary": item.summary,
+                        "matched_skills": item.matched_skills,
+                        "missing_skills": item.missing_skills,
+                        "risk_flags": item.risk_flags,
+                        "explanation": item.explanation,
+                    },
+                    default=str,
+                ),
                 cv_file_name=item.file_name,
                 cv_file_type=item.file_type,
             )
@@ -1452,15 +1646,17 @@ def worker_offline_sync(
         )
 
         # Log quota event
-        db.add(QuotaEvent(
-            worker_key_id=wk.id,
-            organization_id=wk.organization_id,
-            job_id=req.job_id,
-            cv_id=candidate.id,
-            event_type="completed",
-            amount=1,
-            metadata_={"sync_type": "offline_first"},
-        ))
+        db.add(
+            QuotaEvent(
+                worker_key_id=wk.id,
+                organization_id=wk.organization_id,
+                job_id=req.job_id,
+                cv_id=candidate.id,
+                event_type="completed",
+                amount=1,
+                metadata_={"sync_type": "offline_first"},
+            )
+        )
 
         synced_count += 1
 

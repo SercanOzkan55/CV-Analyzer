@@ -3,6 +3,7 @@
 All metric objects and their helper wrappers live here so ``main.py`` only
 needs a single import line for the full observability surface.
 """
+
 from __future__ import annotations
 
 import time
@@ -17,6 +18,7 @@ except Exception:
 
 
 # ── Noop fallback ─────────────────────────────────────────────────────────
+
 
 class _NoopMetric:
     def labels(self, **kwargs):
@@ -36,6 +38,7 @@ class _NoopMetric:
 
 
 # ── Factory helpers ───────────────────────────────────────────────────────
+
 
 def _get_or_create_counter(name: str, description: str, labelnames=()):
     if not Counter:
@@ -123,89 +126,109 @@ _APP_START_TIME = time.time()
 # ── Operational counters ───────────────────────────────────────────────
 
 UPLOADS_TOTAL = _get_or_create_counter(
-    "cv_uploads_total", "Total PDF/DOCX uploads",
+    "cv_uploads_total",
+    "Total PDF/DOCX uploads",
 )
 OPTIMIZES_TOTAL = _get_or_create_counter(
-    "cv_optimizes_total", "Total CV optimize/auto-fix requests",
+    "cv_optimizes_total",
+    "Total CV optimize/auto-fix requests",
 )
 DOWNLOADS_TOTAL = _get_or_create_counter(
-    "cv_downloads_total", "Total CV download requests",
+    "cv_downloads_total",
+    "Total CV download requests",
 )
 ERRORS_TOTAL = _get_or_create_counter(
-    "cv_errors_total", "Total unhandled errors",
+    "cv_errors_total",
+    "Total unhandled errors",
 )
 TIMEOUTS_TOTAL = _get_or_create_counter(
-    "cv_timeouts_total", "Total request timeouts",
+    "cv_timeouts_total",
+    "Total request timeouts",
 )
 
 # ── Process metrics ───────────────────────────────────────────────────────
 
 PROCESS_RSS_BYTES = _get_or_create_gauge(
-    "cv_process_rss_bytes", "Resident set size in bytes",
+    "cv_process_rss_bytes",
+    "Resident set size in bytes",
 )
 PROCESS_VMS_BYTES = _get_or_create_gauge(
-    "cv_process_vms_bytes", "Virtual memory size in bytes",
+    "cv_process_vms_bytes",
+    "Virtual memory size in bytes",
 )
 GC_COLLECTIONS_TOTAL = _get_or_create_gauge(
-    "cv_gc_collections_total", "GC collection count per generation",
+    "cv_gc_collections_total",
+    "GC collection count per generation",
     labelnames=("generation",),
 )
 PROCESS_CPU_PERCENT = _get_or_create_gauge(
-    "cv_process_cpu_percent", "Process CPU usage percent",
+    "cv_process_cpu_percent",
+    "Process CPU usage percent",
 )
 
 # ── Worker metrics ────────────────────────────────────────────────────────
 
 WORKER_ACTIVE_TASKS = _get_or_create_gauge(
-    "cv_worker_active_tasks", "Active worker tasks",
+    "cv_worker_active_tasks",
+    "Active worker tasks",
 )
 WORKER_QUEUE_SIZE = _get_or_create_gauge(
-    "cv_worker_queue_size", "Worker task queue size",
+    "cv_worker_queue_size",
+    "Worker task queue size",
 )
 
 # ── Circuit breaker gauge ─────────────────────────────────────────────────
 
 BREAKER_OPEN = _get_or_create_gauge(
-    "cv_circuit_breaker_open", "Circuit breaker state (1=open, 0=closed)",
+    "cv_circuit_breaker_open",
+    "Circuit breaker state (1=open, 0=closed)",
     labelnames=("service",),
 )
 
 # ── Feature flag gauge ────────────────────────────────────────────────────
 
 FLAG_ENABLED = _get_or_create_gauge(
-    "cv_feature_flag_enabled", "Feature flag state (1=enabled, 0=disabled)",
+    "cv_feature_flag_enabled",
+    "Feature flag state (1=enabled, 0=disabled)",
     labelnames=("flag",),
 )
 
 # ── Panic metrics ─────────────────────────────────────────────────────────
 
 PANIC_TRIGGERS_TOTAL = _get_or_create_counter(
-    "cv_panic_triggers_total", "Times panic mode was triggered",
+    "cv_panic_triggers_total",
+    "Times panic mode was triggered",
 )
 PANIC_ACTIVE = _get_or_create_gauge(
-    "cv_panic_active", "Panic mode active (1=yes, 0=no)",
+    "cv_panic_active",
+    "Panic mode active (1=yes, 0=no)",
 )
 
 # ── Admin action counter ──────────────────────────────────────────────────
 
 ADMIN_ACTIONS_TOTAL = _get_or_create_counter(
-    "cv_admin_actions_total", "Admin control-plane actions",
+    "cv_admin_actions_total",
+    "Admin control-plane actions",
     labelnames=("action",),
 )
 
 # ── SRE metrics ───────────────────────────────────────────────────────────
 
 S3_ERRORS_TOTAL = _get_or_create_counter(
-    "cv_s3_errors_total", "Total S3 operation errors",
+    "cv_s3_errors_total",
+    "Total S3 operation errors",
 )
 JWT_FAILURES_TOTAL = _get_or_create_counter(
-    "cv_jwt_failures_total", "Total JWT authentication failures",
+    "cv_jwt_failures_total",
+    "Total JWT authentication failures",
 )
 REDIS_CONNECTED = _get_or_create_gauge(
-    "cv_redis_connected", "Whether Redis is reachable (1=yes, 0=no)",
+    "cv_redis_connected",
+    "Whether Redis is reachable (1=yes, 0=no)",
 )
 WORKER_RESTARTS_TOTAL = _get_or_create_counter(
-    "cv_worker_restarts_total", "Total model worker auto-restarts",
+    "cv_worker_restarts_total",
+    "Total model worker auto-restarts",
 )
 
 # ── Dependency latency ────────────────────────────────────────────────────
@@ -249,6 +272,7 @@ GUARD_SAFE_MODE_TRIGGERS = _get_or_create_counter(
 
 
 # ── Metric helper functions ───────────────────────────────────────────────
+
 
 def _metric_guard_reject(reason: str) -> None:
     try:
@@ -329,6 +353,7 @@ _GUARD_REJECT_LOCK = _threading.Lock()
 def _record_guard_rejection() -> None:
     """Track guard-level rejection timestamps for auto safe mode."""
     import os
+
     now = time.time()
     window = float(os.getenv("GUARD_SAFE_MODE_WINDOW", "60"))
     with _GUARD_REJECT_LOCK:

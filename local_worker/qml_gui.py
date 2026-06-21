@@ -446,7 +446,9 @@ class ResultListModel(QAbstractListModel):
         if 0 <= row_index < len(self._rows):
             self._rows[row_index]["decision"] = decision
             model_index = self.index(row_index, 0)
-            self.dataChanged.emit(model_index, model_index, [self.DecisionRole, self.DecisionLabelRole, self.AccentRole])
+            self.dataChanged.emit(
+                model_index, model_index, [self.DecisionRole, self.DecisionLabelRole, self.AccentRole]
+            )
 
 
 class HistoryListModel(QAbstractListModel):
@@ -531,25 +533,29 @@ class WebsiteSyncWorker(QObject):
                 raise RuntimeError(f"Connected, but job list failed: {jobs_resp.text}")
             jobs = jobs_resp.json().get("jobs", [])
             if self.mode == "test":
-                self.done.emit({
-                    "mode": "test",
-                    "company_id": str(worker.company_id or ""),
-                    "quota_remaining": int(worker.quota_remaining or 0),
-                    "allowed_jobs": jobs,
-                    "permissions": worker.permissions,
-                })
+                self.done.emit(
+                    {
+                        "mode": "test",
+                        "company_id": str(worker.company_id or ""),
+                        "quota_remaining": int(worker.quota_remaining or 0),
+                        "allowed_jobs": jobs,
+                        "permissions": worker.permissions,
+                    }
+                )
                 return
 
             if not self.pending_results:
-                self.done.emit({
-                    "mode": "sync",
-                    "synced_count": 0,
-                    "synced_files": [],
-                    "company_id": str(worker.company_id or ""),
-                    "quota_remaining": int(worker.quota_remaining or 0),
-                    "allowed_jobs": jobs,
-                    "permissions": worker.permissions,
-                })
+                self.done.emit(
+                    {
+                        "mode": "sync",
+                        "synced_count": 0,
+                        "synced_files": [],
+                        "company_id": str(worker.company_id or ""),
+                        "quota_remaining": int(worker.quota_remaining or 0),
+                        "allowed_jobs": jobs,
+                        "permissions": worker.permissions,
+                    }
+                )
                 return
 
             target_job_id = int(self.job_id) if self.job_id else (int(jobs[0]) if len(jobs) == 1 else 0)
@@ -563,24 +569,26 @@ class WebsiteSyncWorker(QObject):
             synced_ids = []
             for row in self.pending_results:
                 file_path = row.get("file", "")
-                results_payload.append({
-                    "file_name": Path(file_path).name,
-                    "file_type": Path(file_path).suffix.lstrip("."),
-                    "file_hash": row.get("file_hash"),
-                    "duplicate_of": Path(row["duplicate_of"]).name if row.get("duplicate_of") else None,
-                    "score": float(row.get("score") or 0),
-                    "decision": row.get("decision", "recommended_review"),
-                    "confidence": row.get("confidence", "medium"),
-                    "summary": row.get("summary", ""),
-                    "matched_skills": row.get("matched_skills") or [],
-                    "missing_skills": row.get("missing_skills") or [],
-                    "risk_flags": row.get("risk_flags") or [],
-                    "explanation": row.get("explanation", ""),
-                    "candidate_name": candidate_name_from_row(row),
-                    "candidate_email": row.get("email") or None,
-                    "worker_version": row.get("worker_version", "1.0.0"),
-                    "engine_version": row.get("engine_version", "1.0.0"),
-                })
+                results_payload.append(
+                    {
+                        "file_name": Path(file_path).name,
+                        "file_type": Path(file_path).suffix.lstrip("."),
+                        "file_hash": row.get("file_hash"),
+                        "duplicate_of": Path(row["duplicate_of"]).name if row.get("duplicate_of") else None,
+                        "score": float(row.get("score") or 0),
+                        "decision": row.get("decision", "recommended_review"),
+                        "confidence": row.get("confidence", "medium"),
+                        "summary": row.get("summary", ""),
+                        "matched_skills": row.get("matched_skills") or [],
+                        "missing_skills": row.get("missing_skills") or [],
+                        "risk_flags": row.get("risk_flags") or [],
+                        "explanation": row.get("explanation", ""),
+                        "candidate_name": candidate_name_from_row(row),
+                        "candidate_email": row.get("email") or None,
+                        "worker_version": row.get("worker_version", "1.0.0"),
+                        "engine_version": row.get("engine_version", "1.0.0"),
+                    }
+                )
                 synced_files.append(file_path)
                 if row.get("local_result_id"):
                     synced_ids.append(int(row["local_result_id"]))
@@ -594,17 +602,19 @@ class WebsiteSyncWorker(QObject):
                 raise RuntimeError(f"Sync failed: {resp.status_code} - {resp.text}")
 
             data = resp.json() if resp.content else {}
-            self.done.emit({
-                "mode": "sync",
-                "synced_count": int(data.get("synced_count") or len(results_payload)),
-                "synced_files": synced_files,
-                "synced_ids": synced_ids,
-                "company_id": str(worker.company_id or ""),
-                "quota_remaining": int(worker.quota_remaining or 0),
-                "allowed_jobs": jobs,
-                "job_id": target_job_id,
-                "permissions": worker.permissions,
-            })
+            self.done.emit(
+                {
+                    "mode": "sync",
+                    "synced_count": int(data.get("synced_count") or len(results_payload)),
+                    "synced_files": synced_files,
+                    "synced_ids": synced_ids,
+                    "company_id": str(worker.company_id or ""),
+                    "quota_remaining": int(worker.quota_remaining or 0),
+                    "allowed_jobs": jobs,
+                    "job_id": target_job_id,
+                    "permissions": worker.permissions,
+                }
+            )
         except Exception as exc:
             self.failed.emit(str(exc))
 
@@ -1055,7 +1065,11 @@ class LocalWorkerBackend(QObject):
     @Property(str, notify=selectedChanged)
     def selectedSummary(self):
         row = self._selected_row()
-        return row.get("summary") or "Select a result to inspect summary, skills, and risk flags." if row else "Select a result to inspect summary, skills, and risk flags."
+        return (
+            row.get("summary") or "Select a result to inspect summary, skills, and risk flags."
+            if row
+            else "Select a result to inspect summary, skills, and risk flags."
+        )
 
     @Property(str, notify=selectedChanged)
     def selectedExplanation(self):
@@ -1352,11 +1366,15 @@ class LocalWorkerBackend(QObject):
                 self.selectedChanged.emit()
             self._sync_last_synced_count = int(payload.get("synced_count") or 0)
             self._sync_status = "Website sync complete"
-            self._sync_detail = f"{self._sync_last_synced_count} local result(s) uploaded to Website job #{payload.get('job_id')}."
+            self._sync_detail = (
+                f"{self._sync_last_synced_count} local result(s) uploaded to Website job #{payload.get('job_id')}."
+            )
             self.toast.emit(self._sync_detail, "success")
         else:
             self._sync_status = "Website sync active"
-            self._sync_detail = f"Connected. Quota remaining: {self._sync_quota_remaining}. Allowed jobs: {self.syncAllowedJobs}."
+            self._sync_detail = (
+                f"Connected. Quota remaining: {self._sync_quota_remaining}. Allowed jobs: {self.syncAllowedJobs}."
+            )
             self.toast.emit("Website sync connection verified.", "success")
 
         self.metricsChanged.emit()
@@ -1441,23 +1459,41 @@ class LocalWorkerBackend(QObject):
         path = target / "local_worker_current_results.csv"
         with path.open("w", newline="", encoding="utf-8-sig") as fh:
             writer = csv.writer(fh)
-            writer.writerow(["Candidate", "Email", "Score", "Decision", "Confidence", "Duplicate", "Matched Skills", "Missing Skills"])
+            writer.writerow(
+                [
+                    "Candidate",
+                    "Email",
+                    "Score",
+                    "Decision",
+                    "Confidence",
+                    "Duplicate",
+                    "Matched Skills",
+                    "Missing Skills",
+                ]
+            )
             for row in rows:
-                writer.writerow([csv_safe(value) for value in [
-                    Path(row.get("file", "")).name,
-                    row.get("email", ""),
-                    row.get("score", 0),
-                    decision_label(row.get("decision", "")),
-                    row.get("confidence", ""),
-                    "yes" if row.get("is_duplicate") else "no",
-                    list_to_text(row.get("matched_skills")),
-                    list_to_text(row.get("missing_skills")),
-                ]])
+                writer.writerow(
+                    [
+                        csv_safe(value)
+                        for value in [
+                            Path(row.get("file", "")).name,
+                            row.get("email", ""),
+                            row.get("score", 0),
+                            decision_label(row.get("decision", "")),
+                            row.get("confidence", ""),
+                            "yes" if row.get("is_duplicate") else "no",
+                            list_to_text(row.get("matched_skills")),
+                            list_to_text(row.get("missing_skills")),
+                        ]
+                    ]
+                )
         self.toast.emit(f"CSV exported: {path.name}", "success")
 
     @Slot()
     def showAppStatus(self):
-        self.toast.emit("QML desktop app is active. Local analysis, reports, templates, and sync are maintained here.", "info")
+        self.toast.emit(
+            "QML desktop app is active. Local analysis, reports, templates, and sync are maintained here.", "info"
+        )
 
     def _on_progress_max(self, value: int):
         self._progress_maximum = max(1, value)

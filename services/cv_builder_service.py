@@ -44,6 +44,7 @@ def _structured_log(
     payload = {"event": event, **fields}
     _logger.log(level, json.dumps(payload, default=str, ensure_ascii=False))
 
+
 from renderers.cache import get_cached, make_cache_key, set_cached
 from renderers.pdf_renderer import render_pdf as _render_pdf_blocks
 from schemas.cv_model import CVModel, Education, Experience
@@ -87,7 +88,7 @@ _global_parse_semaphore = threading.Semaphore(_GLOBAL_PARSE_LIMIT)
 SAFE_MODE = os.getenv("SAFE_MODE", "").lower() in ("1", "true", "yes")
 
 _ERROR_WINDOW_SECONDS = 300  # 5-minute rolling window
-_ERROR_THRESHOLD = 10        # auto-degrade after this many errors
+_ERROR_THRESHOLD = 10  # auto-degrade after this many errors
 _error_timestamps: list[float] = []
 _safe_mode_auto = False
 _safe_mode_lock = threading.Lock()
@@ -165,6 +166,7 @@ def _config_snapshot() -> dict:
         },
     }
 
+
 # ── Slow-CV guard thresholds ──────────────────────────────────────────────
 _SLOW_WARN_SECONDS = float(os.getenv("SLOW_CV_WARN_SECONDS", "2") or "2")
 _SLOW_ABORT_SECONDS = float(os.getenv("SLOW_CV_ABORT_SECONDS", "5") or "5")
@@ -176,10 +178,10 @@ def _normalize_text(value: str) -> str:
     value = unicodedata.normalize("NFC", value)
     value = value.replace("\r\n", "\n").replace("\r", "\n")
     # Remove stray comment artifacts like /* or */
-    value = re.sub(r'/\*|\*/', '', value)
+    value = re.sub(r"/\*|\*/", "", value)
     # Strip markdown bold **text** and italic *text*
-    value = re.sub(r'\*\*(.+?)\*\*', r'\1', value)
-    value = re.sub(r'(?<!\w)\*(.+?)\*(?!\w)', r'\1', value)
+    value = re.sub(r"\*\*(.+?)\*\*", r"\1", value)
+    value = re.sub(r"(?<!\w)\*(.+?)\*(?!\w)", r"\1", value)
     return value
 
 
@@ -302,7 +304,9 @@ def _normalize_link_value(raw_value: str) -> str:
         return ""
     value = value.replace("GitHub:", "").replace("github:", "")
     value = value.replace("LinkedIn:", "").replace("linkedin:", "")
-    match = re.search(r"(?:https?://)?(?:www\.)?(?:linkedin\.com|github\.com|[A-Za-z0-9.-]+\.[A-Za-z]{2,})(?:/\S*)?", value, re.I)
+    match = re.search(
+        r"(?:https?://)?(?:www\.)?(?:linkedin\.com|github\.com|[A-Za-z0-9.-]+\.[A-Za-z]{2,})(?:/\S*)?", value, re.I
+    )
     if match:
         value = match.group(0).strip().rstrip(",.;")
     value = re.sub(r"^(?:linkedin|github|portfolio|website)\s*:\s*", "", value, flags=re.I)
@@ -328,7 +332,9 @@ def _normalize_contact_fields(cv_data: dict) -> dict:
     location_raw = re.sub(
         r"^\s*(?:adres|address|location|adress[ei]?|direcci[oó]n|ubicaci[oó]n"
         r"|standort|lieu|indirizzo|morada|lokasyon|konum)\s*:\s*",
-        "", location_raw, flags=re.I,
+        "",
+        location_raw,
+        flags=re.I,
     )
     # GUARD: never blank out location — keep original if stripping emptied it
     cleaned_location = location_raw.strip()
@@ -352,10 +358,10 @@ def _build_header_data(cv_data: dict) -> tuple[str, str, str, list[str]]:
 
     # GUARD: Only attempt name rescue when model has NO key fields at all.
     # If full_name, email, phone, or location already exist → skip reconstruction.
-    _has_fields = bool(name or (cv_data.get("email") or "").strip()
-                       or (cv_data.get("phone") or "").strip() or location)
+    _has_fields = bool(name or (cv_data.get("email") or "").strip() or (cv_data.get("phone") or "").strip() or location)
     if not name and not _has_fields:
         from services.cv_autofix_service import _looks_like_person_name
+
         # Last-resort rescue from summary first line
         summary = (cv_data.get("summary") or "").strip()
         first_line = summary.split("\n")[0].strip() if summary else ""
@@ -381,7 +387,7 @@ def _build_header_data(cv_data: dict) -> tuple[str, str, str, list[str]]:
         contact_parts.append(val)
 
     # Add social links to contact line
-    for sl in (cv_data.get("social_links") or []):
+    for sl in cv_data.get("social_links") or []:
         if isinstance(sl, dict):
             url = (sl.get("url") or "").strip()
             platform = (sl.get("platform") or "").strip()
@@ -410,7 +416,7 @@ def _compact_for_one_page(cv_data: dict) -> dict:
     compact["summary"] = _truncate_text(compact.get("summary", ""), 600)
 
     experiences = []
-    for exp in (compact.get("experiences") or []):
+    for exp in compact.get("experiences") or []:
         item = dict(exp or {})
         bullets = _dedupe_preserve(item.get("bullets", []))
         item["bullets"] = [_truncate_text(b, 250) for b in bullets]
@@ -428,13 +434,11 @@ def _compact_for_one_page(cv_data: dict) -> dict:
         if index >= 12:
             break
         deduped_values = _dedupe_preserve(values if isinstance(values, list) else [str(values)])
-        compact_skills[_truncate_text(str(category), 30)] = [
-            _truncate_text(v, 50) for v in deduped_values
-        ]
+        compact_skills[_truncate_text(str(category), 30)] = [_truncate_text(v, 50) for v in deduped_values]
     compact["skills_categorized"] = compact_skills
 
     certifications = []
-    for cert in (compact.get("certifications") or []):
+    for cert in compact.get("certifications") or []:
         item = dict(cert or {})
         item["name"] = _truncate_text(item.get("name", ""), 110)
         item["issuer"] = _truncate_text(item.get("issuer", ""), 60)
@@ -442,7 +446,7 @@ def _compact_for_one_page(cv_data: dict) -> dict:
     compact["certifications"] = certifications
 
     projects = []
-    for proj in (compact.get("projects") or []):
+    for proj in compact.get("projects") or []:
         item = dict(proj or {})
         item["name"] = _truncate_text(item.get("name", ""), 90)
         item["description"] = _truncate_text(item.get("description", ""), 150)
@@ -456,15 +460,18 @@ def _compact_for_one_page(cv_data: dict) -> dict:
 
     return compact
 
+
 # ---------------------------------------------------------------------------
 # OpenAI helpers
 # ---------------------------------------------------------------------------
+
 
 def _get_openai_client_and_model():
     if MOCK_SERVICES_ON:
         return None, None
     try:
         from services.ai_client_factory import get_ai_client_and_model
+
         return get_ai_client_and_model()
     except Exception:
         return None, None
@@ -620,10 +627,110 @@ def _mock_enhance(cv_data: dict, job_description: str, lang: str = "en") -> dict
                 "DevOps & Cloud": [],
                 "Tools & Platforms": [],
             }
-            lang_kw = {"python", "java", "javascript", "typescript", "c++", "c#", "go", "rust", "ruby", "php", "swift", "kotlin", "scala", "r", "matlab", "sql", "html", "css", "dart", "perl", "bash", "shell", "lua", "elixir", "haskell", "objective-c"}
-            backend_kw = {"django", "flask", "fastapi", "spring", "express", "nestjs", "rails", "laravel", "react", "vue", "angular", "next", "nuxt", "svelte", "node", "asp.net", ".net", "graphql", "rest", "grpc", "celery", "gin", "fiber", "actix"}
-            db_kw = {"postgresql", "postgres", "mysql", "mongodb", "redis", "sqlite", "oracle", "dynamodb", "cassandra", "elasticsearch", "neo4j", "mariadb", "supabase", "firebase", "firestore", "couchdb", "influxdb", "mssql", "pgvector"}
-            devops_kw = {"docker", "kubernetes", "k8s", "aws", "gcp", "azure", "terraform", "ansible", "jenkins", "ci/cd", "github actions", "gitlab", "linux", "nginx", "prometheus", "grafana", "helm", "argocd", "cloudflare", "vercel", "heroku", "digitalocean", "lambda", "ec2", "s3", "ecs", "fargate"}
+            lang_kw = {
+                "python",
+                "java",
+                "javascript",
+                "typescript",
+                "c++",
+                "c#",
+                "go",
+                "rust",
+                "ruby",
+                "php",
+                "swift",
+                "kotlin",
+                "scala",
+                "r",
+                "matlab",
+                "sql",
+                "html",
+                "css",
+                "dart",
+                "perl",
+                "bash",
+                "shell",
+                "lua",
+                "elixir",
+                "haskell",
+                "objective-c",
+            }
+            backend_kw = {
+                "django",
+                "flask",
+                "fastapi",
+                "spring",
+                "express",
+                "nestjs",
+                "rails",
+                "laravel",
+                "react",
+                "vue",
+                "angular",
+                "next",
+                "nuxt",
+                "svelte",
+                "node",
+                "asp.net",
+                ".net",
+                "graphql",
+                "rest",
+                "grpc",
+                "celery",
+                "gin",
+                "fiber",
+                "actix",
+            }
+            db_kw = {
+                "postgresql",
+                "postgres",
+                "mysql",
+                "mongodb",
+                "redis",
+                "sqlite",
+                "oracle",
+                "dynamodb",
+                "cassandra",
+                "elasticsearch",
+                "neo4j",
+                "mariadb",
+                "supabase",
+                "firebase",
+                "firestore",
+                "couchdb",
+                "influxdb",
+                "mssql",
+                "pgvector",
+            }
+            devops_kw = {
+                "docker",
+                "kubernetes",
+                "k8s",
+                "aws",
+                "gcp",
+                "azure",
+                "terraform",
+                "ansible",
+                "jenkins",
+                "ci/cd",
+                "github actions",
+                "gitlab",
+                "linux",
+                "nginx",
+                "prometheus",
+                "grafana",
+                "helm",
+                "argocd",
+                "cloudflare",
+                "vercel",
+                "heroku",
+                "digitalocean",
+                "lambda",
+                "ec2",
+                "s3",
+                "ecs",
+                "fargate",
+            }
 
             for skill in raw_skills:
                 s_lower = skill.lower().strip()
@@ -730,20 +837,43 @@ def _section_title(key: str, lang: str = "en") -> str:
 # Safety remap — ensure cv_data keys are canonical before rendering
 # ---------------------------------------------------------------------------
 
+
 def _remap_cv_data(cv_data: dict) -> dict:
     """Remap any non-canonical section keys in cv_data so renderers find them."""
     _REMAP = {
-        "summary": "summary", "experience": "experiences",
-        "education": "education", "skills": "skills",
-        "projects": "projects", "certifications": "certifications",
-        "languages": "languages", "interests": "interests",
+        "summary": "summary",
+        "experience": "experiences",
+        "education": "education",
+        "skills": "skills",
+        "projects": "projects",
+        "certifications": "certifications",
+        "languages": "languages",
+        "interests": "interests",
         "misc": "misc",
     }
     _SKIP = {
-        "full_name", "title", "email", "phone", "location", "linkedin",
-        "summary", "experiences", "education", "skills", "skills_categorized",
-        "projects", "certifications", "languages", "interests", "misc", "language",
-        "section_titles", "format_hints", "contact", "template", "social_links",
+        "full_name",
+        "title",
+        "email",
+        "phone",
+        "location",
+        "linkedin",
+        "summary",
+        "experiences",
+        "education",
+        "skills",
+        "skills_categorized",
+        "projects",
+        "certifications",
+        "languages",
+        "interests",
+        "misc",
+        "language",
+        "section_titles",
+        "format_hints",
+        "contact",
+        "template",
+        "social_links",
     }
     out = dict(cv_data)
     for key in list(out.keys()):
@@ -769,6 +899,7 @@ def _remap_cv_data(cv_data: dict) -> dict:
 # ---------------------------------------------------------------------------
 # DOCX Generation (ATS-optimized)
 # ---------------------------------------------------------------------------
+
 
 def generate_docx(cv_data: dict, template: str = "classic", lang: str = "en", font_family: str = "") -> BytesIO:
     """Generate an ATS-friendly DOCX file. Returns BytesIO buffer."""
@@ -802,10 +933,11 @@ def generate_docx(cv_data: dict, template: str = "classic", lang: str = "en", fo
         "consulting": {"font": "Book Antiqua", "accent_color": (0x5D, 0x4E, 0x75)},
         "classic": {"font": "Arial", "accent_color": (0x00, 0x00, 0x00)},
     }
-    
+
     config = template_config.get(template, template_config["classic"])
     # User font override takes precedence over template default
     from renderers.theme import ALLOWED_FONTS
+
     if font_family and font_family in ALLOWED_FONTS:
         font.name = font_family
     else:
@@ -857,12 +989,12 @@ def generate_docx(cv_data: dict, template: str = "classic", lang: str = "en", fo
         run.bold = True
         run.font.size = Pt(12)
         run.font.name = font.name
-        
+
         # Apply template-specific accent color
         color = config["accent_color"]
         if color != (0x00, 0x00, 0x00):  # Not black (classic default)
             run.font.color.rgb = RGBColor(*color)
-            
+
         # Template-specific styling
         if template in ["corporate", "consulting", "executive"]:
             # Professional templates get thicker border
@@ -876,17 +1008,21 @@ def generate_docx(cv_data: dict, template: str = "classic", lang: str = "en", fo
             # Classic styling
             border_size = "4"
             border_color = "999999"
-            
+
         # Add separator line
         from docx.oxml.ns import qn
+
         pPr = p._p.get_or_add_pPr()
         pBdr = pPr.makeelement(qn("w:pBdr"), {})
-        bottom = pBdr.makeelement(qn("w:bottom"), {
-            qn("w:val"): "single",
-            qn("w:sz"): border_size,
-            qn("w:space"): "1",
-            qn("w:color"): border_color,
-        })
+        bottom = pBdr.makeelement(
+            qn("w:bottom"),
+            {
+                qn("w:val"): "single",
+                qn("w:sz"): border_size,
+                qn("w:space"): "1",
+                qn("w:color"): border_color,
+            },
+        )
         pBdr.append(bottom)
         pPr.append(pBdr)
 
@@ -895,9 +1031,9 @@ def generate_docx(cv_data: dict, template: str = "classic", lang: str = "en", fo
         clean_text = _normalize_text(text_content).strip() if text_content else ""
         if not clean_text:
             return
-        # Remove any existing bullet markers 
-        clean_text = re.sub(r'^[•\-\*]\s*', '', clean_text)
-        
+        # Remove any existing bullet markers
+        clean_text = re.sub(r"^[•\-\*]\s*", "", clean_text)
+
         p = doc.add_paragraph()
         p.paragraph_format.left_indent = Inches(0.2)
         p.paragraph_format.first_line_indent = Inches(-0.15)
@@ -1089,8 +1225,8 @@ def generate_docx(cv_data: dict, template: str = "classic", lang: str = "en", fo
             proj_name = _normalize_text(proj.get("name", ""))
             # Fix "Name- Tech" or "Name -Tech" → "Name - Tech"
             # Only dashes with surrounding whitespace (not compound words like E-Commerce)
-            proj_name = re.sub(r'(\w)-\s+(\w)', r'\1 - \2', proj_name)
-            proj_name = re.sub(r'(\w)\s+-(\w)', r'\1 - \2', proj_name)
+            proj_name = re.sub(r"(\w)-\s+(\w)", r"\1 - \2", proj_name)
+            proj_name = re.sub(r"(\w)\s+-(\w)", r"\1 - \2", proj_name)
             pn_run = p.add_run(proj_name)
             pn_run.bold = True
             pn_run.font.size = Pt(11)
@@ -1124,7 +1260,7 @@ def generate_docx(cv_data: dict, template: str = "classic", lang: str = "en", fo
         seen_lang = set()
         for l in languages:
             if isinstance(l, dict):
-                key = _normalize_text(l.get('name', '')).lower()
+                key = _normalize_text(l.get("name", "")).lower()
             else:
                 key = _normalize_text(str(l)).lower()
             if not key or key in seen_lang:
@@ -1133,10 +1269,10 @@ def generate_docx(cv_data: dict, template: str = "classic", lang: str = "en", fo
             normalized_languages.append(l)
         for l in normalized_languages:
             if isinstance(l, dict):
-                name = l.get('name', '')
-                writing = l.get('writing') or ''
-                listening = l.get('listening') or ''
-                speaking = l.get('speaking') or ''
+                name = l.get("name", "")
+                writing = l.get("writing") or ""
+                listening = l.get("listening") or ""
+                speaking = l.get("speaking") or ""
                 if writing or listening or speaking:
                     skills = []
                     if writing:
@@ -1147,7 +1283,7 @@ def generate_docx(cv_data: dict, template: str = "classic", lang: str = "en", fo
                         skills.append(f"Speaking: {speaking}")
                     line = f"{name} \u2013 {', '.join(skills)}"
                 else:
-                    level = l.get('level', '')
+                    level = l.get("level", "")
                     line = f"{name} \u2013 {level}" if level else name
                 p = doc.add_paragraph()
                 run = p.add_run(line)
@@ -1166,6 +1302,7 @@ def generate_docx(cv_data: dict, template: str = "classic", lang: str = "en", fo
         add_section_header(_section_title("interests", lang))
         parts = [str(i).strip() for i in interests if str(i or "").strip()]
         import textwrap as _tw
+
         full_text = ", ".join(parts)
         wrapped = _tw.fill(full_text, width=70)
         for wline in wrapped.split("\n"):
@@ -1180,6 +1317,7 @@ def generate_docx(cv_data: dict, template: str = "classic", lang: str = "en", fo
         add_section_header(_section_title("misc", lang))
         parts = [str(i).strip() for i in misc if str(i or "").strip()]
         import textwrap as _tw
+
         full_text = ", ".join(parts)
         wrapped = _tw.fill(full_text, width=70)
         for wline in wrapped.split("\n"):
@@ -1220,6 +1358,7 @@ def generate_docx(cv_data: dict, template: str = "classic", lang: str = "en", fo
 # PDF Generation (ATS-optimized, single-column, clean)
 # ---------------------------------------------------------------------------
 
+
 def generate_pdf(cv_data: dict, template: str = "classic", lang: str = "en", font_family: str = "") -> BytesIO:
     """Generate an ATS-friendly PDF. Returns BytesIO buffer."""
     cv_data = _remap_cv_data(cv_data)
@@ -1251,7 +1390,7 @@ def generate_pdf(cv_data: dict, template: str = "classic", lang: str = "en", fon
         "consulting": {"font": "Times", "accent_color": (93, 78, 117)},
         "classic": {"font": "Helvetica", "accent_color": (0, 0, 0)},
     }
-    
+
     pdf_config = pdf_template_config.get(template, pdf_template_config["classic"])
     font_family = pdf_config["font"]
     accent_color = pdf_config["accent_color"]
@@ -1317,19 +1456,19 @@ def generate_pdf(cv_data: dict, template: str = "classic", lang: str = "en", fon
             return ""
         text = _normalize_text(text)
         # Strip markdown bold/italic markers
-        text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
-        text = re.sub(r'__(.+?)__', r'\1', text)
-        text = re.sub(r'(?<!\w)\*(.+?)\*(?!\w)', r'\1', text)
+        text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+        text = re.sub(r"__(.+?)__", r"\1", text)
+        text = re.sub(r"(?<!\w)\*(.+?)\*(?!\w)", r"\1", text)
         # Remove stray comment artifacts like /* or */
-        text = re.sub(r'/\*|\*/', '', text)
+        text = re.sub(r"/\*|\*/", "", text)
         # Remove remaining leading * or / artifacts
-        text = re.sub(r'^[\*/]+\s*', '', text)
+        text = re.sub(r"^[\*/]+\s*", "", text)
         # Fix – • / - • wrap artifacts
         text = text.replace("\u2013 \u2022", "\n\u2022 ")
         text = text.replace("- \u2022", "\n\u2022 ")
         text = text.replace("\u2022 \u2013", "\n\u2022 ")
         text = text.replace("\u2022 -", "\n\u2022 ")
-        text = re.sub(r'\s+\u2022', '\n\u2022', text)
+        text = re.sub(r"\s+\u2022", "\n\u2022", text)
         # Normalize smart quotes / ellipsis
         text = text.replace("\u2018", "'")
         text = text.replace("\u2019", "'")
@@ -1337,9 +1476,9 @@ def generate_pdf(cv_data: dict, template: str = "classic", lang: str = "en", fon
         text = text.replace("\u201d", '"')
         text = text.replace("\u2026", "...")
         # Fix "Word(" → "Word ("
-        text = re.sub(r'([A-Za-z])\(', r'\1 (', text)
+        text = re.sub(r"([A-Za-z])\(", r"\1 (", text)
         # Collapse horizontal whitespace only
-        text = re.sub(r'[ \t]+', ' ', text)
+        text = re.sub(r"[ \t]+", " ", text)
         if unicode_font_loaded:
             return text.strip()
         return text.strip().encode("latin-1", errors="replace").decode("latin-1")
@@ -1432,13 +1571,13 @@ def generate_pdf(cv_data: dict, template: str = "classic", lang: str = "en", fon
     def section_header(title):
         pdf.ln(2)
         pdf.set_font(font_family, "B", 12)
-        
+
         if accent_color != (0, 0, 0):
             pdf.set_text_color(*accent_color)
-        
+
         pdf.cell(effective_width, 5, safe_text(title.upper()), ln=True)
         pdf.set_text_color(0, 0, 0)
-        
+
         if template in ["corporate", "consulting", "executive"]:
             pdf.set_line_width(0.7)
             pdf.set_draw_color(*accent_color)
@@ -1448,7 +1587,7 @@ def generate_pdf(cv_data: dict, template: str = "classic", lang: str = "en", fon
         else:
             pdf.set_line_width(0.3)
             pdf.set_draw_color(150, 150, 150)
-            
+
         pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
         pdf.ln(2)
 
@@ -1461,7 +1600,7 @@ def generate_pdf(cv_data: dict, template: str = "classic", lang: str = "en", fon
         # ── Normalize inline bullets into separate lines ──
         raw = raw.replace(" \u2022 ", "\n\u2022 ")
         raw = raw.replace(" \u2022", "\n\u2022 ")
-        raw = re.sub(r'\s+\*\s+', '\n\u2022 ', raw)
+        raw = re.sub(r"\s+\*\s+", "\n\u2022 ", raw)
         raw = raw.replace("\u2013 \u2022", "\n\u2022")
         raw = raw.replace("- \u2022", "\n\u2022")
         raw = raw.replace("\u2022 \u2013", "\n\u2022")
@@ -1469,8 +1608,8 @@ def generate_pdf(cv_data: dict, template: str = "classic", lang: str = "en", fon
 
         raw = raw.replace("\u2022", "\n\u2022").replace("\u2023", "\n\u2022")
         parts = []
-        for chunk in re.split(r'\n', raw):
-            chunk = re.sub(r'^[\u2022\-\*]+\s*', '', chunk).strip()
+        for chunk in re.split(r"\n", raw):
+            chunk = re.sub(r"^[\u2022\-\*]+\s*", "", chunk).strip()
             if chunk:
                 parts.append(chunk)
         if not parts:
@@ -1532,9 +1671,7 @@ def generate_pdf(cv_data: dict, template: str = "classic", lang: str = "en", fon
             # Line 1: Title – Company (bold)
             title_line = _normalize_text(exp.get("title", ""))
             company = _normalize_text(exp.get("company", ""))
-            title_line = " \u2013 ".join(
-                [x for x in [title_line, company] if x]
-            )
+            title_line = " \u2013 ".join([x for x in [title_line, company] if x])
             _write_text(title_line, style="B", size=11)
 
             # Line 2: Date | Location (italic)
@@ -1644,7 +1781,7 @@ def generate_pdf(cv_data: dict, template: str = "classic", lang: str = "en", fon
                     cat_w = pdf.get_string_width(cat_label) + 1
                     pdf.cell(cat_w, 5, cat_label, ln=False)
                     pdf.set_font(font_family, "", 10)
-                    remainder = sline[len(cat_label):].strip()
+                    remainder = sline[len(cat_label) :].strip()
                     pdf.cell(effective_width - cat_w, 5, remainder, ln=True)
                 else:
                     pdf.set_font(font_family, "", 10)
@@ -1690,8 +1827,8 @@ def generate_pdf(cv_data: dict, template: str = "classic", lang: str = "en", fon
 
             # Fix "Name- Tech" or "Name -Tech" → "Name - Tech"
             # Only fix dashes with surrounding whitespace (not compound words like E-Commerce)
-            name = re.sub(r'(\w)-\s+(\w)', r'\1 - \2', name)   # "Name- Tech"
-            name = re.sub(r'(\w)\s+-(\w)', r'\1 - \2', name)   # "Name -Tech"
+            name = re.sub(r"(\w)-\s+(\w)", r"\1 - \2", name)  # "Name- Tech"
+            name = re.sub(r"(\w)\s+-(\w)", r"\1 - \2", name)  # "Name -Tech"
 
             _write_text(name, style="B", size=11)
 
@@ -1718,10 +1855,10 @@ def generate_pdf(cv_data: dict, template: str = "classic", lang: str = "en", fon
         section_header(_section_title("languages", lang))
         for l in languages:
             if isinstance(l, dict):
-                name = l.get('name', '')
-                writing = l.get('writing') or ''
-                listening = l.get('listening') or ''
-                speaking = l.get('speaking') or ''
+                name = l.get("name", "")
+                writing = l.get("writing") or ""
+                listening = l.get("listening") or ""
+                speaking = l.get("speaking") or ""
                 if writing or listening or speaking:
                     skills = []
                     if writing:
@@ -1732,7 +1869,7 @@ def generate_pdf(cv_data: dict, template: str = "classic", lang: str = "en", fon
                         skills.append(f"Speaking: {speaking}")
                     _write_text(f"{name} - {', '.join(skills)}")
                 else:
-                    level = l.get('level', '')
+                    level = l.get("level", "")
                     _write_text(f"{name} - {level}" if level else name)
             else:
                 _write_text(str(l))
@@ -1793,6 +1930,7 @@ def generate_typst(cv_data: dict, template: str = "classic", font_family: str = 
 
     # Resolve font: user override > template default > Liberation Sans
     from renderers.theme import ALLOWED_FONTS
+
     typst_font = "Liberation Sans"
     if font_family and font_family in ALLOWED_FONTS:
         typst_font = font_family
@@ -1806,8 +1944,8 @@ def generate_typst(cv_data: dict, template: str = "classic", font_family: str = 
 
     lines: list[str] = [
         "#set page(margin: 1.5cm)",
-        f"#set text(font: \"{esc(typst_font)}\", size: 10pt)",
-        f"#let templateName = \"{esc(template)}\"",
+        f'#set text(font: "{esc(typst_font)}", size: 10pt)',
+        f'#let templateName = "{esc(template)}"',
         "",
         f"= {full_name or 'Curriculum Vitae'}",
         f"{email}  {phone}  {location}  {linkedin}".strip(),
@@ -1914,9 +2052,8 @@ def _payload_has_missing_core_sections(payload: dict) -> bool:
 
     skills_categorized = payload.get("skills_categorized") or {}
     plain_skills = payload.get("skills") or []
-    skills_missing = (
-        (not isinstance(skills_categorized, dict) or len(skills_categorized) == 0)
-        and (not isinstance(plain_skills, list) or len(plain_skills) == 0)
+    skills_missing = (not isinstance(skills_categorized, dict) or len(skills_categorized) == 0) and (
+        not isinstance(plain_skills, list) or len(plain_skills) == 0
     )
 
     return summary_missing or experiences_missing or education_missing or skills_missing
@@ -1961,7 +2098,7 @@ def _payload_to_ats_text(payload: dict) -> str:
             ).strip(" -")
             if dates:
                 lines.append(dates)
-            for bullet in (exp.get("bullets") or []):
+            for bullet in exp.get("bullets") or []:
                 text = str(bullet or "").strip()
                 if text:
                     lines.append(f"- {text}")
@@ -1978,7 +2115,7 @@ def _payload_to_ats_text(payload: dict) -> str:
                 lines.append(name)
             if desc:
                 lines.append(desc)
-            for bullet in (proj.get("bullets") or []):
+            for bullet in proj.get("bullets") or []:
                 text = str(bullet or "").strip()
                 if text:
                     lines.append(f"- {text}")
@@ -2030,7 +2167,9 @@ def build_cv(
 
     # ── Config snapshot: log full runtime config at request entry ──
     _structured_log(
-        logger, logging.INFO, "cv_parse",
+        logger,
+        logging.INFO,
+        "cv_parse",
         **_config_snapshot(),
     )
 
@@ -2041,13 +2180,17 @@ def build_cv(
             "Global parse limit reached (%d); rejecting request",
             _GLOBAL_PARSE_LIMIT,
         )
-        raise RuntimeError(
-            f"Server overloaded: {_GLOBAL_PARSE_LIMIT} concurrent parses in progress"
-        )
+        raise RuntimeError(f"Server overloaded: {_GLOBAL_PARSE_LIMIT} concurrent parses in progress")
     try:
         return _build_cv_inner(
-            cv_data, job_description, template, output_format, lang, plan,
-            _build_t0, font_family=font_family,
+            cv_data,
+            job_description,
+            template,
+            output_format,
+            lang,
+            plan,
+            _build_t0,
+            font_family=font_family,
         )
     except Exception:
         _record_parse_error()
@@ -2129,13 +2272,15 @@ def _build_cv_inner(
         logger.warning(
             "build_cv SLOW ABORT: %.2fs elapsed after compile (limit %.1fs), "
             "skipping AI review and rendering immediately",
-            _elapsed_so_far, _SLOW_ABORT_SECONDS,
+            _elapsed_so_far,
+            _SLOW_ABORT_SECONDS,
         )
         _skip_ai_review = True
     elif _elapsed_so_far > _SLOW_WARN_SECONDS:
         logger.warning(
             "build_cv SLOW: %.2fs elapsed after compile (warn threshold %.1fs)",
-            _elapsed_so_far, _SLOW_WARN_SECONDS,
+            _elapsed_so_far,
+            _SLOW_WARN_SECONDS,
         )
 
     final_review_enabled = _is_truthy_env("AI_FINAL_REVIEW", "1")
@@ -2243,7 +2388,9 @@ def _build_cv_inner(
         output_format,
     )
     _structured_log(
-        logger, logging.INFO, "build_cv_summary",
+        logger,
+        logging.INFO,
+        "build_cv_summary",
         sanity=_sanity,
         experiences=len(cv_model.experiences),
         education=len(cv_model.education),
@@ -2276,6 +2423,7 @@ def _build_cv_inner(
             content_type = "text/plain"
         elif output_format == "html":
             from renderers import render as _render_all
+
             r = _render_all(cv_model, template, "html", font_override=font_family)
             buf = r["buffer"]
             extension = "html"
@@ -2296,11 +2444,14 @@ def _build_cv_inner(
 
     rendered_bytes = buf.read()
     buf = BytesIO(rendered_bytes)
-    set_cached(cache_key, {
-        "bytes": rendered_bytes,
-        "filename": filename,
-        "content_type": content_type,
-    })
+    set_cached(
+        cache_key,
+        {
+            "bytes": rendered_bytes,
+            "filename": filename,
+            "content_type": content_type,
+        },
+    )
 
     return {
         "buffer": buf,
@@ -2424,9 +2575,7 @@ def compile_cv_model(cv_data: dict | CVModel) -> CVModel:
     for p in model.projects:
         p.name = _normalize_text(p.name).strip()
         p.description = _normalize_text(p.description).strip()
-        p.bullets = _dedupe_preserve(
-            [_normalize_text(b).strip() for b in p.bullets if _normalize_text(b).strip()]
-        )
+        p.bullets = _dedupe_preserve([_normalize_text(b).strip() for b in p.bullets if _normalize_text(b).strip()])
         # GUARD: if project has description but no bullets, promote description to bullet
         if p.description and not p.bullets:
             p.bullets = [p.description]
@@ -2467,14 +2616,22 @@ def compile_cv_model(cv_data: dict | CVModel) -> CVModel:
         )
         # Safety: if dedup removed everything, restore originals
         if not model.languages and original_count > 0:
-            model.languages = _dedupe_preserve(
-                [str(x).strip() for x in (cv_data if isinstance(cv_data, dict) else {}).get("languages", []) if str(x).strip()]
-            ) or model.languages
+            model.languages = (
+                _dedupe_preserve(
+                    [
+                        str(x).strip()
+                        for x in (cv_data if isinstance(cv_data, dict) else {}).get("languages", [])
+                        if str(x).strip()
+                    ]
+                )
+                or model.languages
+            )
 
     return model
 
 
 # ── Pre-render sanity check ──────────────────────────────────────────────
+
 
 def _pre_render_sanity_check(model: CVModel) -> None:
     """Final in-place cleanup before document rendering.
@@ -2489,7 +2646,8 @@ def _pre_render_sanity_check(model: CVModel) -> None:
     # Languages
     if hasattr(model, "languages") and model.languages:
         model.languages = [
-            lang for lang in model.languages
+            lang
+            for lang in model.languages
             if lang
             and len(lang) > 1
             and not re.match(r"^[\d\W]+$", lang)
@@ -2503,27 +2661,20 @@ def _pre_render_sanity_check(model: CVModel) -> None:
     if model.phone and not re.search(r"\d{4,}", model.phone):
         model.phone = ""
     if hasattr(model, "linkedin"):
-        if model.linkedin and not re.search(
-            r"linkedin\.com|github\.com|https?://", model.linkedin, re.I
-        ):
+        if model.linkedin and not re.search(r"linkedin\.com|github\.com|https?://", model.linkedin, re.I):
             model.linkedin = ""
 
     # Education: drop empty entries
-    model.education = [
-        edu for edu in model.education
-        if edu.degree or edu.school
-    ]
+    model.education = [edu for edu in model.education if edu.degree or edu.school]
 
     # Skills: remove date/URL items
     _date_like = re.compile(r"^\d{4}\s*[-–]\s*\d{4}$|^\d{1,2}/\d{4}$")
-    model.skills = [
-        s for s in model.skills
-        if s and not _date_like.match(s) and not re.match(r"https?://", s, re.I)
-    ]
+    model.skills = [s for s in model.skills if s and not _date_like.match(s) and not re.match(r"https?://", s, re.I)]
     if model.skills_categorized:
         for cat in list(model.skills_categorized):
             cleaned = [
-                s for s in model.skills_categorized[cat]
+                s
+                for s in model.skills_categorized[cat]
                 if s and not _date_like.match(s) and not re.match(r"https?://", s, re.I)
             ]
             if cleaned:
@@ -2574,13 +2725,15 @@ def _cross_section_fixup_model(model: CVModel) -> None:
         has_institution = bool(_INSTITUTION_MODEL_RE.search(text))
         has_date = bool(re.search(r"\b(?:19|20)\d{2}\b", text))
         if (has_degree or has_institution) and has_date and not exp.bullets:
-            model.education.append(Education(
-                degree=exp.title,
-                school=exp.company,
-                location=exp.location,
-                start_date=exp.start_date,
-                end_date=exp.end_date,
-            ))
+            model.education.append(
+                Education(
+                    degree=exp.title,
+                    school=exp.company,
+                    location=exp.location,
+                    start_date=exp.start_date,
+                    end_date=exp.end_date,
+                )
+            )
         else:
             kept.append(exp)
     model.experiences = kept
@@ -2603,7 +2756,8 @@ def _cross_section_fixup_model(model: CVModel) -> None:
             re.I,
         )
         model.languages = [
-            lang for lang in model.languages
+            lang
+            for lang in model.languages
             if lang
             and len(lang.strip()) > 1
             and not _tech_re.search(lang)
@@ -2632,11 +2786,15 @@ def _document_level_validation_model(model: CVModel) -> None:
         for exp in model.experiences:
             text = f"{exp.title} {exp.company} {exp.location} {exp.start_date} {exp.end_date}"
             if (_DEGREE_MODEL_RE.search(text) or _INSTITUTION_MODEL_RE.search(text)) and not exp.bullets:
-                model.education.append(Education(
-                    degree=exp.title, school=exp.company,
-                    location=exp.location,
-                    start_date=exp.start_date, end_date=exp.end_date,
-                ))
+                model.education.append(
+                    Education(
+                        degree=exp.title,
+                        school=exp.company,
+                        location=exp.location,
+                        start_date=exp.start_date,
+                        end_date=exp.end_date,
+                    )
+                )
             else:
                 keep.append(exp)
         model.experiences = keep
@@ -2690,11 +2848,15 @@ def _document_level_validation_model(model: CVModel) -> None:
         for exp in model.experiences:
             text = f"{exp.title} {exp.company} {exp.start_date} {exp.end_date}"
             if _DEGREE_MODEL_RE.search(text) and _YEAR_MODEL_RE.search(text) and not exp.bullets:
-                model.education.append(Education(
-                    degree=exp.title, school=exp.company,
-                    location=exp.location,
-                    start_date=exp.start_date, end_date=exp.end_date,
-                ))
+                model.education.append(
+                    Education(
+                        degree=exp.title,
+                        school=exp.company,
+                        location=exp.location,
+                        start_date=exp.start_date,
+                        end_date=exp.end_date,
+                    )
+                )
             else:
                 remaining.append(exp)
         model.experiences = remaining
@@ -2707,12 +2869,15 @@ def _document_level_validation_model(model: CVModel) -> None:
             has_degree = bool(_DEGREE_MODEL_RE.search(text))
             has_institution = bool(_INSTITUTION_MODEL_RE.search(text))
             if not has_degree and not has_institution and _YEAR_MODEL_RE.search(text):
-                model.experiences.append(Experience(
-                    title=edu.degree or edu.school,
-                    company=edu.school if edu.degree else "",
-                    location=getattr(edu, "location", ""),
-                    start_date=edu.start_date, end_date=edu.end_date,
-                ))
+                model.experiences.append(
+                    Experience(
+                        title=edu.degree or edu.school,
+                        company=edu.school if edu.degree else "",
+                        location=getattr(edu, "location", ""),
+                        start_date=edu.start_date,
+                        end_date=edu.end_date,
+                    )
+                )
             else:
                 remaining_edu.append(edu)
         model.education = remaining_edu
@@ -2725,7 +2890,8 @@ def _document_level_validation_model(model: CVModel) -> None:
             re.I,
         )
         model.languages = [
-            lang for lang in model.languages
+            lang
+            for lang in model.languages
             if lang
             and len(lang.strip()) > 1
             and not _tech_re.search(lang)
@@ -2801,11 +2967,15 @@ def _anomaly_detection_model(model: CVModel) -> None:
             has_institution = bool(_INSTITUTION_MODEL_RE.search(text))
             has_year = bool(_YEAR_MODEL_RE.search(text))
             if has_degree and has_institution and has_year:
-                model.education.append(Education(
-                    degree=exp.title, school=exp.company,
-                    location=getattr(exp, "location", ""),
-                    start_date=exp.start_date, end_date=exp.end_date,
-                ))
+                model.education.append(
+                    Education(
+                        degree=exp.title,
+                        school=exp.company,
+                        location=getattr(exp, "location", ""),
+                        start_date=exp.start_date,
+                        end_date=exp.end_date,
+                    )
+                )
             else:
                 kept_exp.append(exp)
         model.experiences = kept_exp
@@ -2883,16 +3053,18 @@ _FALLBACK_MIN_SECTIONS = 2
 
 def _needs_fallback_render(model: CVModel) -> bool:
     """Return True when the model is too empty to render a useful CV."""
-    section_count = sum([
-        bool(model.summary),
-        bool(model.experiences),
-        bool(model.education),
-        bool(model.skills or model.skills_categorized),
-        bool(model.projects),
-        bool(getattr(model, "certifications", None)),
-        bool(model.languages),
-        bool(getattr(model, "interests", None)),
-    ])
+    section_count = sum(
+        [
+            bool(model.summary),
+            bool(model.experiences),
+            bool(model.education),
+            bool(model.skills or model.skills_categorized),
+            bool(model.projects),
+            bool(getattr(model, "certifications", None)),
+            bool(model.languages),
+            bool(getattr(model, "interests", None)),
+        ]
+    )
     total_text = (
         len(model.summary)
         + sum(len(e.title) + len(" ".join(e.bullets)) for e in model.experiences)
@@ -2920,8 +3092,16 @@ def _build_fallback_model(cv_data: dict, model: CVModel) -> CVModel:
     so the rendered CV is never empty.  Never invents new data.
     """
     _SKIP = {
-        "full_name", "title", "email", "phone", "location", "linkedin",
-        "language", "section_titles", "format_hints", "contact",
+        "full_name",
+        "title",
+        "email",
+        "phone",
+        "location",
+        "linkedin",
+        "language",
+        "section_titles",
+        "format_hints",
+        "contact",
     }
 
     collected: list[str] = []
@@ -2988,8 +3168,15 @@ def _build_fallback_model(cv_data: dict, model: CVModel) -> CVModel:
 # ── Final layout normalization ─────────────────────────────────────────────
 
 _CANONICAL_ORDER_MODEL = [
-    "summary", "experience", "projects", "education", "skills",
-    "certifications", "languages", "interests", "misc",
+    "summary",
+    "experience",
+    "projects",
+    "education",
+    "skills",
+    "certifications",
+    "languages",
+    "interests",
+    "misc",
 ]
 
 _SECTION_FIELD_MODEL = {
@@ -3006,9 +3193,16 @@ _SECTION_FIELD_MODEL = {
 
 _CONTACT_KEYS = ["full_name", "title", "email", "phone", "location", "linkedin"]
 _SECTION_DICT_KEYS = [
-    "summary", "experiences", "projects", "education",
-    "skills", "skills_categorized", "certifications",
-    "languages", "interests", "misc",
+    "summary",
+    "experiences",
+    "projects",
+    "education",
+    "skills",
+    "skills_categorized",
+    "certifications",
+    "languages",
+    "interests",
+    "misc",
 ]
 _META_KEYS = ["language", "section_titles"]
 

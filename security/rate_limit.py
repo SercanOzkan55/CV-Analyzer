@@ -34,9 +34,8 @@ def check_upload_rate(user_id: str) -> None:
         if len(timestamps) >= _MAX_UPLOADS_PER_WINDOW:
             logger.warning(
                 "rate_limit:upload_exceeded user=%s count=%d",
-                user_id, len(timestamps),
+                user_id,
+                len(timestamps),
             )
-            raise ValueError(
-                f"Upload rate limit exceeded ({_MAX_UPLOADS_PER_WINDOW} per minute)"
-            )
+            raise ValueError(f"Upload rate limit exceeded ({_MAX_UPLOADS_PER_WINDOW} per minute)")
         timestamps.append(now)

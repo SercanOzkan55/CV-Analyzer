@@ -1,5 +1,3 @@
-
-
 def test_unicode_payload(client):
     """Unicode input should not crash the endpoint."""
     payload = {"cv_text": "你好世界 🌍🚀", "job_description": "Привет мир"}

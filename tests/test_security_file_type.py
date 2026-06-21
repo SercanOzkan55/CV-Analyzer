@@ -1,5 +1,3 @@
-
-
 def test_file_type_enforcement(client):
     """Non-PDF file uploads should be rejected."""
     files = {"file": ("test.exe", b"MZ...", "application/octet-stream")}

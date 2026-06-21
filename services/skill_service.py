@@ -469,9 +469,7 @@ def extract_skills(text: str) -> dict:
             try:
                 data = json.loads(cached)
                 found = set(data.get("found", []))
-                by_category = {
-                    k: set(v) for k, v in (data.get("by_category", {}) or {}).items()
-                }
+                by_category = {k: set(v) for k, v in (data.get("by_category", {}) or {}).items()}
                 return {"found": found, "by_category": by_category}
             except Exception:
                 # Ignore cache decode errors and fall back to fresh computation
@@ -555,7 +553,11 @@ def extract_skills(text: str) -> dict:
         candidates = set()
 
         # 1) Prefer explicit "Skills:" lines when present
-        for m in re.finditer(r"(?mi)^(?:skills|technical skills|technologies|tech stack|skills and technologies)\s*[:\-]\s*(.+)$", text, re.MULTILINE):
+        for m in re.finditer(
+            r"(?mi)^(?:skills|technical skills|technologies|tech stack|skills and technologies)\s*[:\-]\s*(.+)$",
+            text,
+            re.MULTILINE,
+        ):
             chunk = m.group(1)
             parts = re.split(r"[,\|;/\\•\u2022]+", chunk)
             for p in parts:

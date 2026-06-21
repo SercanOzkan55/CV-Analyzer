@@ -1,4 +1,5 @@
 """Calibrate B007 after TF-IDF change."""
+
 import json, pathlib
 
 DS = pathlib.Path(__file__).resolve().parent.parent / "tests/benchmark/benchmark_dataset.json"

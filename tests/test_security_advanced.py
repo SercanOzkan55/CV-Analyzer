@@ -38,9 +38,7 @@ def test_org_privilege_escalation(client, org_id):
 
 
 # SQL injection in job_text
-@pytest.mark.parametrize(
-    "malicious", ["Robert'); DROP TABLE organizations;--", "' OR TRUE --"]
-)
+@pytest.mark.parametrize("malicious", ["Robert'); DROP TABLE organizations;--", "' OR TRUE --"])
 def test_sql_injection_job_text(client, malicious):
     payload = {"cv_text": "foo", "job_text": malicious}
     resp = client.post("/api/v1/analyze", json=payload)

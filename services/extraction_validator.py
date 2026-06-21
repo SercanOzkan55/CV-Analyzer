@@ -21,56 +21,98 @@ logger = logging.getLogger("app.extraction_validator")
 
 # ── Patterns ──────────────────────────────────────────────────────────────
 
-_EMAIL_RE = re.compile(
-    r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.I
-)
-_PHONE_RE = re.compile(
-    r"\(?\+?\d[\d()\-\s.]{7,}\d"
-)
-_URL_RE = re.compile(
-    r"https?://|linkedin\.com|github\.com", re.I
-)
+_EMAIL_RE = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.I)
+_PHONE_RE = re.compile(r"\(?\+?\d[\d()\-\s.]{7,}\d")
+_URL_RE = re.compile(r"https?://|linkedin\.com|github\.com", re.I)
 
 # Tokens that should NEVER appear as skills
 _SKILL_GARBAGE_PATTERNS = [
     re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.I),  # email
-    re.compile(r"\(?\+?\d[\d()\-\s.]{7,}\d"),                      # phone
-    re.compile(r"^\d{1,2}(?:th|st|nd|rd)$", re.I),                 # ordinals: 10th, 12th
-    re.compile(r"^\d+\.?\d*%$"),                                     # percentages: 80.34%
-    re.compile(r"^\d{4}$"),                                          # bare years: 2022
-    re.compile(r"^\d{1,2}[./]\d{1,2}[./]\d{2,4}$"),                # dates: 13.10.2003
-    re.compile(r"^https?://", re.I),                                 # URLs
-    re.compile(r"^www\.", re.I),                                     # www URLs
-    re.compile(r"gmail\.com|hotmail\.com|yahoo\.com", re.I),        # email domains
-    re.compile(r"^[a-z]$", re.I),                                    # single chars
-    re.compile(r"^[a-z]\.[a-z]", re.I),                             # abbreviations like c.b.s.e
-    re.compile(r"^\d+\.?\d*$"),                                      # bare numbers: 62.2, 3.80
-    re.compile(r"^u\.p\.?$", re.I),                                  # location abbreviations
+    re.compile(r"\(?\+?\d[\d()\-\s.]{7,}\d"),  # phone
+    re.compile(r"^\d{1,2}(?:th|st|nd|rd)$", re.I),  # ordinals: 10th, 12th
+    re.compile(r"^\d+\.?\d*%$"),  # percentages: 80.34%
+    re.compile(r"^\d{4}$"),  # bare years: 2022
+    re.compile(r"^\d{1,2}[./]\d{1,2}[./]\d{2,4}$"),  # dates: 13.10.2003
+    re.compile(r"^https?://", re.I),  # URLs
+    re.compile(r"^www\.", re.I),  # www URLs
+    re.compile(r"gmail\.com|hotmail\.com|yahoo\.com", re.I),  # email domains
+    re.compile(r"^[a-z]$", re.I),  # single chars
+    re.compile(r"^[a-z]\.[a-z]", re.I),  # abbreviations like c.b.s.e
+    re.compile(r"^\d+\.?\d*$"),  # bare numbers: 62.2, 3.80
+    re.compile(r"^u\.p\.?$", re.I),  # location abbreviations
 ]
 
 # Known language names (lowercase) — for validation
 _VALID_LANGUAGE_NAMES = {
-    "english", "turkish", "french", "german", "spanish", "portuguese",
-    "italian", "dutch", "russian", "polish", "swedish", "norwegian",
-    "danish", "finnish", "czech", "hungarian", "romanian",
-    "arabic", "chinese", "japanese", "korean", "hindi",
-    "indonesian", "vietnamese", "thai", "greek", "hebrew",
-    "persian", "urdu", "bengali", "tagalog", "malay",
-    "swahili", "filipino",
+    "english",
+    "turkish",
+    "french",
+    "german",
+    "spanish",
+    "portuguese",
+    "italian",
+    "dutch",
+    "russian",
+    "polish",
+    "swedish",
+    "norwegian",
+    "danish",
+    "finnish",
+    "czech",
+    "hungarian",
+    "romanian",
+    "arabic",
+    "chinese",
+    "japanese",
+    "korean",
+    "hindi",
+    "indonesian",
+    "vietnamese",
+    "thai",
+    "greek",
+    "hebrew",
+    "persian",
+    "urdu",
+    "bengali",
+    "tagalog",
+    "malay",
+    "swahili",
+    "filipino",
     # Turkish names
-    "türkçe", "ingilizce", "fransızca", "almanca", "ispanyolca",
-    "portekizce", "italyanca", "rusça", "arapça", "japonca",
-    "korece", "çince", "hintçe", "farsça",
+    "türkçe",
+    "ingilizce",
+    "fransızca",
+    "almanca",
+    "ispanyolca",
+    "portekizce",
+    "italyanca",
+    "rusça",
+    "arapça",
+    "japonca",
+    "korece",
+    "çince",
+    "hintçe",
+    "farsça",
 }
 
 # Experience/project keywords that should NOT appear in summary
 _SUMMARY_CONTAMINATION_KEYWORDS = [
-    "windmill", "microcontroller", "synopsis",
-    "marching band", "intramural", "volleyball",
-    "cricket", "football", "hobbies",
-    "father's name", "marital status", "nationality",
-    "declaration", "assert you",
-    "gold medallist", "participated in various",
+    "windmill",
+    "microcontroller",
+    "synopsis",
+    "marching band",
+    "intramural",
+    "volleyball",
+    "cricket",
+    "football",
+    "hobbies",
+    "father's name",
+    "marital status",
+    "nationality",
+    "declaration",
+    "assert you",
+    "gold medallist",
+    "participated in various",
 ]
 
 
@@ -114,9 +156,21 @@ def _is_valid_language_entry(entry: str) -> bool:
     # Reject entries that look like core section headers or heavy structural text
     # (Kept strictly to global CV standard sections to avoid false positives)
     section_words = {
-        "education", "experience", "skills", "projects", "summary",
-        "profile", "objective", "blog", "website", "development",
-        "engineer", "degree", "university", "bachelor", "master",
+        "education",
+        "experience",
+        "skills",
+        "projects",
+        "summary",
+        "profile",
+        "objective",
+        "blog",
+        "website",
+        "development",
+        "engineer",
+        "degree",
+        "university",
+        "bachelor",
+        "master",
     }
     entry_lower = entry.lower()
     entry_words_lower = [w.lower().rstrip(":,;") for w in entry.split()]
@@ -134,7 +188,8 @@ def _is_valid_language_entry(entry: str) -> bool:
     if re.search(
         r"\b(?:native|fluent|advanced|intermediate|beginner|proficient|basic"
         r"|ana\s*dil|ileri|orta|başlangıç)\b",
-        entry, re.I,
+        entry,
+        re.I,
     ):
         return True
     # Reject everything else — if it doesn't match any positive signal,
@@ -241,9 +296,21 @@ def validate_extraction(
     else:
         # Check if name looks like a degree or job title
         name_lower = extracted_name.lower()
-        title_words = {"engineer", "developer", "student", "manager", "b.tech",
-                       "b.sc", "m.sc", "bachelor", "master", "intern",
-                       "mühendis", "öğrenci", "stajyer"}
+        title_words = {
+            "engineer",
+            "developer",
+            "student",
+            "manager",
+            "b.tech",
+            "b.sc",
+            "m.sc",
+            "bachelor",
+            "master",
+            "intern",
+            "mühendis",
+            "öğrenci",
+            "stajyer",
+        }
         if any(tw in name_lower for tw in title_words):
             hard_fails.append(f"name_is_title: '{extracted_name}'")
             score -= 15
@@ -254,9 +321,7 @@ def validate_extraction(
     if isinstance(skills_flat, list):
         garbage_skills = [s for s in skills_flat if _is_garbage_skill(str(s))]
         if garbage_skills:
-            hard_fails.append(
-                f"garbage_skills: {garbage_skills[:5]}"
-            )
+            hard_fails.append(f"garbage_skills: {garbage_skills[:5]}")
             score -= min(20, len(garbage_skills) * 3)
     else:
         garbage_skills = []
@@ -268,9 +333,7 @@ def validate_extraction(
             if isinstance(items, list):
                 cat_garbage = [s for s in items if _is_garbage_skill(str(s))]
                 if cat_garbage:
-                    issues.append(
-                        f"garbage_in_category_{cat}: {cat_garbage[:3]}"
-                    )
+                    issues.append(f"garbage_in_category_{cat}: {cat_garbage[:3]}")
                     score -= min(10, len(cat_garbage) * 2)
 
     # ── 3. Language Quality ──────────────────────────────────────────────
@@ -283,9 +346,7 @@ def validate_extraction(
             if not _is_valid_language_entry(lang_str):
                 broken_languages.append(lang_str)
         if broken_languages:
-            hard_fails.append(
-                f"broken_languages: {broken_languages}"
-            )
+            hard_fails.append(f"broken_languages: {broken_languages}")
             score -= min(15, len(broken_languages) * 5)
 
     # ── 4. Summary Contamination ─────────────────────────────────────────
@@ -293,9 +354,7 @@ def validate_extraction(
     summary = str(extracted.get("summary", "")).strip()
     contamination = _check_summary_contamination(summary)
     if contamination:
-        hard_fails.append(
-            f"summary_contaminated: {contamination[:3]}"
-        )
+        hard_fails.append(f"summary_contaminated: {contamination[:3]}")
         score -= min(15, len(contamination) * 5)
 
     # ── 5. Date Integrity ────────────────────────────────────────────────
@@ -310,7 +369,8 @@ def validate_extraction(
     # Check if raw text has experience-like content but extracted has none
     exp_signals = re.findall(
         r"\b(?:experience|deneyim|intern|staj|worked|managed|developed)\b",
-        raw_text, re.I,
+        raw_text,
+        re.I,
     )
     exp_entries = extracted.get("experiences", [])
     if len(exp_signals) >= 3 and not exp_entries:
@@ -320,7 +380,8 @@ def validate_extraction(
     # Check education
     edu_signals = re.findall(
         r"\b(?:university|üniversite|bachelor|lisans|education|eğitim|b\.sc|b\.tech)\b",
-        raw_text, re.I,
+        raw_text,
+        re.I,
     )
     edu_entries = extracted.get("education", [])
     if len(edu_signals) >= 2 and not edu_entries:
@@ -335,14 +396,11 @@ def validate_extraction(
         degree = str(edu.get("degree", ""))
         school = str(edu.get("school", ""))
         # Check if activity/project leaked into education
-        activity_words = {"marching band", "volleyball", "cricket", "football",
-                          "chess", "debate", "club", "society"}
+        activity_words = {"marching band", "volleyball", "cricket", "football", "chess", "debate", "club", "society"}
         for field_name, field_val in [("degree", degree), ("school", school)]:
             for aw in activity_words:
                 if aw in field_val.lower():
-                    hard_fails.append(
-                        f"education[{i}].{field_name}_contains_activity: '{aw}'"
-                    )
+                    hard_fails.append(f"education[{i}].{field_name}_contains_activity: '{aw}'")
                     score -= 10
 
     # ── Final Score ──────────────────────────────────────────────────────
@@ -362,7 +420,9 @@ def validate_extraction(
     if needs_fallback:
         logger.warning(
             "extraction_quality_low score=%d hard_fails=%d issues=%d",
-            score, len(hard_fails), len(issues),
+            score,
+            len(hard_fails),
+            len(issues),
         )
     else:
         logger.info("extraction_quality_ok score=%d", score)

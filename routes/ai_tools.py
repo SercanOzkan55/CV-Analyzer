@@ -13,8 +13,8 @@ from services.owner_workflow_service import create_owner_notification
 from typing import List, Optional
 
 
-
 router = APIRouter(tags=["ai-tools"])
+
 
 class SemanticSearchRequest(BaseModel):
     job_text: str | None = None
@@ -102,10 +102,14 @@ def find_candidate_embeddings(
     candidate_ids = [cid for cid, _score in matches]
     rows_map = {}
     if candidate_ids:
-        rows = db.query(Candidate).filter(
-            Candidate.id.in_(candidate_ids),
-            Candidate.organization_id == organization_id,
-        ).all()
+        rows = (
+            db.query(Candidate)
+            .filter(
+                Candidate.id.in_(candidate_ids),
+                Candidate.organization_id == organization_id,
+            )
+            .all()
+        )
         rows_map = {row.id: row for row in rows}
 
     return {
@@ -128,9 +132,7 @@ def find_candidate_embeddings(
 
 @router.post("/api/v1/semantic-search")
 @rate_limit("20/minute")
-def semantic_search(
-    body: SemanticSearchRequest, user=Depends(verify_supabase_jwt), db=Depends(get_db)
-):
+def semantic_search(body: SemanticSearchRequest, user=Depends(verify_supabase_jwt), db=Depends(get_db)):
     _ensure_not_expired(user)
     db_user = get_or_create_user(db, user.get("user_id"), user.get("email"))
     organization_id = getattr(db_user, "organization_id", None)
@@ -144,10 +146,14 @@ def semantic_search(
     # Resolve job embedding
     job_vec = None
     if body.job_id:
-        job = db.query(Job).filter(
-            Job.id == body.job_id,
-            Job.organization_id == organization_id,
-        ).one_or_none()
+        job = (
+            db.query(Job)
+            .filter(
+                Job.id == body.job_id,
+                Job.organization_id == organization_id,
+            )
+            .one_or_none()
+        )
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
         job_vec = job.job_embedding
@@ -191,10 +197,14 @@ def semantic_search(
     # Fetch candidate rows preserving order
     candidates = []
     if candidate_ids:
-        rows = db.query(Candidate).filter(
-            Candidate.id.in_(candidate_ids),
-            Candidate.organization_id == organization_id,
-        ).all()
+        rows = (
+            db.query(Candidate)
+            .filter(
+                Candidate.id.in_(candidate_ids),
+                Candidate.organization_id == organization_id,
+            )
+            .all()
+        )
         rows_map = {r.id: r for r in rows}
         for cid, score in matches:
             r = rows_map.get(cid)
@@ -202,11 +212,7 @@ def semantic_search(
                 candidates.append(
                     {
                         "id": r.id,
-                        "cv_text": (
-                            (r.cv_text[:200] + "...")
-                            if r.cv_text and len(r.cv_text) > 200
-                            else r.cv_text
-                        ),
+                        "cv_text": ((r.cv_text[:200] + "...") if r.cv_text and len(r.cv_text) > 200 else r.cv_text),
                         "organization_id": r.organization_id,
                         "score": float(score),
                     }
@@ -254,14 +260,10 @@ def _describe_cv_change_summary(added_count: int, removed_count: int, added_sect
 def _build_cv_change_summary(original_text: str, optimized_text: str, max_items: int = 8) -> dict:
     """Return a compact before/after CV text summary for the UI."""
     original_lines = [
-        re.sub(r"\s+", " ", line.strip())
-        for line in str(original_text or "").splitlines()
-        if line and line.strip()
+        re.sub(r"\s+", " ", line.strip()) for line in str(original_text or "").splitlines() if line and line.strip()
     ]
     optimized_lines = [
-        re.sub(r"\s+", " ", line.strip())
-        for line in str(optimized_text or "").splitlines()
-        if line and line.strip()
+        re.sub(r"\s+", " ", line.strip()) for line in str(optimized_text or "").splitlines() if line and line.strip()
     ]
 
     before_set = set(original_lines)
@@ -269,8 +271,7 @@ def _build_cv_change_summary(original_text: str, optimized_text: str, max_items:
     added = [line for line in optimized_lines if line not in before_set]
     removed = [line for line in original_lines if line not in after_set]
     added_sections = sorted(
-        set(_detect_cv_sections_from_text(optimized_text))
-        - set(_detect_cv_sections_from_text(original_text))
+        set(_detect_cv_sections_from_text(optimized_text)) - set(_detect_cv_sections_from_text(original_text))
     )
 
     return {
@@ -318,6 +319,7 @@ async def auto_fix_cv_pdf(
 
     # Per-user + global optimize concurrency guard
     from security.runtime_guard import OptimizeConcurrencyGuard
+
     try:
         guard = OptimizeConcurrencyGuard(supabase_id or "anon")
         guard.__enter__()
@@ -544,6 +546,7 @@ def rewrite_cv_endpoint(
     _consume_billable_usage(db, db_user, "rewrite-cv", response=response)
 
     from security.runtime_guard import OptimizeConcurrencyGuard
+
     try:
         with OptimizeConcurrencyGuard(supabase_id):
             try:
@@ -1075,6 +1078,7 @@ def job_match_score_endpoint(
     # gets evaluated differently for junior vs senior vs manager roles.
     mode = (body.mode or "senior").lower().strip()
     raw_score = float(result.get("score", result.get("final_score", 0)) or 0)
+
     def _as_percent(value):
         value = float(value or 0)
         return value * 100 if 0 < value <= 1 else value
@@ -1087,10 +1091,10 @@ def job_match_score_endpoint(
 
     # Mode weights: (keyword, experience, title, seniority, skill)
     _MODE_WEIGHTS = {
-        "junior":   {"keyword": 0.35, "experience": 0.10, "title": 0.15, "seniority": 0.10, "skill": 0.30},
-        "senior":   {"keyword": 0.25, "experience": 0.25, "title": 0.15, "seniority": 0.15, "skill": 0.20},
-        "manager":  {"keyword": 0.20, "experience": 0.30, "title": 0.20, "seniority": 0.15, "skill": 0.15},
-        "tech":     {"keyword": 0.30, "experience": 0.15, "title": 0.10, "seniority": 0.10, "skill": 0.35},
+        "junior": {"keyword": 0.35, "experience": 0.10, "title": 0.15, "seniority": 0.10, "skill": 0.30},
+        "senior": {"keyword": 0.25, "experience": 0.25, "title": 0.15, "seniority": 0.15, "skill": 0.20},
+        "manager": {"keyword": 0.20, "experience": 0.30, "title": 0.20, "seniority": 0.15, "skill": 0.15},
+        "tech": {"keyword": 0.30, "experience": 0.15, "title": 0.10, "seniority": 0.10, "skill": 0.35},
         "academic": {"keyword": 0.25, "experience": 0.20, "title": 0.20, "seniority": 0.10, "skill": 0.25},
     }
     w = _MODE_WEIGHTS.get(mode, _MODE_WEIGHTS["senior"])
@@ -1160,17 +1164,21 @@ def job_description_quality_endpoint(
     quality = _assess_job_description_quality(body.job_description, body.jd_skills or [])
     suggestions = []
     if quality.get("status") in {"missing", "invalid"}:
-        suggestions.extend([
-            "Add a real role title.",
-            "List 5-10 required skills or tools.",
-            "Add responsibilities, seniority, and expected outcomes.",
-        ])
+        suggestions.extend(
+            [
+                "Add a real role title.",
+                "List 5-10 required skills or tools.",
+                "Add responsibilities, seniority, and expected outcomes.",
+            ]
+        )
     elif quality.get("status") == "weak":
-        suggestions.extend([
-            "Add concrete responsibilities.",
-            "Mention seniority and required years only if relevant.",
-            "Add must-have and nice-to-have skills separately.",
-        ])
+        suggestions.extend(
+            [
+                "Add concrete responsibilities.",
+                "Mention seniority and required years only if relevant.",
+                "Add must-have and nice-to-have skills separately.",
+            ]
+        )
     else:
         suggestions.append("Job description is specific enough for matching.")
 
@@ -1321,7 +1329,9 @@ def save_cv_version(
     if body.job_description and str(body.job_description).strip():
         try:
             pipeline = _main_module().run_pipeline(cv_text, body.job_description, lang=body.lang)
-            match_score = float((pipeline.get("match_score_v2") or {}).get("match_score") or pipeline.get("final_score") or 0.0)
+            match_score = float(
+                (pipeline.get("match_score_v2") or {}).get("match_score") or pipeline.get("final_score") or 0.0
+            )
         except Exception:
             match_score = None
 
@@ -1373,11 +1383,7 @@ def delete_cv_version(
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
 
-    row = (
-        db.query(CVVersion)
-        .filter(CVVersion.id == version_id, CVVersion.user_id == db_user.id)
-        .first()
-    )
+    row = db.query(CVVersion).filter(CVVersion.id == version_id, CVVersion.user_id == db_user.id).first()
     if not row:
         raise HTTPException(status_code=404, detail="CV version not found")
     db.delete(row)
@@ -1433,11 +1439,7 @@ def get_cv_version(
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
 
-    row = (
-        db.query(CVVersion)
-        .filter(CVVersion.id == version_id, CVVersion.user_id == db_user.id)
-        .first()
-    )
+    row = db.query(CVVersion).filter(CVVersion.id == version_id, CVVersion.user_id == db_user.id).first()
     if not row:
         raise HTTPException(status_code=404, detail="CV version not found")
 
@@ -1490,7 +1492,7 @@ def agent_chat_endpoint(
             "empathetic, and guiding tone. Your job is to help the candidate brainstorm career goals, "
             "improve their resume summary, optimize keyword placement, and suggest action-oriented next steps.\n"
             "Keep your answers inspirational, constructive, and action-focused."
-        )
+        ),
     }
 
     agent_prompt = system_prompts.get(body.agent_type, system_prompts["coach"])
@@ -1500,10 +1502,7 @@ def agent_chat_endpoint(
 
     # If CV context is provided, inject it as context
     if body.cv_context:
-        messages.append({
-            "role": "system",
-            "content": f"Candidate CV Context for Reference:\n{body.cv_context[:5000]}"
-        })
+        messages.append({"role": "system", "content": f"Candidate CV Context for Reference:\n{body.cv_context[:5000]}"})
 
     # Append history
     for msg in body.history or []:
@@ -1517,13 +1516,14 @@ def agent_chat_endpoint(
 
     # Query the LLM client
     from services.ai_client_factory import get_ai_client_and_model
+
     client, model = get_ai_client_and_model()
 
     if not client:
         # Mock mode fallback
         return {
             "response": f"[Mock Agent: {body.agent_type.upper()}] Hello! I read your message: '{body.message}'. "
-                        "To use real agent features, configure GEMINI_API_KEY or OPENAI_API_KEY."
+            "To use real agent features, configure GEMINI_API_KEY or OPENAI_API_KEY."
         }
 
     try:

@@ -3,6 +3,7 @@
 Extracted to break circular imports: services that need metrics, alerts,
 or the circuit breaker import from here instead of ``main``.
 """
+
 from __future__ import annotations
 
 import logging
@@ -66,10 +67,12 @@ def _get_or_create_gauge(name: str, description: str, labelnames=()):
 
 # ── Prometheus counters used by services ──────────────────────────────────
 S3_ERRORS_TOTAL = _get_or_create_counter(
-    "cv_s3_errors_total_shared", "Total S3 operation errors (shared)",
+    "cv_s3_errors_total_shared",
+    "Total S3 operation errors (shared)",
 )
 WORKER_RESTARTS_TOTAL = _get_or_create_counter(
-    "cv_worker_restarts_total_shared", "Total model worker auto-restarts (shared)",
+    "cv_worker_restarts_total_shared",
+    "Total model worker auto-restarts (shared)",
 )
 GUARD_CIRCUIT_BREAKER_TRIPS = _get_or_create_counter(
     "cv_guard_circuit_breaker_trips_shared",
@@ -96,7 +99,8 @@ def _cb_record_failure(service: str) -> None:
     opened = False
     with _cb_lock:
         state = _circuit_breaker_state.setdefault(
-            service, {"failures": 0, "last_failure": 0, "open_until": 0},
+            service,
+            {"failures": 0, "last_failure": 0, "open_until": 0},
         )
         state["failures"] += 1
         state["last_failure"] = now
@@ -105,7 +109,9 @@ def _cb_record_failure(service: str) -> None:
             opened = True
             logging.getLogger("app.guard").warning(
                 "circuit_breaker:open service=%s failures=%d cooldown=%.0fs",
-                service, state["failures"], _CB_COOLDOWN_SECONDS,
+                service,
+                state["failures"],
+                _CB_COOLDOWN_SECONDS,
             )
     if opened:
         try:
@@ -120,7 +126,9 @@ def _cb_record_success(service: str) -> None:
     with _cb_lock:
         if service in _circuit_breaker_state:
             _circuit_breaker_state[service] = {
-                "failures": 0, "last_failure": 0, "open_until": 0,
+                "failures": 0,
+                "last_failure": 0,
+                "open_until": 0,
             }
     try:
         BREAKER_OPEN.labels(service=service).set(0)

@@ -1,16 +1,20 @@
 import os
 
+
 def _mock_services_on() -> bool:
     return os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes")
+
 
 def _get_client_and_model():
     if _mock_services_on():
         return None, None
     try:
         from services.ai_client_factory import get_ai_client_and_model
+
         return get_ai_client_and_model()
     except Exception:
         return None, None
+
 
 def generate_primary_name(job_text):
     client, model = _get_client_and_model()

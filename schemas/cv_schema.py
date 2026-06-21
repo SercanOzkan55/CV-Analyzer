@@ -4,6 +4,7 @@ This is the single source of truth after normalize.  No text parsing
 ever happens after data enters this schema.  The layout engine and
 every renderer consume this schema directly.
 """
+
 from __future__ import annotations
 
 from typing import Dict, List
@@ -72,8 +73,10 @@ class CVSchema(BaseModel):
     def __setattr__(self, name: str, value: object) -> None:
         if name != "_frozen" and self._frozen:
             import logging
+
             logging.getLogger("app.parser.schema").warning(
-                "frozen_schema_mutation: attempted to set %s after freeze", name,
+                "frozen_schema_mutation: attempted to set %s after freeze",
+                name,
             )
             return
         super().__setattr__(name, value)
@@ -98,4 +101,5 @@ class CVSchema(BaseModel):
     def to_cv_model(self):
         """Convert to legacy CVModel for backward compatibility."""
         from schemas.cv_model import CVModel
+
         return CVModel.from_mapping(self.model_dump())

@@ -1,4 +1,5 @@
 """Tests for services/layout_analyzer.py — structural CV text analysis."""
+
 import pytest
 from services.layout_analyzer import analyze_layout, LayoutInfo
 

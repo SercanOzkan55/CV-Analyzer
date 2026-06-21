@@ -85,14 +85,17 @@ def _get_limiter():
     """Get rate limiter instance from FastAPI app state"""
     try:
         main = _main()
-        if hasattr(main, 'app') and hasattr(main.app, 'state') and hasattr(main.app.state, 'limiter'):
+        if hasattr(main, "app") and hasattr(main.app, "state") and hasattr(main.app.state, "limiter"):
             return main.app.state.limiter
+
         # Fallback if limiter not available
         class NoopLimiter:
             def limit(self, limit_string):
                 def decorator(func):
                     return func
+
                 return decorator
+
         return NoopLimiter()
     except:
         # If anything fails, return noop limiter
@@ -100,7 +103,9 @@ def _get_limiter():
             def limit(self, limit_string):
                 def decorator(func):
                     return func
+
                 return decorator
+
         return NoopLimiter()
 
 
@@ -162,16 +167,15 @@ def _decision_insights(snapshot: dict | None) -> dict:
             pass
 
     matched = _as_clean_list(
-        data.get("matched_skills")
-        or data.get("detected_skills")
-        or data.get("top_skills")
-        or data.get("skills_found"),
+        data.get("matched_skills") or data.get("detected_skills") or data.get("top_skills") or data.get("skills_found"),
         limit=8,
     )
     missing = _as_clean_list(
         data.get("missing_skills")
         or data.get("missing_keywords")
-        or ((data.get("keyword_gap") or {}).get("missing_words") if isinstance(data.get("keyword_gap"), dict) else None),
+        or (
+            (data.get("keyword_gap") or {}).get("missing_words") if isinstance(data.get("keyword_gap"), dict) else None
+        ),
         limit=8,
     )
     risks = _as_clean_list(data.get("risk_flags") or data.get("warnings"), limit=5)
@@ -267,6 +271,7 @@ def _serialize_action(action: CandidateAction) -> dict:
         "analysis_snapshot": snapshot,
     }
 
+
 router = APIRouter(prefix="/api/v1/recruiter")
 _BATCH_TASK_OWNERS: dict[str, dict[str, int]] = {}
 
@@ -343,6 +348,7 @@ class CandidatePreview(BaseModel):
 
 class PaginationMeta(BaseModel):
     """Pagination metadata for list responses"""
+
     total: int
     limit: int
     offset: int
@@ -455,8 +461,7 @@ def recruiter_required(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
         # Require explicit invite instead
         raise HTTPException(
             status_code=403,
-            detail="Recruiter account is not assigned to an organization. "
-                   "Contact your admin to request an invite."
+            detail="Recruiter account is not assigned to an organization. Contact your admin to request an invite.",
         )
 
     return db_user
@@ -483,29 +488,26 @@ def recruiter_candidates(
 ) -> CandidatesResponse:
     """
     Retrieve candidates from recruiter's organization with pagination.
-    
+
     **Parameters:**
     - `limit`: Number of records to return (1-1000, default 20)
     - `offset`: Starting position for pagination (default 0)
-    
+
     **Returns:**
     - List of candidates with pagination metadata
-    
+
     **Raises:**
     - 400: Recruiter has no organization
     """
     org_id = recruiter.organization_id
     if not org_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Recruiter profile is incomplete (no organization assigned)"
-        )
+        raise HTTPException(status_code=400, detail="Recruiter profile is incomplete (no organization assigned)")
 
     users_subq = db.query(User.id).filter(User.organization_id == org_id).subquery()
-    
+
     # Get total count
     total_count = db.query(Analysis).filter(Analysis.user_id.in_(select(users_subq.c.id))).count()
-    
+
     # Get paginated records
     records = (
         db.query(Analysis)
@@ -532,12 +534,7 @@ def recruiter_candidates(
         for r in records
     ]
 
-    pagination = PaginationMeta(
-        total=total_count,
-        limit=limit,
-        offset=offset,
-        hasMore=(offset + limit) < total_count
-    )
+    pagination = PaginationMeta(total=total_count, limit=limit, offset=offset, hasMore=(offset + limit) < total_count)
 
     return CandidatesResponse(candidates=candidates, data=candidates, total=total_count, pagination=pagination)
 
@@ -637,15 +634,15 @@ def recruiter_search(
 ) -> SearchResponse:
     """
     Search candidates in recruiter's organization by CV text with pagination.
-    
+
     **Parameters:**
     - `q`: Search query (1-500 characters)
     - `limit`: Maximum results per page (1-1000, default 20)
     - `offset`: Starting position for pagination (default 0)
-    
+
     **Returns:**
     - List of candidates matching search query with pagination metadata
-    
+
     **Raises:**
     - 400: Missing query or recruiter has no organization
     - 429: Search rate limit exceeded
@@ -653,17 +650,11 @@ def recruiter_search(
     """
     org_id = recruiter.organization_id
     if not org_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Recruiter profile is incomplete (no organization assigned)"
-        )
+        raise HTTPException(status_code=400, detail="Recruiter profile is incomplete (no organization assigned)")
 
     query = (q or "").strip()
     if not query:
-        raise HTTPException(
-            status_code=400,
-            detail="Search query 'q' is required and cannot be empty"
-        )
+        raise HTTPException(status_code=400, detail="Search query 'q' is required and cannot be empty")
 
     limit = min(max(1, int(limit)), 100)
     results: list[dict] = []
@@ -671,8 +662,8 @@ def recruiter_search(
 
     try:
         use_postgres = False
-        if getattr(getattr(db, 'bind', None), 'dialect', None):
-            db_dialect = getattr(db.bind.dialect, 'name', '').lower()
+        if getattr(getattr(db, "bind", None), "dialect", None):
+            db_dialect = getattr(db.bind.dialect, "name", "").lower()
             use_postgres = db_dialect in ("postgresql", "postgres")
 
         if use_postgres:
@@ -711,7 +702,9 @@ def recruiter_search(
                     """
                 )
                 try:
-                    rows = db.execute(sql_query, {"q": query, "org_id": org_id, "offset": int(offset), "limit": int(limit)}).fetchall()
+                    rows = db.execute(
+                        sql_query, {"q": query, "org_id": org_id, "offset": int(offset), "limit": int(limit)}
+                    ).fetchall()
                 except Exception as db_err:
                     logger.error("postgres_search_failed q=%s org_id=%s error=%s", query, org_id, db_err)
                     use_postgres = False
@@ -738,7 +731,7 @@ def recruiter_search(
                     .filter(Candidate.cv_text.ilike(pattern))
                     .count()
                 )
-                
+
                 # Get paginated results
                 rows = (
                     db.query(Candidate)
@@ -750,10 +743,7 @@ def recruiter_search(
                 )
             except Exception as db_err:
                 logger.error("sqlite_search_failed q=%s org_id=%s error=%s", query, org_id, db_err)
-                raise HTTPException(
-                    status_code=500,
-                    detail="Search failed (database error)"
-                )
+                raise HTTPException(status_code=500, detail="Search failed (database error)")
             for r in rows:
                 cv_preview = None
                 cv_text = getattr(r, "cv_text", None)
@@ -771,17 +761,9 @@ def recruiter_search(
         raise
     except Exception as e:
         logger.error("search_unexpected_error q=%s org_id=%s error=%s", query, org_id, e)
-        raise HTTPException(
-            status_code=500,
-            detail="An unexpected error occurred during search"
-        )
+        raise HTTPException(status_code=500, detail="An unexpected error occurred during search")
 
-    pagination = PaginationMeta(
-        total=total_count,
-        limit=limit,
-        offset=offset,
-        hasMore=(offset + limit) < total_count
-    )
+    pagination = PaginationMeta(total=total_count, limit=limit, offset=offset, hasMore=(offset + limit) < total_count)
 
     return SearchResponse(results=results, total=total_count, query=query, pagination=pagination)
 
@@ -838,9 +820,7 @@ async def recruiter_batch_rank(
             if cleaned.upper() == cleaned and len(cleaned) > 20:
                 continue
             words = cleaned.split()
-            if 1 < len(words) <= 5 and all(
-                _re_rank.match(r"^[A-Za-zÀ-ÿĀ-žÇçĞğİıÖöŞşÜü\-'.]+$", w) for w in words
-            ):
+            if 1 < len(words) <= 5 and all(_re_rank.match(r"^[A-Za-zÀ-ÿĀ-žÇçĞğİıÖöŞşÜü\-'.]+$", w) for w in words):
                 name = cleaned
                 break
         return name, email
@@ -903,19 +883,20 @@ async def recruiter_batch_rank(
                     "builder_payload": builder_payload,
                 }
             )
-            
+
             # Record score to global benchmark anonymously
             try:
                 from services.benchmark_service import record_ats_score, infer_profession_with_db
+
                 profession = infer_profession_with_db(db, job_title=None, experience_titles=[jd_text])
                 record_ats_score(
                     db=db,
                     ats_score=float(result.get("ats_score") or result.get("final_score") or 0.0),
-                    profession=profession
+                    profession=profession,
                 )
             except Exception as b_err:
                 logger.warning("batch_rank: failed to record benchmark score: %s", b_err)
-                
+
         except Exception as e:
             # Skip this CV and continue with next ones
             skipped.append((upload.filename or f"candidate_{idx + 1}", str(e)[:100]))
@@ -948,19 +929,12 @@ async def recruiter_batch_rank(
         "ranking": ranked,
         "job_description_quality": (ranked[0].get("job_description_quality") if ranked else {}),
         "score_version": (ranked[0].get("score_version") if ranked else ""),
-        "warnings": sorted({
-            str(w).strip()
-            for row in ranked
-            for w in (row.get("warnings") or [])
-            if str(w).strip()
-        }),
+        "warnings": sorted({str(w).strip() for row in ranked for w in (row.get("warnings") or []) if str(w).strip()}),
         "skipped_count": len(skipped),
         "skipped_files": skipped[:10] if skipped else [],  # Show first 10 skipped for user feedback
         "analytics": {
             "avg_score": avg_score,
-            "top_skills": [
-                {"skill": skill, "count": count} for skill, count in top_skills
-            ],
+            "top_skills": [{"skill": skill, "count": count} for skill, count in top_skills],
             "candidate_distribution": distribution,
         },
     }
@@ -978,20 +952,20 @@ async def recruiter_batch_upload(
 ) -> dict:
     """
     Upload and process multiple CVs for a job position.
-    
+
     **Parameters:**
     - `job_id`: Target job ID (must be > 0)
     - `files`: List of PDF/text files (required)
-    
+
     **Validation:**
     - Each file must be a valid PDF or text file
     - Maximum 50 files per request
     - Total credits must be sufficient
-    
+
     **Returns:**
     - Task ID for batch processing job
     - Count of processed CVs
-    
+
     **Raises:**
     - 400: Invalid files, no text extracted, or insufficient credits
     - 404: Job not found
@@ -999,51 +973,38 @@ async def recruiter_batch_upload(
     """
     org_id = recruiter.organization_id
     if not org_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Recruiter profile is incomplete (no organization assigned)"
-        )
+        raise HTTPException(status_code=400, detail="Recruiter profile is incomplete (no organization assigned)")
 
     # Validate files list
     if not files or len(files) == 0:
-        raise HTTPException(
-            status_code=400,
-            detail="At least one file is required"
-        )
-    
+        raise HTTPException(status_code=400, detail="At least one file is required")
+
     if len(files) > _MAX_BATCH_FILES:
         raise HTTPException(
             status_code=400,
             detail="Maximum {} files per upload (you provided {})".format(
                 _MAX_BATCH_FILES,
                 len(files),
-            )
+            ),
         )
 
-    job = db.query(RecruiterJob).filter(
-        RecruiterJob.id == job_id,
-        RecruiterJob.organization_id == org_id
-    ).first()
+    job = db.query(RecruiterJob).filter(RecruiterJob.id == job_id, RecruiterJob.organization_id == org_id).first()
     if not job:
-        raise HTTPException(
-            status_code=404,
-            detail="Job not found or you do not have permission to access it"
-        )
+        raise HTTPException(status_code=404, detail="Job not found or you do not have permission to access it")
 
     cv_list = []
     valid_extensions = (".pdf", ".txt", ".docx")
-    
+
     for idx, file in enumerate(files):
         if not file.filename:
             logger.warning("batch_upload: file %d has no filename", idx)
             continue
-            
+
         # Validate file extension
         filename_lower = (file.filename or "").lower()
         if not any(filename_lower.endswith(ext) for ext in valid_extensions):
             raise HTTPException(
-                status_code=400,
-                detail="Unsupported file format: {}. Allowed: PDF, TXT, DOCX".format(file.filename)
+                status_code=400, detail="Unsupported file format: {}. Allowed: PDF, TXT, DOCX".format(file.filename)
             )
 
         try:
@@ -1052,17 +1013,11 @@ async def recruiter_batch_upload(
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
             logger.error("batch_upload: failed to read file %s error=%s", file.filename, e)
-            raise HTTPException(
-                status_code=400,
-                detail="Failed to read file: {}".format(file.filename)
-            )
+            raise HTTPException(status_code=400, detail="Failed to read file: {}".format(file.filename))
 
         # Validate file not empty
         if not contents or len(contents) == 0:
-            raise HTTPException(
-                status_code=400,
-                detail="File is empty: {}".format(file.filename)
-            )
+            raise HTTPException(status_code=400, detail="File is empty: {}".format(file.filename))
 
         # Validate file size before text extraction.
         if len(contents) > MAX_UPLOAD_BYTES:
@@ -1071,7 +1026,7 @@ async def recruiter_batch_upload(
                 detail="File too large (max {}): {}".format(
                     _format_bytes(MAX_UPLOAD_BYTES),
                     file.filename,
-                )
+                ),
             )
 
         # Extract text from file
@@ -1089,22 +1044,19 @@ async def recruiter_batch_upload(
             raise
         except Exception as e:
             logger.error("batch_upload: text extraction failed for %s error=%s", file.filename, e)
-            raise HTTPException(
-                status_code=400,
-                detail="Failed to extract text from file: {}".format(file.filename)
-            )
+            raise HTTPException(status_code=400, detail="Failed to extract text from file: {}".format(file.filename))
 
         # Validate extracted text
         if not text or len(text.strip()) < 50:
             raise HTTPException(
-                status_code=400,
-                detail="File contains insufficient text or is unreadable: {}".format(file.filename)
+                status_code=400, detail="File contains insufficient text or is unreadable: {}".format(file.filename)
             )
 
         cv_file_key = None
         if os.getenv("ENV") != "test":
             try:
                 from services.storage_service import upload_original_cv
+
                 cv_file_key = upload_original_cv(
                     contents,
                     str(recruiter.id),
@@ -1114,41 +1066,39 @@ async def recruiter_batch_upload(
             except Exception as e:
                 logger.info("batch_upload: original file storage skipped for %s error=%s", file.filename, e)
 
-        cv_list.append({
-            "filename": file.filename,
-            "cv_file_name": file.filename,
-            "cv_file_type": filename_lower.rsplit(".", 1)[-1] if "." in filename_lower else "txt",
-            "cv_file_key": cv_file_key,
-            "text": text[:100_000]  # Cap at 100k chars
-        })
+        cv_list.append(
+            {
+                "filename": file.filename,
+                "cv_file_name": file.filename,
+                "cv_file_type": filename_lower.rsplit(".", 1)[-1] if "." in filename_lower else "txt",
+                "cv_file_key": cv_file_key,
+                "text": text[:100_000],  # Cap at 100k chars
+            }
+        )
 
     if not cv_list:
-        raise HTTPException(
-            status_code=400,
-            detail="No valid CVs could be extracted from uploaded files"
-        )
+        raise HTTPException(status_code=400, detail="No valid CVs could be extracted from uploaded files")
 
     # Check organization credits
     org = db.query(Organization).filter(Organization.id == org_id).with_for_update().first()
     if not org:
-        raise HTTPException(
-            status_code=500,
-            detail="Organization not found (internal error)"
-        )
+        raise HTTPException(status_code=500, detail="Organization not found (internal error)")
 
     requested_cv_count = len(cv_list)
     available_credits = org.cv_credit_limit - org.monthly_usage
-    
+
     if available_credits < requested_cv_count:
         logger.warning(
             "batch_upload: insufficient_credits org_id=%s available=%d requested=%d",
-            org_id, available_credits, requested_cv_count
+            org_id,
+            available_credits,
+            requested_cv_count,
         )
         raise HTTPException(
             status_code=429,
             detail="Insufficient credits. You need {} CVs analyzed but only have {} credits remaining this month.".format(
                 requested_cv_count, available_credits
-            )
+            ),
         )
     _billable_usage(db, recruiter, "recruiter-batch-upload", response=response)
 
@@ -1165,13 +1115,12 @@ async def recruiter_batch_upload(
             org_id=org_id,
             recruiter_id=recruiter.id,
         )
-        
+
         logger.info(
-            "batch_upload: queued task_id=%s org_id=%s job_id=%d cv_count=%d",
-            task.id, org_id, job.id, len(cv_list)
+            "batch_upload: queued task_id=%s org_id=%s job_id=%d cv_count=%d", task.id, org_id, job.id, len(cv_list)
         )
         _record_batch_task_owner(str(task.id), int(org_id), int(recruiter.id))
-        
+
         return {
             "task_id": task.id,
             "count": len(cv_list),
@@ -1184,10 +1133,7 @@ async def recruiter_batch_upload(
         db.add(org)
         db.commit()
         logger.error("batch_upload: task_queueing_failed org_id=%s error=%s", org_id, e)
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to queue batch processing job"
-        )
+        raise HTTPException(status_code=500, detail="Failed to queue batch processing job")
 
 
 _IN_MEMORY_CACHE = {}
@@ -1272,23 +1218,20 @@ def recruiter_list_jobs(
 ) -> JobsResponse:
     """
     List all job positions for recruiter's organization with pagination.
-    
+
     **Parameters:**
     - `limit`: Number of records to return (1-1000, default 20)
     - `offset`: Starting position for pagination (default 0)
-    
+
     **Returns:**
     - List of job positions with pagination metadata
-    
+
     **Raises:**
     - 400: Recruiter has no organization
     """
     org_id = recruiter.organization_id
     if not org_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Recruiter profile is incomplete (no organization assigned)"
-        )
+        raise HTTPException(status_code=400, detail="Recruiter profile is incomplete (no organization assigned)")
 
     cache_key = _get_jobs_cache_key(org_id, limit, offset)
     cached_data = _get_cache(cache_key)
@@ -1311,7 +1254,7 @@ def recruiter_list_jobs(
 
     # Get total count
     total_count = db.query(RecruiterJob).filter(RecruiterJob.organization_id == org_id).count()
-    
+
     # Get paginated jobs
     jobs = (
         db.query(RecruiterJob)
@@ -1321,7 +1264,7 @@ def recruiter_list_jobs(
         .limit(limit)
         .all()
     )
-    
+
     job_list = [
         JobResponse(
             id=j.id,
@@ -1332,12 +1275,7 @@ def recruiter_list_jobs(
         for j in jobs
     ]
 
-    pagination = PaginationMeta(
-        total=total_count,
-        limit=limit,
-        offset=offset,
-        hasMore=(offset + limit) < total_count
-    )
+    pagination = PaginationMeta(total=total_count, limit=limit, offset=offset, hasMore=(offset + limit) < total_count)
 
     response_data = JobsResponse(jobs=job_list, total=total_count, pagination=pagination)
     _set_cache(cache_key, response_data.dict(), ttl=300)
@@ -1394,12 +1332,9 @@ def recruiter_dashboard_rank(
         "ranking": ranked,
         "job_description_quality": (analyses[0].get("job_description_quality") if analyses else {}),
         "score_version": (analyses[0].get("score_version") if analyses else ""),
-        "warnings": sorted({
-            str(w).strip()
-            for analysis in analyses
-            for w in (analysis.get("warnings") or [])
-            if str(w).strip()
-        }),
+        "warnings": sorted(
+            {str(w).strip() for analysis in analyses for w in (analysis.get("warnings") or []) if str(w).strip()}
+        ),
     }
 
 
@@ -1432,15 +1367,13 @@ def recruiter_dashboard_action(body: RecruiterActionRequest, db=Depends(get_db),
 
     stage = str(body.action or "").strip().lower()
     if stage not in _ALLOWED_CANDIDATE_STAGES:
-        raise HTTPException(status_code=400, detail=f"action must be one of {', '.join(sorted(_ALLOWED_CANDIDATE_STAGES))}")
+        raise HTTPException(
+            status_code=400, detail=f"action must be one of {', '.join(sorted(_ALLOWED_CANDIDATE_STAGES))}"
+        )
 
     final_score = body.final_score
     ats_score = body.ats_score
-    job = (
-        db.query(RecruiterJob)
-        .filter(RecruiterJob.id == body.job_id, RecruiterJob.organization_id == org_id)
-        .first()
-    )
+    job = db.query(RecruiterJob).filter(RecruiterJob.id == body.job_id, RecruiterJob.organization_id == org_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -1513,7 +1446,12 @@ def recruiter_dashboard_action(body: RecruiterActionRequest, db=Depends(get_db),
                     db.refresh(record)
                     email_status = {"requested": True, "sent": True, "reason": "sent", "subject": subject}
                 else:
-                    email_status = {"requested": True, "sent": False, "reason": "email_provider_failed", "subject": subject}
+                    email_status = {
+                        "requested": True,
+                        "sent": False,
+                        "reason": "email_provider_failed",
+                        "subject": subject,
+                    }
             except Exception as exc:
                 logger.warning("candidate_decision_email_failed action_id=%s error=%s", record.id, exc)
                 email_status = {"requested": True, "sent": False, "reason": "send_error", "subject": subject}
@@ -1547,9 +1485,7 @@ def recruiter_dashboard_actions(job_id: int, db=Depends(get_db), recruiter=Depen
         raise HTTPException(status_code=400, detail="Recruiter has no organization")
 
     actions = _rc_get_actions(db, job_id, org_id)
-    return {
-        "actions": [_serialize_action(a) for a in actions]
-    }
+    return {"actions": [_serialize_action(a) for a in actions]}
 
 
 @router.put("/dashboard/actions/{action_id}/stage")
@@ -1565,7 +1501,9 @@ def recruiter_update_action_stage(
 
     stage = str(body.stage or "").strip().lower()
     if stage not in _ALLOWED_CANDIDATE_STAGES:
-        raise HTTPException(status_code=400, detail=f"stage must be one of {', '.join(sorted(_ALLOWED_CANDIDATE_STAGES))}")
+        raise HTTPException(
+            status_code=400, detail=f"stage must be one of {', '.join(sorted(_ALLOWED_CANDIDATE_STAGES))}"
+        )
 
     record = (
         db.query(CandidateAction)
@@ -1635,22 +1573,26 @@ def recruiter_pipeline(job_id: int, db=Depends(get_db), recruiter=Depends(recrui
         raise HTTPException(status_code=400, detail="Recruiter has no organization")
 
     actions = _rc_get_actions(db, job_id, org_id)
-    grouped = {stage: [] for stage in ("pending", "shortlist", "interview", "offer", "accepted", "rejected", "withdrawn")}
+    grouped = {
+        stage: [] for stage in ("pending", "shortlist", "interview", "offer", "accepted", "rejected", "withdrawn")
+    }
     for action in actions:
         stage = str(action.action or "pending").lower()
         grouped.setdefault(stage, []).append(_serialize_action(action))
 
     return {
         "job_id": job_id,
-        "stages": [
-            {"stage": stage, "count": len(items), "actions": items}
-            for stage, items in grouped.items()
-        ],
+        "stages": [{"stage": stage, "count": len(items), "actions": items} for stage, items in grouped.items()],
     }
 
 
 @router.get("/report/{job_id}")
-def recruiter_batch_report(job_id: int, format: str = Query("xlsx", pattern="^(xlsx|csv)$"), db=Depends(get_db), recruiter=Depends(recruiter_required)):
+def recruiter_batch_report(
+    job_id: int,
+    format: str = Query("xlsx", pattern="^(xlsx|csv)$"),
+    db=Depends(get_db),
+    recruiter=Depends(recruiter_required),
+):
     org_id = recruiter.organization_id
     if not org_id:
         raise HTTPException(status_code=400, detail="Recruiter has no organization")
@@ -1689,7 +1631,9 @@ def recruiter_batch_report(job_id: int, format: str = Query("xlsx", pattern="^(x
 
 
 @router.post("/templates")
-def recruiter_create_template(body: RecruiterEmailTemplateCreate, db=Depends(get_db), recruiter=Depends(recruiter_required)):
+def recruiter_create_template(
+    body: RecruiterEmailTemplateCreate, db=Depends(get_db), recruiter=Depends(recruiter_required)
+):
     org_id = recruiter.organization_id
     if not org_id:
         raise HTTPException(status_code=400, detail="Recruiter has no organization")
@@ -1753,7 +1697,9 @@ def recruiter_delete_template(template_id: int, db=Depends(get_db), recruiter=De
 
 
 @router.post("/templates/preview")
-def recruiter_preview_template(body: RecruiterTemplatePreviewRequest, db=Depends(get_db), recruiter=Depends(recruiter_required)):
+def recruiter_preview_template(
+    body: RecruiterTemplatePreviewRequest, db=Depends(get_db), recruiter=Depends(recruiter_required)
+):
     org_id = recruiter.organization_id
     if not org_id:
         raise HTTPException(status_code=400, detail="Recruiter has no organization")
@@ -1776,20 +1722,20 @@ def recruiter_send_email(
 ) -> dict:
     """
     Send email to candidate using email template.
-    
+
     **Parameters:**
     - `action_id` or `candidate_email`: Email recipient (one is required)
     - `template_id`: Email template to use
     - `sender_email`: Optional sender email (defaults to recruiter email)
-    
+
     **Validation:**
     - Template must exist and belong to recruiter's organization
     - Candidate email must be valid
     - Action record must exist if action_id provided
-    
+
     **Returns:**
     - Confirmation of sent email with subject and recipient
-    
+
     **Raises:**
     - 400: Invalid email or missing required fields
     - 404: Template or action not found
@@ -1797,10 +1743,7 @@ def recruiter_send_email(
     """
     org_id = recruiter.organization_id
     if not org_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Recruiter profile is incomplete (no organization assigned)"
-        )
+        raise HTTPException(status_code=400, detail="Recruiter profile is incomplete (no organization assigned)")
 
     candidate_name = body.candidate_name or ""
     candidate_email = body.candidate_email or ""
@@ -1808,15 +1751,13 @@ def recruiter_send_email(
 
     # Resolve candidate email from action record if provided
     if body.action_id:
-        action_record = db.query(CandidateAction).filter(
-            CandidateAction.id == body.action_id,
-            CandidateAction.organization_id == org_id
-        ).first()
+        action_record = (
+            db.query(CandidateAction)
+            .filter(CandidateAction.id == body.action_id, CandidateAction.organization_id == org_id)
+            .first()
+        )
         if not action_record:
-            raise HTTPException(
-                status_code=404,
-                detail="Candidate action record not found"
-            )
+            raise HTTPException(status_code=404, detail="Candidate action record not found")
         candidate_name = action_record.candidate_name or candidate_name
         candidate_email = action_record.candidate_email or candidate_email
 
@@ -1824,7 +1765,7 @@ def recruiter_send_email(
     if not candidate_email or "@" not in candidate_email or "." not in candidate_email:
         raise HTTPException(
             status_code=400,
-            detail="Valid candidate email is required (either provide candidate_email or action_id with valid email)"
+            detail="Valid candidate email is required (either provide candidate_email or action_id with valid email)",
         )
 
     err = _rc_validate_email(candidate_name, candidate_email)
@@ -1834,17 +1775,14 @@ def recruiter_send_email(
     # Load and validate template
     tpl = _rc_get_tpl(db, body.template_id, org_id)
     if not tpl:
-        raise HTTPException(
-            status_code=404,
-            detail="Email template not found or you do not have permission to use it"
-        )
+        raise HTTPException(status_code=404, detail="Email template not found or you do not have permission to use it")
 
     # Build template variables
     variables = {
         "name": candidate_name.strip() or "Candidate",
         "email": candidate_email.strip(),
     }
-    
+
     if action_record and action_record.analysis_snapshot:
         try:
             snapshot = json.loads(action_record.analysis_snapshot)
@@ -1860,21 +1798,17 @@ def recruiter_send_email(
         rendered = _rc_render(tpl.body, tpl.subject, variables)
     except Exception as e:
         logger.error("email_send: template_rendering_failed template_id=%s error=%s", body.template_id, e)
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to render email template"
-        )
+        raise HTTPException(status_code=500, detail="Failed to render email template")
 
     # Resolve sender email
     sender = (body.sender_email or "").strip()
     if not sender or "@" not in sender:
         sender = recruiter.email or ""
-    
+
     if not sender:
         logger.warning("email_send: no_sender_email recruiter_id=%s", recruiter.id)
         raise HTTPException(
-            status_code=400,
-            detail="Sender email is required (set your email in profile or provide sender_email)"
+            status_code=400, detail="Sender email is required (set your email in profile or provide sender_email)"
         )
 
     # Send email
@@ -1887,10 +1821,7 @@ def recruiter_send_email(
         )
     except Exception as e:
         logger.error("email_send: send_failed to=%s sender=%s error=%s", candidate_email, sender, e)
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to send email (check mail server configuration)"
-        )
+        raise HTTPException(status_code=500, detail="Failed to send email (check mail server configuration)")
 
     if _send_ok:
         if action_record:
@@ -1898,7 +1829,7 @@ def recruiter_send_email(
                 _rc_mark_sent(db, action_record.id)
             except Exception as e:
                 logger.warning("email_send: failed_to_mark_sent action_id=%s error=%s", action_record.id, e)
-        
+
         logger.info("email_send: success to=%s template_id=%s", candidate_email, body.template_id)
         return {
             "sent": True,
@@ -1906,11 +1837,10 @@ def recruiter_send_email(
             "subject": rendered["subject"],
             "timestamp": str(datetime.utcnow()),
         }
-    
+
     logger.warning("email_send: provider_returned_false to=%s", candidate_email)
     raise HTTPException(
-        status_code=500,
-        detail="Email provider returned failure (check email configuration and try again)"
+        status_code=500, detail="Email provider returned failure (check email configuration and try again)"
     )
 
 
@@ -1921,33 +1851,24 @@ def recruiter_list_reminders(
 ) -> dict:
     """
     List all reminders for recruiter's organization.
-    
+
     **Returns:**
     - List of reminders sorted by event date (ascending)
-    
+
     **Raises:**
     - 400: Recruiter has no organization
     """
     org_id = recruiter.organization_id
     if not org_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Recruiter profile is incomplete (no organization assigned)"
-        )
+        raise HTTPException(status_code=400, detail="Recruiter profile is incomplete (no organization assigned)")
 
     try:
         reminders = (
-            db.query(Reminder)
-            .filter(Reminder.organization_id == org_id)
-            .order_by(Reminder.event_date.asc())
-            .all()
+            db.query(Reminder).filter(Reminder.organization_id == org_id).order_by(Reminder.event_date.asc()).all()
         )
     except Exception as e:
         logger.error("reminders_list_failed org_id=%s error=%s", org_id, e)
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to retrieve reminders"
-        )
+        raise HTTPException(status_code=500, detail="Failed to retrieve reminders")
 
     return {
         "reminders": [
@@ -1978,7 +1899,7 @@ def recruiter_create_reminder(
 ) -> dict:
     """
     Create a new reminder for recruiter's organization.
-    
+
     **Parameters:**
     - `title`: Reminder title (required)
     - `event_date`: Event date (ISO format, required)
@@ -1986,39 +1907,30 @@ def recruiter_create_reminder(
     - `reminder_type`: Type of reminder (optional)
     - `description`: Additional description (optional)
     - `is_active`: Whether reminder is active (default: true)
-    
+
     **Validation:**
     - Event date must be in the future
     - Target email must be valid
     - Title cannot be empty
-    
+
     **Returns:**
     - Created reminder with ID
-    
+
     **Raises:**
     - 400: Invalid input data
     - 500: Database error
     """
     org_id = recruiter.organization_id
     if not org_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Recruiter profile is incomplete (no organization assigned)"
-        )
+        raise HTTPException(status_code=400, detail="Recruiter profile is incomplete (no organization assigned)")
 
     # Validate title
     title = (body.title or "").strip()
     if not title:
-        raise HTTPException(
-            status_code=400,
-            detail="Title is required"
-        )
-    
+        raise HTTPException(status_code=400, detail="Title is required")
+
     if len(title) > 500:
-        raise HTTPException(
-            status_code=400,
-            detail="Title too long (max 500 characters)"
-        )
+        raise HTTPException(status_code=400, detail="Title too long (max 500 characters)")
 
     # Validate event date
     try:
@@ -2028,16 +1940,12 @@ def recruiter_create_reminder(
             event_date = body.event_date
     except Exception as e:
         raise HTTPException(
-            status_code=400,
-            detail=f"Invalid event_date format: {e}. Use ISO format (e.g., 2026-05-15T10:00:00)"
+            status_code=400, detail=f"Invalid event_date format: {e}. Use ISO format (e.g., 2026-05-15T10:00:00)"
         )
-    
+
     now = datetime.utcnow()
     if event_date <= now:
-        raise HTTPException(
-            status_code=400,
-            detail="Event date must be in the future"
-        )
+        raise HTTPException(status_code=400, detail="Event date must be in the future")
 
     # Validate target email
     target_email = body.target_email or recruiter.email or ""
@@ -2058,9 +1966,9 @@ def recruiter_create_reminder(
         db.add(reminder)
         db.commit()
         db.refresh(reminder)
-        
+
         logger.info("reminder_created reminder_id=%s org_id=%s event_date=%s", reminder.id, org_id, event_date)
-        
+
         return {
             "id": reminder.id,
             "title": reminder.title,
@@ -2072,25 +1980,20 @@ def recruiter_create_reminder(
     except Exception as e:
         db.rollback()
         logger.error("reminder_create_failed org_id=%s error=%s", org_id, e)
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to create reminder"
-        )
+        raise HTTPException(status_code=500, detail="Failed to create reminder")
     db.refresh(reminder)
     return {"id": reminder.id, "created_at": str(reminder.created_at)}
 
 
 @router.put("/reminders/{reminder_id}")
-def recruiter_update_reminder(reminder_id: int, body: RecruiterReminderUpdateRequest, db=Depends(get_db), recruiter=Depends(recruiter_required)):
+def recruiter_update_reminder(
+    reminder_id: int, body: RecruiterReminderUpdateRequest, db=Depends(get_db), recruiter=Depends(recruiter_required)
+):
     org_id = recruiter.organization_id
     if not org_id:
         raise HTTPException(status_code=400, detail="Recruiter has no organization")
 
-    reminder = (
-        db.query(Reminder)
-        .filter(Reminder.id == reminder_id, Reminder.organization_id == org_id)
-        .first()
-    )
+    reminder = db.query(Reminder).filter(Reminder.id == reminder_id, Reminder.organization_id == org_id).first()
     if not reminder:
         raise HTTPException(status_code=404, detail="Reminder not found")
 
@@ -2119,11 +2022,7 @@ def recruiter_delete_reminder(reminder_id: int, db=Depends(get_db), recruiter=De
     if not org_id:
         raise HTTPException(status_code=400, detail="Recruiter has no organization")
 
-    reminder = (
-        db.query(Reminder)
-        .filter(Reminder.id == reminder_id, Reminder.organization_id == org_id)
-        .first()
-    )
+    reminder = db.query(Reminder).filter(Reminder.id == reminder_id, Reminder.organization_id == org_id).first()
     if not reminder:
         raise HTTPException(status_code=404, detail="Reminder not found")
 
@@ -2174,7 +2073,9 @@ async def recruiter_scan_cv(
             )
         contents = await img_file.read()
         if len(contents) > _main()._SCAN_MAX_FILE_SIZE:
-            raise HTTPException(status_code=400, detail=f"Image too large (max {_main()._SCAN_MAX_FILE_SIZE // 1_000_000}MB)")
+            raise HTTPException(
+                status_code=400, detail=f"Image too large (max {_main()._SCAN_MAX_FILE_SIZE // 1_000_000}MB)"
+            )
         if len(contents) < 100:
             raise HTTPException(status_code=400, detail="Image file appears empty or corrupt")
         all_image_bytes.append(contents)
@@ -2207,6 +2108,7 @@ async def recruiter_scan_cv(
 
     # ── CV detection ──
     from security.validators import is_probably_cv
+
     if not is_probably_cv(combined_text):
         raise HTTPException(
             status_code=400,
@@ -2231,6 +2133,7 @@ async def recruiter_scan_cv(
 
     # ── Run analysis pipeline (same as analyze-pdf) ──
     from renderers.blocks import fix_decomposed_diacritics
+
     combined_text = fix_decomposed_diacritics(combined_text)
 
     autofix = _main().auto_fix_cv_text(
@@ -2241,11 +2144,16 @@ async def recruiter_scan_cv(
         mode="light_fix",
     )
     normalized_text = autofix.get("optimized_cv_text") or combined_text
-    payload = autofix.get("builder_payload") or _main().structured_text_to_builder_payload(
-        normalized_text,
-        job_description=job_description,
-        lang=lang,
-    ).model_dump()
+    payload = (
+        autofix.get("builder_payload")
+        or _main()
+        .structured_text_to_builder_payload(
+            normalized_text,
+            job_description=job_description,
+            lang=lang,
+        )
+        .model_dump()
+    )
 
     result = _pipeline(normalized_text, job_description, lang)
     result["builder_payload"] = payload
@@ -2260,6 +2168,7 @@ async def recruiter_scan_cv(
             record_ats_score as _bm_record,
             get_benchmark_comparison as _bm_compare,
         )
+
         _bm_prof = _bm_infer(
             job_title=_main()._extract_job_title_from_jd(job_description),
             experience_titles=[],
@@ -2268,7 +2177,9 @@ async def recruiter_scan_cv(
         )
         _bm_record(db, float(result.get("ats_score") or 0), _bm_prof)
         result["global_benchmark"] = _bm_compare(
-            db, float(result.get("ats_score") or 0), _bm_prof,
+            db,
+            float(result.get("ats_score") or 0),
+            _bm_prof,
         )
     except Exception:
         result["global_benchmark"] = None
@@ -2284,6 +2195,7 @@ async def recruiter_scan_cv(
             all_image_bytes,
         )
         import base64
+
         result["pdf_base64"] = base64.b64encode(pdf_bytes).decode("ascii")
         result["pdf_size"] = len(pdf_bytes)
     except Exception as e:

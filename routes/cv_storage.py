@@ -47,10 +47,12 @@ def _consume_billable_usage(*args, **kwargs):
 def audit_log(*args, **kwargs):
     return _legacy("audit_log")(*args, **kwargs)
 
+
 router = APIRouter(tags=["cv-storage"])
 
 from routes.user_data import _storage_key_fingerprint  # noqa: E402
 from routes.ai_tools import JobMatchScoreRequest  # noqa: E402
+
 
 def _text_to_cvmodel(cv_text: str, lang: str = "en"):
     """Parse raw CV text into a CVModel via the autofix pipeline."""
@@ -129,10 +131,7 @@ def score_breakdown_endpoint(
         "feedback": {
             "score_before": feedback.score_before,
             "potential_score": feedback.potential_score,
-            "items": [
-                {"category": f.category, "priority": f.priority, "message": f.message}
-                for f in feedback.items
-            ],
+            "items": [{"category": f.category, "priority": f.priority, "message": f.message} for f in feedback.items],
         },
     }
 
@@ -200,7 +199,7 @@ async def upload_cv(
 
             existing = db.query(CVVersion).filter(CVVersion.user_id == db_user.id).all()
             for row in existing:
-                txt = (row.cv_text or row.optimized_cv_text or "")
+                txt = row.cv_text or row.optimized_cv_text or ""
                 if not txt:
                     continue
                 existing_fp = hashlib.sha256(txt.encode("utf-8")).hexdigest()
@@ -321,11 +320,12 @@ def download_cv(
         if not exists(key):
             raise HTTPException(status_code=404, detail="File not found")
         url_or_path = get_download_url(key, supabase_id)
-        
+
         from services.storage_service import STORAGE_BACKEND
+
         if STORAGE_BACKEND == "local":
             return FileResponse(url_or_path, filename=os.path.basename(key))
-            
+
         audit_log("cv_download", user_id=supabase_id, key_hash=_storage_key_fingerprint(key))
         return {"url": url_or_path}
     except ValueError:

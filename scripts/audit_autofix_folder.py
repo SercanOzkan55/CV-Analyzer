@@ -39,18 +39,11 @@ def iter_cv_files(folder: Path) -> Iterable[Path]:
 
 def section_counts(text: str) -> dict[str, int]:
     _, sections, _ = _parse_sections(text or "")
-    return {
-        key: len(_non_empty_section_lines(sections, key))
-        for key in sorted(PROTECTED_SECTION_KEYS)
-    }
+    return {key: len(_non_empty_section_lines(sections, key)) for key in sorted(PROTECTED_SECTION_KEYS)}
 
 
 def shrunk_sections(before: dict[str, int], after: dict[str, int]) -> list[str]:
-    return [
-        key
-        for key, before_count in before.items()
-        if before_count > 0 and after.get(key, 0) < before_count
-    ]
+    return [key for key, before_count in before.items() if before_count > 0 and after.get(key, 0) < before_count]
 
 
 def write_text(path: Path, text: str) -> None:
@@ -59,9 +52,7 @@ def write_text(path: Path, text: str) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Audit auto-fix output quality for a folder of CV files."
-    )
+    parser = argparse.ArgumentParser(description="Audit auto-fix output quality for a folder of CV files.")
     parser.add_argument("folder", type=Path, help="Folder containing PDF/DOCX/TXT CVs")
     parser.add_argument(
         "--job-description",
@@ -123,11 +114,7 @@ def main() -> int:
                 job_description=args.job_description,
                 use_ai=args.use_ai,
             )
-            optimized = str(
-                result.get("optimized_cv_text")
-                or result.get("optimized_text")
-                or ""
-            )
+            optimized = str(result.get("optimized_cv_text") or result.get("optimized_text") or "")
             after_counts = section_counts(optimized)
             shrunk = shrunk_sections(before_counts, after_counts)
 

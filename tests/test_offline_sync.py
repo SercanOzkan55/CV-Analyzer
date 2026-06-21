@@ -36,7 +36,7 @@ def test_offline_sync_success(client, db_session, recruiter_user, test_job):
                 "candidate_name": "John Doe",
                 "candidate_email": "john.doe@example.com",
                 "worker_version": "1.0.0",
-                "engine_version": "1.0.0"
+                "engine_version": "1.0.0",
             },
             {
                 "file_name": "resume2.pdf",
@@ -55,9 +55,9 @@ def test_offline_sync_success(client, db_session, recruiter_user, test_job):
                 "candidate_name": "Jane Smith",
                 "candidate_email": "jane.smith@example.com",
                 "worker_version": "1.0.0",
-                "engine_version": "1.0.0"
-            }
-        ]
+                "engine_version": "1.0.0",
+            },
+        ],
     }
 
     response = client.post("/api/worker/offline-sync", json=payload, headers=headers)
@@ -68,14 +68,21 @@ def test_offline_sync_success(client, db_session, recruiter_user, test_job):
 
     # 3. Verify DB records
     # Verify candidates
-    candidates = db_session.query(Candidate).filter(Candidate.email.in_(["john.doe@example.com", "jane.smith@example.com"])).all()
+    candidates = (
+        db_session.query(Candidate)
+        .filter(Candidate.email.in_(["john.doe@example.com", "jane.smith@example.com"]))
+        .all()
+    )
     assert len(candidates) == 2
     assert {c.name for c in candidates} == {"John Doe", "Jane Smith"}
 
     # Verify candidate actions
     actions = db_session.query(CandidateAction).filter_by(job_id=test_job.id).all()
     assert len(actions) == 2
-    assert {a.action for a in actions} == {"shortlist", "rejected"}  # recommended_accept -> shortlist, recommended_reject -> rejected
+    assert {a.action for a in actions} == {
+        "shortlist",
+        "rejected",
+    }  # recommended_accept -> shortlist, recommended_reject -> rejected
 
     # Verify worker analysis results
     results = db_session.query(WorkerAnalysisResult).filter_by(job_id=test_job.id).all()
@@ -119,8 +126,8 @@ def test_offline_sync_quota_limit_exceeded(client, db_session, recruiter_user, t
                 "explanation": "test",
                 "candidate_name": "Cand 2",
                 "candidate_email": "cand2@example.com",
-            }
-        ]
+            },
+        ],
     }
 
     # Should return 402 quota exceeded

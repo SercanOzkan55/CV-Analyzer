@@ -29,11 +29,7 @@ def main():
 
     db = SessionLocal()
     try:
-        org = (
-            db.query(Organization)
-            .filter(Organization.domain == args.org_domain)
-            .first()
-        )
+        org = db.query(Organization).filter(Organization.domain == args.org_domain).first()
         if not org:
             org = Organization(name=args.org_name, domain=args.org_domain)
             db.add(org)

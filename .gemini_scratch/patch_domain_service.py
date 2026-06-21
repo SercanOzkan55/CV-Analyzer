@@ -2,7 +2,7 @@ import os
 
 file_path = r"c:\Users\ASUS\Desktop\cv-analyzer\services\domain_service.py"
 
-with open(file_path, 'r', encoding='utf-8') as f:
+with open(file_path, "r", encoding="utf-8") as f:
     content = f.read()
 
 target_1 = """_OPENAI_KEY = os.getenv("OPENAI_API_KEY")
@@ -67,5 +67,5 @@ if target_3_norm in modified:
 else:
     print("FAILED: target_3 not found")
 
-with open(file_path, 'w', encoding='utf-8', newline='') as f:
+with open(file_path, "w", encoding="utf-8", newline="") as f:
     f.write(modified)

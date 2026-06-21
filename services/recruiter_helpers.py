@@ -52,22 +52,17 @@ def _validate_pdf_upload(contents: bytes, content_type: str | None) -> None:
 
     obj_count = contents.count(b" obj")
     if obj_count > _MAX_PDF_OBJECTS:
-        logging.getLogger("app.security").warning(
-            "pdf_rejected: too many objects %d > %d", obj_count, _MAX_PDF_OBJECTS
-        )
+        logging.getLogger("app.security").warning("pdf_rejected: too many objects %d > %d", obj_count, _MAX_PDF_OBJECTS)
         raise HTTPException(status_code=400, detail="PDF too complex (too many objects)")
 
     page_count = contents.count(b"/Type /Page") - contents.count(b"/Type /Pages")
     if page_count > _MAX_PDF_PAGES:
-        logging.getLogger("app.security").warning(
-            "pdf_rejected: too many pages %d > %d", page_count, _MAX_PDF_PAGES
-        )
-        raise HTTPException(
-            status_code=400, detail=f"PDF too large (max {_MAX_PDF_PAGES} pages)"
-        )
+        logging.getLogger("app.security").warning("pdf_rejected: too many pages %d > %d", page_count, _MAX_PDF_PAGES)
+        raise HTTPException(status_code=400, detail=f"PDF too large (max {_MAX_PDF_PAGES} pages)")
 
     try:
         from services.pdf_runtime import _scan_upload_for_viruses
+
         _scan_upload_for_viruses(contents)
     except HTTPException:
         raise
@@ -106,9 +101,7 @@ def _extract_pdf_text(contents: bytes) -> tuple[str, bool]:
         with pdfplumber.open(io.BytesIO(contents)) as pdf:
             # ── Security: reject PDFs with too many pages ──
             if len(pdf.pages) > _MAX_PDF_PAGES:
-                logging.getLogger("app.security").warning(
-                    "pdf_pages_limit: %d > %d", len(pdf.pages), _MAX_PDF_PAGES
-                )
+                logging.getLogger("app.security").warning("pdf_pages_limit: %d > %d", len(pdf.pages), _MAX_PDF_PAGES)
                 raise HTTPException(
                     status_code=400,
                     detail=f"PDF too large (max {_MAX_PDF_PAGES} pages)",
@@ -279,9 +272,7 @@ def _extract_pdf_text(contents: bytes) -> tuple[str, bool]:
     # Security: cap extracted text length
     truncated = len(raw) > _MAX_PDF_EXTRACTED_CHARS
     if truncated:
-        logging.getLogger("app.security").warning(
-            "pdf_text_truncated: %d > %d", len(raw), _MAX_PDF_EXTRACTED_CHARS
-        )
+        logging.getLogger("app.security").warning("pdf_text_truncated: %d > %d", len(raw), _MAX_PDF_EXTRACTED_CHARS)
         raw = raw[:_MAX_PDF_EXTRACTED_CHARS]
     return fix_decomposed_diacritics(raw), truncated
 
@@ -345,9 +336,7 @@ def _do_send_email(
             )
             if recruiter_email:
                 mail.reply_to = Email(recruiter_email)
-            response = sendgrid.SendGridAPIClient(api_key=sendgrid_key).client.mail.send.post(
-                request_body=mail.get()
-            )
+            response = sendgrid.SendGridAPIClient(api_key=sendgrid_key).client.mail.send.post(request_body=mail.get())
             _logger.info(
                 "sendgrid_sent to=%s reply_to=%s status=%s",
                 redact_for_log(to_email, key="to_email"),
@@ -439,15 +428,17 @@ def _render_reminder_body(reminder: Reminder, days_left: int) -> str:
     ]
     if reminder.description:
         body_lines.extend(["", "Notlar:", reminder.description.strip()])
-    body_lines.extend([
-        "",
-        "Kısa kontrol listesi:",
-        "- CV ve iş ilanını tekrar gözden geçir.",
-        "- Görüşme linkini, adresi veya son teklif tarihini kontrol et.",
-        "- Sorularını ve takip notlarını hazırla.",
-        "",
-        "Bu hatırlatma otomatik olarak gönderildi.",
-    ])
+    body_lines.extend(
+        [
+            "",
+            "Kısa kontrol listesi:",
+            "- CV ve iş ilanını tekrar gözden geçir.",
+            "- Görüşme linkini, adresi veya son teklif tarihini kontrol et.",
+            "- Sorularını ve takip notlarını hazırla.",
+            "",
+            "Bu hatırlatma otomatik olarak gönderildi.",
+        ]
+    )
     return "\n".join(body_lines)
 
 
@@ -489,11 +480,7 @@ def _process_due_reminders(db):
                 db.add(reminder)
                 db.commit()
             continue
-        if (
-            reminder.notified_3d_at is None
-            and reminder.notified_1d_at is None
-            and days_left == 3
-        ):
+        if reminder.notified_3d_at is None and reminder.notified_1d_at is None and days_left == 3:
             if _send_reminder_email(reminder, 3, recipient):
                 reminder.notified_3d_at = now
                 db.add(reminder)

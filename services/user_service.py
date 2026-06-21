@@ -2,6 +2,7 @@
 
 Extracted from ``main.py`` to reduce monolith size.
 """
+
 from __future__ import annotations
 
 import logging
@@ -145,11 +146,7 @@ def _adopt_pending_owner_member(db, supabase_id: str, email: str) -> User | None
 
 def _get_owned_analysis_or_404(db, analysis_id: int, db_user: User) -> Analysis:
     """Return an analysis only when it belongs to the authenticated user."""
-    analysis = (
-        db.query(Analysis)
-        .filter(Analysis.id == analysis_id, Analysis.user_id == db_user.id)
-        .first()
-    )
+    analysis = db.query(Analysis).filter(Analysis.id == analysis_id, Analysis.user_id == db_user.id).first()
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
     return analysis
@@ -170,12 +167,8 @@ def _resolve_initial_user_plan(email: str | None) -> str:
     email_value = (email or "").strip().lower()
     domain_value = email_value.split("@", 1)[1] if "@" in email_value else ""
 
-    allowed_emails = {
-        x.strip().lower() for x in allowed_emails_raw.split(",") if x.strip()
-    }
-    allowed_domains = {
-        x.strip().lower() for x in allowed_domains_raw.split(",") if x.strip()
-    }
+    allowed_emails = {x.strip().lower() for x in allowed_emails_raw.split(",") if x.strip()}
+    allowed_domains = {x.strip().lower() for x in allowed_domains_raw.split(",") if x.strip()}
 
     if allowed_emails or allowed_domains:
         if email_value in allowed_emails or domain_value in allowed_domains:
@@ -248,8 +241,10 @@ def _build_analysis_benchmark(db, analysis_record: Analysis) -> dict:
 
     if len(peer_scores) < BENCHMARK_MIN_PEERS:
         return {
-            "available": False, "scope": scope,
-            "peer_count": len(peer_scores), "min_peers": BENCHMARK_MIN_PEERS,
+            "available": False,
+            "scope": scope,
+            "peer_count": len(peer_scores),
+            "min_peers": BENCHMARK_MIN_PEERS,
             "reason": "not_enough_peers",
         }
 
@@ -283,14 +278,15 @@ def _build_premium_insights(result: dict) -> dict:
 
     action_plan = []
     for skill in top_skills:
-        action_plan.append({
-            "title": f"Mini proje ile {skill} guclendir",
-            "detail": f"{skill} iceren olculebilir bir proje ciktisi ekleyin (repo, demo, metrik).",
-        })
+        action_plan.append(
+            {
+                "title": f"Mini proje ile {skill} guclendir",
+                "detail": f"{skill} iceren olculebilir bir proje ciktisi ekleyin (repo, demo, metrik).",
+            }
+        )
 
     interview_questions = [
-        f"{skill} kullanarak cozdugunuz bir problemi adim adim anlatir misiniz?"
-        for skill in top_skills
+        f"{skill} kullanarak cozdugunuz bir problemi adim adim anlatir misiniz?" for skill in top_skills
     ]
 
     return {

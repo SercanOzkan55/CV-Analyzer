@@ -35,7 +35,7 @@ for p in FILES:
         raw, truncated = extract_pdf_text(contents, max_pages=20, max_chars=300000, ocr_extract_text=None)
         extracted = extract_structured(raw)
         report = validate_extraction(raw, extracted, strict=True)
-        fingerprint = hashlib.sha256(raw.encode('utf-8')).hexdigest()
+        fingerprint = hashlib.sha256(raw.encode("utf-8")).hexdigest()
         dup = seen_hashes.get(fingerprint)
         if dup:
             dup_note = f"duplicate_of:{dup}"
@@ -50,15 +50,15 @@ for p in FILES:
             "duplicate_note": dup_note,
             "extraction_report": report,
             "extracted_preview": {
-                k: (extracted.get(k) if k in ("skills","languages","summary") else None)
-                for k in ("skills","languages","summary")
-            }
+                k: (extracted.get(k) if k in ("skills", "languages", "summary") else None)
+                for k in ("skills", "languages", "summary")
+            },
         }
         out.append(entry)
     except Exception as e:
         out.append({"path": str(p), "error": "exception", "detail": str(e)})
 
 out_path = ROOT / "extraction_reports.json"
-out_path.write_bytes(json.dumps(out, ensure_ascii=False, indent=2).encode('utf-8'))
+out_path.write_bytes(json.dumps(out, ensure_ascii=False, indent=2).encode("utf-8"))
 print("WROTE", str(out_path))
 print(json.dumps(out, ensure_ascii=False))

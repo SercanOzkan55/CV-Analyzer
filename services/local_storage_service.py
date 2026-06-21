@@ -12,9 +12,11 @@ logger = logging.getLogger("app.storage.local")
 # Root directory for local storage, relative to the app root
 LOCAL_STORAGE_ROOT = os.getenv("LOCAL_STORAGE_PATH", "storage")
 
+
 def _ensure_dir(path: str):
     """Ensure the directory for a given file path exists."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
+
 
 def upload(file_bytes: bytes, key: str, content_type: str = None) -> None:
     """Save bytes to local disk using the key as relative path."""
@@ -24,6 +26,7 @@ def upload(file_bytes: bytes, key: str, content_type: str = None) -> None:
         f.write(file_bytes)
     logger.debug("local_storage:saved key=%s size=%d", redact_s3_key(key), len(file_bytes))
 
+
 def download(key: str) -> bytes:
     """Read bytes from local disk."""
     full_path = os.path.join(LOCAL_STORAGE_ROOT, key)
@@ -32,6 +35,7 @@ def download(key: str) -> bytes:
     with open(full_path, "rb") as f:
         return f.read()
 
+
 def delete(key: str) -> None:
     """Remove file from local disk."""
     full_path = os.path.join(LOCAL_STORAGE_ROOT, key)
@@ -39,20 +43,20 @@ def delete(key: str) -> None:
         os.remove(full_path)
         logger.debug("local_storage:deleted key=%s", redact_s3_key(key))
 
+
 def head(key: str) -> dict | None:
     """Check if file exists and return metadata (simulated)."""
     full_path = os.path.join(LOCAL_STORAGE_ROOT, key)
     if os.path.exists(full_path):
         stats = os.stat(full_path)
-        return {
-            "size": stats.st_size,
-            "updated": stats.st_mtime
-        }
+        return {"size": stats.st_size, "updated": stats.st_mtime}
     return None
+
 
 def get_local_path(key: str) -> str:
     """Return the absolute path on disk for a given key."""
     return os.path.abspath(os.path.join(LOCAL_STORAGE_ROOT, key))
+
 
 def validate_storage() -> bool:
     """Check if storage root is writable."""

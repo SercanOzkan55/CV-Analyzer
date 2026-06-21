@@ -47,6 +47,7 @@ def _structured_log(
     payload = {"event": event, **fields}
     _logger.log(level, _json.dumps(payload, default=str, ensure_ascii=False))
 
+
 # ── Parser versioning ─────────────────────────────────────────────────────
 # Allows swapping parser implementations via env var without code deploys.
 # "v1" is the current production classifier.  Future versions (v2, experimental)
@@ -54,12 +55,8 @@ def _structured_log(
 PARSER_VERSION = os.getenv("PARSER_VERSION", "v1").strip().lower()
 
 # Slow-CV guard: hard timeout for detect_sections
-_CLASSIFIER_TIMEOUT_SECONDS = float(
-    os.getenv("CLASSIFIER_TIMEOUT_SECONDS", "5") or "5"
-)
-_CLASSIFIER_WARN_SECONDS = float(
-    os.getenv("CLASSIFIER_WARN_SECONDS", "2") or "2"
-)
+_CLASSIFIER_TIMEOUT_SECONDS = float(os.getenv("CLASSIFIER_TIMEOUT_SECONDS", "5") or "5")
+_CLASSIFIER_WARN_SECONDS = float(os.getenv("CLASSIFIER_WARN_SECONDS", "2") or "2")
 
 
 # ── tiny helpers ──────────────────────────────────────────────────────────
@@ -89,10 +86,10 @@ _SINGLE_YEAR_RE = re.compile(rf"\b{_YEAR}\b")
 _EMAIL_RE = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.I)
 _PHONE_RE = re.compile(
     r"(?<!\d)"
-    r"(?:\+\d{1,3}[\s.-]?)?"       # optional country code: +1, +90, +44
-    r"\(?\d{2,4}\)?[\s.-]?"        # area code: (555), 555, 0555
-    r"\d{2,4}[\s.-]?"              # middle digits
-    r"\d{2,4}"                     # last digits
+    r"(?:\+\d{1,3}[\s.-]?)?"  # optional country code: +1, +90, +44
+    r"\(?\d{2,4}\)?[\s.-]?"  # area code: (555), 555, 0555
+    r"\d{2,4}[\s.-]?"  # middle digits
+    r"\d{2,4}"  # last digits
     r"(?!\d)"
 )
 _URL_RE = re.compile(
@@ -677,6 +674,7 @@ _HEADER_HINTS: Dict[str, re.Pattern] = {
 
 # ── block splitter ────────────────────────────────────────────────────────
 
+
 def _clean_line(line: str) -> str:
     """Normalize a single line (NFC, collapse whitespace)."""
     clean = unicodedata.normalize("NFC", line)
@@ -757,8 +755,8 @@ def split_blocks(text: str) -> List[List[str]]:
 # a capitalized phrase and may contain a date somewhere on the same line.
 _TITLE_WITH_DATE_RE = re.compile(
     rf"^(?![-*\u2022\u2013\u2014\u2023\u25aa\u25a0]\s)"  # not a bullet
-    rf"[A-ZÀ-ÖØ-Þ\u0100-\u024F]"                        # starts uppercase
-    rf".*\b{_YEAR}\b",                                     # has a year
+    rf"[A-ZÀ-ÖØ-Þ\u0100-\u024F]"  # starts uppercase
+    rf".*\b{_YEAR}\b",  # has a year
     re.UNICODE,
 )
 
@@ -769,9 +767,9 @@ _YEAR_ONLY_LINE_RE = re.compile(rf"^\s*{_YEAR}\s*$")
 # email/URL, letters-only.  All significant words (len > 2) must start
 # with an uppercase letter to qualify (strict Title Case).
 _TITLE_LIKE_LINE_RE = re.compile(
-    r"^(?![-*\u2022\u2013\u2014\u2023\u25aa\u25a0]\s)"   # not a bullet
-    r"[A-ZÀ-ÖØ-Þ\u0100-\u024F]"                          # starts uppercase
-    r"[\w\u00C0-\u024F' -]+$",                             # letters/hyphens/spaces only
+    r"^(?![-*\u2022\u2013\u2014\u2023\u25aa\u25a0]\s)"  # not a bullet
+    r"[A-ZÀ-ÖØ-Þ\u0100-\u024F]"  # starts uppercase
+    r"[\w\u00C0-\u024F' -]+$",  # letters/hyphens/spaces only
     re.UNICODE,
 )
 
@@ -786,7 +784,7 @@ _CAP_PHRASE_YEAR_RE = re.compile(
 # Examples: "BSc Istanbul Technical University", "MBA Finance".
 _DEGREE_INSTITUTION_RE = re.compile(
     r"^(?:[-*\u2022\u2013\u2014\u2023\u25aa\u25a0]\s*)?"  # optional bullet
-    r"[A-Z][A-Za-z.]{1,4}\s+"                              # short abbrev (2-5 chars)
+    r"[A-Z][A-Za-z.]{1,4}\s+"  # short abbrev (2-5 chars)
     r"(?:[A-ZÀ-ÖØ-Þ\u0100-\u024F][\w\u00C0-\u024F'-]+\s*){2,}",  # capitalized phrase
     re.UNICODE,
 )
@@ -828,12 +826,14 @@ def _is_weak_boundary(line: str) -> bool:
     # title-like line (strictest check last)
     stripped = line.strip()
     words = stripped.split()
-    if (2 <= len(words) <= 4
-            and _TITLE_LIKE_LINE_RE.match(stripped)
-            and not _EMAIL_RE.search(stripped)
-            and not _URL_RE.search(stripped)
-            and not _SINGLE_YEAR_RE.search(stripped)
-            and all(w[0].isupper() for w in words if len(w) > 2)):
+    if (
+        2 <= len(words) <= 4
+        and _TITLE_LIKE_LINE_RE.match(stripped)
+        and not _EMAIL_RE.search(stripped)
+        and not _URL_RE.search(stripped)
+        and not _SINGLE_YEAR_RE.search(stripped)
+        and all(w[0].isupper() for w in words if len(w) > 2)
+    ):
         return True
     return False
 
@@ -846,10 +846,7 @@ def _is_bullet_restart(line: str, prev_lines: List[str]) -> bool:
     if not _BULLET_RE.match(line):
         return False
     after_bullet = re.sub(r"^\s*[-*\u2022\u2013\u2014\u2023\u25aa\u25a0]\s*", "", line)
-    has_signal = bool(
-        _SINGLE_YEAR_RE.search(after_bullet)
-        or _CAPITALIZED_PHRASE_RE.match(after_bullet)
-    )
+    has_signal = bool(_SINGLE_YEAR_RE.search(after_bullet) or _CAPITALIZED_PHRASE_RE.match(after_bullet))
     if not has_signal:
         return False
     if prev_lines:
@@ -929,14 +926,11 @@ def split_entries_inside_block(blocks: List[List[str]]) -> List[List[str]]:
 
         for idx, line in enumerate(block):
             is_strong = _is_strong_boundary(line)
-            is_weak = (_is_weak_boundary(line)
-                       or (idx > 0 and _is_bullet_restart(line, block[:idx])))
+            is_weak = _is_weak_boundary(line) or (idx > 0 and _is_bullet_restart(line, block[:idx]))
 
             should_split = False
             if (is_strong or is_weak) and strong_seen:
-                content_lines = sum(
-                    1 for l in sub if l.strip() and not _sniff_header(l)
-                )
+                content_lines = sum(1 for l in sub if l.strip() and not _sniff_header(l))
                 if content_lines >= 1:
                     should_split = True
 
@@ -946,15 +940,15 @@ def split_entries_inside_block(blocks: List[List[str]]) -> List[List[str]]:
                     # belong to the new entry, not the old one ──
                     last_d = _find_last_strong_idx(sub)
                     if last_d >= 0 and last_d < len(sub) - 1:
-                        before = sub[:last_d + 1]
-                        carry = sub[last_d + 1:]
+                        before = sub[: last_d + 1]
+                        carry = sub[last_d + 1 :]
                         if before:
                             result.append(before)
                         sub = carry + [line]
                     else:
                         result.append(sub)
                         sub = [line]
-                    strong_seen = True   # this strong line is consumed
+                    strong_seen = True  # this strong line is consumed
                 else:
                     # Weak signal split (no backtrack needed — weak signals
                     # appear at the start of a new entry, not mid-entry)
@@ -975,105 +969,172 @@ def split_entries_inside_block(blocks: List[List[str]]) -> List[List[str]]:
 # ── canonical section key mapper ──────────────────────────────────────────
 
 _CANONICAL_KEYS = [
-    "summary", "experience", "education", "skills", "projects",
-    "certifications", "languages", "interests", "contact", "misc",
+    "summary",
+    "experience",
+    "education",
+    "skills",
+    "projects",
+    "certifications",
+    "languages",
+    "interests",
+    "contact",
+    "misc",
 ]
 
 # Exhaustive alias → canonical map.  Used by _canonicalize_section_key as
 # first-pass exact lookup before falling back to substring matching.
 _GLOBAL_ALIASES: Dict[str, str] = {
     # ── summary ──────────────────────────────────────────────────────
-    "personal information": "summary", "profile": "summary",
-    "about": "summary", "about me": "summary", "objective": "summary",
-    "career objective": "summary", "personal": "summary",
-    "personal statement": "summary", "personal profile": "summary",
-    "professional summary": "summary", "executive summary": "summary",
-    "executive profile": "summary", "career summary": "summary", "introduction": "summary",
+    "personal information": "summary",
+    "profile": "summary",
+    "about": "summary",
+    "about me": "summary",
+    "objective": "summary",
+    "career objective": "summary",
+    "personal": "summary",
+    "personal statement": "summary",
+    "personal profile": "summary",
+    "professional summary": "summary",
+    "executive summary": "summary",
+    "executive profile": "summary",
+    "career summary": "summary",
+    "introduction": "summary",
     # TR
-    "özet": "summary", "kişisel bilgiler": "summary",
+    "özet": "summary",
+    "kişisel bilgiler": "summary",
     "kariyer özeti": "summary",
     # FR
-    "résumé professionnel": "summary", "profil professionnel": "summary",
+    "résumé professionnel": "summary",
+    "profil professionnel": "summary",
     # DE
-    "persönliche zusammenfassung": "summary", "zusammenfassung": "summary", "über mich": "summary", "kurzprofil": "summary",
+    "persönliche zusammenfassung": "summary",
+    "zusammenfassung": "summary",
+    "über mich": "summary",
+    "kurzprofil": "summary",
     # ES
-    "resumen profesional": "summary", "perfil profesional": "summary",
-    "resumen": "summary", "perfil": "summary",
+    "resumen profesional": "summary",
+    "perfil profesional": "summary",
+    "resumen": "summary",
+    "perfil": "summary",
     # PT
-    "resumo profissional": "summary", "perfil profissional": "summary",
-    "resumo": "summary", "objetivo profissional": "summary",
+    "resumo profissional": "summary",
+    "perfil profissional": "summary",
+    "resumo": "summary",
+    "objetivo profissional": "summary",
     # IT
-    "profilo professionale": "summary", "riepilogo": "summary", "sommario": "summary",
+    "profilo professionale": "summary",
+    "riepilogo": "summary",
+    "sommario": "summary",
     # NL
-    "samenvatting": "summary", "profiel": "summary", "persoonlijk profiel": "summary",
+    "samenvatting": "summary",
+    "profiel": "summary",
+    "persoonlijk profiel": "summary",
     # RU
-    "резюме": "summary", "профиль": "summary", "о себе": "summary",
+    "резюме": "summary",
+    "профиль": "summary",
+    "о себе": "summary",
     "краткое описание": "summary",
     # PL
-    "podsumowanie": "summary", "podsumowanie zawodowe": "summary",
-    "profil zawodowy": "summary", "o mnie": "summary",
+    "podsumowanie": "summary",
+    "podsumowanie zawodowe": "summary",
+    "profil zawodowy": "summary",
+    "o mnie": "summary",
     # SV
-    "sammanfattning": "summary", "personlig profil": "summary",
+    "sammanfattning": "summary",
+    "personlig profil": "summary",
     # NO/DA
     "sammendrag": "summary",
     # FI
-    "yhteenveto": "summary", "profiili": "summary", "henkilöprofiili": "summary",
+    "yhteenveto": "summary",
+    "profiili": "summary",
+    "henkilöprofiili": "summary",
     # CS
-    "shrnutí": "summary", "osobní profil": "summary",
+    "shrnutí": "summary",
+    "osobní profil": "summary",
     # HU
-    "összefoglaló": "summary", "személyes profil": "summary",
+    "összefoglaló": "summary",
+    "személyes profil": "summary",
     # RO
-    "rezumat": "summary", "profil personal": "summary", "obiectiv": "summary",
+    "rezumat": "summary",
+    "profil personal": "summary",
+    "obiectiv": "summary",
     # AR
-    "ملخص": "summary", "نبذة شخصية": "summary", "الملف الشخصي": "summary",
+    "ملخص": "summary",
+    "نبذة شخصية": "summary",
+    "الملف الشخصي": "summary",
     "هدف وظيفي": "summary",
     # ZH
-    "个人简介": "summary", "个人概述": "summary", "自我介绍": "summary",
-    "职业目标": "summary", "摘要": "summary", "个人总结": "summary",
+    "个人简介": "summary",
+    "个人概述": "summary",
+    "自我介绍": "summary",
+    "职业目标": "summary",
+    "摘要": "summary",
+    "个人总结": "summary",
     # JA
-    "概要": "summary", "自己紹介": "summary", "プロフィール": "summary",
+    "概要": "summary",
+    "自己紹介": "summary",
+    "プロフィール": "summary",
     "職務要約": "summary",
     # KO
-    "요약": "summary", "자기소개": "summary", "프로필": "summary",
+    "요약": "summary",
+    "자기소개": "summary",
+    "프로필": "summary",
     "경력 요약": "summary",
     # HI
-    "सारांश": "summary", "प्रोफ़ाइल": "summary", "परिचय": "summary",
+    "सारांश": "summary",
+    "प्रोफ़ाइल": "summary",
+    "परिचय": "summary",
     "व्यक्तिगत विवरण": "summary",
     # ID
-    "ringkasan": "summary", "tentang saya": "summary", "ikhtisar": "summary",
+    "ringkasan": "summary",
+    "tentang saya": "summary",
+    "ikhtisar": "summary",
     # VI
-    "tóm tắt": "summary", "hồ sơ": "summary", "giới thiệu bản thân": "summary",
+    "tóm tắt": "summary",
+    "hồ sơ": "summary",
+    "giới thiệu bản thân": "summary",
     # TH
-    "สรุป": "summary", "โปรไฟล์": "summary", "ประวัติย่อ": "summary",
-
+    "สรุป": "summary",
+    "โปรไฟล์": "summary",
+    "ประวัติย่อ": "summary",
     # ── contact ──────────────────────────────────────────────────────
-    "communication": "contact", "contact information": "contact",
-    "contact info": "contact", "personal info": "contact",
+    "communication": "contact",
+    "contact information": "contact",
+    "contact info": "contact",
+    "personal info": "contact",
     "details": "contact",
     # TR
-    "iletişim": "contact", "iletişim bilgileri": "contact",
+    "iletişim": "contact",
+    "iletişim bilgileri": "contact",
     # FR
-    "coordonnées": "contact", "informations de contact": "contact",
+    "coordonnées": "contact",
+    "informations de contact": "contact",
     # DE
-    "kontakt": "contact", "kontaktdaten": "contact",
+    "kontakt": "contact",
+    "kontaktdaten": "contact",
     "kontaktinformationen": "contact",
     # ES
-    "contacto": "contact", "información de contacto": "contact",
+    "contacto": "contact",
+    "información de contacto": "contact",
     "datos de contacto": "contact",
     # PT
-    "contato": "contact", "informações de contato": "contact",
+    "contato": "contact",
+    "informações de contato": "contact",
     # IT
-    "contatto": "contact", "contatti": "contact",
+    "contatto": "contact",
+    "contatti": "contact",
     "informazioni di contatto": "contact",
     # NL
     "contactgegevens": "contact",
     # RU
-    "контакт": "contact", "контакты": "contact",
+    "контакт": "contact",
+    "контакты": "contact",
     "контактная информация": "contact",
     # PL
     "dane kontaktowe": "contact",
     # SV
-    "kontaktinformation": "contact", "kontaktuppgifter": "contact",
+    "kontaktinformation": "contact",
+    "kontaktuppgifter": "contact",
     # NO
     "kontaktopplysninger": "contact",
     # FI
@@ -1081,241 +1142,361 @@ _GLOBAL_ALIASES: Dict[str, str] = {
     # CS
     "kontaktní údaje": "contact",
     # HU
-    "kapcsolat": "contact", "elérhetőség": "contact", "elérhetőségek": "contact",
+    "kapcsolat": "contact",
+    "elérhetőség": "contact",
+    "elérhetőségek": "contact",
     # RO
     "date de contact": "contact",
     # AR
-    "الاتصال": "contact", "التواصل": "contact", "معلومات الاتصال": "contact",
+    "الاتصال": "contact",
+    "التواصل": "contact",
+    "معلومات الاتصال": "contact",
     "بيانات التواصل": "contact",
     # ZH
-    "联系方式": "contact", "联系信息": "contact",
+    "联系方式": "contact",
+    "联系信息": "contact",
     # JA
-    "連絡先": "contact", "連絡情報": "contact",
+    "連絡先": "contact",
+    "連絡情報": "contact",
     # KO
-    "연락처": "contact", "연락 정보": "contact",
+    "연락처": "contact",
+    "연락 정보": "contact",
     # HI
-    "संपर्क": "contact", "संपर्क जानकारी": "contact",
+    "संपर्क": "contact",
+    "संपर्क जानकारी": "contact",
     # ID
-    "kontak": "contact", "informasi kontak": "contact",
+    "kontak": "contact",
+    "informasi kontak": "contact",
     # VI
-    "liên hệ": "contact", "thông tin liên hệ": "contact",
+    "liên hệ": "contact",
+    "thông tin liên hệ": "contact",
     # TH
-    "ติดต่อ": "contact", "ข้อมูลติดต่อ": "contact",
-
+    "ติดต่อ": "contact",
+    "ข้อมูลติดต่อ": "contact",
     # ── experience ───────────────────────────────────────────────────
-    "work": "experience", "employment": "experience",
-    "work experience": "experience", "professional experience": "experience",
-    "career history": "experience", "work history": "experience",
+    "work": "experience",
+    "employment": "experience",
+    "work experience": "experience",
+    "professional experience": "experience",
+    "career history": "experience",
+    "work history": "experience",
     "work background": "experience",
-    "employment history": "experience", "professional background": "experience",
-    "training": "experience", "trainings": "experience",
+    "employment history": "experience",
+    "professional background": "experience",
+    "training": "experience",
+    "trainings": "experience",
     # TR
-    "deneyim": "experience", "iş deneyimi": "experience",
+    "deneyim": "experience",
+    "iş deneyimi": "experience",
     "mesleki deneyim": "experience",
     # FR
-    "expérience": "experience", "expérience professionnelle": "experience",
+    "expérience": "experience",
+    "expérience professionnelle": "experience",
     "parcours professionnel": "experience",
     # DE
-    "erfahrung": "experience", "berufserfahrung": "experience",
+    "erfahrung": "experience",
+    "berufserfahrung": "experience",
     "beruflicher werdegang": "experience",
     # ES
-    "experiencia": "experience", "experiencia laboral": "experience",
+    "experiencia": "experience",
+    "experiencia laboral": "experience",
     "experiencia profesional": "experience",
     "trayectoria profesional": "experience",
     # PT
-    "experiência": "experience", "experiência profissional": "experience",
+    "experiência": "experience",
+    "experiência profissional": "experience",
     "histórico profissional": "experience",
     # IT
-    "esperienza": "experience", "esperienza lavorativa": "experience",
+    "esperienza": "experience",
+    "esperienza lavorativa": "experience",
     "esperienze professionali": "experience",
     # NL
-    "ervaring": "experience", "werkervaring": "experience",
+    "ervaring": "experience",
+    "werkervaring": "experience",
     "professionele ervaring": "experience",
     # RU
-    "опыт": "experience", "опыт работы": "experience",
-    "трудовой стаж": "experience", "профессиональный опыт": "experience",
+    "опыт": "experience",
+    "опыт работы": "experience",
+    "трудовой стаж": "experience",
+    "профессиональный опыт": "experience",
     # PL
-    "doświadczenie": "experience", "doświadczenie zawodowe": "experience",
+    "doświadczenie": "experience",
+    "doświadczenie zawodowe": "experience",
     "historia zatrudnienia": "experience",
     # SV
-    "erfarenhet": "experience", "arbetslivserfarenhet": "experience",
+    "erfarenhet": "experience",
+    "arbetslivserfarenhet": "experience",
     "yrkeserfarenhet": "experience",
     # NO
-    "erfaring": "experience", "arbeidserfaring": "experience",
+    "erfaring": "experience",
+    "arbeidserfaring": "experience",
     "yrkeserfaring": "experience",
     # DA
-    "erhvervserfaring": "experience", "arbejdserfaring": "experience",
+    "erhvervserfaring": "experience",
+    "arbejdserfaring": "experience",
     # FI
-    "kokemus": "experience", "työkokemus": "experience",
+    "kokemus": "experience",
+    "työkokemus": "experience",
     "työhistoria": "experience",
     # CS
-    "zkušenosti": "experience", "pracovní zkušenosti": "experience",
+    "zkušenosti": "experience",
+    "pracovní zkušenosti": "experience",
     # HU
-    "tapasztalat": "experience", "munkatapasztalat": "experience",
+    "tapasztalat": "experience",
+    "munkatapasztalat": "experience",
     "szakmai tapasztalat": "experience",
     # RO
-    "experiență": "experience", "experiență profesională": "experience",
+    "experiență": "experience",
+    "experiență profesională": "experience",
     # AR
-    "الخبرة": "experience", "الخبرة المهنية": "experience",
-    "الخبرات": "experience", "خبرة العمل": "experience",
+    "الخبرة": "experience",
+    "الخبرة المهنية": "experience",
+    "الخبرات": "experience",
+    "خبرة العمل": "experience",
     # ZH
-    "工作经验": "experience", "工作经历": "experience",
-    "职业经历": "experience", "工作履历": "experience",
+    "工作经验": "experience",
+    "工作经历": "experience",
+    "职业经历": "experience",
+    "工作履历": "experience",
     # JA
-    "職歴": "experience", "経験": "experience", "職務経歴": "experience",
+    "職歴": "experience",
+    "経験": "experience",
+    "職務経歴": "experience",
     # KO
-    "경력": "experience", "경험": "experience",
-    "직무 경험": "experience", "업무 경험": "experience",
+    "경력": "experience",
+    "경험": "experience",
+    "직무 경험": "experience",
+    "업무 경험": "experience",
     # HI
-    "अनुभव": "experience", "कार्य अनुभव": "experience",
+    "अनुभव": "experience",
+    "कार्य अनुभव": "experience",
     # ID
-    "pengalaman": "experience", "pengalaman kerja": "experience",
+    "pengalaman": "experience",
+    "pengalaman kerja": "experience",
     "riwayat pekerjaan": "experience",
     # VI
-    "kinh nghiệm": "experience", "kinh nghiệm làm việc": "experience",
+    "kinh nghiệm": "experience",
+    "kinh nghiệm làm việc": "experience",
     # TH
-    "ประสบการณ์": "experience", "ประสบการณ์ทำงาน": "experience",
-
+    "ประสบการณ์": "experience",
+    "ประสบการณ์ทำงาน": "experience",
     # ── education ────────────────────────────────────────────────────
-    "academic": "education", "academics": "education",
-    "qualifications": "education", "academic qualifications": "education",
-    "studies": "education", "academic background": "education", "educational background": "education",
+    "academic": "education",
+    "academics": "education",
+    "qualifications": "education",
+    "academic qualifications": "education",
+    "studies": "education",
+    "academic background": "education",
+    "educational background": "education",
     # TR
-    "eğitim": "education", "akademik geçmiş": "education",
+    "eğitim": "education",
+    "akademik geçmiş": "education",
     # FR
-    "formation": "education", "études": "education",
+    "formation": "education",
+    "études": "education",
     "parcours académique": "education",
     # DE
-    "ausbildung": "education", "bildung": "education", "studium": "education",
+    "ausbildung": "education",
+    "bildung": "education",
+    "studium": "education",
     "akademische ausbildung": "education",
     # ES
-    "educación": "education", "formación": "education",
+    "educación": "education",
+    "formación": "education",
     "formación académica": "education",
     # PT
-    "educação": "education", "formação acadêmica": "education",
+    "educação": "education",
+    "formação acadêmica": "education",
     # IT
-    "istruzione": "education", "formazione": "education",
+    "istruzione": "education",
+    "formazione": "education",
     # NL
-    "opleiding": "education", "onderwijs": "education", "opleidingen": "education",
+    "opleiding": "education",
+    "onderwijs": "education",
+    "opleidingen": "education",
     # RU
-    "образование": "education", "обучение": "education",
+    "образование": "education",
+    "обучение": "education",
     # PL
-    "wykształcenie": "education", "edukacja": "education",
+    "wykształcenie": "education",
+    "edukacja": "education",
     # SV
-    "utbildning": "education", "akademisk bakgrund": "education",
+    "utbildning": "education",
+    "akademisk bakgrund": "education",
     # NO
-    "utdanning": "education", "utdannelse": "education",
+    "utdanning": "education",
+    "utdannelse": "education",
     # DA
-    "uddannelse": "education", "akademisk baggrund": "education",
+    "uddannelse": "education",
+    "akademisk baggrund": "education",
     # FI
-    "koulutus": "education", "opinnot": "education",
+    "koulutus": "education",
+    "opinnot": "education",
     # CS
     "vzdělání": "education",
     # HU
-    "végzettség": "education", "tanulmányok": "education", "oktatás": "education",
+    "végzettség": "education",
+    "tanulmányok": "education",
+    "oktatás": "education",
     # RO
-    "educație": "education", "studii": "education",
+    "educație": "education",
+    "studii": "education",
     # AR
-    "التعليم": "education", "المؤهلات الأكاديمية": "education",
+    "التعليم": "education",
+    "المؤهلات الأكاديمية": "education",
     "الدراسة": "education",
     # ZH
-    "教育": "education", "学历": "education", "教育背景": "education",
+    "教育": "education",
+    "学历": "education",
+    "教育背景": "education",
     "学习经历": "education",
     # JA
     "学歴": "education",
     # KO
-    "학력": "education", "교육": "education",
+    "학력": "education",
+    "교육": "education",
     # HI
-    "शिक्षा": "education", "शैक्षिक योग्यता": "education",
+    "शिक्षा": "education",
+    "शैक्षिक योग्यता": "education",
     # ID
-    "pendidikan": "education", "riwayat pendidikan": "education",
+    "pendidikan": "education",
+    "riwayat pendidikan": "education",
     # VI
-    "học vấn": "education", "trình độ học vấn": "education",
+    "học vấn": "education",
+    "trình độ học vấn": "education",
     # TH
-    "การศึกษา": "education", "ประวัติการศึกษา": "education",
-
+    "การศึกษา": "education",
+    "ประวัติการศึกษา": "education",
     # ── skills ───────────────────────────────────────────────────────
-    "technical skills": "skills", "core competencies": "skills", "skill set": "skills", "skills set": "skills",
-    "competencies": "skills", "technologies": "skills",
-    "abilities": "skills", "key skills": "skills",
-    "professional skills": "skills", "it skills": "skills",
-    "hard skills": "skills", "soft skills": "skills",
+    "technical skills": "skills",
+    "core competencies": "skills",
+    "skill set": "skills",
+    "skills set": "skills",
+    "competencies": "skills",
+    "technologies": "skills",
+    "abilities": "skills",
+    "key skills": "skills",
+    "professional skills": "skills",
+    "it skills": "skills",
+    "hard skills": "skills",
+    "soft skills": "skills",
     # TR
-    "beceriler": "skills", "yetenekler": "skills",
-    "teknik beceriler": "skills", "yetkinlikler": "skills",
+    "beceriler": "skills",
+    "yetenekler": "skills",
+    "teknik beceriler": "skills",
+    "yetkinlikler": "skills",
     # FR
-    "compétences": "skills", "compétences techniques": "skills",
+    "compétences": "skills",
+    "compétences techniques": "skills",
     "aptitudes": "skills",
     # DE
-    "fähigkeiten": "skills", "kenntnisse": "skills",
-    "kompetenzen": "skills", "technische fähigkeiten": "skills",
+    "fähigkeiten": "skills",
+    "kenntnisse": "skills",
+    "kompetenzen": "skills",
+    "technische fähigkeiten": "skills",
     # ES
-    "habilidades": "skills", "competencias": "skills",
+    "habilidades": "skills",
+    "competencias": "skills",
     "habilidades técnicas": "skills",
     # PT
-    "competências": "skills", "aptidões": "skills",
+    "competências": "skills",
+    "aptidões": "skills",
     # IT
-    "competenze": "skills", "abilità": "skills",
+    "competenze": "skills",
+    "abilità": "skills",
     "competenze tecniche": "skills",
     # NL
-    "vaardigheden": "skills", "competenties": "skills",
+    "vaardigheden": "skills",
+    "competenties": "skills",
     "technische vaardigheden": "skills",
     # RU
-    "навыки": "skills", "умения": "skills", "компетенции": "skills",
+    "навыки": "skills",
+    "умения": "skills",
+    "компетенции": "skills",
     "технические навыки": "skills",
     # PL
-    "umiejętności": "skills", "kompetencje": "skills",
+    "umiejętności": "skills",
+    "kompetencje": "skills",
     # SV
-    "färdigheter": "skills", "kompetenser": "skills",
+    "färdigheter": "skills",
+    "kompetenser": "skills",
     # NO
-    "ferdigheter": "skills", "kompetanser": "skills",
+    "ferdigheter": "skills",
+    "kompetanser": "skills",
     # DA
-    "færdigheder": "skills", "kompetencer": "skills",
+    "færdigheder": "skills",
+    "kompetencer": "skills",
     # FI
-    "taidot": "skills", "osaaminen": "skills",
+    "taidot": "skills",
+    "osaaminen": "skills",
     # CS
-    "dovednosti": "skills", "schopnosti": "skills",
+    "dovednosti": "skills",
+    "schopnosti": "skills",
     # HU
-    "készségek": "skills", "képességek": "skills", "szaktudás": "skills",
+    "készségek": "skills",
+    "képességek": "skills",
+    "szaktudás": "skills",
     # RO
-    "competențe": "skills", "abilități": "skills",
+    "competențe": "skills",
+    "abilități": "skills",
     # AR
-    "المهارات": "skills", "المهارات التقنية": "skills", "القدرات": "skills",
+    "المهارات": "skills",
+    "المهارات التقنية": "skills",
+    "القدرات": "skills",
     # ZH
-    "技能": "skills", "专业技能": "skills", "核心能力": "skills",
+    "技能": "skills",
+    "专业技能": "skills",
+    "核心能力": "skills",
     # JA
-    "スキル": "skills", "技術": "skills", "能力": "skills",
+    "スキル": "skills",
+    "技術": "skills",
+    "能力": "skills",
     # KO
-    "기술": "skills", "스킬": "skills", "역량": "skills", "핵심 역량": "skills",
+    "기술": "skills",
+    "스킬": "skills",
+    "역량": "skills",
+    "핵심 역량": "skills",
     # HI
-    "कौशल": "skills", "दक्षता": "skills", "तकनीकी कौशल": "skills",
+    "कौशल": "skills",
+    "दक्षता": "skills",
+    "तकनीकी कौशल": "skills",
     # ID
-    "keahlian": "skills", "keterampilan": "skills", "kemampuan": "skills",
+    "keahlian": "skills",
+    "keterampilan": "skills",
+    "kemampuan": "skills",
     # VI
-    "kỹ năng": "skills", "năng lực": "skills",
+    "kỹ năng": "skills",
+    "năng lực": "skills",
     # TH
-    "ทักษะ": "skills", "ความสามารถ": "skills",
-
+    "ทักษะ": "skills",
+    "ความสามารถ": "skills",
     # ── projects ─────────────────────────────────────────────────────
-    "project": "projects", "portfolio": "projects",
-    "personal projects": "projects", "academic projects": "projects",
-    "key projects": "projects", "project experience": "projects",
+    "project": "projects",
+    "portfolio": "projects",
+    "personal projects": "projects",
+    "academic projects": "projects",
+    "key projects": "projects",
+    "project experience": "projects",
     # TR
-    "projeler": "projects", "kişisel projeler": "projects",
+    "projeler": "projects",
+    "kişisel projeler": "projects",
     # FR
-    "projets": "projects", "projets personnels": "projects",
+    "projets": "projects",
+    "projets personnels": "projects",
     # DE
     "projekte": "projects",
     # ES
     "proyectos": "projects",
     # PT
-    "projetos": "projects", "projectos": "projects",
+    "projetos": "projects",
+    "projectos": "projects",
     # IT
     "progetti": "projects",
     # NL
     "projecten": "projects",
     # RU
-    "проекты": "projects", "личные проекты": "projects",
+    "проекты": "projects",
+    "личные проекты": "projects",
     # PL/CS
     "projekty": "projects",
     # SV/DA
@@ -1329,42 +1510,53 @@ _GLOBAL_ALIASES: Dict[str, str] = {
     # RO
     "proiecte": "projects",
     # AR
-    "المشاريع": "projects", "مشاريع": "projects",
+    "المشاريع": "projects",
+    "مشاريع": "projects",
     # ZH
-    "项目": "projects", "项目经验": "projects", "个人项目": "projects",
+    "项目": "projects",
+    "项目经验": "projects",
+    "个人项目": "projects",
     # JA
     "プロジェクト": "projects",
     # KO
     "프로젝트": "projects",
     # HI
-    "परियोजनाएं": "projects", "परियोजना": "projects",
+    "परियोजनाएं": "projects",
+    "परियोजना": "projects",
     # ID
     "proyek": "projects",
     # VI
     "dự án": "projects",
     # TH
     "โครงการ": "projects",
-
     # ── certifications ───────────────────────────────────────────────
-    "certification": "certifications", "certificates": "certifications",
-    "certificate": "certifications", "licenses": "certifications",
-    "awards": "certifications", "awards and certifications": "certifications",
+    "certification": "certifications",
+    "certificates": "certifications",
+    "certificate": "certifications",
+    "licenses": "certifications",
+    "awards": "certifications",
+    "awards and certifications": "certifications",
     # TR
-    "sertifikalar": "certifications", "belgeler": "certifications",
+    "sertifikalar": "certifications",
+    "belgeler": "certifications",
     # FR
     "diplômes": "certifications",
     # DE
-    "zertifizierungen": "certifications", "zertifikate": "certifications",
+    "zertifizierungen": "certifications",
+    "zertifikate": "certifications",
     # ES
-    "certificaciones": "certifications", "certificados": "certifications",
+    "certificaciones": "certifications",
+    "certificados": "certifications",
     # PT
     "certificações": "certifications",
     # IT
     "certificazioni": "certifications",
     # NL
-    "certificeringen": "certifications", "certificaten": "certifications",
+    "certificeringen": "certifications",
+    "certificaten": "certifications",
     # RU
-    "сертификаты": "certifications", "дипломы": "certifications",
+    "сертификаты": "certifications",
+    "дипломы": "certifications",
     # PL
     "certyfikaty": "certifications",
     # SV
@@ -1374,104 +1566,144 @@ _GLOBAL_ALIASES: Dict[str, str] = {
     # DA
     "certificeringer": "certifications",
     # FI
-    "sertifikaatit": "certifications", "todistukset": "certifications",
+    "sertifikaatit": "certifications",
+    "todistukset": "certifications",
     # CS
     "certifikáty": "certifications",
     # HU
-    "tanúsítványok": "certifications", "minősítések": "certifications",
+    "tanúsítványok": "certifications",
+    "minősítések": "certifications",
     # RO
     "certificări": "certifications",
     # AR
-    "الشهادات": "certifications", "شهادات": "certifications",
+    "الشهادات": "certifications",
+    "شهادات": "certifications",
     # ZH
-    "证书": "certifications", "资格证书": "certifications", "认证": "certifications",
+    "证书": "certifications",
+    "资格证书": "certifications",
+    "认证": "certifications",
     # JA
-    "資格": "certifications", "認定": "certifications",
+    "資格": "certifications",
+    "認定": "certifications",
     # KO
-    "자격증": "certifications", "인증": "certifications",
+    "자격증": "certifications",
+    "인증": "certifications",
     # HI
     "प्रमाणपत्र": "certifications",
     # ID
-    "sertifikasi": "certifications", "sertifikat": "certifications",
+    "sertifikasi": "certifications",
+    "sertifikat": "certifications",
     # VI
     "chứng chỉ": "certifications",
     # TH
-    "ใบรับรอง": "certifications", "ประกาศนียบัตร": "certifications",
-
+    "ใบรับรอง": "certifications",
+    "ประกาศนียบัตร": "certifications",
     # ── languages ────────────────────────────────────────────────────
-    "language": "languages", "language skills": "languages",
-    "foreign languages": "languages", "linguistic": "languages",
+    "language": "languages",
+    "language skills": "languages",
+    "foreign languages": "languages",
+    "linguistic": "languages",
     # TR
-    "diller": "languages", "yabancı diller": "languages",
+    "diller": "languages",
+    "yabancı diller": "languages",
     # FR
-    "langues": "languages", "compétences linguistiques": "languages",
+    "langues": "languages",
+    "compétences linguistiques": "languages",
     # DE
-    "sprachen": "languages", "sprachkenntnisse": "languages",
+    "sprachen": "languages",
+    "sprachkenntnisse": "languages",
     # ES
-    "idiomas": "languages", "lenguas": "languages",
+    "idiomas": "languages",
+    "lenguas": "languages",
     # PT
     "línguas": "languages",
     # IT
-    "lingue": "languages", "competenze linguistiche": "languages",
+    "lingue": "languages",
+    "competenze linguistiche": "languages",
     # NL
-    "talen": "languages", "talenkennis": "languages",
+    "talen": "languages",
+    "talenkennis": "languages",
     # RU
-    "языки": "languages", "знание языков": "languages",
+    "языки": "languages",
+    "знание языков": "languages",
     "владение языками": "languages",
     # PL
-    "języki": "languages", "języki obce": "languages",
+    "języki": "languages",
+    "języki obce": "languages",
     # SV/NO
     "språk": "languages",
     # DA
     "sprog": "languages",
     # FI
-    "kielet": "languages", "kielitaito": "languages",
+    "kielet": "languages",
+    "kielitaito": "languages",
     # CS
-    "jazyky": "languages", "jazykové znalosti": "languages",
+    "jazyky": "languages",
+    "jazykové znalosti": "languages",
     # HU
-    "nyelvek": "languages", "nyelvtudás": "languages",
+    "nyelvek": "languages",
+    "nyelvtudás": "languages",
     "idegen nyelvek": "languages",
     # RO
-    "limbi": "languages", "limbi străine": "languages",
+    "limbi": "languages",
+    "limbi străine": "languages",
     # AR
-    "اللغات": "languages", "المهارات اللغوية": "languages",
+    "اللغات": "languages",
+    "المهارات اللغوية": "languages",
     # ZH
-    "语言": "languages", "语言能力": "languages", "外语": "languages",
+    "语言": "languages",
+    "语言能力": "languages",
+    "外语": "languages",
     # JA
-    "言語": "languages", "語学": "languages",
+    "言語": "languages",
+    "語学": "languages",
     # KO
-    "언어": "languages", "외국어": "languages",
+    "언어": "languages",
+    "외국어": "languages",
     # HI
-    "भाषाएं": "languages", "भाषा कौशल": "languages",
+    "भाषाएं": "languages",
+    "भाषा कौशल": "languages",
     # ID
     "bahasa": "languages",
     # VI
-    "ngôn ngữ": "languages", "ngoại ngữ": "languages",
+    "ngôn ngữ": "languages",
+    "ngoại ngữ": "languages",
     # TH
-    "ภาษา": "languages", "ทักษะทางภาษา": "languages",
-
+    "ภาษา": "languages",
+    "ทักษะทางภาษา": "languages",
     # ── interests ────────────────────────────────────────────────────
-    "interest": "interests", "hobbies": "interests",
-    "personal interest": "interests", "personal interests": "interests",
+    "interest": "interests",
+    "hobbies": "interests",
+    "personal interest": "interests",
+    "personal interests": "interests",
     # TR
-    "ilgi alanları": "interests", "hobiler": "interests",
+    "ilgi alanları": "interests",
+    "hobiler": "interests",
     # FR
-    "centres d'intérêt": "interests", "loisirs": "interests",
+    "centres d'intérêt": "interests",
+    "loisirs": "interests",
     "passions": "interests",
     # DE
-    "interessen": "interests", "hobbys": "interests",
+    "interessen": "interests",
+    "hobbys": "interests",
     # ES
-    "intereses": "interests", "aficiones": "interests",
+    "intereses": "interests",
+    "aficiones": "interests",
     "pasatiempos": "interests",
     # PT
-    "interesses": "interests", "passatempos": "interests",
+    "interesses": "interests",
+    "passatempos": "interests",
     # IT
-    "interessi": "interests", "hobby": "interests",
-    "passioni": "interests", "tempo libero": "interests",
+    "interessi": "interests",
+    "hobby": "interests",
+    "passioni": "interests",
+    "tempo libero": "interests",
     # NL
     "hobby's": "interests",
     # RU
-    "интересы": "interests", "хобби": "interests", "увлечения": "interests",
+    "интересы": "interests",
+    "хобби": "interests",
+    "увлечения": "interests",
     # PL
     "zainteresowania": "interests",
     # SV
@@ -1479,136 +1711,237 @@ _GLOBAL_ALIASES: Dict[str, str] = {
     # NO/DA
     "interesser": "interests",
     # FI
-    "kiinnostukset": "interests", "harrastukset": "interests",
+    "kiinnostukset": "interests",
+    "harrastukset": "interests",
     # CS
-    "zájmy": "interests", "koníčky": "interests",
+    "zájmy": "interests",
+    "koníčky": "interests",
     # HU
-    "érdeklődés": "interests", "hobbik": "interests",
+    "érdeklődés": "interests",
+    "hobbik": "interests",
     # RO
-    "interese": "interests", "hobby-uri": "interests",
+    "interese": "interests",
+    "hobby-uri": "interests",
     # AR
-    "الاهتمامات": "interests", "الهوايات": "interests",
+    "الاهتمامات": "interests",
+    "الهوايات": "interests",
     # ZH
-    "兴趣": "interests", "爱好": "interests", "兴趣爱好": "interests",
+    "兴趣": "interests",
+    "爱好": "interests",
+    "兴趣爱好": "interests",
     # JA
-    "趣味": "interests", "興味": "interests", "関心": "interests",
+    "趣味": "interests",
+    "興味": "interests",
+    "関心": "interests",
     # KO
-    "관심사": "interests", "취미": "interests",
+    "관심사": "interests",
+    "취미": "interests",
     # HI
-    "रुचियां": "interests", "शौक": "interests",
+    "रुचियां": "interests",
+    "शौक": "interests",
     # ID
-    "minat": "interests", "hobi": "interests",
+    "minat": "interests",
+    "hobi": "interests",
     # VI
-    "sở thích": "interests", "đam mê": "interests",
+    "sở thích": "interests",
+    "đam mê": "interests",
     # TH
-    "ความสนใจ": "interests", "งานอดิเรก": "interests",
+    "ความสนใจ": "interests",
+    "งานอดิเรก": "interests",
 }
 
 # Substring fragments → canonical key for fuzzy fallback
 _FUZZY_FRAGMENTS: list[tuple[str, str]] = [
     # EN
-    ("summar", "summary"), ("profile", "summary"), ("objective", "summary"),
-    ("about", "summary"), ("personal info", "summary"),
-    ("contact", "contact"), ("communic", "contact"), ("details", "contact"),
-    ("experi", "experience"), ("employ", "experience"), ("work", "experience"),
+    ("summar", "summary"),
+    ("profile", "summary"),
+    ("objective", "summary"),
+    ("about", "summary"),
+    ("personal info", "summary"),
+    ("contact", "contact"),
+    ("communic", "contact"),
+    ("details", "contact"),
+    ("experi", "experience"),
+    ("employ", "experience"),
+    ("work", "experience"),
     ("career", "experience"),
-    ("educat", "education"), ("academ", "education"),
-    ("studies", "education"), ("qualif", "education"),
-    ("skill", "skills"), ("competen", "skills"), ("abilit", "skills"),
-    ("project", "projects"), ("portfolio", "projects"),
-    ("certif", "certifications"), ("licens", "certifications"),
-    ("language", "languages"), ("linguist", "languages"),
-    ("interest", "interests"), ("hobbi", "interests"),
+    ("educat", "education"),
+    ("academ", "education"),
+    ("studies", "education"),
+    ("qualif", "education"),
+    ("skill", "skills"),
+    ("competen", "skills"),
+    ("abilit", "skills"),
+    ("project", "projects"),
+    ("portfolio", "projects"),
+    ("certif", "certifications"),
+    ("licens", "certifications"),
+    ("language", "languages"),
+    ("linguist", "languages"),
+    ("interest", "interests"),
+    ("hobbi", "interests"),
     # FR
-    ("résumé", "summary"), ("profil professionnel", "summary"),
-    ("expérience", "experience"), ("parcours", "experience"),
-    ("formation", "education"), ("études", "education"),
-    ("compétence", "skills"), ("aptitude", "skills"),
-    ("projet", "projects"), ("diplôme", "certifications"),
-    ("langue", "languages"), ("loisir", "interests"),
+    ("résumé", "summary"),
+    ("profil professionnel", "summary"),
+    ("expérience", "experience"),
+    ("parcours", "experience"),
+    ("formation", "education"),
+    ("études", "education"),
+    ("compétence", "skills"),
+    ("aptitude", "skills"),
+    ("projet", "projects"),
+    ("diplôme", "certifications"),
+    ("langue", "languages"),
+    ("loisir", "interests"),
     ("coordonnée", "contact"),
     # DE
-    ("zusammenfassung", "summary"), ("kurzprofil", "summary"),
-    ("erfahrung", "experience"), ("beruf", "experience"),
-    ("ausbildung", "education"), ("bildung", "education"), ("studium", "education"),
-    ("fähigkeit", "skills"), ("kenntnis", "skills"), ("kompetenz", "skills"),
-    ("projekte", "projects"), ("zertifik", "certifications"),
-    ("sprach", "languages"), ("kontakt", "contact"),
+    ("zusammenfassung", "summary"),
+    ("kurzprofil", "summary"),
+    ("erfahrung", "experience"),
+    ("beruf", "experience"),
+    ("ausbildung", "education"),
+    ("bildung", "education"),
+    ("studium", "education"),
+    ("fähigkeit", "skills"),
+    ("kenntnis", "skills"),
+    ("kompetenz", "skills"),
+    ("projekte", "projects"),
+    ("zertifik", "certifications"),
+    ("sprach", "languages"),
+    ("kontakt", "contact"),
     # ES/PT
-    ("experiencia", "experience"), ("experiência", "experience"),
-    ("educación", "education"), ("educação", "education"),
-    ("formación", "education"), ("formação", "education"),
-    ("habilidad", "skills"), ("competência", "skills"),
-    ("proyecto", "projects"), ("idioma", "languages"),
-    ("certificacion", "certifications"), ("certificação", "certifications"),
+    ("experiencia", "experience"),
+    ("experiência", "experience"),
+    ("educación", "education"),
+    ("educação", "education"),
+    ("formación", "education"),
+    ("formação", "education"),
+    ("habilidad", "skills"),
+    ("competência", "skills"),
+    ("proyecto", "projects"),
+    ("idioma", "languages"),
+    ("certificacion", "certifications"),
+    ("certificação", "certifications"),
     # IT
-    ("esperienza", "experience"), ("istruzione", "education"),
-    ("competenz", "skills"), ("progetti", "projects"),
-    ("certificazion", "certifications"), ("lingu", "languages"),
+    ("esperienza", "experience"),
+    ("istruzione", "education"),
+    ("competenz", "skills"),
+    ("progetti", "projects"),
+    ("certificazion", "certifications"),
+    ("lingu", "languages"),
     # NL
-    ("ervaring", "experience"), ("opleiding", "education"),
-    ("vaardighe", "skills"), ("projecten", "projects"),
+    ("ervaring", "experience"),
+    ("opleiding", "education"),
+    ("vaardighe", "skills"),
+    ("projecten", "projects"),
     # RU
-    ("опыт", "experience"), ("образован", "education"),
-    ("навык", "skills"), ("умен", "skills"), ("проект", "projects"),
-    ("сертификат", "certifications"), ("язык", "languages"),
-    ("интерес", "interests"), ("хобби", "interests"),
-    ("резюме", "summary"), ("профил", "summary"),
+    ("опыт", "experience"),
+    ("образован", "education"),
+    ("навык", "skills"),
+    ("умен", "skills"),
+    ("проект", "projects"),
+    ("сертификат", "certifications"),
+    ("язык", "languages"),
+    ("интерес", "interests"),
+    ("хобби", "interests"),
+    ("резюме", "summary"),
+    ("профил", "summary"),
     # PL
-    ("doświadczeni", "experience"), ("wykształceni", "education"),
-    ("umiejętnoś", "skills"), ("zainteresowania", "interests"),
+    ("doświadczeni", "experience"),
+    ("wykształceni", "education"),
+    ("umiejętnoś", "skills"),
+    ("zainteresowania", "interests"),
     # SV/NO/DA
-    ("erfarenhet", "experience"), ("utbildning", "education"),
-    ("utdanning", "education"), ("uddannelse", "education"),
-    ("färdighet", "skills"), ("ferdighet", "skills"),
+    ("erfarenhet", "experience"),
+    ("utbildning", "education"),
+    ("utdanning", "education"),
+    ("uddannelse", "education"),
+    ("färdighet", "skills"),
+    ("ferdighet", "skills"),
     # FI
-    ("kokemus", "experience"), ("koulutus", "education"),
-    ("taido", "skills"), ("osaaminen", "skills"),
+    ("kokemus", "experience"),
+    ("koulutus", "education"),
+    ("taido", "skills"),
+    ("osaaminen", "skills"),
     # CS/HU/RO
-    ("zkušenost", "experience"), ("tapasztalat", "experience"),
-    ("vzdělán", "education"), ("végzettség", "education"),
-    ("dovednost", "skills"), ("készség", "skills"),
+    ("zkušenost", "experience"),
+    ("tapasztalat", "experience"),
+    ("vzdělán", "education"),
+    ("végzettség", "education"),
+    ("dovednost", "skills"),
+    ("készség", "skills"),
     # AR
-    ("الخبر", "experience"), ("التعليم", "education"),
-    ("المهار", "skills"), ("المشاريع", "projects"),
-    ("الشهاد", "certifications"), ("اللغ", "languages"),
-    ("الاهتمام", "interests"), ("ملخص", "summary"),
+    ("الخبر", "experience"),
+    ("التعليم", "education"),
+    ("المهار", "skills"),
+    ("المشاريع", "projects"),
+    ("الشهاد", "certifications"),
+    ("اللغ", "languages"),
+    ("الاهتمام", "interests"),
+    ("ملخص", "summary"),
     # ZH
-    ("经验", "experience"), ("经历", "experience"),
-    ("教育", "education"), ("学历", "education"),
-    ("技能", "skills"), ("项目", "projects"),
-    ("证书", "certifications"), ("语言", "languages"),
-    ("兴趣", "interests"), ("简介", "summary"),
+    ("经验", "experience"),
+    ("经历", "experience"),
+    ("教育", "education"),
+    ("学历", "education"),
+    ("技能", "skills"),
+    ("项目", "projects"),
+    ("证书", "certifications"),
+    ("语言", "languages"),
+    ("兴趣", "interests"),
+    ("简介", "summary"),
     # JA
-    ("職歴", "experience"), ("学歴", "education"),
-    ("スキル", "skills"), ("プロジェクト", "projects"),
-    ("資格", "certifications"), ("言語", "languages"),
-    ("趣味", "interests"), ("概要", "summary"),
+    ("職歴", "experience"),
+    ("学歴", "education"),
+    ("スキル", "skills"),
+    ("プロジェクト", "projects"),
+    ("資格", "certifications"),
+    ("言語", "languages"),
+    ("趣味", "interests"),
+    ("概要", "summary"),
     # KO
-    ("경력", "experience"), ("학력", "education"),
-    ("기술", "skills"), ("프로젝트", "projects"),
-    ("자격증", "certifications"), ("언어", "languages"),
-    ("취미", "interests"), ("요약", "summary"),
+    ("경력", "experience"),
+    ("학력", "education"),
+    ("기술", "skills"),
+    ("프로젝트", "projects"),
+    ("자격증", "certifications"),
+    ("언어", "languages"),
+    ("취미", "interests"),
+    ("요약", "summary"),
     # HI
-    ("अनुभव", "experience"), ("शिक्षा", "education"),
-    ("कौशल", "skills"), ("परियोजना", "projects"),
-    ("प्रमाणपत्र", "certifications"), ("भाषा", "languages"),
-    ("रुचि", "interests"), ("सारांश", "summary"),
+    ("अनुभव", "experience"),
+    ("शिक्षा", "education"),
+    ("कौशल", "skills"),
+    ("परियोजना", "projects"),
+    ("प्रमाणपत्र", "certifications"),
+    ("भाषा", "languages"),
+    ("रुचि", "interests"),
+    ("सारांश", "summary"),
     # ID
-    ("pengalaman", "experience"), ("pendidikan", "education"),
-    ("keahlian", "skills"), ("keterampilan", "skills"),
-    ("proyek", "projects"), ("sertifikas", "certifications"),
+    ("pengalaman", "experience"),
+    ("pendidikan", "education"),
+    ("keahlian", "skills"),
+    ("keterampilan", "skills"),
+    ("proyek", "projects"),
+    ("sertifikas", "certifications"),
     ("ringkasan", "summary"),
     # VI
-    ("kinh nghiệm", "experience"), ("học vấn", "education"),
-    ("kỹ năng", "skills"), ("dự án", "projects"),
-    ("chứng chỉ", "certifications"), ("ngôn ngữ", "languages"),
+    ("kinh nghiệm", "experience"),
+    ("học vấn", "education"),
+    ("kỹ năng", "skills"),
+    ("dự án", "projects"),
+    ("chứng chỉ", "certifications"),
+    ("ngôn ngữ", "languages"),
     ("tóm tắt", "summary"),
     # TH
-    ("ประสบการณ์", "experience"), ("การศึกษา", "education"),
-    ("ทักษะ", "skills"), ("โครงการ", "projects"),
-    ("ใบรับรอง", "certifications"), ("ภาษา", "languages"),
-    ("ความสนใจ", "interests"), ("สรุป", "summary"),
+    ("ประสบการณ์", "experience"),
+    ("การศึกษา", "education"),
+    ("ทักษะ", "skills"),
+    ("โครงการ", "projects"),
+    ("ใบรับรอง", "certifications"),
+    ("ภาษา", "languages"),
+    ("ความสนใจ", "interests"),
+    ("สรุป", "summary"),
 ]
 
 
@@ -1701,99 +2034,312 @@ _CONTACT_LINE_RE = re.compile(
 
 # ALL-CAPS words that are safe to accept as section headers even
 # without matching _HEADER_HINTS.  Very conservative list.
-_ALLCAPS_SECTION_WORDS = frozenset({
-    # EN
-    "experience", "education", "skills", "projects", "certifications",
-    "languages", "summary", "profile", "objective", "employment",
-    "qualifications", "competencies", "technologies", "certificates",
-    "communication", "professional", "technical", "personal", "academic",
-    "interests", "hobbies", "references", "contact", "activities",
-    "publications", "awards", "achievements", "volunteer", "about",
-    "work", "portfolio",
-    # TR
-    "deneyim", "eğitim", "beceriler", "projeler", "sertifikalar",
-    "diller", "özet", "profil", "yetenekler", "yetkinlikler",
-    "iletişim", "ilgi", "alanları", "referanslar", "hobiler",
-    # FR
-    "expérience", "formation", "études", "compétences", "projets",
-    "certifications", "langues", "loisirs", "coordonnées", "diplômes",
-    # DE
-    "erfahrung", "berufserfahrung", "ausbildung", "bildung", "studium",
-    "fähigkeiten", "kenntnisse", "kompetenzen", "projekte",
-    "zertifizierungen", "zertifikate", "sprachen", "kontakt",
-    "interessen", "hobbys", "zusammenfassung",
-    # ES
-    "experiencia", "educación", "formación", "habilidades",
-    "competencias", "proyectos", "certificaciones", "idiomas",
-    "intereses", "aficiones", "contacto", "resumen", "perfil",
-    # PT
-    "experiência", "educação", "formação", "habilidades",
-    "competências", "projetos", "certificações", "interesses",
-    "contato", "resumo",
-    # IT
-    "esperienza", "istruzione", "formazione", "competenze",
-    "abilità", "progetti", "certificazioni", "lingue",
-    "interessi", "contatto", "contatti", "riepilogo", "sommario",
-    # NL
-    "ervaring", "werkervaring", "opleiding", "onderwijs",
-    "vaardigheden", "competenties", "projecten", "certificeringen",
-    "talen", "contactgegevens", "samenvatting", "profiel",
-    # RU
-    "опыт", "образование", "навыки", "умения", "компетенции",
-    "проекты", "сертификаты", "языки", "контакт", "контакты",
-    "интересы", "хобби", "резюме", "профиль",
-    # PL
-    "doświadczenie", "wykształcenie", "edukacja", "umiejętności",
-    "kompetencje", "projekty", "certyfikaty", "języki",
-    "zainteresowania", "podsumowanie",
-    # SV
-    "erfarenhet", "utbildning", "färdigheter", "kompetenser",
-    "sammanfattning", "intressen",
-    # NO
-    "erfaring", "utdanning", "ferdigheter", "kompetanser",
-    "sammendrag", "interesser",
-    # DA
-    "uddannelse", "færdigheder", "kompetencer",
-    # FI
-    "kokemus", "työkokemus", "koulutus", "taidot", "osaaminen",
-    "projektit", "kielet", "yhteystiedot", "yhteenveto",
-    "kiinnostukset", "harrastukset",
-    # CS
-    "zkušenosti", "vzdělání", "dovednosti", "schopnosti",
-    "certifikáty", "jazyky", "zájmy", "shrnutí",
-    # HU
-    "tapasztalat", "végzettség", "tanulmányok", "készségek",
-    "képességek", "projektek", "tanúsítványok", "nyelvek",
-    "kapcsolat", "összefoglaló", "érdeklődés",
-    # RO
-    "experiență", "educație", "studii", "competențe", "abilități",
-    "proiecte", "certificări", "limbi", "interese", "rezumat",
-    # AR
-    "الخبرة", "التعليم", "المهارات", "المشاريع", "الشهادات",
-    "اللغات", "الاتصال", "التواصل", "الاهتمامات", "الهوايات", "ملخص",
-    # ZH
-    "工作经验", "教育", "技能", "项目", "证书", "语言",
-    "联系方式", "兴趣", "个人简介", "学历",
-    # JA
-    "職歴", "学歴", "スキル", "プロジェクト", "資格",
-    "言語", "連絡先", "趣味", "概要",
-    # KO
-    "경력", "학력", "기술", "스킬", "프로젝트",
-    "자격증", "언어", "연락처", "취미", "요약",
-    # HI
-    "अनुभव", "शिक्षा", "कौशल", "परियोजनाएं", "प्रमाणपत्र",
-    "भाषाएं", "संपर्क", "रुचियां", "सारांश",
-    # ID
-    "pengalaman", "pendidikan", "keahlian", "keterampilan",
-    "proyek", "sertifikasi", "sertifikat", "bahasa",
-    "kontak", "ringkasan", "minat",
-    # VI
-    "kinh nghiệm", "học vấn", "kỹ năng", "dự án",
-    "chứng chỉ", "ngôn ngữ", "liên hệ", "sở thích", "tóm tắt",
-    # TH
-    "ประสบการณ์", "การศึกษา", "ทักษะ", "โครงการ",
-    "ใบรับรอง", "ภาษา", "ติดต่อ", "ความสนใจ", "สรุป",
-})
+_ALLCAPS_SECTION_WORDS = frozenset(
+    {
+        # EN
+        "experience",
+        "education",
+        "skills",
+        "projects",
+        "certifications",
+        "languages",
+        "summary",
+        "profile",
+        "objective",
+        "employment",
+        "qualifications",
+        "competencies",
+        "technologies",
+        "certificates",
+        "communication",
+        "professional",
+        "technical",
+        "personal",
+        "academic",
+        "interests",
+        "hobbies",
+        "references",
+        "contact",
+        "activities",
+        "publications",
+        "awards",
+        "achievements",
+        "volunteer",
+        "about",
+        "work",
+        "portfolio",
+        # TR
+        "deneyim",
+        "eğitim",
+        "beceriler",
+        "projeler",
+        "sertifikalar",
+        "diller",
+        "özet",
+        "profil",
+        "yetenekler",
+        "yetkinlikler",
+        "iletişim",
+        "ilgi",
+        "alanları",
+        "referanslar",
+        "hobiler",
+        # FR
+        "expérience",
+        "formation",
+        "études",
+        "compétences",
+        "projets",
+        "certifications",
+        "langues",
+        "loisirs",
+        "coordonnées",
+        "diplômes",
+        # DE
+        "erfahrung",
+        "berufserfahrung",
+        "ausbildung",
+        "bildung",
+        "studium",
+        "fähigkeiten",
+        "kenntnisse",
+        "kompetenzen",
+        "projekte",
+        "zertifizierungen",
+        "zertifikate",
+        "sprachen",
+        "kontakt",
+        "interessen",
+        "hobbys",
+        "zusammenfassung",
+        # ES
+        "experiencia",
+        "educación",
+        "formación",
+        "habilidades",
+        "competencias",
+        "proyectos",
+        "certificaciones",
+        "idiomas",
+        "intereses",
+        "aficiones",
+        "contacto",
+        "resumen",
+        "perfil",
+        # PT
+        "experiência",
+        "educação",
+        "formação",
+        "habilidades",
+        "competências",
+        "projetos",
+        "certificações",
+        "interesses",
+        "contato",
+        "resumo",
+        # IT
+        "esperienza",
+        "istruzione",
+        "formazione",
+        "competenze",
+        "abilità",
+        "progetti",
+        "certificazioni",
+        "lingue",
+        "interessi",
+        "contatto",
+        "contatti",
+        "riepilogo",
+        "sommario",
+        # NL
+        "ervaring",
+        "werkervaring",
+        "opleiding",
+        "onderwijs",
+        "vaardigheden",
+        "competenties",
+        "projecten",
+        "certificeringen",
+        "talen",
+        "contactgegevens",
+        "samenvatting",
+        "profiel",
+        # RU
+        "опыт",
+        "образование",
+        "навыки",
+        "умения",
+        "компетенции",
+        "проекты",
+        "сертификаты",
+        "языки",
+        "контакт",
+        "контакты",
+        "интересы",
+        "хобби",
+        "резюме",
+        "профиль",
+        # PL
+        "doświadczenie",
+        "wykształcenie",
+        "edukacja",
+        "umiejętności",
+        "kompetencje",
+        "projekty",
+        "certyfikaty",
+        "języki",
+        "zainteresowania",
+        "podsumowanie",
+        # SV
+        "erfarenhet",
+        "utbildning",
+        "färdigheter",
+        "kompetenser",
+        "sammanfattning",
+        "intressen",
+        # NO
+        "erfaring",
+        "utdanning",
+        "ferdigheter",
+        "kompetanser",
+        "sammendrag",
+        "interesser",
+        # DA
+        "uddannelse",
+        "færdigheder",
+        "kompetencer",
+        # FI
+        "kokemus",
+        "työkokemus",
+        "koulutus",
+        "taidot",
+        "osaaminen",
+        "projektit",
+        "kielet",
+        "yhteystiedot",
+        "yhteenveto",
+        "kiinnostukset",
+        "harrastukset",
+        # CS
+        "zkušenosti",
+        "vzdělání",
+        "dovednosti",
+        "schopnosti",
+        "certifikáty",
+        "jazyky",
+        "zájmy",
+        "shrnutí",
+        # HU
+        "tapasztalat",
+        "végzettség",
+        "tanulmányok",
+        "készségek",
+        "képességek",
+        "projektek",
+        "tanúsítványok",
+        "nyelvek",
+        "kapcsolat",
+        "összefoglaló",
+        "érdeklődés",
+        # RO
+        "experiență",
+        "educație",
+        "studii",
+        "competențe",
+        "abilități",
+        "proiecte",
+        "certificări",
+        "limbi",
+        "interese",
+        "rezumat",
+        # AR
+        "الخبرة",
+        "التعليم",
+        "المهارات",
+        "المشاريع",
+        "الشهادات",
+        "اللغات",
+        "الاتصال",
+        "التواصل",
+        "الاهتمامات",
+        "الهوايات",
+        "ملخص",
+        # ZH
+        "工作经验",
+        "教育",
+        "技能",
+        "项目",
+        "证书",
+        "语言",
+        "联系方式",
+        "兴趣",
+        "个人简介",
+        "学历",
+        # JA
+        "職歴",
+        "学歴",
+        "スキル",
+        "プロジェクト",
+        "資格",
+        "言語",
+        "連絡先",
+        "趣味",
+        "概要",
+        # KO
+        "경력",
+        "학력",
+        "기술",
+        "스킬",
+        "프로젝트",
+        "자격증",
+        "언어",
+        "연락처",
+        "취미",
+        "요약",
+        # HI
+        "अनुभव",
+        "शिक्षा",
+        "कौशल",
+        "परियोजनाएं",
+        "प्रमाणपत्र",
+        "भाषाएं",
+        "संपर्क",
+        "रुचियां",
+        "सारांश",
+        # ID
+        "pengalaman",
+        "pendidikan",
+        "keahlian",
+        "keterampilan",
+        "proyek",
+        "sertifikasi",
+        "sertifikat",
+        "bahasa",
+        "kontak",
+        "ringkasan",
+        "minat",
+        # VI
+        "kinh nghiệm",
+        "học vấn",
+        "kỹ năng",
+        "dự án",
+        "chứng chỉ",
+        "ngôn ngữ",
+        "liên hệ",
+        "sở thích",
+        "tóm tắt",
+        # TH
+        "ประสบการณ์",
+        "การศึกษา",
+        "ทักษะ",
+        "โครงการ",
+        "ใบรับรอง",
+        "ภาษา",
+        "ติดต่อ",
+        "ความสนใจ",
+        "สรุป",
+    }
+)
 
 
 def _sniff_header(line: str) -> str | None:
@@ -1802,7 +2348,7 @@ def _sniff_header(line: str) -> str | None:
     if not stripped:
         return None
     # Lines starting with bullet markers are never section headers
-    if re.match(r'^\s*[-*•‣–—▪■]\s', stripped):
+    if re.match(r"^\s*[-*•‣–—▪■]\s", stripped):
         return None
 
     # ── Contact-line guard: email / phone / URL / birth-date lines are NEVER headers ──
@@ -1857,10 +2403,12 @@ def _sniff_header(line: str) -> str | None:
     #    Only return canonical names from _HEADER_HINTS — never return
     #    arbitrary Title Case words (they could be person/company names).
     words = stripped.split()
-    if (1 <= len(words) <= 3
+    if (
+        1 <= len(words) <= 3
         and stripped[0].isupper()
         and not re.search(r"\d|@|https?://|\.com|\.io", stripped, re.I)
-        and all(w[0].isupper() for w in words if len(w) > 2)):
+        and all(w[0].isupper() for w in words if len(w) > 2)
+    ):
         lowered_all = " ".join(w.lower() for w in words)
         for canonical, pattern in _HEADER_HINTS.items():
             if pattern.match(lowered_all):
@@ -1878,6 +2426,7 @@ def _sniff_header(line: str) -> str | None:
 
 # ── headerless detection helpers ──────────────────────────────────────────
 
+
 def _is_title_like(line: str) -> bool:
     """Return True if *line* looks like a short title (not a date/URL/email)."""
     stripped = line.strip()
@@ -1894,8 +2443,12 @@ def _is_title_like(line: str) -> bool:
 
 
 def _detect_headerless_project(
-    lines: List[str], text: str, text_raw: str,
-    has_tech: bool, has_url: bool, bullet_count: int,
+    lines: List[str],
+    text: str,
+    text_raw: str,
+    has_tech: bool,
+    has_url: bool,
+    bullet_count: int,
 ) -> bool:
     """Detect project blocks without explicit section headers.
 
@@ -1918,22 +2471,30 @@ def _detect_headerless_project(
 
 def _detect_headerless_education(lines: List[str], text: str) -> bool:
     """Detect education blocks: >=2 of {degree, institution, year}."""
-    has_degree = bool(re.search(
-        r"\b(?:b\.?s\.?c?|m\.?s\.?c?|b\.?a|m\.?a|ph\.?d|m\.?b\.?a"
-        r"|bachelor|master|diploma|associate|degree)\b",
-        text, re.I,
-    ))
-    has_institution = bool(re.search(
-        r"\b(?:university|institute|college|school|faculty|academy)\b",
-        text, re.I,
-    ))
+    has_degree = bool(
+        re.search(
+            r"\b(?:b\.?s\.?c?|m\.?s\.?c?|b\.?a|m\.?a|ph\.?d|m\.?b\.?a"
+            r"|bachelor|master|diploma|associate|degree)\b",
+            text,
+            re.I,
+        )
+    )
+    has_institution = bool(
+        re.search(
+            r"\b(?:university|institute|college|school|faculty|academy)\b",
+            text,
+            re.I,
+        )
+    )
     has_year = bool(_SINGLE_YEAR_RE.search(text))
     return sum([has_degree, has_institution, has_year]) >= 2
 
 
 def _detect_headerless_interests(
-    lines: List[str], text: str,
-    has_tech: bool, has_url: bool,
+    lines: List[str],
+    text: str,
+    has_tech: bool,
+    has_url: bool,
 ) -> bool:
     """Detect interest/hobby blocks: short lines, no tech/date/URL, human words."""
     if has_tech or has_url:
@@ -1986,6 +2547,7 @@ def _scorer_fallback(text: str) -> str | None:
 
 # ── block classifier ─────────────────────────────────────────────────────
 
+
 def _classify_content(lines: List[str], text: str, text_raw: str) -> str:
     """Content-only block classification using structural patterns.
 
@@ -2019,10 +2581,13 @@ def _classify_content(lines: List[str], text: str, text_raw: str) -> str:
         if _CERT_KEYWORDS.search(text) and edu_score == 0 and exp_score == 0:
             return "certifications"
         has_gpa = bool(re.search(r"\bgpa|cgpa\b", text, re.I))
-        has_degree = bool(re.search(
-            r"\b(?:b\.?s\.?c?|m\.?s\.?c?|b\.?a|m\.?a|ph\.?d|m\.?b\.?a|bachelor|master|diploma|associate|degree)\b",
-            text, re.I,
-        ))
+        has_degree = bool(
+            re.search(
+                r"\b(?:b\.?s\.?c?|m\.?s\.?c?|b\.?a|m\.?a|ph\.?d|m\.?b\.?a|bachelor|master|diploma|associate|degree)\b",
+                text,
+                re.I,
+            )
+        )
         # Education: degree/institution/GPA takes priority over experience
         # when there are no bullets (education blocks rarely have bullets).
         if edu_score > 0 or has_gpa or has_degree:
@@ -2191,10 +2756,13 @@ def classify_block(lines: List[str], *, layout_type: str = "single_column") -> s
 
         # Strong education signals: GPA, degree abbreviations, university names
         has_gpa = bool(re.search(r"\bgpa|cgpa\b", text, re.I))
-        has_degree = bool(re.search(
-            r"\b(?:b\.?s\.?c?|m\.?s\.?c?|b\.?a|m\.?a|ph\.?d|m\.?b\.?a|bachelor|master|diploma|associate|degree)\b",
-            text, re.I,
-        ))
+        has_degree = bool(
+            re.search(
+                r"\b(?:b\.?s\.?c?|m\.?s\.?c?|b\.?a|m\.?a|ph\.?d|m\.?b\.?a|bachelor|master|diploma|associate|degree)\b",
+                text,
+                re.I,
+            )
+        )
 
         # Education: degree/institution/GPA wins over experience when no
         # heavy bullet usage (education blocks rarely have bullets).
@@ -2256,8 +2824,12 @@ def classify_block(lines: List[str], *, layout_type: str = "single_column") -> s
     if len(lines) <= 5:
         delimiter_count_early = sum(len(_SKILL_DELIMITER_RE.findall(l)) for l in lines)
         provider_lines = sum(1 for l in lines if _CERT_PROVIDER_RE.search(l))
-        if (provider_lines >= len(lines) * 0.5 and provider_lines >= 1
-                and not has_education_signal and delimiter_count_early < 3):
+        if (
+            provider_lines >= len(lines) * 0.5
+            and provider_lines >= 1
+            and not has_education_signal
+            and delimiter_count_early < 3
+        ):
             return "certifications"
 
     # 6) Projects: url/github + tech names, or action verbs + tech + url
@@ -2345,8 +2917,13 @@ def classify_block(lines: List[str], *, layout_type: str = "single_column") -> s
 
 # ── validation layer ──────────────────────────────────────────────────────
 
+
 def _validate_section(
-    label: str, *, lines: List[str], text: str, text_raw: str,
+    label: str,
+    *,
+    lines: List[str],
+    text: str,
+    text_raw: str,
     has_header: bool = False,
 ) -> str:
     """Validate that a content-based section label has sufficient signals.
@@ -2367,40 +2944,42 @@ def _validate_section(
     bullet_count = sum(1 for line in lines if _BULLET_RE.match(line))
     has_email = bool(_EMAIL_RE.search(text_raw))
     has_phone = bool(_PHONE_RE.search(text_raw))
-    has_url = bool(
-        re.search(r"https?://|github\.com|gitlab\.com|linkedin\.com", text_raw, re.I)
-    )
+    has_url = bool(re.search(r"https?://|github\.com|gitlab\.com|linkedin\.com", text_raw, re.I))
     has_tech = bool(_TECH_NAMES_RE.search(text))
     avg_words = sum(len(line.split()) for line in lines) / max(len(lines), 1)
 
     if label == "education":
         has_institution = bool(_EDUCATION_KEYWORDS.search(text))
-        has_degree = bool(re.search(
-            r"\b(?:b\.?s\.?c?|m\.?s\.?c?|b\.?a|m\.?a|ph\.?d|m\.?b\.?a"
-            r"|bachelor|master|diploma|associate|degree)\b",
-            text, re.I,
-        ))
+        has_degree = bool(
+            re.search(
+                r"\b(?:b\.?s\.?c?|m\.?s\.?c?|b\.?a|m\.?a|ph\.?d|m\.?b\.?a"
+                r"|bachelor|master|diploma|associate|degree)\b",
+                text,
+                re.I,
+            )
+        )
         has_gpa = bool(re.search(r"\bgpa|cgpa\b", text, re.I))
         has_cap_phrase = bool(_CAPITALIZED_PHRASE_RE.search(text_raw))
         if has_header:
             # Header present → one supporting signal is enough
-            if not any([has_date_signal, has_institution, has_degree,
-                        has_gpa, has_cap_phrase]):
+            if not any([has_date_signal, has_institution, has_degree, has_gpa, has_cap_phrase]):
                 return "other"
         else:
             # No header → need ≥2 corroborating signals
-            signals = sum([has_date_signal, has_institution, has_degree,
-                           has_gpa, has_cap_phrase])
+            signals = sum([has_date_signal, has_institution, has_degree, has_gpa, has_cap_phrase])
             if signals < 2:
                 return "other"
 
     elif label == "experience":
         # Guard: degree + institution + no bullets → this is education, not experience
-        has_degree_v = bool(re.search(
-            r"\b(?:b\.?s\.?c?|m\.?s\.?c?|b\.?a|m\.?a|ph\.?d|m\.?b\.?a"
-            r"|bachelor|master|diploma|associate|degree)\b",
-            text, re.I,
-        ))
+        has_degree_v = bool(
+            re.search(
+                r"\b(?:b\.?s\.?c?|m\.?s\.?c?|b\.?a|m\.?a|ph\.?d|m\.?b\.?a"
+                r"|bachelor|master|diploma|associate|degree)\b",
+                text,
+                re.I,
+            )
+        )
         has_institution_v = bool(_EDUCATION_KEYWORDS.search(text))
         if has_degree_v and has_institution_v and bullet_count <= 1:
             return "education"
@@ -2433,9 +3012,7 @@ def _validate_section(
         if has_date_signal or has_url:
             return "other"
         # A line with commas is a skill list even if word count is high
-        has_comma_list = any(
-            len(_SKILL_DELIMITER_RE.findall(line)) >= 2 for line in lines
-        )
+        has_comma_list = any(len(_SKILL_DELIMITER_RE.findall(line)) >= 2 for line in lines)
         if not has_comma_list:
             has_long_sentence = any(len(line.split()) > 12 for line in lines)
             if has_long_sentence:
@@ -2471,16 +3048,20 @@ _CONFIDENCE_THRESHOLDS: dict[str, float] = {
     "ats_clean": 0.40,
 }
 
-_W_HEADER   = 0.35
-_W_DATE     = 0.15
+_W_HEADER = 0.35
+_W_DATE = 0.15
 _W_KEYWORDS = 0.20
-_W_BULLETS  = 0.10
-_W_URL      = 0.05
-_W_LENGTH   = 0.15
+_W_BULLETS = 0.10
+_W_URL = 0.05
+_W_LENGTH = 0.15
 
 
 def _compute_confidence(
-    label: str, *, lines: List[str], text: str, text_raw: str,
+    label: str,
+    *,
+    lines: List[str],
+    text: str,
+    text_raw: str,
     has_header: bool = False,
 ) -> float:
     """Compute confidence score (0.0–1.0) for a section classification.
@@ -2501,9 +3082,7 @@ def _compute_confidence(
     bullet_count = sum(1 for ln in lines if _BULLET_RE.match(ln))
     has_email = bool(_EMAIL_RE.search(text_raw))
     has_phone = bool(_PHONE_RE.search(text_raw))
-    has_url = bool(
-        re.search(r"https?://|github\.com|gitlab\.com|linkedin\.com", text_raw, re.I)
-    )
+    has_url = bool(re.search(r"https?://|github\.com|gitlab\.com|linkedin\.com", text_raw, re.I))
     has_tech = bool(_TECH_NAMES_RE.search(text))
     avg_words = sum(len(ln.split()) for ln in lines) / max(len(lines), 1)
     n_lines = len(lines)
@@ -2518,10 +3097,14 @@ def _compute_confidence(
         if has_date_signal:
             score += _W_DATE
         has_edu_kw = bool(_EDUCATION_KEYWORDS.search(text))
-        has_degree = bool(re.search(
-            r"\b(?:b\.?s\.?c?|m\.?s\.?c?|b\.?a|m\.?a|ph\.?d|m\.?b\.?a"
-            r"|bachelor|master|diploma|associate|degree)\b", text, re.I,
-        ))
+        has_degree = bool(
+            re.search(
+                r"\b(?:b\.?s\.?c?|m\.?s\.?c?|b\.?a|m\.?a|ph\.?d|m\.?b\.?a"
+                r"|bachelor|master|diploma|associate|degree)\b",
+                text,
+                re.I,
+            )
+        )
         has_gpa = bool(re.search(r"\bgpa|cgpa\b", text, re.I))
         if has_edu_kw or has_degree or has_gpa:
             score += _W_KEYWORDS
@@ -2632,15 +3215,26 @@ def _compute_confidence(
 # ── Multi-section scoring ─────────────────────────────────────────────────────
 
 _SCORED_SECTIONS = [
-    "education", "experience", "projects", "skills",
-    "languages", "contact", "summary", "certifications", "interests",
+    "education",
+    "experience",
+    "projects",
+    "skills",
+    "languages",
+    "contact",
+    "summary",
+    "certifications",
+    "interests",
 ]
 
 _CLOSE_MARGIN = 0.10
 
 
 def _score_all_sections(
-    *, lines: List[str], text: str, text_raw: str, has_header: bool = False,
+    *,
+    lines: List[str],
+    text: str,
+    text_raw: str,
+    has_header: bool = False,
 ) -> Dict[str, float]:
     """Score a block against every candidate section.
 
@@ -2656,9 +3250,7 @@ def _score_all_sections(
     bullet_count = sum(1 for ln in lines if _BULLET_RE.match(ln))
     has_email = bool(_EMAIL_RE.search(text_raw))
     has_phone = bool(_PHONE_RE.search(text_raw))
-    has_url = bool(
-        re.search(r"https?://|github\.com|gitlab\.com|linkedin\.com", text_raw, re.I)
-    )
+    has_url = bool(re.search(r"https?://|github\.com|gitlab\.com|linkedin\.com", text_raw, re.I))
     has_tech = bool(_TECH_NAMES_RE.search(text))
     avg_words = sum(len(ln.split()) for ln in lines) / max(len(lines), 1)
     n_lines = len(lines)
@@ -2666,10 +3258,14 @@ def _score_all_sections(
     total_chars = sum(len(ln) for ln in lines)
     lang_matches = len(_LANGUAGE_KEYWORDS.findall(text))
     has_edu_kw = bool(_EDUCATION_KEYWORDS.search(text))
-    has_degree = bool(re.search(
-        r"\b(?:b\.?s\.?c?|m\.?s\.?c?|b\.?a|m\.?a|ph\.?d|m\.?b\.?a"
-        r"|bachelor|master|diploma|associate|degree)\b", text, re.I,
-    ))
+    has_degree = bool(
+        re.search(
+            r"\b(?:b\.?s\.?c?|m\.?s\.?c?|b\.?a|m\.?a|ph\.?d|m\.?b\.?a"
+            r"|bachelor|master|diploma|associate|degree)\b",
+            text,
+            re.I,
+        )
+    )
     has_gpa = bool(re.search(r"\bgpa|cgpa\b", text, re.I))
     has_exp_kw = bool(_EXPERIENCE_KEYWORDS.search(text))
     has_cert_kw = bool(_CERT_KEYWORDS.search(text))
@@ -2821,9 +3417,7 @@ def _pick_best_section(
     best_score = scores[best_label]
 
     # Prefer initial_label when it's competitive
-    if (initial_label
-            and initial_label in scores
-            and best_score - scores[initial_label] <= _CLOSE_MARGIN):
+    if initial_label and initial_label in scores and best_score - scores[initial_label] <= _CLOSE_MARGIN:
         best_label = initial_label
         best_score = scores[initial_label]
 
@@ -2832,9 +3426,7 @@ def _pick_best_section(
     margin = _CLOSE_MARGIN
     if proximity is not None and proximity <= 2:
         margin = 0.20
-    if (active_section
-            and active_section in scores
-            and best_score - scores[active_section] <= margin):
+    if active_section and active_section in scores and best_score - scores[active_section] <= margin:
         return (active_section, scores[active_section])
 
     return (best_label, best_score)
@@ -2842,18 +3434,46 @@ def _pick_best_section(
 
 # ── header normalisation ──────────────────────────────────────────────────────
 
-_MERGED_SPLIT_RE = re.compile(r'(?<=[a-z])(?=[A-Z])')
+_MERGED_SPLIT_RE = re.compile(r"(?<=[a-z])(?=[A-Z])")
 
 # Known section words used to split merged all-caps headers
-_KNOWN_WORDS = sorted([
-    "EXPERIENCE", "EDUCATION", "SKILLS", "PROJECTS", "CERTIFICATIONS",
-    "LANGUAGES", "SUMMARY", "PROFILE", "OBJECTIVE", "EMPLOYMENT",
-    "QUALIFICATIONS", "COMPETENCIES", "TECHNOLOGIES", "CERTIFICATES",
-    "COMMUNICATION", "PROFESSIONAL", "TECHNICAL", "PERSONAL", "ACADEMIC",
-    "INTEREST", "INTERESTS", "HOBBIES", "REFERENCES", "CONTACT",
-    "VOLUNTEER", "AWARDS", "ACHIEVEMENTS", "ACTIVITIES", "PUBLICATIONS",
-    "ABOUT", "WORK",
-], key=len, reverse=True)  # longest first for greedy match
+_KNOWN_WORDS = sorted(
+    [
+        "EXPERIENCE",
+        "EDUCATION",
+        "SKILLS",
+        "PROJECTS",
+        "CERTIFICATIONS",
+        "LANGUAGES",
+        "SUMMARY",
+        "PROFILE",
+        "OBJECTIVE",
+        "EMPLOYMENT",
+        "QUALIFICATIONS",
+        "COMPETENCIES",
+        "TECHNOLOGIES",
+        "CERTIFICATES",
+        "COMMUNICATION",
+        "PROFESSIONAL",
+        "TECHNICAL",
+        "PERSONAL",
+        "ACADEMIC",
+        "INTEREST",
+        "INTERESTS",
+        "HOBBIES",
+        "REFERENCES",
+        "CONTACT",
+        "VOLUNTEER",
+        "AWARDS",
+        "ACHIEVEMENTS",
+        "ACTIVITIES",
+        "PUBLICATIONS",
+        "ABOUT",
+        "WORK",
+    ],
+    key=len,
+    reverse=True,
+)  # longest first for greedy match
 
 
 def _try_split_merged_line(line: str) -> list[str]:
@@ -2864,7 +3484,7 @@ def _try_split_merged_line(line: str) -> list[str]:
     """
     stripped = line.strip()
     # Must have no spaces and be long enough to contain 2 headers
-    if ' ' in stripped or len(stripped) < 10:
+    if " " in stripped or len(stripped) < 10:
         return [line]
     # All-caps: try known-word split
     if stripped == stripped.upper():
@@ -2874,8 +3494,8 @@ def _try_split_merged_line(line: str) -> list[str]:
             matched = False
             for word in _KNOWN_WORDS:
                 if remaining.upper().startswith(word):
-                    parts.append(remaining[:len(word)])
-                    remaining = remaining[len(word):]
+                    parts.append(remaining[: len(word)])
+                    remaining = remaining[len(word) :]
                     matched = True
                     break
             if not matched:
@@ -2898,14 +3518,14 @@ def _split_merged_allcaps(text: str) -> str:
         matched = False
         for word in _KNOWN_WORDS:
             if remaining.upper().startswith(word):
-                parts.append(remaining[:len(word)])
-                remaining = remaining[len(word):]
+                parts.append(remaining[: len(word)])
+                remaining = remaining[len(word) :]
                 matched = True
                 break
         if not matched:
             parts.append(remaining)
             break
-    return ' '.join(parts) if len(parts) > 1 else text
+    return " ".join(parts) if len(parts) > 1 else text
 
 
 def _normalize_header(raw: str) -> str:
@@ -2918,13 +3538,13 @@ def _normalize_header(raw: str) -> str:
     """
     t = raw.strip()
     # remove trailing colon (possibly with space before it)
-    t = re.sub(r'\s*:\s*$', '', t)
+    t = re.sub(r"\s*:\s*$", "", t)
     # split merged uppercase words: "EDUCATIONCOMMUNICATION" → "EDUCATION COMMUNICATION"
-    if ' ' not in t and len(t) > 14 and t == t.upper():
+    if " " not in t and len(t) > 14 and t == t.upper():
         t = _split_merged_allcaps(t)
     # split mixed case merged words: "EducationCommunication"
-    elif ' ' not in t and len(t) > 14:
-        t = _MERGED_SPLIT_RE.sub(' ', t)
+    elif " " not in t and len(t) > 14:
+        t = _MERGED_SPLIT_RE.sub(" ", t)
     return t
 
 
@@ -2934,9 +3554,9 @@ _SAFE_MODE = os.getenv("SAFE_MODE", "").lower() in ("1", "true", "yes")
 _MAX_INPUT_CHARS = 50_000 if _SAFE_MODE else 100_000
 _MAX_INPUT_LINES = 500 if _SAFE_MODE else 1_000
 _MAX_BLOCKS = 1_000 if _SAFE_MODE else 2_000
-_MAX_WORDS_PER_LINE = 200       # truncate absurdly long lines
-_MAX_REGEX_INPUT = 10_000      # max chars fed to any single regex call
-_MAX_SECTIONS = 20             # max distinct section keys in output
+_MAX_WORDS_PER_LINE = 200  # truncate absurdly long lines
+_MAX_REGEX_INPUT = 10_000  # max chars fed to any single regex call
+_MAX_SECTIONS = 20  # max distinct section keys in output
 
 
 def detect_sections(
@@ -2994,31 +3614,61 @@ def detect_sections(
 
     # Map non-canonical labels to canonical section names
     _LABEL_ALIASES: Dict[str, str] = {
-        "profile": "summary", "about": "summary", "about me": "summary",
-        "objective": "summary", "personal": "summary", "introduction": "summary",
-        "personal statement": "summary", "personal profile": "summary",
-        "professional summary": "summary", "executive summary": "summary",
-        "executive profile": "summary", "career summary": "summary", "career objective": "summary",
+        "profile": "summary",
+        "about": "summary",
+        "about me": "summary",
+        "objective": "summary",
+        "personal": "summary",
+        "introduction": "summary",
+        "personal statement": "summary",
+        "personal profile": "summary",
+        "professional summary": "summary",
+        "executive summary": "summary",
+        "executive profile": "summary",
+        "career summary": "summary",
+        "career objective": "summary",
         "personal information": "summary",
-        "work": "experience", "employment": "experience", "work experience": "experience",
-        "professional experience": "experience", "career history": "experience",
-        "work history": "experience", "work background": "experience",
-        "employment history": "experience", "training": "experience", "trainings": "experience",
-        "academic": "education", "academics": "education", "qualifications": "education",
-        "academic qualifications": "education", "educational background": "education",
-        "technical skills": "skills", "core competencies": "skills", "skill set": "skills", "skills set": "skills",
-        "competencies": "skills", "technologies": "skills",
+        "work": "experience",
+        "employment": "experience",
+        "work experience": "experience",
+        "professional experience": "experience",
+        "career history": "experience",
+        "work history": "experience",
+        "work background": "experience",
+        "employment history": "experience",
+        "training": "experience",
+        "trainings": "experience",
+        "academic": "education",
+        "academics": "education",
+        "qualifications": "education",
+        "academic qualifications": "education",
+        "educational background": "education",
+        "technical skills": "skills",
+        "core competencies": "skills",
+        "skill set": "skills",
+        "skills set": "skills",
+        "competencies": "skills",
+        "technologies": "skills",
         "project": "projects",
-        "certification": "certifications", "certificates": "certifications",
-        "certificate": "certifications", "licenses": "certifications",
+        "certification": "certifications",
+        "certificates": "certifications",
+        "certificate": "certifications",
+        "licenses": "certifications",
         "language": "languages",
-        "communication": "contact", "contact information": "contact",
-        "interest": "interests", "interests": "interests",
-        "personal interest": "interests", "personal interests": "interests",
+        "communication": "contact",
+        "contact information": "contact",
+        "interest": "interests",
+        "interests": "interests",
+        "personal interest": "interests",
+        "personal interests": "interests",
         "hobbies": "interests",
-        "volunteer": "misc", "awards": "misc", "achievements": "misc",
-        "publications": "misc", "activities": "misc",
-        "other activities": "misc", "other": "misc",
+        "volunteer": "misc",
+        "awards": "misc",
+        "achievements": "misc",
+        "publications": "misc",
+        "activities": "misc",
+        "other activities": "misc",
+        "other": "misc",
     }
 
     # Pre-process: tag each block with its header hint and content lines
@@ -3034,14 +3684,15 @@ def detect_sections(
         # header get relaxed validation (has_header=True); blocks with
         # no header get strict multi-signal validation.
         if label not in ("noise", "header", "other"):
-            has_hdr = header_hint is not None and (
-                header_hint in _CANONICAL_KEYS or header_hint == "noise"
-            )
+            has_hdr = header_hint is not None and (header_hint in _CANONICAL_KEYS or header_hint == "noise")
             v_lines = content_lines or block
             v_text = " ".join(v_lines).lower()
             v_text_raw = " ".join(v_lines)
             label = _validate_section(
-                label, lines=v_lines, text=v_text, text_raw=v_text_raw,
+                label,
+                lines=v_lines,
+                text=v_text,
+                text_raw=v_text_raw,
                 has_header=has_hdr,
             )
 
@@ -3053,7 +3704,9 @@ def detect_sections(
         logger.warning(
             "detect_sections TIMEOUT: classification took %.2fs (limit %.1fs), "
             "returning partial results from %d tagged blocks",
-            _elapsed_classify, _CLASSIFIER_TIMEOUT_SECONDS, len(tagged),
+            _elapsed_classify,
+            _CLASSIFIER_TIMEOUT_SECONDS,
+            len(tagged),
         )
         # Build sections from what we have so far and return early
         for _label, _hdr, _clines, _blk in tagged:
@@ -3065,7 +3718,8 @@ def detect_sections(
     if _elapsed_classify > _CLASSIFIER_WARN_SECONDS:
         logger.warning(
             "detect_sections SLOW: classification took %.2fs (warn threshold %.1fs)",
-            _elapsed_classify, _CLASSIFIER_WARN_SECONDS,
+            _elapsed_classify,
+            _CLASSIFIER_WARN_SECONDS,
         )
 
     # Layout-dependent confidence threshold
@@ -3081,16 +3735,10 @@ def detect_sections(
         if header_hint and not has_content:
             # Check if next block is also a bare header
             next_is_header = (
-                i + 1 < len(tagged)
-                and tagged[i + 1][1] is not None
-                and not any(l.strip() for l in tagged[i + 1][2])
+                i + 1 < len(tagged) and tagged[i + 1][1] is not None and not any(l.strip() for l in tagged[i + 1][2])
             )
             # Or previous block was a bare header
-            prev_is_header = (
-                i > 0
-                and tagged[i - 1][1] is not None
-                and not any(l.strip() for l in tagged[i - 1][2])
-            )
+            prev_is_header = i > 0 and tagged[i - 1][1] is not None and not any(l.strip() for l in tagged[i - 1][2])
             if next_is_header or prev_is_header:
                 continue  # sidebar label — skip entirely
 
@@ -3110,9 +3758,7 @@ def detect_sections(
         c_lines = content_lines or block
         c_text = " ".join(c_lines).lower()
         c_text_raw = " ".join(c_lines)
-        has_hdr_flag = header_hint is not None and (
-            header_hint in _CANONICAL_KEYS or header_hint == "noise"
-        )
+        has_hdr_flag = header_hint is not None and (header_hint in _CANONICAL_KEYS or header_hint == "noise")
 
         if header_hint:
             # Header blocks definitively establish the section.
@@ -3125,29 +3771,34 @@ def detect_sections(
         else:
             # No header: score all candidate sections and pick best
             all_scores = _score_all_sections(
-                lines=c_lines, text=c_text, text_raw=c_text_raw,
+                lines=c_lines,
+                text=c_text,
+                text_raw=c_text_raw,
                 has_header=has_hdr_flag,
             )
-            nearby_active = (
-                active_section
-                if active_section and (i - active_section_idx) <= 5
-                else None
-            )
+            nearby_active = active_section if active_section and (i - active_section_idx) <= 5 else None
             # Pass proximity so _pick_best_section can use a wider
             # margin for blocks right next to their section header.
             proximity = (i - active_section_idx) if active_section else None
             scored_label, scored_score = _pick_best_section(
-                all_scores, nearby_active, initial_label=label,
+                all_scores,
+                nearby_active,
+                initial_label=label,
                 proximity=proximity,
             )
-
-
 
             # If the block was initially classified as "header" or "other",
             # do not allow overriding it with weak/structural scores of
             # interests, languages, skills, projects, certifications, or summary
             # unless there is an actual keyword signal for that section.
-            if label in ("header", "other") and scored_label in ("interests", "languages", "skills", "projects", "certifications", "summary"):
+            if label in ("header", "other") and scored_label in (
+                "interests",
+                "languages",
+                "skills",
+                "projects",
+                "certifications",
+                "summary",
+            ):
                 has_interest_kw = bool(_INTEREST_KEYWORDS.search(c_text))
                 lang_matches = len(_LANGUAGE_KEYWORDS.findall(c_text))
                 has_tech = bool(_TECH_NAMES_RE.search(c_text))
@@ -3212,8 +3863,7 @@ def detect_sections(
         _SOURCE_RANK = {"header": 3, "score": 2, "fallback": 1}
         if label not in ("other", "header", "noise"):
             existing_source = section_sources.get(label)
-            if (existing_source is None
-                    or _SOURCE_RANK.get(_source, 0) > _SOURCE_RANK.get(existing_source, 0)):
+            if existing_source is None or _SOURCE_RANK.get(_source, 0) > _SOURCE_RANK.get(existing_source, 0):
                 section_sources[label] = _source
 
         sections.setdefault(label, [])
@@ -3227,7 +3877,9 @@ def detect_sections(
         {k: len(v) for k, v in sections.items()},
     )
     _structured_log(
-        logger, logging.INFO, "detect_sections",
+        logger,
+        logging.INFO,
+        "detect_sections",
         latency=round(_elapsed, 3),
         blocks=len(blocks),
         sections={k: len(v) for k, v in sections.items()},
@@ -3236,8 +3888,7 @@ def detect_sections(
 
     # ── Security: cap distinct section count ──
     if len(sections) > _MAX_SECTIONS:
-        logger.warning("detect_sections: section count capped %d → %d",
-                       len(sections), _MAX_SECTIONS)
+        logger.warning("detect_sections: section count capped %d → %d", len(sections), _MAX_SECTIONS)
         # Keep sections with most lines; drop smallest
         sorted_keys = sorted(sections.keys(), key=lambda k: len(sections[k]), reverse=True)
         for extra_key in sorted_keys[_MAX_SECTIONS:]:
@@ -3251,6 +3902,7 @@ def detect_sections(
 # ── Parser version registry ───────────────────────────────────────────────
 # Maps version tags to parser functions.  ``get_parser()`` returns the
 # active implementation selected by ``PARSER_VERSION`` env var.
+
 
 def _detect_sections_v1(
     text: str,
@@ -3298,7 +3950,8 @@ def get_parser():
             if canary_fn is not None:
                 logger.info(
                     "Canary routing: using %s (%d%% rollout)",
-                    _CANARY_VERSION, _CANARY_PERCENT,
+                    _CANARY_VERSION,
+                    _CANARY_PERCENT,
                 )
                 return canary_fn
             logger.warning(
@@ -3309,7 +3962,8 @@ def get_parser():
     fn = _PARSER_REGISTRY.get(PARSER_VERSION)
     if fn is None:
         logger.warning(
-            "Unknown PARSER_VERSION=%r, falling back to v1", PARSER_VERSION,
+            "Unknown PARSER_VERSION=%r, falling back to v1",
+            PARSER_VERSION,
         )
         fn = _PARSER_REGISTRY["v1"]
     return fn

@@ -1,4 +1,5 @@
 """Tests for services/section_resolver.py — cross-section classification fixes."""
+
 import pytest
 from services.section_resolver import resolve_parsed_entries, resolve_raw_sections
 
@@ -7,9 +8,15 @@ class TestResolveRawSections:
     def _make_sections(self, **kwargs):
         """Helper: minimal sections dict with required keys."""
         base = {
-            "header": [], "summary": [], "experience": [],
-            "education": [], "skills": [], "projects": [],
-            "certifications": [], "languages": [], "misc": [],
+            "header": [],
+            "summary": [],
+            "experience": [],
+            "education": [],
+            "skills": [],
+            "projects": [],
+            "certifications": [],
+            "languages": [],
+            "misc": [],
         }
         base.update(kwargs)
         return base

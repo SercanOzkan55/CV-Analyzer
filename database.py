@@ -30,9 +30,7 @@ _mock_mode = _truthy(os.getenv("MOCK_SERVICES")) and ENV.lower() not in (
     "prod",
 )
 _mock_use_real_db = _truthy(os.getenv("MOCK_USE_REAL_DB"))
-_raw_database_url = os.getenv("DATABASE_URL") or _read_secret_file(
-    os.getenv("DATABASE_URL_FILE")
-)
+_raw_database_url = os.getenv("DATABASE_URL") or _read_secret_file(os.getenv("DATABASE_URL_FILE"))
 
 if _mock_mode and not _mock_use_real_db:
     DATABASE_URL = os.getenv("MOCK_DATABASE_URL", "sqlite:///./mock_dev.db")
@@ -58,9 +56,7 @@ if DATABASE_URL and "supabase.com" in DATABASE_URL:
     )
 
 if ENV == "test" and not DATABASE_URL:
-    engine = create_engine(
-        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
-    )
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
 elif DATABASE_URL and DATABASE_URL.startswith("sqlite"):
     sqlite_kwargs = {"connect_args": {"check_same_thread": False}}
     if DATABASE_URL in ("sqlite://", "sqlite:///:memory:"):
@@ -76,9 +72,7 @@ else:
         echo=False,
     )
 
-SessionLocal = sessionmaker(
-    autocommit=False, autoflush=False, bind=engine, expire_on_commit=False
-)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, expire_on_commit=False)
 
 Base = declarative_base()
 

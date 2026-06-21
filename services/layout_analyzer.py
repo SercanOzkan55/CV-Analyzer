@@ -30,8 +30,13 @@ _UNDERLINE_RE = re.compile(r"^[-=_]{3,}\s*$")
 
 # ── Types ─────────────────────────────────────────────────────────────────
 LayoutType = Literal[
-    "default", "sidebar", "academic", "developer",
-    "skills_heavy", "no_header", "ats_clean",
+    "default",
+    "sidebar",
+    "academic",
+    "developer",
+    "skills_heavy",
+    "no_header",
+    "ats_clean",
 ]
 HeaderStyle = Literal["allcaps", "titlecase", "underline", "mixed", "none"]
 
@@ -65,6 +70,7 @@ class LayoutInfo:
 # ═══════════════════════════════════════════════════════════════════════════
 # PUBLIC API
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def analyze_layout(text: str) -> LayoutInfo:
     """Analyze structural layout of *text*.
@@ -177,6 +183,7 @@ def _classify_layout(
 # ═══════════════════════════════════════════════════════════════════════════
 # PRIVATE HELPERS
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def _detect_and_linearize_columns(text: str, lines: List[str]) -> str:
     """Detect interleaved multi-column text and linearize into single column.

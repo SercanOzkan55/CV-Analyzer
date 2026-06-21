@@ -1,4 +1,5 @@
 """Tests for services/job_match_service.py — CV-job matching."""
+
 import pytest
 from unittest.mock import patch
 from schemas.cv_model import CVModel
@@ -14,7 +15,7 @@ def _sample_model():
         candidate_name="John Doe",
         detected_skills=["python", "javascript", "docker", "aws"],
         cv_text="Experienced software engineer with Python and Docker skills. "
-                "Built REST APIs and microservices. Led team of 5 engineers.",
+        "Built REST APIs and microservices. Led team of 5 engineers.",
     )
 
 

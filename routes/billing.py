@@ -6,6 +6,8 @@ main module; later passes can move those shared helpers into services.
 """
 
 from fastapi import APIRouter
+import requests
+
 from core.runtime_bridge import main_module as _main_module
 from core.route_dependencies import *  # noqa: F403
 
@@ -105,10 +107,7 @@ def _parse_billing_status_or_400(billing_status: str | None) -> str:
     if value not in User.BILLING_STATUSES:
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Invalid billing_status. Allowed: "
-                f"{', '.join(User.BILLING_STATUSES)}"
-            ),
+            detail=(f"Invalid billing_status. Allowed: {', '.join(User.BILLING_STATUSES)}"),
         )
     return value
 
@@ -119,10 +118,7 @@ def _parse_user_role_or_400(role: str | None) -> str:
     if value not in allowed_roles:
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Invalid role. Allowed: "
-                f"{', '.join(sorted(allowed_roles))}"
-            ),
+            detail=(f"Invalid role. Allowed: {', '.join(sorted(allowed_roles))}"),
         )
     return value
 
@@ -143,11 +139,7 @@ def _parse_billing_admin_allowed_emails() -> set[str]:
     raw = str(os.getenv("BILLING_ADMIN_ALLOWED_EMAILS", "")).strip()
     if not raw:
         return set()
-    return {
-        item.strip().lower()
-        for item in raw.split(",")
-        if item and item.strip()
-    }
+    return {item.strip().lower() for item in raw.split(",") if item and item.strip()}
 
 
 def _require_billing_admin_access(
@@ -201,7 +193,9 @@ def billing_admin_me(
 
 def _email_backend_status() -> dict:
     return {
-        "from_email": bool(os.getenv("REMINDER_EMAIL_FROM") or os.getenv("SMTP_FROM") or os.getenv("SENDGRID_FROM_EMAIL")),
+        "from_email": bool(
+            os.getenv("REMINDER_EMAIL_FROM") or os.getenv("SMTP_FROM") or os.getenv("SENDGRID_FROM_EMAIL")
+        ),
         "sendgrid_configured": bool(os.getenv("SENDGRID_API_KEY")),
         "smtp_configured": bool(os.getenv("SMTP_HOST")),
         "default_from": os.getenv("REMINDER_EMAIL_FROM") or os.getenv("SMTP_FROM") or "sikayet.cvanalizor@gmail.com",
@@ -342,7 +336,12 @@ def admin_ops_health(
         "status": status,
         "ready": bool(_app_ready),
         "panic_mode": bool(_panic_mode),
-        "instance": {"build_id": BUILD_ID, "git_sha": GIT_SHA, "parser_build": PARSER_BUILD, "instance_id": INSTANCE_ID},
+        "instance": {
+            "build_id": BUILD_ID,
+            "git_sha": GIT_SHA,
+            "parser_build": PARSER_BUILD,
+            "instance_id": INSTANCE_ID,
+        },
         "dependencies": {"database": {"status": db_status, "error": db_error}},
         "disk_usage_percent": disk_pct,
         "counts": counts,
@@ -433,18 +432,22 @@ def admin_parser_regression(
             error = str(exc)[:240]
 
         missing_sections = sorted(expected_sections - {item.lower() for item in sections})
-        lang_ok = not case.expected_language or str(detected_language).lower().startswith(str(case.expected_language).lower())
+        lang_ok = not case.expected_language or str(detected_language).lower().startswith(
+            str(case.expected_language).lower()
+        )
         passed = bool(lang_ok and not missing_sections and not error)
-        results.append({
-            "name": case.name,
-            "passed": passed,
-            "detected_language": detected_language,
-            "expected_language": case.expected_language,
-            "sections": sections,
-            "missing_sections": missing_sections,
-            "candidate_name": payload.get("full_name") or payload.get("name") or "",
-            "error": error,
-        })
+        results.append(
+            {
+                "name": case.name,
+                "passed": passed,
+                "detected_language": detected_language,
+                "expected_language": case.expected_language,
+                "sections": sections,
+                "missing_sections": missing_sections,
+                "candidate_name": payload.get("full_name") or payload.get("name") or "",
+                "error": error,
+            }
+        )
 
     passed_count = sum(1 for item in results if item["passed"])
     return {
@@ -480,12 +483,7 @@ def billing_admin_list_users(
         query = query.filter(User.plan_type == normalized_plan)
 
     total = int(query.count())
-    rows = (
-        query.order_by(User.created_at.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
+    rows = query.order_by(User.created_at.desc()).offset(offset).limit(limit).all()
 
     items = [
         {
@@ -586,25 +584,21 @@ def _stripe_api_post(path: str, form_data: dict[str, str]) -> dict:
     if not secret_key:
         raise HTTPException(status_code=503, detail="Stripe is not configured")
 
-    encoded = urllib.parse.urlencode(form_data).encode("utf-8")
-    req = urllib.request.Request(
-        f"https://api.stripe.com{path}",
-        data=encoded,
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {secret_key}",
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-    )
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            body = resp.read().decode("utf-8")
-            return json.loads(body)
-    except urllib.error.HTTPError as exc:
-        body = ""
+        response = requests.post(
+            f"https://api.stripe.com{path}",
+            data=form_data,
+            headers={
+                "Authorization": f"Bearer {secret_key}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            timeout=20,
+        )
+        response.raise_for_status()
+        return response.json()
+    except requests.HTTPError as exc:
         try:
-            body = exc.read().decode("utf-8", errors="ignore")
-            payload = json.loads(body)
+            payload = exc.response.json() if exc.response is not None else {}
             message = payload.get("error", {}).get("message")
             if message:
                 raise HTTPException(status_code=502, detail=f"Stripe error: {message}")
@@ -613,8 +607,10 @@ def _stripe_api_post(path: str, form_data: dict[str, str]) -> dict:
         except Exception:
             pass
         raise HTTPException(status_code=502, detail="Stripe request failed")
-    except Exception:
+    except requests.RequestException:
         raise HTTPException(status_code=502, detail="Stripe connection failed")
+    except ValueError:
+        raise HTTPException(status_code=502, detail="Stripe response was invalid")
 
 
 def _stripe_api_get(
@@ -638,26 +634,20 @@ def _stripe_api_get(
     if not secret_key:
         raise HTTPException(status_code=503, detail="Stripe is not configured")
 
-    query = ""
-    if query_params:
-        query = "?" + urllib.parse.urlencode(query_params)
-
-    req = urllib.request.Request(
-        f"https://api.stripe.com{path}{query}",
-        method="GET",
-        headers={
-            "Authorization": f"Bearer {secret_key}",
-        },
-    )
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            body = resp.read().decode("utf-8")
-            return json.loads(body)
-    except urllib.error.HTTPError as exc:
-        body = ""
+        response = requests.get(
+            f"https://api.stripe.com{path}",
+            params=query_params,
+            headers={
+                "Authorization": f"Bearer {secret_key}",
+            },
+            timeout=20,
+        )
+        response.raise_for_status()
+        return response.json()
+    except requests.HTTPError as exc:
         try:
-            body = exc.read().decode("utf-8", errors="ignore")
-            payload = json.loads(body)
+            payload = exc.response.json() if exc.response is not None else {}
             message = payload.get("error", {}).get("message")
             if message:
                 raise HTTPException(status_code=502, detail=f"Stripe error: {message}")
@@ -666,18 +656,16 @@ def _stripe_api_get(
         except Exception:
             pass
         raise HTTPException(status_code=502, detail="Stripe request failed")
-    except Exception:
+    except requests.RequestException:
         raise HTTPException(status_code=502, detail="Stripe connection failed")
+    except ValueError:
+        raise HTTPException(status_code=502, detail="Stripe response was invalid")
 
 
 def _get_billing_owner(db, db_user: User):
     """Return (owner_type, owner_model) for billing operations."""
     if db_user.role == "recruiter" and db_user.organization_id:
-        org = (
-            db.query(Organization)
-            .filter(Organization.id == db_user.organization_id)
-            .first()
-        )
+        org = db.query(Organization).filter(Organization.id == db_user.organization_id).first()
         if org:
             return "organization", org
     return "user", db_user
@@ -1049,7 +1037,8 @@ def create_contact_sales_request(
     )
 
     crm_webhook_url = os.getenv("CRM_WEBHOOK_URL", "").strip()
-    if crm_webhook_url:
+    parsed_crm_webhook = urllib.parse.urlparse(crm_webhook_url) if crm_webhook_url else None
+    if parsed_crm_webhook and parsed_crm_webhook.scheme == "https" and parsed_crm_webhook.netloc:
         payload = {
             "event": "contact_sales",
             "supabase_id": supabase_id,
@@ -1061,20 +1050,15 @@ def create_contact_sales_request(
             "message": message,
             "created_at": datetime.utcnow().isoformat() + "Z",
         }
-        req = urllib.request.Request(
-            crm_webhook_url,
-            data=json.dumps(payload).encode("utf-8"),
-            method="POST",
-            headers={"Content-Type": "application/json"},
-        )
         try:
-            with urllib.request.urlopen(req, timeout=10):
-                return {
-                    "status": "accepted",
-                    "mode": "crm_webhook",
-                    "plan_type": plan_type,
-                }
-        except Exception:
+            response = requests.post(crm_webhook_url, json=payload, timeout=10)
+            response.raise_for_status()
+            return {
+                "status": "accepted",
+                "mode": "crm_webhook",
+                "plan_type": plan_type,
+            }
+        except requests.RequestException:
             # Fall through to mailto fallback so the user can still reach sales.
             pass
 
@@ -1140,11 +1124,7 @@ def activate_premium_trial(
 
     org_updated = False
     if db_user.role == "recruiter" and db_user.organization_id:
-        org = (
-            db.query(Organization)
-            .filter(Organization.id == db_user.organization_id)
-            .first()
-        )
+        org = db.query(Organization).filter(Organization.id == db_user.organization_id).first()
         if org:
             org.plan_type = requested
             org.billing_status = "trialing"
@@ -1233,9 +1213,7 @@ def admin_set_user_plan(
 
     organization_updated = False
     organization_id = getattr(db_user, "organization_id", None)
-    if body.update_organization and organization_id and (
-        desired_plan is not None or desired_status is not None
-    ):
+    if body.update_organization and organization_id and (desired_plan is not None or desired_status is not None):
         org = db.query(Organization).filter(Organization.id == organization_id).first()
         if org:
             if desired_plan is not None:
@@ -1287,6 +1265,7 @@ async def stripe_webhook(request: Request, db=Depends(get_db)):
     Verifies Stripe signature and processes event.
     In development (MOCK_SERVICES=true), signature validation is skipped for testing.
     """
+
     def _get_secret_or_file(env_name: str, file_env_name: str, default: str = "") -> str:
         value = os.getenv(env_name, "").strip()
         if value:
@@ -1300,9 +1279,7 @@ async def stripe_webhook(request: Request, db=Depends(get_db)):
         except Exception:
             return default
 
-    STRIPE_WEBHOOK_SECRET = _get_secret_or_file(
-        "STRIPE_WEBHOOK_SECRET", "STRIPE_WEBHOOK_SECRET_FILE", ""
-    )
+    STRIPE_WEBHOOK_SECRET = _get_secret_or_file("STRIPE_WEBHOOK_SECRET", "STRIPE_WEBHOOK_SECRET_FILE", "")
     IS_TEST_MODE = _main_module().MOCK_SERVICES_ON
 
     payload = await request.body()
@@ -1345,9 +1322,7 @@ async def stripe_webhook(request: Request, db=Depends(get_db)):
 
             # Compute expected signature per Stripe's scheme
             signed_payload = f"{timestamp}.".encode() + payload
-            expected_sig = hmac.new(
-                STRIPE_WEBHOOK_SECRET.encode(), signed_payload, hashlib.sha256
-            ).hexdigest()
+            expected_sig = hmac.new(STRIPE_WEBHOOK_SECRET.encode(), signed_payload, hashlib.sha256).hexdigest()
 
             if not any(hmac.compare_digest(expected_sig, s) for s in signatures):
                 return JSONResponse(status_code=401, content={"error": "Invalid signature"})
@@ -1383,17 +1358,9 @@ async def stripe_webhook(request: Request, db=Depends(get_db)):
                     ],
                 )
                 line_items_obj = session_details.get("line_items", {})
-                line_items = (
-                    line_items_obj.get("data", [])
-                    if isinstance(line_items_obj, dict)
-                    else []
-                )
+                line_items = line_items_obj.get("data", []) if isinstance(line_items_obj, dict) else []
                 first_item = line_items[0] if isinstance(line_items, list) and line_items else {}
-                price_obj = (
-                    first_item.get("price", {})
-                    if isinstance(first_item, dict)
-                    else {}
-                )
+                price_obj = first_item.get("price", {}) if isinstance(first_item, dict) else {}
                 if isinstance(price_obj, dict):
                     stripe_price_id = str(price_obj.get("id") or "") or None
                     recurring = price_obj.get("recurring", {})
@@ -1417,21 +1384,9 @@ async def stripe_webhook(request: Request, db=Depends(get_db)):
                     breakdown = total_details.get("breakdown", {})
                     if isinstance(breakdown, dict):
                         discounts = breakdown.get("discounts", [])
-                        first_discount = (
-                            discounts[0]
-                            if isinstance(discounts, list) and discounts
-                            else {}
-                        )
-                        discount_obj = (
-                            first_discount.get("discount", {})
-                            if isinstance(first_discount, dict)
-                            else {}
-                        )
-                        coupon_obj = (
-                            discount_obj.get("coupon", {})
-                            if isinstance(discount_obj, dict)
-                            else {}
-                        )
+                        first_discount = discounts[0] if isinstance(discounts, list) and discounts else {}
+                        discount_obj = first_discount.get("discount", {}) if isinstance(first_discount, dict) else {}
+                        coupon_obj = discount_obj.get("coupon", {}) if isinstance(discount_obj, dict) else {}
                         if isinstance(coupon_obj, dict):
                             code = str(coupon_obj.get("id") or coupon_obj.get("name") or "").strip()
                             if code:
@@ -1470,11 +1425,7 @@ async def stripe_webhook(request: Request, db=Depends(get_db)):
             try:
                 owner_type = "unknown"
                 tracked_user_id = None
-                user = (
-                    db.query(User)
-                    .filter(User.stripe_customer_id == customer_id)
-                    .first()
-                )
+                user = db.query(User).filter(User.stripe_customer_id == customer_id).first()
                 if user:
                     owner_type = "user"
                     tracked_user_id = user.id
@@ -1484,11 +1435,7 @@ async def stripe_webhook(request: Request, db=Depends(get_db)):
                     db.add(user)
                     db.commit()
                 else:
-                    org = (
-                        db.query(Organization)
-                        .filter(Organization.stripe_customer_id == customer_id)
-                        .first()
-                    )
+                    org = db.query(Organization).filter(Organization.stripe_customer_id == customer_id).first()
                     if org:
                         owner_type = "organization"
                         org.billing_status = status or "active"
@@ -1523,11 +1470,7 @@ async def stripe_webhook(request: Request, db=Depends(get_db)):
             try:
                 owner_type = "unknown"
                 tracked_user_id = None
-                user = (
-                    db.query(User)
-                    .filter(User.stripe_customer_id == customer_id)
-                    .first()
-                )
+                user = db.query(User).filter(User.stripe_customer_id == customer_id).first()
                 if user:
                     owner_type = "user"
                     tracked_user_id = user.id
@@ -1535,11 +1478,7 @@ async def stripe_webhook(request: Request, db=Depends(get_db)):
                     db.add(user)
                     db.commit()
                 else:
-                    org = (
-                        db.query(Organization)
-                        .filter(Organization.stripe_customer_id == customer_id)
-                        .first()
-                    )
+                    org = db.query(Organization).filter(Organization.stripe_customer_id == customer_id).first()
                     if org:
                         owner_type = "organization"
                         org.billing_status = "canceled"
@@ -1579,4 +1518,3 @@ async def stripe_webhook(request: Request, db=Depends(get_db)):
 
 # Recruiter routes moved to routes/recruiter.py
 # ================================================
-

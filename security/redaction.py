@@ -82,7 +82,9 @@ def redact_for_log(value: Any, key: str | None = None, max_depth: int = 4) -> An
     """Redact a value for structured logging/audit payloads."""
     normalized_key = str(key or "").strip().lower()
 
-    if normalized_key in _SENSITIVE_KEYS or any(part in normalized_key for part in ("password", "secret", "token", "api_key")):
+    if normalized_key in _SENSITIVE_KEYS or any(
+        part in normalized_key for part in ("password", "secret", "token", "api_key")
+    ):
         return "[redacted-secret]"
 
     if value is None or isinstance(value, bool | int | float):
@@ -109,10 +111,7 @@ def redact_for_log(value: Any, key: str | None = None, max_depth: int = 4) -> An
         return redact_sensitive_text(serialized, max_length=500)
 
     if isinstance(value, Mapping):
-        return {
-            str(k): redact_for_log(v, key=str(k), max_depth=max_depth - 1)
-            for k, v in value.items()
-        }
+        return {str(k): redact_for_log(v, key=str(k), max_depth=max_depth - 1) for k, v in value.items()}
 
     if isinstance(value, Sequence) and not isinstance(value, bytes | bytearray | str):
         return [redact_for_log(item, max_depth=max_depth - 1) for item in list(value)[:50]]

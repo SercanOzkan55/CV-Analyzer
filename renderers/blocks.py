@@ -15,15 +15,15 @@ from schemas.cv_model import CVModel, Education, Experience, Project
 # PDF extractors often emit standalone diacritics *before* the base letter
 # instead of proper combining characters (e.g. ¨O instead of Ö).
 _STANDALONE_TO_COMBINING: dict[str, str] = {
-    "\u00A8": "\u0308",  # DIAERESIS  ¨  → ö ü ä ë ï
-    "\u00B8": "\u0327",  # CEDILLA    ¸  → ç ş
-    "\u02D8": "\u0306",  # BREVE      ˘  → ğ
-    "\u02D9": "\u0307",  # DOT ABOVE  ˙  → İ
-    "\u00B4": "\u0301",  # ACUTE      ´  → é á í
+    "\u00a8": "\u0308",  # DIAERESIS  ¨  → ö ü ä ë ï
+    "\u00b8": "\u0327",  # CEDILLA    ¸  → ç ş
+    "\u02d8": "\u0306",  # BREVE      ˘  → ğ
+    "\u02d9": "\u0307",  # DOT ABOVE  ˙  → İ
+    "\u00b4": "\u0301",  # ACUTE      ´  → é á í
     "\u0060": "\u0300",  # GRAVE      `  → è à
-    "\u02DC": "\u0303",  # TILDE      ˜  → ñ ã
-    "\u02C7": "\u030C",  # CARON      ˇ  → š č ž
-    "\u02DA": "\u030A",  # RING ABOVE ˚  → å
+    "\u02dc": "\u0303",  # TILDE      ˜  → ñ ã
+    "\u02c7": "\u030c",  # CARON      ˇ  → š č ž
+    "\u02da": "\u030a",  # RING ABOVE ˚  → å
 }
 
 _DIACRIT_BEFORE_LETTER_RE = re.compile(
@@ -38,9 +38,11 @@ def fix_decomposed_diacritics(text: str) -> str:
     'ş', '˘g' instead of 'ğ', etc.  This function re-orders them so that
     NFC normalisation can compose them into the correct codepoint.
     """
+
     def _reorder(m: re.Match) -> str:
         combining = _STANDALONE_TO_COMBINING[m.group(1)]
-        return m.group(2) + combining          # letter + combining mark
+        return m.group(2) + combining  # letter + combining mark
+
     text = _DIACRIT_BEFORE_LETTER_RE.sub(_reorder, text)
     return unicodedata.normalize("NFC", text)
 
@@ -81,9 +83,9 @@ def _is_likely_location(text: str) -> bool:
     """Return *True* if *text* looks like a place rather than a person name."""
     if not text:
         return False
-    if "," in text:                         # "Istanbul, Turkey"
+    if "," in text:  # "Istanbul, Turkey"
         return True
-    if re.search(r"\d", text):              # zip / street nr
+    if re.search(r"\d", text):  # zip / street nr
         return True
     return False
 
@@ -107,11 +109,7 @@ def _rescue_name(model: CVModel):
     location = (model.location or "").strip()
 
     if not name and location:
-        if (
-            not _is_likely_location(location)
-            and not _CONTACT_RE.search(location)
-            and _looks_like_person_name(location)
-        ):
+        if not _is_likely_location(location) and not _CONTACT_RE.search(location) and _looks_like_person_name(location):
             name = location
             location = ""
 
@@ -159,11 +157,11 @@ def render_header(model: CVModel) -> List[str]:
 
     lines: List[str] = []
     if name:
-        lines.append(name)       # Rule 1: name always first
+        lines.append(name)  # Rule 1: name always first
     if title:
-        lines.append(title)       # Rule 4: title always second
+        lines.append(title)  # Rule 4: title always second
     if contact:
-        lines.append(contact)     # Rule 5: contact never contains name
+        lines.append(contact)  # Rule 5: contact never contains name
     return lines
 
 
@@ -196,7 +194,9 @@ def _looks_like_tech_list(text: str) -> bool:
         return False
     if any(len(token.split()) > 4 for token in tokens):
         return False
-    return not re.search(r"\b(?:developed|implemented|designed|managed|created|built|geliştirdi|tasarladı)\b", value, re.I)
+    return not re.search(
+        r"\b(?:developed|implemented|designed|managed|created|built|geliştirdi|tasarladı)\b", value, re.I
+    )
 
 
 def render_experience(exp: Experience) -> List[str]:
@@ -353,22 +353,27 @@ def render_section_generic(
 
 # ── Render safety ───────────────────────────────────────────────────────────
 
-_BULLET_MARKER_RE = re.compile(
-    r"^\s*[\u2022\u2023\u25aa\u25a0\u2013\u2014*\-]+\s*"
-)
+_BULLET_MARKER_RE = re.compile(r"^\s*[\u2022\u2023\u25aa\u25a0\u2013\u2014*\-]+\s*")
 
 _MAX_LINE_WIDTH = 120
 
 # ── Render safety limits ──────────────────────────────────────────────────
 _MAX_RENDER_SECTIONS = 15
-_MAX_RENDER_ENTRIES = 50        # max experience/education/project entries
-_MAX_RENDER_BULLETS = 20        # max bullets per entry
-_MAX_RENDER_ITEMS = 200         # max total flat-list items (skills, etc.)
-_MAX_RENDER_CHARS = 200_000     # max total rendered characters
+_MAX_RENDER_ENTRIES = 50  # max experience/education/project entries
+_MAX_RENDER_BULLETS = 20  # max bullets per entry
+_MAX_RENDER_ITEMS = 200  # max total flat-list items (skills, etc.)
+_MAX_RENDER_CHARS = 200_000  # max total rendered characters
 
 _RENDER_CANONICAL_ORDER = [
-    "summary", "experience", "education", "projects", "skills",
-    "certifications", "languages", "interests", "misc",
+    "summary",
+    "experience",
+    "education",
+    "projects",
+    "skills",
+    "certifications",
+    "languages",
+    "interests",
+    "misc",
 ]
 
 _RENDER_SECTION_TO_FIELD = {
@@ -383,7 +388,7 @@ _RENDER_SECTION_TO_FIELD = {
     "misc": "misc",
 }
 
-_MAX_HEADER_FIELD_LEN = 200    # max characters per header field
+_MAX_HEADER_FIELD_LEN = 200  # max characters per header field
 
 
 def _sanitize_header_fields(model: CVModel) -> None:
@@ -406,19 +411,18 @@ def _sanitize_header_fields(model: CVModel) -> None:
     from services.cv_autofix_service import _looks_like_person_name
 
     # ── Clean empty pipe tokens from header fields ──
-    _PIPE_CLEANUP_RE = re.compile(r'(?:^\s*\|\s*|\s*\|\s*$|\s*\|\s*(?=\|))')
+    _PIPE_CLEANUP_RE = re.compile(r"(?:^\s*\|\s*|\s*\|\s*$|\s*\|\s*(?=\|))")
     for _fld in ("full_name", "title", "email", "phone", "location", "linkedin"):
         _val = getattr(model, _fld, "") or ""
         # Security: cap header field length
         if len(_val) > _MAX_HEADER_FIELD_LEN:
-            logger.warning("header field %s truncated %d → %d",
-                           _fld, len(_val), _MAX_HEADER_FIELD_LEN)
+            logger.warning("header field %s truncated %d → %d", _fld, len(_val), _MAX_HEADER_FIELD_LEN)
             _val = _val[:_MAX_HEADER_FIELD_LEN]
             setattr(model, _fld, _val)
         if "|" in _val:
             # Collapse empty pipe segments, strip leading/trailing pipes
             _val = _PIPE_CLEANUP_RE.sub("", _val).strip()
-            _val = re.sub(r'\s*\|\s*\|\s*', ' | ', _val)  # collapse double pipes
+            _val = re.sub(r"\s*\|\s*\|\s*", " | ", _val)  # collapse double pipes
             _val = _val.strip(" |")
             setattr(model, _fld, _val)
 
@@ -487,26 +491,39 @@ def prepare_for_render(model: CVModel) -> CVModel:
 
     # ── Rule 1: Skip empty sections ──
     safe.experiences = [
-        exp for exp in safe.experiences
-        if any(v.strip() for v in (
-            exp.title, exp.company, exp.location,
-            exp.start_date, exp.end_date,
-        )) or exp.bullets
+        exp
+        for exp in safe.experiences
+        if any(
+            v.strip()
+            for v in (
+                exp.title,
+                exp.company,
+                exp.location,
+                exp.start_date,
+                exp.end_date,
+            )
+        )
+        or exp.bullets
     ]
     safe.education = [
-        edu for edu in safe.education
-        if any(v.strip() for v in (
-            edu.degree, edu.school, edu.field,
-            edu.location, edu.start_date, edu.end_date, edu.gpa,
-        ))
+        edu
+        for edu in safe.education
+        if any(
+            v.strip()
+            for v in (
+                edu.degree,
+                edu.school,
+                edu.field,
+                edu.location,
+                edu.start_date,
+                edu.end_date,
+                edu.gpa,
+            )
+        )
     ]
-    safe.projects = [
-        proj for proj in safe.projects
-        if proj.name.strip() or proj.description.strip() or proj.bullets
-    ]
+    safe.projects = [proj for proj in safe.projects if proj.name.strip() or proj.description.strip() or proj.bullets]
     safe.certifications = [
-        cert for cert in safe.certifications
-        if cert.name.strip() or cert.issuer.strip() or cert.date.strip()
+        cert for cert in safe.certifications if cert.name.strip() or cert.issuer.strip() or cert.date.strip()
     ]
     if safe.skills_categorized:
         safe.skills_categorized = {
@@ -520,8 +537,7 @@ def prepare_for_render(model: CVModel) -> CVModel:
 
     # ── Render safety: cap section sizes to prevent huge output ──
     if len(safe.experiences) > _MAX_RENDER_ENTRIES:
-        logger.warning("render: experiences capped %d → %d",
-                       len(safe.experiences), _MAX_RENDER_ENTRIES)
+        logger.warning("render: experiences capped %d → %d", len(safe.experiences), _MAX_RENDER_ENTRIES)
         safe.experiences = safe.experiences[:_MAX_RENDER_ENTRIES]
     if len(safe.education) > _MAX_RENDER_ENTRIES:
         safe.education = safe.education[:_MAX_RENDER_ENTRIES]

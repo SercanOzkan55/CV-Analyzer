@@ -144,9 +144,7 @@ def _looks_like_section_heading(text: str) -> bool:
     if not alpha:
         return False
     upper_count = sum(1 for ch in alpha if ch.isupper())
-    return upper_count / max(len(alpha), 1) >= 0.55 or all(
-        word[:1].isupper() for word in words if word[:1].isalpha()
-    )
+    return upper_count / max(len(alpha), 1) >= 0.55 or all(word[:1].isupper() for word in words if word[:1].isalpha())
 
 
 def _detect_columns_from_heading_rows(
@@ -330,9 +328,7 @@ def extract_pdf_text(
 
         with pdfplumber.open(io.BytesIO(contents)) as pdf:
             if len(pdf.pages) > max_pages:
-                logging.getLogger("app.security").warning(
-                    "pdf_pages_limit: %d > %d", len(pdf.pages), max_pages
-                )
+                logging.getLogger("app.security").warning("pdf_pages_limit: %d > %d", len(pdf.pages), max_pages)
                 raise HTTPException(
                     status_code=400,
                     detail=f"PDF too large (max {max_pages} pages)",
@@ -382,8 +378,6 @@ def extract_pdf_text(
     raw = "\n".join(text_parts).strip()
     truncated = len(raw) > max_chars
     if truncated:
-        logging.getLogger("app.security").warning(
-            "pdf_text_truncated: %d > %d", len(raw), max_chars
-        )
+        logging.getLogger("app.security").warning("pdf_text_truncated: %d > %d", len(raw), max_chars)
         raw = raw[:max_chars]
     return fix_decomposed_diacritics(_fix_common_mojibake(raw)), truncated

@@ -5,6 +5,7 @@ Run this before deploying to production
 
 import os
 import sys
+import importlib
 
 from dotenv import load_dotenv
 
@@ -121,17 +122,14 @@ def validate_main_code():
         checks = {
             "analyze endpoint uses Depends": "Depends(verify_supabase_jwt)" in content
             and '@app.post("/api/v1/analyze")' in content,
-            "analyze-pdf endpoint uses Depends": "Depends(verify_supabase_jwt)"
-            in content
+            "analyze-pdf endpoint uses Depends": "Depends(verify_supabase_jwt)" in content
             and '@app.post("/api/v1/analyze-pdf")' in content,
             "history endpoint uses Depends": "Depends(verify_supabase_jwt)" in content
             and '@app.get("/api/v1/history")' in content,
             "get_or_create_user function": "def get_or_create_user" in content,
-            "User model imported": "from models import" in content
-            and "User" in content,
+            "User model imported": "from models import" in content and "User" in content,
             "Rate limiting applied": "@limiter.limit" in content,
-            "user_id linked to Analysis": "Analysis(user_id=" in content
-            or "user_id=db_user.id" in content,
+            "user_id linked to Analysis": "Analysis(user_id=" in content or "user_id=db_user.id" in content,
         }
 
         for check_name, passed in checks.items():
@@ -164,8 +162,7 @@ def validate_models():
             "User has plan_type": "plan_type" in content,
             "User has daily_usage": "daily_usage" in content,
             "User has monthly_usage": "monthly_usage" in content,
-            "Analysis has user_id": "class Analysis" in content
-            and "user_id" in content,
+            "Analysis has user_id": "class Analysis" in content and "user_id" in content,
         }
 
         for check_name, passed in checks.items():
@@ -241,16 +238,16 @@ def validate_imports():
     results = []
 
     imports_to_check = {
-        "FastAPI": "from fastapi import FastAPI",
-        "JWT": "from jose import jwt",
-        "SQLAlchemy": "from sqlalchemy import",
-        "Pydantic": "from pydantic import",
-        "PyPDF2": "import PyPDF2",
+        "FastAPI": "fastapi",
+        "JWT": "jose.jwt",
+        "SQLAlchemy": "sqlalchemy",
+        "Pydantic": "pydantic",
+        "PyPDF2": "PyPDF2",
     }
 
-    for lib_name, import_stmt in imports_to_check.items():
+    for lib_name, module_name in imports_to_check.items():
         try:
-            exec(import_stmt)
+            importlib.import_module(module_name)
             result = check(f"{lib_name} installed", True)
             results.append(result)
         except ImportError as e:

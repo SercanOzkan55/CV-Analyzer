@@ -1,4 +1,5 @@
 """Tests for services/layout_engine.py — layout building from schema."""
+
 import pytest
 from schemas.cv_schema import CVSchema, ExperienceEntry, EducationEntry, ProjectEntry
 from services.layout_engine import (
@@ -19,22 +20,28 @@ def _sample_schema():
         summary="Experienced software engineer.",
         experiences=[
             ExperienceEntry(
-                title="Senior Dev", company="Acme", location="NYC",
-                start_date="Jan 2020", end_date="Present",
+                title="Senior Dev",
+                company="Acme",
+                location="NYC",
+                start_date="Jan 2020",
+                end_date="Present",
                 bullets=["Led team of 5", "Built REST APIs"],
             ),
         ],
         education=[
             EducationEntry(
-                degree="BS", field="Computer Science", school="MIT",
-                start_date="2016", end_date="2020", gpa="3.8",
+                degree="BS",
+                field="Computer Science",
+                school="MIT",
+                start_date="2016",
+                end_date="2020",
+                gpa="3.8",
             ),
         ],
         skills=["Python", "JavaScript", "Docker"],
         languages=["English", "Turkish"],
         projects=[
-            ProjectEntry(name="CV Analyzer", description="ML-based CV scoring",
-                         bullets=["Built scoring pipeline"]),
+            ProjectEntry(name="CV Analyzer", description="ML-based CV scoring", bullets=["Built scoring pipeline"]),
         ],
     )
 

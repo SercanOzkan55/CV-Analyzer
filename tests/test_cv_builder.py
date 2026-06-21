@@ -1,4 +1,5 @@
 """Tests for services/cv_builder_service.py — pure utility functions."""
+
 import pytest
 from services.cv_builder_service import (
     _normalize_text,

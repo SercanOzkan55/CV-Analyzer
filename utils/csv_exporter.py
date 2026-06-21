@@ -36,25 +36,35 @@ def generate_csv_download(
     writer = csv.writer(output)
 
     # Write header
-    writer.writerow([
-        'Filename', 'Status', 'Final Score', 'ATS Score',
-        'Skills Match', 'Experience Match', 'Education Match',
-        'Processed At', 'Job ID'
-    ])
+    writer.writerow(
+        [
+            "Filename",
+            "Status",
+            "Final Score",
+            "ATS Score",
+            "Skills Match",
+            "Experience Match",
+            "Education Match",
+            "Processed At",
+            "Job ID",
+        ]
+    )
 
     # Write data
     for result in results:
-        writer.writerow([
-            result.get('filename', ''),
-            result.get('status', ''),
-            result.get('final_score', 0),
-            result.get('ats_score', 0),
-            '; '.join(result.get('skills_match', [])),
-            result.get('experience_match', 0),
-            result.get('education_match', 0),
-            result.get('processed_at', ''),
-            result.get('job_id', job_id)
-        ])
+        writer.writerow(
+            [
+                result.get("filename", ""),
+                result.get("status", ""),
+                result.get("final_score", 0),
+                result.get("ats_score", 0),
+                "; ".join(result.get("skills_match", [])),
+                result.get("experience_match", 0),
+                result.get("education_match", 0),
+                result.get("processed_at", ""),
+                result.get("job_id", job_id),
+            ]
+        )
 
     csv_content = output.getvalue()
     output.close()
@@ -64,12 +74,12 @@ def generate_csv_download(
     expires_at = datetime.utcnow() + timedelta(hours=1)
 
     _temp_downloads[download_id] = {
-        'content': csv_content,
-        'content_type': 'text/csv',
-        'filename': f'cv_rankings_job_{job_id}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
-        'expires_at': expires_at,
-        'owner_organization_id': owner_organization_id,
-        'owner_subscription_id': owner_subscription_id,
+        "content": csv_content,
+        "content_type": "text/csv",
+        "filename": f"cv_rankings_job_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        "expires_at": expires_at,
+        "owner_organization_id": owner_organization_id,
+        "owner_subscription_id": owner_subscription_id,
     }
 
     return f"/api/v1/downloads/{download_id}?token={sign_download_id(download_id)}"
@@ -91,7 +101,7 @@ def get_temp_download(download_id: str) -> Dict[str, Any]:
     download = _temp_downloads[download_id]
 
     # Check expiration
-    if datetime.utcnow() > download['expires_at']:
+    if datetime.utcnow() > download["expires_at"]:
         del _temp_downloads[download_id]
         return None
 
@@ -101,10 +111,7 @@ def get_temp_download(download_id: str) -> Dict[str, Any]:
 def cleanup_expired_downloads():
     """Clean up expired temporary downloads."""
     current_time = datetime.utcnow()
-    expired = [
-        download_id for download_id, data in _temp_downloads.items()
-        if current_time > data['expires_at']
-    ]
+    expired = [download_id for download_id, data in _temp_downloads.items() if current_time > data["expires_at"]]
 
     for download_id in expired:
         del _temp_downloads[download_id]

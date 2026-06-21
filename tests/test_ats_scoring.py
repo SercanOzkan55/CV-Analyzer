@@ -1,4 +1,5 @@
 """Unit tests for services/ats_scoring.py"""
+
 import pytest
 from schemas.cv_model import CVModel, Experience, Education, Project, Certification
 from services.ats_scoring import score_cv, ScoreResult
@@ -76,8 +77,7 @@ class TestScoreCV:
     def test_all_categories_in_range(self):
         model = _make_model()
         result = score_cv(model)
-        for field in ["structure", "keywords", "experience", "education",
-                      "languages", "ats", "length", "soft_skills"]:
+        for field in ["structure", "keywords", "experience", "education", "languages", "ats", "length", "soft_skills"]:
             score = getattr(result, field)
             assert 0 <= score <= 100, f"{field} out of range: {score}"
 
@@ -141,8 +141,8 @@ class TestScoreCV:
     def test_soft_skills_detected(self):
         model = _make_model(
             summary="Strong leadership and communication skills. "
-                    "Excellent teamwork and problem-solving abilities. "
-                    "Experienced in mentoring and stakeholder management.",
+            "Excellent teamwork and problem-solving abilities. "
+            "Experienced in mentoring and stakeholder management.",
         )
         result = score_cv(model)
         assert result.soft_skills >= 50

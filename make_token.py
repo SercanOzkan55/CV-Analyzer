@@ -47,9 +47,7 @@ def main():
         secret = load_secret_from_dotenv(".env")
 
     if not secret:
-        print(
-            "Error: SUPABASE_JWT_SECRET not set in environment and .env not found or missing the key"
-        )
+        print("Error: SUPABASE_JWT_SECRET not set in environment and .env not found or missing the key")
         raise SystemExit(1)
 
     now = int(time.time())

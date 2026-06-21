@@ -92,6 +92,7 @@ def get_rules() -> Dict:
 
 # ── normalization helpers ──
 
+
 def _fix_broken_lines(text: str) -> str:
     """Fix lines broken by PDF extraction: hyphenated words, split sentences."""
     lines = text.split("\n")
@@ -169,7 +170,7 @@ def _normalize_experience_bullets(experiences: List[Dict], rules: Dict) -> List[
         trimmed = []
         for b in exp["bullets"]:
             if len(b) > max_len * 3:
-                b = b[:max_len * 3 - 3].rstrip() + "..."
+                b = b[: max_len * 3 - 3].rstrip() + "..."
             trimmed.append(b)
         exp["bullets"] = trimmed
 
@@ -248,8 +249,15 @@ def normalize(structured: Dict) -> Dict:
 
     # Step 0: remap any non-canonical keys so nothing is lost
     _LIST_KEYS = {
-        "experiences", "education", "skills", "skills_categorized",
-        "projects", "certifications", "languages", "interests", "misc",
+        "experiences",
+        "education",
+        "skills",
+        "skills_categorized",
+        "projects",
+        "certifications",
+        "languages",
+        "interests",
+        "misc",
     }
     _REMAP_TARGETS = {
         "summary": "summary",
@@ -265,10 +273,26 @@ def normalize(structured: Dict) -> Dict:
     }
     for key in list(normalized.keys()):
         if key.startswith("_") or key in (
-            "full_name", "title", "email", "phone", "location", "linkedin",
-            "summary", "experiences", "education", "skills", "skills_categorized",
-            "projects", "certifications", "languages", "interests", "misc", "language",
-            "section_titles", "format_hints", "contact",
+            "full_name",
+            "title",
+            "email",
+            "phone",
+            "location",
+            "linkedin",
+            "summary",
+            "experiences",
+            "education",
+            "skills",
+            "skills_categorized",
+            "projects",
+            "certifications",
+            "languages",
+            "interests",
+            "misc",
+            "language",
+            "section_titles",
+            "format_hints",
+            "contact",
         ):
             continue
         canonical = canonicalize_section_key(key)
@@ -303,10 +327,12 @@ def normalize(structured: Dict) -> Dict:
     if isinstance(education, list) and education:
         has_any_gpa = any((edu.get("gpa") or "").strip() for edu in education)
         if not has_any_gpa:
-            for exp in (normalized.get("experiences") or normalized.get("experience") or []):
-                for bullet in (exp.get("bullets") or []):
+            for exp in normalized.get("experiences") or normalized.get("experience") or []:
+                for bullet in exp.get("bullets") or []:
                     gpa_match = re.search(
-                        r"(?:GPA|CGPA)\s*:\s*(\d[\d./]+)", str(bullet), re.I,
+                        r"(?:GPA|CGPA)\s*:\s*(\d[\d./]+)",
+                        str(bullet),
+                        re.I,
                     )
                     if gpa_match:
                         education[0]["gpa"] = gpa_match.group(1)
@@ -343,16 +369,18 @@ def normalize(structured: Dict) -> Dict:
     #   a year, a company/role hint, or an action verb bullet.
     _YEAR_RE = re.compile(r"\b(?:19|20)\d{2}\b|present|current|ongoing|halen|günümüz", re.I)
     _valid_exps: list = []
-    for _exp in (normalized.get("experiences") or []):
+    for _exp in normalized.get("experiences") or []:
         if not isinstance(_exp, dict):
             continue
-        _exp_text = " ".join([
-            str(_exp.get("company", "")),
-            str(_exp.get("title", "")),
-            str(_exp.get("start_date", "")),
-            str(_exp.get("end_date", "")),
-            " ".join(str(b) for b in (_exp.get("bullets") or [])),
-        ])
+        _exp_text = " ".join(
+            [
+                str(_exp.get("company", "")),
+                str(_exp.get("title", "")),
+                str(_exp.get("start_date", "")),
+                str(_exp.get("end_date", "")),
+                " ".join(str(b) for b in (_exp.get("bullets") or [])),
+            ]
+        )
         # Accept if: has a year, has at least 1 bullet, or has a title/company
         has_year = bool(_YEAR_RE.search(_exp_text))
         has_bullets = bool(_exp.get("bullets"))
@@ -379,10 +407,10 @@ def normalize(structured: Dict) -> Dict:
             #     value (no commas/semicolons/pipes).  If the suffix
             #     contains delimiters (≥2 items) leave the line intact so
             #     step 5aa can promote it to skills_categorized.
-            _prefix_m = re.match(r'^[A-Za-z\u00C0-\u024F]+(?:\s+[A-Za-z\u00C0-\u024F]+){0,2}\s*:\s+', _s)
+            _prefix_m = re.match(r"^[A-Za-z\u00C0-\u024F]+(?:\s+[A-Za-z\u00C0-\u024F]+){0,2}\s*:\s+", _s)
             if _prefix_m:
-                _after = _s[_prefix_m.end():].strip()
-                _delimited = re.split(r'[,;|]', _after)
+                _after = _s[_prefix_m.end() :].strip()
+                _delimited = re.split(r"[,;|]", _after)
                 _delimited = [x.strip() for x in _delimited if x.strip()]
                 if len(_delimited) < 2:
                     # Single value → drop the prefix
@@ -400,20 +428,20 @@ def normalize(structured: Dict) -> Dict:
     #   Reject garbage tokens: emails, phones, dates, percentages, URLs, single chars.
     _garbage_re = re.compile(
         r"^(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})$"  # email
-        r"|(?:\(?\+?\d[\d()\-\s.]{7,}\d)"               # phone
-        r"|(?:^\d{1,2}(?:th|st|nd|rd)$)"                # ordinals
-        r"|(?:^\d+\.?\d*%$)"                            # percentages
-        r"|(?:^\d{4}$)"                                 # bare years
-        r"|(?:^\d{1,2}[./]\d{1,2}[./]\d{2,4}$)"         # dates
-        r"|(?:^https?://|^www\.)"                       # URLs
-        r"|(?:gmail\.com|hotmail\.com|yahoo\.com)"      # email domains
-        r"|(?:^[a-z]$)"                                 # single char
-        r"|(?:^[a-z]\.[a-z]\.?$)"                       # short abbreviations
-        r"|(?:^\d+\.?\d*$)",                            # bare numbers
-        re.IGNORECASE
+        r"|(?:\(?\+?\d[\d()\-\s.]{7,}\d)"  # phone
+        r"|(?:^\d{1,2}(?:th|st|nd|rd)$)"  # ordinals
+        r"|(?:^\d+\.?\d*%$)"  # percentages
+        r"|(?:^\d{4}$)"  # bare years
+        r"|(?:^\d{1,2}[./]\d{1,2}[./]\d{2,4}$)"  # dates
+        r"|(?:^https?://|^www\.)"  # URLs
+        r"|(?:gmail\.com|hotmail\.com|yahoo\.com)"  # email domains
+        r"|(?:^[a-z]$)"  # single char
+        r"|(?:^[a-z]\.[a-z]\.?$)"  # short abbreviations
+        r"|(?:^\d+\.?\d*$)",  # bare numbers
+        re.IGNORECASE,
     )
     _filtered_skills: list = []
-    for _sk_item in (normalized.get("skills") or []):
+    for _sk_item in normalized.get("skills") or []:
         _sk_str = str(_sk_item).strip()
         if not _sk_str:
             continue
@@ -436,10 +464,10 @@ def normalize(structured: Dict) -> Dict:
     _kept_flat: list = []
     for _sk in _raw_skills:
         _sk_str = str(_sk).strip()
-        _cat_m = re.match(r'^([A-Za-z\u00C0-\u024F]+(?:\s+[A-Za-z\u00C0-\u024F]+){0,2})\s*:\s+(.+)$', _sk_str)
+        _cat_m = re.match(r"^([A-Za-z\u00C0-\u024F]+(?:\s+[A-Za-z\u00C0-\u024F]+){0,2})\s*:\s+(.+)$", _sk_str)
         if _cat_m:
             _cat_name = _cat_m.group(1).strip()
-            _cat_items = [x.strip() for x in re.split(r'[,;|]', _cat_m.group(2)) if x.strip()]
+            _cat_items = [x.strip() for x in re.split(r"[,;|]", _cat_m.group(2)) if x.strip()]
             if _cat_items and len(_cat_items) >= 2:
                 _cat_from_flat.setdefault(_cat_name, []).extend(_cat_items)
                 continue
@@ -454,9 +482,7 @@ def normalize(structured: Dict) -> Dict:
         normalized["skills_categorized"] = _existing_cat
 
     # 5b. Move language items out of skills → languages
-    normalized["skills"], _extracted_langs = _split_languages_from_skills(
-        normalized.get("skills") or []
-    )
+    normalized["skills"], _extracted_langs = _split_languages_from_skills(normalized.get("skills") or [])
     # Also clean skills_categorized
     raw_cat = normalized.get("skills_categorized")
     if isinstance(raw_cat, dict):
@@ -491,7 +517,7 @@ def normalize(structured: Dict) -> Dict:
             r"|\b(?:education|experience|skills|projects|summary|profile"
             r"|objective|blog|website|development|engineer|degree|university"
             r"|bachelor|master|software|technology|health|sports|teamwork|personal)\b",
-            re.IGNORECASE
+            re.IGNORECASE,
         )
         for lang in languages:
             key = str(lang).strip().lower()
@@ -510,14 +536,14 @@ def normalize(structured: Dict) -> Dict:
         normalized["languages"] = deduped
 
     # 6b. Strip empty / noise tokens from all flat-list sections
-    _NOISE_TOKENS = frozenset({'""', '|', '||', ':', ',', '-', '–', '—', '•', '*', '/', '\\'})
+    _NOISE_TOKENS = frozenset({'""', "|", "||", ":", ",", "-", "–", "—", "•", "*", "/", "\\"})
     for _flat_key in ("skills", "languages", "interests", "misc"):
         _items = normalized.get(_flat_key)
         if isinstance(_items, list):
             normalized[_flat_key] = [
-                s for s in _items
-                if isinstance(s, str) and s.strip() and s.strip() not in _NOISE_TOKENS
-                and len(s.strip()) > 1
+                s
+                for s in _items
+                if isinstance(s, str) and s.strip() and s.strip() not in _NOISE_TOKENS and len(s.strip()) > 1
             ]
 
     # 6c. Strip empty / noise tokens from dict-list sections (experience, education, projects, certifications)
@@ -533,9 +559,9 @@ def normalize(structured: Dict) -> Dict:
                     _entry[_field] = ""
                 elif isinstance(_val, list):
                     _entry[_field] = [
-                        v for v in _val
-                        if isinstance(v, str) and v.strip() and v.strip() not in _NOISE_TOKENS
-                        and len(v.strip()) > 1
+                        v
+                        for v in _val
+                        if isinstance(v, str) and v.strip() and v.strip() not in _NOISE_TOKENS and len(v.strip()) > 1
                     ]
 
     # 6d. Contact must not be inside experience entries
@@ -558,11 +584,9 @@ def normalize(structured: Dict) -> Dict:
                     _exp[_fld] = ""
             # Strip contact lines from bullets
             _kept_bullets = []
-            for _b in (_exp.get("bullets") or []):
+            for _b in _exp.get("bullets") or []:
                 _b_str = str(_b).strip()
-                if _b_str and not (
-                    _CONTACT_IN_EXP_RE.search(_b_str) and len(_b_str.split()) <= 6
-                ):
+                if _b_str and not (_CONTACT_IN_EXP_RE.search(_b_str) and len(_b_str.split()) <= 6):
                     _kept_bullets.append(_b_str)
             _exp["bullets"] = _kept_bullets
 
@@ -616,10 +640,12 @@ def normalize(structured: Dict) -> Dict:
 
     # 7d. Section resolution (cross-section fixup via resolver)
     from services.section_resolver import resolve_parsed_entries
+
     resolve_parsed_entries(normalized)
 
     # 7e. Sanitization rules (normalizer only sanitizes — no section moving)
     from utils.cv_normalizer import apply_normalization_rules
+
     apply_normalization_rules(normalized)
 
     # 8. Mark as normalized
@@ -627,8 +653,7 @@ def normalize(structured: Dict) -> Dict:
 
     # 8b. Log final schema counts for debugging
     _schema_counts = {}
-    for _sk in ("experiences", "education", "skills", "projects",
-                "certifications", "languages", "interests", "misc"):
+    for _sk in ("experiences", "education", "skills", "projects", "certifications", "languages", "interests", "misc"):
         _sv = normalized.get(_sk)
         if isinstance(_sv, list):
             _schema_counts[_sk] = len(_sv)
@@ -638,17 +663,24 @@ def normalize(structured: Dict) -> Dict:
     try:
         _json_size = len(json.dumps(normalized, default=str))
         if _json_size > _MAX_JSON_SIZE:
-            logger.warning("normalize: JSON output too large %d > %d, trimming",
-                           _json_size, _MAX_JSON_SIZE)
+            logger.warning("normalize: JSON output too large %d > %d, trimming", _json_size, _MAX_JSON_SIZE)
             # Trim the largest list sections until under limit
-            _list_keys = ["experiences", "education", "skills", "projects",
-                          "certifications", "languages", "interests", "misc"]
-            for _trim_key in sorted(_list_keys,
-                                     key=lambda k: len(json.dumps(normalized.get(k, []), default=str)),
-                                     reverse=True):
+            _list_keys = [
+                "experiences",
+                "education",
+                "skills",
+                "projects",
+                "certifications",
+                "languages",
+                "interests",
+                "misc",
+            ]
+            for _trim_key in sorted(
+                _list_keys, key=lambda k: len(json.dumps(normalized.get(k, []), default=str)), reverse=True
+            ):
                 _tv = normalized.get(_trim_key)
                 if isinstance(_tv, list) and len(_tv) > 5:
-                    normalized[_trim_key] = _tv[:len(_tv) // 2]
+                    normalized[_trim_key] = _tv[: len(_tv) // 2]
                     _json_size = len(json.dumps(normalized, default=str))
                     if _json_size <= _MAX_JSON_SIZE:
                         break
@@ -664,11 +696,11 @@ _SECTION_SIZE_LIMIT = 60  # lines — if a section exceeds this, re-evaluate
 
 
 # ── Security limits ────────────────────────────────────────────────────────
-_MAX_SECTION_ENTRIES = 50    # max entries in any dict-list section
-_MAX_SECTION_LINES = 500     # max items in any flat-list section
+_MAX_SECTION_ENTRIES = 50  # max entries in any dict-list section
+_MAX_SECTION_LINES = 500  # max items in any flat-list section
 _MAX_BULLETS_PER_ENTRY = 30  # max bullets per experience/project entry
-_MAX_WORDS_PER_LINE = 200    # truncate absurdly long lines
-_MAX_JSON_SIZE = 500_000     # max serialized output size (bytes)
+_MAX_WORDS_PER_LINE = 200  # truncate absurdly long lines
+_MAX_JSON_SIZE = 500_000  # max serialized output size (bytes)
 
 
 def _normalize_section_consistency(data: Dict) -> None:
@@ -680,8 +712,14 @@ def _normalize_section_consistency(data: Dict) -> None:
     3. Hard caps on section items, entry counts, bullet counts, line length.
     """
     _list_sections = [
-        "experiences", "education", "skills", "projects",
-        "certifications", "languages", "interests", "misc",
+        "experiences",
+        "education",
+        "skills",
+        "projects",
+        "certifications",
+        "languages",
+        "interests",
+        "misc",
     ]
     for key in _list_sections:
         val = data.get(key)
@@ -709,8 +747,7 @@ def _normalize_section_consistency(data: Dict) -> None:
         # Dict-list sections (experiences, education, projects, certifications)
         if val and isinstance(val[0], dict):
             if len(val) > _MAX_SECTION_ENTRIES:
-                logger.warning("normalize: %s capped %d → %d entries",
-                               key, len(val), _MAX_SECTION_ENTRIES)
+                logger.warning("normalize: %s capped %d → %d entries", key, len(val), _MAX_SECTION_ENTRIES)
                 data[key] = val[:_MAX_SECTION_ENTRIES]
             # Cap bullets per entry
             for _entry in data[key]:
@@ -720,8 +757,7 @@ def _normalize_section_consistency(data: Dict) -> None:
                         _entry["bullets"] = _bullets[:_MAX_BULLETS_PER_ENTRY]
         # Flat-list sections (skills, languages, interests, misc)
         elif len(val) > _MAX_SECTION_LINES:
-            logger.warning("normalize: %s capped %d → %d items",
-                           key, len(val), _MAX_SECTION_LINES)
+            logger.warning("normalize: %s capped %d → %d items", key, len(val), _MAX_SECTION_LINES)
             data[key] = val[:_MAX_SECTION_LINES]
         # Truncate absurdly long individual strings
         for _i, _item in enumerate(data.get(key, [])):
@@ -736,5 +772,3 @@ def _normalize_section_consistency(data: Dict) -> None:
 
 
 # ── Cross-section fixup (raw dicts) ────────────────────────────────────
-
-

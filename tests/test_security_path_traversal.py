@@ -1,5 +1,3 @@
-
-
 def test_path_traversal_upload(client):
     """Path traversal in filenames should not cause server errors."""
     files = {"file": ("../etc/passwd", b"%PDF-fakepdf", "application/pdf")}

@@ -106,6 +106,7 @@ def get_embedding(text: str, max_length: int = 20000):
     # Circuit breaker: skip if OpenAI service is in open state
     try:
         from shared import _cb_is_open, _cb_record_failure, _cb_record_success
+
         if _cb_is_open("openai_embedding"):
             logger.warning(json.dumps({"event": "embedding_circuit_open"}))
             return None
@@ -174,9 +175,7 @@ def get_embedding(text: str, max_length: int = 20000):
                 pass
         if hasattr(logger, "bind"):
             logger.bind(event="embedding_fail", text_len=len(text)).exception(
-                json.dumps(
-                    {"event": "embedding_fail", "error": str(e), "text_len": len(text)}
-                )
+                json.dumps({"event": "embedding_fail", "error": str(e), "text_len": len(text)})
             )
         else:
             try:
