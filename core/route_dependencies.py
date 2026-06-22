@@ -39,7 +39,58 @@ from sqlalchemy import text
 from starlette.concurrency import run_in_threadpool
 
 from auth import verify_supabase_jwt
+from core.http_runtime import (
+    _admin_access_error,
+    _admin_ip_allowed,
+    _admin_rate_limited,
+    _is_duplicate_request,
+    _make_dedup_key,
+    audit_log,
+    track_event,
+)
+from core.metrics import (
+    _metric_error,
+    _metric_parse_latency,
+    _metric_quota_hit,
+    _metric_request,
+    _observe_dep,
+)
+from core.ops_runtime import (
+    _audit_event,
+    _check_disk_safety,
+    _clear_panic,
+    _get_cpu_percent,
+    _get_disk_usage,
+    _get_flag,
+    _get_rss_bytes,
+    _inflight_get,
+    _is_draining,
+    _is_killed,
+    _is_panic,
+    _recent_events,
+    _record_ai_usage,
+    _record_ops_event,
+    _record_security_event,
+    _set_drain,
+    _set_flag,
+    _set_kill_switch,
+)
 from core.request_utils import _read_upload_or_400
+from core.quota import (
+    _apply_daily_quota_headers,
+    _check_cost_guard,
+    _consume_billable_usage,
+    _consume_daily_quota,
+    _consume_user_rate_limit,
+    _get_daily_quota_status,
+    _is_admin_user,
+    _is_premium_plan,
+    _normalize_plan,
+    _quota_today_date,
+    _record_usage_daily,
+    _resolve_daily_limit_for_plan,
+    _resolve_effective_plan,
+)
 from core.runtime_bridge import is_mock_services_on, main_module
 from database import SessionLocal, get_db
 from models import Analysis, CVVersion, Candidate, Job, JobApplication, Organization, RecruiterJob, Reminder, User
@@ -47,6 +98,22 @@ from services import rewrite_service
 from services.ai_feature_service import ensure_ai_rewrite_allowed as _ensure_ai_rewrite_allowed
 from services.billing_service import is_feature_enabled
 from services.cv_autofix_service import auto_fix_cv_text, structured_text_to_builder_payload
+from services.email_service import (
+    _append_feedback_record,
+    _do_send_email,
+    _read_feedback_records,
+    _send_feedback_email,
+    _send_reminder_email,
+    _validate_reminder_email,
+)
+from services.user_service import (
+    _apply_plan_based_result_features,
+    _build_analysis_benchmark,
+    _ensure_not_expired,
+    _get_owned_analysis_or_404,
+    get_or_create_user,
+)
+from shared import _alert, _cb_is_open, _cb_record_failure, _cb_record_success
 from services.cv_builder_service import build_cv, compile_cv_model, get_available_templates
 from services.embedding_service import (
     find_similar_candidates,
@@ -89,13 +156,6 @@ def _legacy(name: str):
     return getattr(main_module(), name)
 
 
-def _legacy_call(name: str):
-    def _wrapped(*args, **kwargs):
-        return _legacy(name)(*args, **kwargs)
-
-    return _wrapped
-
-
 # Decorators/dependencies must keep their original call signatures, so these are
 # direct references rather than variadic wrappers.
 rate_limit = _legacy("rate_limit")
@@ -103,67 +163,6 @@ require_abuse_check = _legacy("require_abuse_check")
 require_user_global_rate = _legacy("require_user_global_rate")
 require_search_rate = getattr(main_module(), "require_search_rate", lambda *a, **k: None)
 require_embed_rate = getattr(main_module(), "require_embed_rate", lambda *a, **k: None)
-
-# Frequently used legacy helpers. They are centralized here while the remaining
-# app/account/quota services are split out in smaller follow-up passes.
-audit_log = _legacy_call("audit_log")
-track_event = _legacy_call("track_event")
-get_or_create_user = _legacy_call("get_or_create_user")
-_ensure_not_expired = _legacy_call("_ensure_not_expired")
-_normalize_plan = _legacy_call("_normalize_plan")
-_resolve_effective_plan = _legacy_call("_resolve_effective_plan")
-_resolve_daily_limit_for_plan = _legacy_call("_resolve_daily_limit_for_plan")
-_quota_today_date = _legacy_call("_quota_today_date")
-_is_premium_plan = _legacy_call("_is_premium_plan")
-_is_admin_user = _legacy_call("_is_admin_user")
-_consume_daily_quota = _legacy_call("_consume_daily_quota")
-_get_daily_quota_status = _legacy_call("_get_daily_quota_status")
-_consume_user_rate_limit = _legacy_call("_consume_user_rate_limit")
-_consume_billable_usage = _legacy_call("_consume_billable_usage")
-_apply_daily_quota_headers = _legacy_call("_apply_daily_quota_headers")
-_record_usage_daily = _legacy_call("_record_usage_daily")
-_get_owned_analysis_or_404 = _legacy_call("_get_owned_analysis_or_404")
-_build_analysis_benchmark = _legacy_call("_build_analysis_benchmark")
-_apply_plan_based_result_features = _legacy_call("_apply_plan_based_result_features")
-_check_cost_guard = _legacy_call("_check_cost_guard")
-_check_disk_safety = _legacy_call("_check_disk_safety")
-_get_disk_usage = _legacy_call("_get_disk_usage")
-_get_flag = _legacy_call("_get_flag")
-_set_flag = _legacy_call("_set_flag")
-_metric_request = _legacy_call("_metric_request")
-_metric_error = _legacy_call("_metric_error")
-_metric_quota_hit = _legacy_call("_metric_quota_hit")
-_metric_parse_latency = _legacy_call("_metric_parse_latency")
-_record_ai_usage = _legacy_call("_record_ai_usage")
-_record_ops_event = _legacy_call("_record_ops_event")
-_record_security_event = _legacy_call("_record_security_event")
-_recent_events = _legacy_call("_recent_events")
-_read_feedback_records = _legacy_call("_read_feedback_records")
-_append_feedback_record = _legacy_call("_append_feedback_record")
-_send_feedback_email = _legacy_call("_send_feedback_email")
-_do_send_email = _legacy_call("_do_send_email")
-_validate_reminder_email = _legacy_call("_validate_reminder_email")
-_send_reminder_email = _legacy_call("_send_reminder_email")
-_admin_access_error = _legacy_call("_admin_access_error")
-_admin_ip_allowed = _legacy_call("_admin_ip_allowed")
-_admin_rate_limited = _legacy_call("_admin_rate_limited")
-_audit_event = _legacy_call("_audit_event")
-_alert = _legacy_call("_alert")
-_cb_record_failure = _legacy_call("_cb_record_failure")
-_cb_record_success = _legacy_call("_cb_record_success")
-_cb_is_open = _legacy_call("_cb_is_open")
-_observe_dep = _legacy_call("_observe_dep")
-_get_cpu_percent = _legacy_call("_get_cpu_percent")
-_get_rss_bytes = _legacy_call("_get_rss_bytes")
-_is_killed = _legacy_call("_is_killed")
-_set_kill_switch = _legacy_call("_set_kill_switch")
-_is_draining = _legacy_call("_is_draining")
-_set_drain = _legacy_call("_set_drain")
-_is_panic = _legacy_call("_is_panic")
-_clear_panic = _legacy_call("_clear_panic")
-_inflight_get = _legacy_call("_inflight_get")
-_is_duplicate_request = _legacy_call("_is_duplicate_request")
-_make_dedup_key = _legacy_call("_make_dedup_key")
 
 
 def _legacy_value(name: str, default=None):
