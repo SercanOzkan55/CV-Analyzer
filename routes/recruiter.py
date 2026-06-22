@@ -100,6 +100,7 @@ def _get_limiter():
         return NoopLimiter()
     except Exception as exc:
         logger.warning("rate_limiter_unavailable error=%s", exc)
+
         # If anything fails, return noop limiter
         class NoopLimiter:
             def limit(self, limit_string):
