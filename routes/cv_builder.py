@@ -15,44 +15,18 @@ from auth import verify_supabase_jwt
 from database import get_db
 from models import User
 from services import rewrite_service
-from core.runtime_bridge import main_module as _main_module
 from services.ai_feature_service import ensure_ai_rewrite_allowed as _ensure_ai_rewrite_allowed
 from services.cv_builder_service import build_cv, compile_cv_model, get_available_templates
+from services.user_service import _ensure_not_expired, get_or_create_user
+from core.quota import _consume_billable_usage, _is_premium_plan, _resolve_effective_plan
+from core.http_runtime import _MAX_RESPONSE_BODY_BYTES, audit_log
 
 
 logger = logging.getLogger("app.cv_builder")
 
 
-def _legacy(name: str):
-    return getattr(_main_module(), name)
-
-
-def get_or_create_user(*args, **kwargs):
-    return _legacy("get_or_create_user")(*args, **kwargs)
-
-
-def _ensure_not_expired(*args, **kwargs):
-    return _legacy("_ensure_not_expired")(*args, **kwargs)
-
-
-def _resolve_effective_plan(*args, **kwargs):
-    return _legacy("_resolve_effective_plan")(*args, **kwargs)
-
-
-def _is_premium_plan(*args, **kwargs):
-    return _legacy("_is_premium_plan")(*args, **kwargs)
-
-
-def _consume_billable_usage(*args, **kwargs):
-    return _legacy("_consume_billable_usage")(*args, **kwargs)
-
-
-def audit_log(*args, **kwargs):
-    return _legacy("audit_log")(*args, **kwargs)
-
-
 def _max_response_body_bytes() -> int:
-    return int(getattr(_main_module(), "_MAX_RESPONSE_BODY_BYTES", 50 * 1024 * 1024))
+    return int(_MAX_RESPONSE_BODY_BYTES)
 
 
 router = APIRouter(tags=["cv-builder"])
