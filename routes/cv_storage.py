@@ -13,39 +13,21 @@ from fastapi.responses import FileResponse
 
 from auth import verify_supabase_jwt
 from core.request_utils import _read_upload_or_400
-from core.runtime_bridge import main_module as _main_module
+from core.http_runtime import (
+    RATE_LIMIT_IP_ANALYZE_PER_MIN,
+    RATE_LIMIT_IP_UPLOAD_PER_MIN,
+    audit_log,
+    rate_limit,
+    require_abuse_check,
+)
+from core.metrics import DOWNLOADS_TOTAL
+from core.quota import _consume_billable_usage
 from database import get_db
 from services.pdf_runtime import _scan_upload_for_viruses
+from services.user_service import _ensure_not_expired, get_or_create_user
 
 
 logger = logging.getLogger("app.cv_storage")
-RATE_LIMIT_IP_ANALYZE_PER_MIN = getattr(_main_module(), "RATE_LIMIT_IP_ANALYZE_PER_MIN", 10)
-RATE_LIMIT_IP_UPLOAD_PER_MIN = getattr(_main_module(), "RATE_LIMIT_IP_UPLOAD_PER_MIN", 5)
-DOWNLOADS_TOTAL = getattr(_main_module(), "DOWNLOADS_TOTAL", None)
-
-
-def _legacy(name: str):
-    return getattr(_main_module(), name)
-
-
-rate_limit = _legacy("rate_limit")
-require_abuse_check = _legacy("require_abuse_check")
-
-
-def _ensure_not_expired(*args, **kwargs):
-    return _legacy("_ensure_not_expired")(*args, **kwargs)
-
-
-def get_or_create_user(*args, **kwargs):
-    return _legacy("get_or_create_user")(*args, **kwargs)
-
-
-def _consume_billable_usage(*args, **kwargs):
-    return _legacy("_consume_billable_usage")(*args, **kwargs)
-
-
-def audit_log(*args, **kwargs):
-    return _legacy("audit_log")(*args, **kwargs)
 
 
 router = APIRouter(tags=["cv-storage"])
