@@ -191,6 +191,18 @@ _NOISE_KEYWORDS = re.compile(
 # Skill-style: short comma/pipe-separated items, or "Category: item, item"
 _SKILL_DELIMITER_RE = re.compile(r"[,;|/]")
 
+# Qualifier words that commonly precede "experience" in CV section headers
+# ("Research Experience", "Health-Related Experience", "Other Work
+# Experience"). Because the experience hint is anchored with ``$``, only lines
+# that *end* in "experience" match — job titles such as "User Experience
+# Designer" are unaffected.
+_EXP_QUALIFIER = (
+    r"(?:research|relevant|clinical|teaching|volunteer|voluntary|additional|other"
+    r"|related|industry|industrial|laboratory|lab|technical|healthcare"
+    r"|health[\s-]?related|field|military|international|leadership|internship"
+    r"|hands[\s-]?on|summer|key|academic|project|career|professional|work)"
+)
+
 # Known section header aliases — BONUS signal, English only.
 # Non-English headers are detected structurally (short/ALL-CAPS/Title Case)
 # and classified by block content instead.
@@ -251,7 +263,11 @@ _HEADER_HINTS: Dict[str, re.Pattern] = {
         re.I,
     ),
     "experience": re.compile(
-        r"^(?:experience|work\s+experience|professional\s+experience|employment"
+        # One or two qualifier words before "experience" (e.g. "research
+        # experience", "other work experience"); the trailing ``$`` keeps job
+        # titles like "User Experience Designer" from matching.
+        r"^(?:" + _EXP_QUALIFIER + r"[\s-]+){1,2}experience$"
+        r"|^(?:experience|work\s+experience|professional\s+experience|employment"
         r"|employment\s+history|work\s+history|work\s+background|career\s+history|professional\s+background|industrial\s+training(?:\s+attended)?|trainings?|training"
         # TR
         r"|deneyim|i[sş]\s*deneyimi|mesleki\s*deneyim"
