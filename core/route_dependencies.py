@@ -40,15 +40,45 @@ from starlette.concurrency import run_in_threadpool
 
 from auth import verify_supabase_jwt
 from core.http_runtime import (
+    ABUSE_PROTECTION_ENABLED,
+    RATE_LIMIT_IP_ANALYZE_PDF_PER_MIN,
+    RATE_LIMIT_IP_ANALYZE_PER_MIN,
+    RATE_LIMIT_IP_MATCH_PER_MIN,
+    RATE_LIMIT_IP_RENDER_PER_MIN,
+    RATE_LIMIT_IP_REWRITE_PER_MIN,
+    RATE_LIMIT_IP_UPLOAD_PER_MIN,
+    RATE_LIMIT_USER_ANALYZE_PDF_PER_MIN,
+    RATE_LIMIT_USER_ANALYZE_PER_MIN,
+    _ADMIN_IP_ALLOWLIST,
+    _CB_COOLDOWN_SECONDS,
+    _CB_FAILURE_THRESHOLD,
+    _CSRF_PROTECTION_ENABLED,
+    _ENV_MODE,
+    _GLOBAL_CONCURRENCY_LIMIT,
+    _MAX_RESPONSE_BODY_BYTES,
+    _REQUEST_QUEUE_SIZE,
+    _REQUEST_TIMEOUT_SECONDS,
     _admin_access_error,
     _admin_ip_allowed,
     _admin_rate_limited,
     _is_duplicate_request,
     _make_dedup_key,
     audit_log,
+    rate_limit,
+    require_abuse_check,
+    require_embed_rate,
+    require_search_rate,
+    require_user_global_rate,
     track_event,
 )
 from core.metrics import (
+    ADMIN_ACTIONS_TOTAL,
+    BREAKER_OPEN,
+    DOWNLOADS_TOTAL,
+    OPTIMIZES_TOTAL,
+    UPLOADS_TOTAL,
+    UPTIME_SECONDS,
+    _APP_START_TIME,
     _metric_error,
     _metric_parse_latency,
     _metric_quota_hit,
@@ -56,6 +86,12 @@ from core.metrics import (
     _observe_dep,
 )
 from core.ops_runtime import (
+    MAINTENANCE_MODE,
+    _CPU_USAGE_LIMIT,
+    _MEMORY_RSS_LIMIT_MB,
+    _PANIC_ERROR_THRESHOLD,
+    _PANIC_ERROR_WINDOW,
+    _SAMPLE_RATE,
     _audit_event,
     _check_disk_safety,
     _clear_panic,
@@ -77,6 +113,13 @@ from core.ops_runtime import (
 )
 from core.request_utils import _read_upload_or_400
 from core.quota import (
+    COST_ANALYZE_PER_DAY,
+    COST_OPTIMIZE_PER_DAY,
+    COST_UPLOAD_PER_DAY,
+    ORG_PLAN_LIMITS_DAILY,
+    ORG_PLAN_LIMITS_MONTHLY,
+    USER_PLAN_LIMITS_DAILY,
+    USER_PLAN_LIMITS_MONTHLY,
     _apply_daily_quota_headers,
     _check_cost_guard,
     _consume_billable_usage,
@@ -98,6 +141,21 @@ from services import rewrite_service
 from services.ai_feature_service import ensure_ai_rewrite_allowed as _ensure_ai_rewrite_allowed
 from services.billing_service import is_feature_enabled
 from services.cv_autofix_service import auto_fix_cv_text, structured_text_to_builder_payload
+from services.cv_builder_service import (
+    BUILD_ID,
+    ENABLE_AI_REVIEW,
+    ENABLE_CLASSIFIER,
+    ENABLE_FALLBACK,
+    ENABLE_SANITIZER,
+    GIT_SHA,
+    INSTANCE_ID,
+    PARSER_BUILD,
+    _GLOBAL_PARSE_LIMIT,
+    _is_safe_mode,
+    build_cv,
+    compile_cv_model,
+    get_available_templates,
+)
 from services.email_service import (
     _append_feedback_record,
     _do_send_email,
@@ -107,6 +165,7 @@ from services.email_service import (
     _validate_reminder_email,
 )
 from services.user_service import (
+    BENCHMARK_MIN_PEERS,
     _apply_plan_based_result_features,
     _build_analysis_benchmark,
     _ensure_not_expired,
@@ -114,7 +173,6 @@ from services.user_service import (
     get_or_create_user,
 )
 from shared import _alert, _cb_is_open, _cb_record_failure, _cb_record_success
-from services.cv_builder_service import build_cv, compile_cv_model, get_available_templates
 from services.embedding_service import (
     find_similar_candidates,
     get_embedding,
@@ -124,6 +182,8 @@ from services.embedding_service import (
 from services.keyword_service import compare
 from services.language_service import detect_language, interpret_score_localized
 from services.pdf_runtime import (
+    CLAMAV_ENABLED,
+    _MAX_PDF_EXTRACTED_CHARS,
     _extract_pdf_text,
     _scan_upload_for_viruses,
     _validate_pdf_upload,
@@ -152,77 +212,19 @@ class AnalyzeRequest(BaseModel):
             self.job_description = self.job_text
 
 
-def _legacy(name: str):
-    return getattr(main_module(), name)
+MOCK_SERVICES_ON = is_mock_services_on()
+_guard_logger = logging.getLogger("app.guard")
 
 
-# Decorators/dependencies must keep their original call signatures, so these are
-# direct references rather than variadic wrappers.
-rate_limit = _legacy("rate_limit")
-require_abuse_check = _legacy("require_abuse_check")
-require_user_global_rate = _legacy("require_user_global_rate")
-require_search_rate = getattr(main_module(), "require_search_rate", lambda *a, **k: None)
-require_embed_rate = getattr(main_module(), "require_embed_rate", lambda *a, **k: None)
-
-
+# ── Mutable runtime state ──────────────────────────────────────────────────
+# These reference live objects owned by main.py. Replacing them with source-
+# module imports risks state desync — intentionally deferred.
 def _legacy_value(name: str, default=None):
     return getattr(main_module(), name, default)
 
 
-MOCK_SERVICES_ON = is_mock_services_on()
-ABUSE_PROTECTION_ENABLED = _legacy_value("ABUSE_PROTECTION_ENABLED", False)
-CLAMAV_ENABLED = _legacy_value("CLAMAV_ENABLED", False)
-MAINTENANCE_MODE = _legacy_value("MAINTENANCE_MODE", False)
-BENCHMARK_MIN_PEERS = _legacy_value("BENCHMARK_MIN_PEERS", 5)
-BUILD_ID = _legacy_value("BUILD_ID", "dev")
-GIT_SHA = _legacy_value("GIT_SHA", "unknown")
-PARSER_BUILD = _legacy_value("PARSER_BUILD", "local")
-INSTANCE_ID = _legacy_value("INSTANCE_ID", "local")
-
-RATE_LIMIT_IP_ANALYZE_PER_MIN = _legacy_value("RATE_LIMIT_IP_ANALYZE_PER_MIN", 10)
-RATE_LIMIT_IP_ANALYZE_PDF_PER_MIN = _legacy_value("RATE_LIMIT_IP_ANALYZE_PDF_PER_MIN", 10)
-RATE_LIMIT_USER_ANALYZE_PER_MIN = _legacy_value("RATE_LIMIT_USER_ANALYZE_PER_MIN", 10)
-RATE_LIMIT_USER_ANALYZE_PDF_PER_MIN = _legacy_value("RATE_LIMIT_USER_ANALYZE_PDF_PER_MIN", 10)
-RATE_LIMIT_IP_UPLOAD_PER_MIN = _legacy_value("RATE_LIMIT_IP_UPLOAD_PER_MIN", 5)
-RATE_LIMIT_IP_RENDER_PER_MIN = _legacy_value("RATE_LIMIT_IP_RENDER_PER_MIN", 10)
-RATE_LIMIT_IP_MATCH_PER_MIN = _legacy_value("RATE_LIMIT_IP_MATCH_PER_MIN", 10)
-RATE_LIMIT_IP_REWRITE_PER_MIN = _legacy_value("RATE_LIMIT_IP_REWRITE_PER_MIN", 5)
-
-USER_PLAN_LIMITS_DAILY = _legacy_value("USER_PLAN_LIMITS_DAILY", {})
-USER_PLAN_LIMITS_MONTHLY = _legacy_value("USER_PLAN_LIMITS_MONTHLY", {})
-ORG_PLAN_LIMITS_DAILY = _legacy_value("ORG_PLAN_LIMITS_DAILY", {})
-ORG_PLAN_LIMITS_MONTHLY = _legacy_value("ORG_PLAN_LIMITS_MONTHLY", {})
-COST_UPLOAD_PER_DAY = _legacy_value("COST_UPLOAD_PER_DAY", 1000)
-COST_ANALYZE_PER_DAY = _legacy_value("COST_ANALYZE_PER_DAY", COST_UPLOAD_PER_DAY)
-COST_OPTIMIZE_PER_DAY = _legacy_value("COST_OPTIMIZE_PER_DAY", 500)
-
-_MAX_RESPONSE_BODY_BYTES = _legacy_value("_MAX_RESPONSE_BODY_BYTES", 50 * 1024 * 1024)
-_MAX_PDF_EXTRACTED_CHARS = _legacy_value("_MAX_PDF_EXTRACTED_CHARS", 100_000)
-_APP_START_TIME = _legacy_value("_APP_START_TIME", time.time())
-_ENV_MODE = _legacy_value("_ENV_MODE", os.getenv("ENV", "development").lower())
-_CSRF_PROTECTION_ENABLED = _legacy_value("_CSRF_PROTECTION_ENABLED", False)
-_ADMIN_IP_ALLOWLIST = _legacy_value("_ADMIN_IP_ALLOWLIST", [])
-_CPU_USAGE_LIMIT = _legacy_value("_CPU_USAGE_LIMIT", 100.0)
-_MEMORY_RSS_LIMIT_MB = _legacy_value("_MEMORY_RSS_LIMIT_MB", 1024)
-_GLOBAL_CONCURRENCY_LIMIT = _legacy_value("_GLOBAL_CONCURRENCY_LIMIT", 20)
-_REQUEST_QUEUE_SIZE = _legacy_value("_REQUEST_QUEUE_SIZE", 100)
-_REQUEST_TIMEOUT_SECONDS = _legacy_value("_REQUEST_TIMEOUT_SECONDS", 600)
-_CB_FAILURE_THRESHOLD = _legacy_value("_CB_FAILURE_THRESHOLD", 5)
-_CB_COOLDOWN_SECONDS = _legacy_value("_CB_COOLDOWN_SECONDS", 30)
-_PANIC_ERROR_THRESHOLD = _legacy_value("_PANIC_ERROR_THRESHOLD", 20)
-_PANIC_ERROR_WINDOW = _legacy_value("_PANIC_ERROR_WINDOW", 60)
-_SAMPLE_RATE = _legacy_value("_SAMPLE_RATE", 0.01)
 _app_ready = _legacy_value("_app_ready", False)
 _panic_mode = _legacy_value("_panic_mode", False)
-_guard_logger = _legacy_value("_guard_logger", logging.getLogger("app.guard"))
-
-UPLOADS_TOTAL = _legacy_value("UPLOADS_TOTAL")
-DOWNLOADS_TOTAL = _legacy_value("DOWNLOADS_TOTAL")
-OPTIMIZES_TOTAL = _legacy_value("OPTIMIZES_TOTAL")
-ADMIN_ACTIONS_TOTAL = _legacy_value("ADMIN_ACTIONS_TOTAL")
-UPTIME_SECONDS = _legacy_value("UPTIME_SECONDS")
-BREAKER_OPEN = _legacy_value("BREAKER_OPEN")
-
 _ops_events = _legacy_value("_ops_events", [])
 _security_events = _legacy_value("_security_events", [])
 _ai_usage_events = _legacy_value("_ai_usage_events", [])
@@ -230,19 +232,11 @@ _live_flags = _legacy_value("_live_flags", {})
 _live_flags_lock = _legacy_value("_live_flags_lock")
 _circuit_breaker_state = _legacy_value("_circuit_breaker_state", {})
 _global_parse_semaphore = _legacy_value("_global_parse_semaphore")
-_GLOBAL_PARSE_LIMIT = _legacy_value("_GLOBAL_PARSE_LIMIT", 10)
 _LOCAL_ABUSE_BANS = _legacy_value("_LOCAL_ABUSE_BANS", {})
 _ip_global_counts = _legacy_value("_ip_global_counts", {})
 _user_global_counts = _legacy_value("_user_global_counts", {})
 _user_embed_counts = _legacy_value("_user_embed_counts", {})
 _search_counts = _legacy_value("_search_counts", {})
-
-ENABLE_CLASSIFIER = _legacy_value("ENABLE_CLASSIFIER", True)
-ENABLE_AI_REVIEW = _legacy_value("ENABLE_AI_REVIEW", True)
-ENABLE_SANITIZER = _legacy_value("ENABLE_SANITIZER", True)
-ENABLE_FALLBACK = _legacy_value("ENABLE_FALLBACK", True)
-_is_safe_mode = _legacy_value("_is_safe_mode", lambda: False)
-
 share_tokens = _legacy_value("share_tokens", {})
 
 __all__ = [name for name in globals() if not name.startswith("__")]
