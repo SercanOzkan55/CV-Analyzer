@@ -13,6 +13,7 @@ from fastapi import APIRouter
 from core.runtime_bridge import main_module as _main_module
 from core.route_dependencies import *  # noqa: F403
 from models import AsyncTaskOwner
+from utils.sql import LIKE_ESCAPE_CHAR, contains_like_pattern
 
 
 router = APIRouter(tags=["analysis"])
@@ -1099,9 +1100,14 @@ def get_history(
 
     # Apply filters
     if q:
-        base_query = base_query.filter(Analysis.interpretation.ilike(f"%{q}%") | Analysis.job_title.ilike(f"%{q}%"))
+        q_pattern = contains_like_pattern(q)
+        base_query = base_query.filter(
+            Analysis.interpretation.ilike(q_pattern, escape=LIKE_ESCAPE_CHAR)
+            | Analysis.job_title.ilike(q_pattern, escape=LIKE_ESCAPE_CHAR)
+        )
     if job_title:
-        base_query = base_query.filter(Analysis.job_title.ilike(f"%{job_title}%"))
+        job_title_pattern = contains_like_pattern(job_title)
+        base_query = base_query.filter(Analysis.job_title.ilike(job_title_pattern, escape=LIKE_ESCAPE_CHAR))
     if from_date:
         try:
             base_query = base_query.filter(Analysis.created_at >= datetime.fromisoformat(from_date))

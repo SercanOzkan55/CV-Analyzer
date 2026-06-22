@@ -63,6 +63,7 @@ from services.recruiter_helpers import (
 )
 from security.file_guard import read_upload_limited
 from services.tasks import batch_recruiter_task
+from utils.sql import LIKE_ESCAPE_CHAR, contains_like_pattern
 
 logger = logging.getLogger("app.recruiter")
 
@@ -97,7 +98,8 @@ def _get_limiter():
                 return decorator
 
         return NoopLimiter()
-    except:
+    except Exception as exc:
+        logger.warning("rate_limiter_unavailable error=%s", exc)
         # If anything fails, return noop limiter
         class NoopLimiter:
             def limit(self, limit_string):
@@ -722,13 +724,13 @@ def recruiter_search(
                         )
 
         if not use_postgres:
-            pattern = f"%{query}%"
+            pattern = contains_like_pattern(query)
             try:
                 # Get total count
                 total_count = (
                     db.query(Candidate)
                     .filter(Candidate.organization_id == org_id)
-                    .filter(Candidate.cv_text.ilike(pattern))
+                    .filter(Candidate.cv_text.ilike(pattern, escape=LIKE_ESCAPE_CHAR))
                     .count()
                 )
 
@@ -736,7 +738,7 @@ def recruiter_search(
                 rows = (
                     db.query(Candidate)
                     .filter(Candidate.organization_id == org_id)
-                    .filter(Candidate.cv_text.ilike(pattern))
+                    .filter(Candidate.cv_text.ilike(pattern, escape=LIKE_ESCAPE_CHAR))
                     .offset(offset)
                     .limit(limit)
                     .all()

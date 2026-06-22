@@ -458,13 +458,13 @@ async def websocket_batch_upload_progress(websocket: WebSocket, task_id: str):
         logger.error("websocket: unexpected error task_id=%s error=%s", task_id, e)
         try:
             await websocket.send_json({"error": f"Unexpected error: {str(e)}"})
-        except:
-            pass
+        except Exception as send_err:
+            logger.debug("websocket: failed to send error task_id=%s error=%s", task_id, send_err)
     finally:
         try:
             await websocket.close()
-        except:
-            pass
+        except Exception as close_err:
+            logger.debug("websocket: close failed task_id=%s error=%s", task_id, close_err)
 
 
 # ════════════════════════════════════════════════════════════════════════════

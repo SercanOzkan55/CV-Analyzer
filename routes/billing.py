@@ -10,6 +10,7 @@ import requests
 
 from core.runtime_bridge import main_module as _main_module
 from core.route_dependencies import *  # noqa: F403
+from utils.sql import LIKE_ESCAPE_CHAR, contains_like_pattern
 
 
 router = APIRouter(tags=["billing"])
@@ -477,7 +478,7 @@ def billing_admin_list_users(
 
     query = db.query(User)
     if email:
-        query = query.filter(User.email.ilike(f"%{email.strip()}%"))
+        query = query.filter(User.email.ilike(contains_like_pattern(email.strip()), escape=LIKE_ESCAPE_CHAR))
     if plan_type:
         normalized_plan = _parse_plan_type_or_400(plan_type)
         query = query.filter(User.plan_type == normalized_plan)
