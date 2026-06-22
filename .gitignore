@@ -73,6 +73,10 @@ storage_data/
 
 # Dev scratch files
 _dev_scratch/
+.gemini_scratch/
+.codex-ci-check/
+dev_logs/
+tmp_video_frames/
 tools/node-v*/
 tmp_*.py
 tmp_*.json

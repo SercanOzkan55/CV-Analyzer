@@ -1,6 +1,0 @@
-﻿$ErrorActionPreference = 'Continue'
-$env:MOCK_SERVICES = '1'
-$env:ENV = 'development'
-$env:WORKER_DOWNLOAD_SIGNING_SECRET = 'local-dev-worker-download-secret'
-Set-Location 'C:\Users\ASUS\Desktop\cv-analyzer'
-& 'C:\Users\ASUS\Desktop\cv-analyzer\.venv\Scripts\python.exe' -m uvicorn main:app --host 127.0.0.1 --port 8001 *> 'C:\Users\ASUS\Desktop\cv-analyzer\dev_logs\backend.log'
