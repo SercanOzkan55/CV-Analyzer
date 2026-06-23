@@ -180,6 +180,32 @@ class TestBuildSchema:
         assert schema.full_name == ""
         assert schema.experiences == []
 
+    def test_drops_substanceless_header_entry(self):
+        # An ALL-CAPS section header that leaked into experience with no
+        # bullets, company, or dates must not become a fake job.
+        normalized = {
+            "experience": [
+                {"title": "Senior Engineer", "company": "Acme", "bullets": ["Shipped X"]},
+                {"title": "LEADERSHIP ACTIVITIES", "company": "", "bullets": []},
+                {"title": "Sanchez 1", "company": "", "bullets": []},
+            ]
+        }
+        schema = build_schema(normalized)
+        titles = [e.title for e in schema.experiences]
+        assert "Senior Engineer" in titles
+        assert "LEADERSHIP ACTIVITIES" not in titles
+        assert "Sanchez 1" not in titles
+
+    def test_keeps_dateless_entry_with_bullets(self):
+        # A real role with bullets but no parsed company/date must be kept.
+        normalized = {
+            "experience": [
+                {"title": "Volunteer Tutor", "company": "", "bullets": ["Tutored 10 students"]},
+            ]
+        }
+        schema = build_schema(normalized)
+        assert any(e.title == "Volunteer Tutor" for e in schema.experiences)
+
     def test_recovers_name_when_header_was_tech_stack(self):
         normalized = {
             "full_name": "HTML / CSS",
