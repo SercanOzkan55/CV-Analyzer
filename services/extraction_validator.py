@@ -197,6 +197,96 @@ def _is_valid_language_entry(entry: str) -> bool:
     return False
 
 
+# Symbol/digit and conjunction-led starts that mark a wrapped sentence
+# fragment rather than a real role line. (Case-insensitive only for the word
+# list — the lowercase-start test is handled separately so IGNORECASE does not
+# defeat it.)
+_FRAGMENT_SYMBOL_RE = re.compile(r"^[&,;:.\-–—(]|^\(?\d")
+_FRAGMENT_WORD_RE = re.compile(
+    r"^(?:and|or|such\s+as|with|the|of|for|to|in|by|but|was|were|also)\b",
+    re.I,
+)
+# Leading bullet glyphs (incl. private-use Wingdings/Symbol points) — a real
+# role title never starts with one.
+_FRAGMENT_BULLET_RE = re.compile(r"^[•●○◦▪■‣⁃∙·▸▹▶▷]")
+# Bare structural labels that are section/field headers, not job titles.
+_FRAGMENT_LABEL_WORDS = {
+    "experience",
+    "organization",
+    "organisation",
+    "department",
+    "designation",
+    "objective",
+    "profile",
+    "declaration",
+    "summary",
+    "skills",
+    "references",
+    "education",
+    "projects",
+    "responsibilities",
+    "key responsibilities",
+    "personal details",
+    "company",
+}
+
+
+def _looks_fragmented_title(title: str) -> bool:
+    """True if an experience *title* looks like a fragment, not a real role.
+
+    These dominate the experience list when a table or an unusual layout
+    (e.g. "ORGANIZATION:/KEY RESPONSIBILITIES:") is mis-split into tiny entries.
+    """
+    t = (title or "").strip()
+    if not t:
+        return True
+    # Leading bullet glyph (incl. private-use Wingdings/Symbol points).
+    if _FRAGMENT_BULLET_RE.match(t) or 0xE000 <= ord(t[0]) <= 0xF8FF:
+        return True
+    # Starts lowercase → mid-sentence wrap (case-sensitive on purpose).
+    if t[0].islower():
+        return True
+    if _FRAGMENT_SYMBOL_RE.match(t):
+        return True
+    if _FRAGMENT_WORD_RE.match(t):
+        return True
+    # Bare structural label / section word used as a title.
+    label = re.sub(r"\s*[:\-–—].*$", "", t).strip().lower()
+    if label in _FRAGMENT_LABEL_WORDS:
+        return True
+    # ALL-CAPS short phrase → a section header that leaked in
+    # ("KEY RESPONSIBILITIES", "PAST EXPERIENCE", "BUT").
+    if t.isupper() and len(t.split()) <= 3:
+        return True
+    return False
+
+
+def _check_experience_fragmentation(extracted: dict) -> List[str]:
+    """Detect over-split / garbage experience lists from hard layouts.
+
+    Tables and non-standard structures get shredded into many tiny entries
+    with fragment titles and few bullets. We flag those so the caller can fall
+    back to an LLM re-parse instead of shipping garbage.
+    """
+    entries = [e for e in extracted.get("experiences", []) or [] if isinstance(e, dict)]
+    n = len(entries)
+    if n < 4:
+        return []
+
+    fragmented = sum(1 for e in entries if _looks_fragmented_title(str(e.get("title", ""))))
+    frag_ratio = fragmented / n
+    avg_bullets = sum(len(e.get("bullets") or []) for e in entries) / n
+
+    issues: List[str] = []
+    # Rule A: fragment-titled entries dominate the list.
+    if frag_ratio >= 0.4:
+        issues.append(f"experience_fragmented: {fragmented}/{n} fragment-like titles")
+    # Rule B: many entries but almost no bullets → over-split table/structure.
+    if n >= 8 and avg_bullets < 1.2:
+        issues.append(f"experience_oversplit: {n} entries, avg {avg_bullets:.1f} bullets/entry")
+    return issues
+
+
 def _check_summary_contamination(summary: str) -> List[str]:
     """Return list of contamination signals found in summary."""
     if not summary:
@@ -402,6 +492,13 @@ def validate_extraction(
                 if aw in field_val.lower():
                     hard_fails.append(f"education[{i}].{field_name}_contains_activity: '{aw}'")
                     score -= 10
+
+    # ── 8. Experience Fragmentation / Over-splitting ─────────────────────
+
+    frag_issues = _check_experience_fragmentation(extracted)
+    if frag_issues:
+        hard_fails.append(f"experience_garbage: {frag_issues}")
+        score -= 30
 
     # ── Final Score ──────────────────────────────────────────────────────
 
