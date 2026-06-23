@@ -1,7 +1,44 @@
 """Unit tests for services/section_classifier.py — public API."""
 
 import pytest
-from services.section_classifier import classify_block, split_blocks, canonicalize_section_key
+from services.section_classifier import (
+    classify_block,
+    split_blocks,
+    canonicalize_section_key,
+    _sniff_header,
+)
+
+
+class TestSniffExperienceHeaders:
+    """Qualifier-prefixed experience headers should be recognized as
+    experience section headers, while job titles ending in 'experience'
+    should not."""
+
+    @pytest.mark.parametrize(
+        "header",
+        [
+            "RESEARCH EXPERIENCE",
+            "Health-Related Experience",
+            "OTHER WORK EXPERIENCE",
+            "Clinical Experience",
+            "Teaching Experience",
+            "Volunteer Experience",
+            "EXPERIENCE",
+            "Work Experience",
+        ],
+    )
+    def test_qualifier_experience_headers(self, header):
+        assert _sniff_header(header) == "experience"
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            "User Experience Designer",
+            "Customer Experience Lead",
+        ],
+    )
+    def test_job_titles_are_not_headers(self, line):
+        assert _sniff_header(line) != "experience"
 
 
 # ── classify_block ───────────────────────────────────────────
