@@ -8,11 +8,31 @@ from services.cv_autofix_service import (
     _header_has_contact,
     _clean_lines,
     _polish_text,
+    _parse_experience_entries,
     guess_name_from_lines,
     _canonical_section,
     _noise_section,
     _enforce_protected_section_floor,
 )
+
+
+def test_parse_experience_entries_splits_multiple_bullet_jobs():
+    # Jobs separated by header lines, with ● (U+25CF) bullets — the most
+    # common CV bullet glyph. Each job must become its own entry instead of
+    # collapsing into one.
+    lines = [
+        "Microbiology Intern, Beckman Coulter, CA June 2022 to September 2022",
+        "● Sub-cultured microorganisms and performed laboratory tests",
+        "● Prepared materials for clinical trial initiation activities",
+        "Pharmacy Intern, CVS Health, CA June 2024 to September 2024",
+        "● Carefully dispensed prescriptions in a sterile manner",
+        "● Collaborated with healthcare professionals on counselling",
+        "Salesperson, Macy's, CA August 2023 to Present",
+        "● Greeted approximately 50 customers per shift",
+    ]
+    entries = _parse_experience_entries(lines)
+    assert len(entries) == 3
+    assert all(e["bullets"] for e in entries)
 
 
 def test_clean_lines():

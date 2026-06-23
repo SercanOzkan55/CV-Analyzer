@@ -1409,7 +1409,8 @@ def _build_structured_cv(
         experience_lines = _normalize_experience(experience_raw)
     else:
         has_bullets = any(
-            re.match(r"^\s*[-*•\u2013\u2014\u2023\u25aa\u25a0\uf0b7]\s+", line) for line in experience_raw
+            re.match(r"^\s*[-*•\u2013\u2014\u2023\u25aa\u25a0\u25cf\u25cb\u25e6\uf0b7]\s+", line)
+            for line in experience_raw
         )
         experience_lines = (
             _normalize_experience(experience_raw) if (experience_raw and not has_bullets) else experience_raw
@@ -1423,7 +1424,8 @@ def _build_structured_cv(
         project_lines = _normalize_experience(project_raw)
     else:
         has_project_bullets = any(
-            re.match(r"^\s*[-*•\u2013\u2014\u2023\u25aa\u25a0\uf0b7]\s+", line) for line in project_raw
+            re.match(r"^\s*[-*•\u2013\u2014\u2023\u25aa\u25a0\u25cf\u25cb\u25e6\uf0b7]\s+", line)
+            for line in project_raw
         )
         project_lines = _normalize_experience(project_raw) if (project_raw and not has_project_bullets) else project_raw
     language_lines = _normalize_list_section(sections.get("languages", []))
@@ -1955,9 +1957,9 @@ def _split_concatenated_bullets(lines: list[str]) -> list[str]:
             continue
         # Detect lines that start with a bullet marker and contain more markers mid-line
         # Markers: *, •, -, –, —, ▪, ■  (only when preceded by whitespace or sentence-end)
-        if re.match(r"^\s*[*\u2022\u2023\u2013\u2014\u25aa\u25a0]", line):
+        if re.match(r"^\s*[*\u2022\u2023\u2013\u2014\u25aa\u25a0\u25cf\u25cb\u25e6]", line):
             # Split on mid-line bullet markers
-            parts = re.split(r"\s+(?=[*\u2022\u2023\u2013\u2014\u25aa\u25a0](?:\s|[A-Z]))", line)
+            parts = re.split(r"\s+(?=[*\u2022\u2023\u2013\u2014\u25aa\u25a0\u25cf\u25cb\u25e6](?:\s|[A-Z]))", line)
             for part in parts:
                 part = part.strip()
                 if part:
@@ -2199,7 +2201,7 @@ def _parse_experience_entries(lines: list[str]) -> list[dict]:
         # A line starting with a bullet marker (-, •, *, –, …) is a bullet
         # UNLESS it has no content after the marker, is purely a date,
         # or is a very short role-like phrase (≤3 words after marker).
-        _bullet_m = re.match(r"^\s*[-*•\u2013\u2014\u2023\u25aa\u25a0\uf0b7]\s*", line)
+        _bullet_m = re.match(r"^\s*[-*•\u2013\u2014\u2023\u25aa\u25a0\u25cf\u25cb\u25e6\uf0b7]\s*", line)
         if _bullet_m and not _is_date_like(line):
             bullet_text = line[_bullet_m.end() :].strip()
             # Only reject as "role title" if the after-marker text is very
@@ -2803,7 +2805,7 @@ def _parse_project_entries(lines: list[str]) -> list[dict]:
         re.I,
     )
     _URL_LINE = re.compile(r"^\s*(?:https?://\S+|www\.\S+)\s*$", re.I)
-    _BULLET_RE_PROJ = re.compile(r"^\s*[-*•\u2013\u2014\u2023\u25aa\u25a0►]\s+")
+    _BULLET_RE_PROJ = re.compile(r"^\s*[-*•\u2013\u2014\u2023\u25aa\u25a0\u25cf\u25cb\u25e6►]\s+")
 
     _PROJECT_CONTINUATION_RE = re.compile(
         r"^(?:and|or|with|to|for|in|on|of|by|as|using|between|while|through|that|which|ve|ile|i[cç]in|olarak)\b",
