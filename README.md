@@ -1,1033 +1,540 @@
-# CV Analyzer: Enterprise-Grade Resume Intelligence, ATS Calibration, and Local Desktop Processing Grid
+<div align="center">
 
-CV Analyzer is a production-ready AI resume intelligence, applicant screening, ATS calibration, recruiter workflow, and local desktop processing platform. The codebase combines:
+# 🎯 CV Analyzer
 
-1. **FastAPI Backend Server Node:** ASGI web server for REST endpoints, database access, Stripe billing, Supabase JWT authentication, quota enforcement, storage adapters, worker sync, and scoring services.
-2. **Vite + React 18 Web Portal:** Responsive SaaS portal with animated landing pages, dashboards, CV analysis, CV Builder, recruiter workspaces, feedback, billing, and analytics-oriented UI flows.
-3. **Expo React Native Mobile Scaffold:** Mobile client scaffold prepared for CV upload and history tracking flows.
-4. **PySide6 Qt Quick/QML Local Worker:** Native desktop application for private local CV folder processing, offline-first workspace storage, local exports, and explicit website sync.
+### Enterprise-grade resume intelligence · ATS calibration · recruiter workflows · privacy-first local processing
 
-The current product direction is hybrid SaaS plus local privacy. The website handles account, billing, recruiter, and cloud workflows; the Local Worker keeps sensitive batch processing on the user's own machine until sync is explicitly requested.
+*A hybrid SaaS + local-desktop platform that parses, scores, rewrites, and benchmarks résumés against applicant-tracking-system (ATS) criteria — with a deterministic-first parsing core and AI used only where it earns its cost.*
 
-- Web users can upload CVs, analyze ATS fit, build CVs, manage history, use recruiter tools, and manage premium/billing flows.
-- Recruiters can create jobs, upload or sync batches, rank candidates, review decisions, and generate reports.
-- Local Worker users can process CV folders on their own machine and explicitly sync selected results back to the website.
-- Security controls are layered across file validation, request limits, auth, quota enforcement, storage guards, audit tests, and dependency scanning.
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.135-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
+![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
+![Tailwind](https://img.shields.io/badge/Tailwind-4-38BDF8?logo=tailwindcss&logoColor=white)
+![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-D71F00)
+![Celery](https://img.shields.io/badge/Celery-5.6-37814A?logo=celery&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-7.2-DC382D?logo=redis&logoColor=white)
+![License](https://img.shields.io/badge/license-Proprietary-lightgrey)
 
----
-
-## Table of Contents
-
-1. [Product Scope](#product-scope)
-2. [Architecture](#architecture)
-3. [Repository Map](#repository-map)
-4. [Backend](#backend)
-5. [Frontend Web App](#frontend-web-app)
-6. [Local Worker Desktop App](#local-worker-desktop-app)
-7. [Mobile Scaffold](#mobile-scaffold)
-8. [Processing Pipeline](#processing-pipeline)
-9. [Recruiter and Local Sync](#recruiter-and-local-sync)
-10. [Security Model](#security-model)
-11. [Environment Variables](#environment-variables)
-12. [Local Development](#local-development)
-13. [Testing and Validation](#testing-and-validation)
-14. [Packaging and Deployment](#packaging-and-deployment)
-15. [Operational Notes](#operational-notes)
-16. [Current Technical Debt](#current-technical-debt)
-17. [Git Workflow](#git-workflow)
+</div>
 
 ---
 
-## Product Scope
+## 📑 Table of Contents
 
-CV Analyzer supports several user flows:
-
-### Candidate / Individual User
-
-- Upload CV files and receive ATS-oriented analysis.
-- See score breakdowns, detected skills, missing skills, recommendations, and history.
-- Use AI tools for CV rewriting, CV building, cover letters, career studio flows, and template-related features.
-- Store and manage previous analyses.
-- Access light/dark themed UI with animated SaaS landing and dashboard surfaces.
-
-### Recruiter / Hiring User
-
-- Create and manage jobs.
-- Upload job descriptions and candidate CV batches.
-- Rank candidates against a job description.
-- Review fit score, skills, missing requirements, and recommended decisions.
-- Export reports and candidate summaries.
-- Use local-worker keys for private local processing.
-- Sync local results back into the web recruiter workspace when explicitly requested.
-
-### Local Desktop User
-
-- Run native desktop processing with Qt Quick/QML.
-- Select local folders containing PDF, DOCX, and TXT resumes.
-- Process files locally with offline-first workspace storage.
-- Generate CSV, JSON, and HTML style outputs.
-- Keep API keys in local credential storage where available.
-- Use website sync only as an explicit action.
+| # | Section | # | Section |
+|---|---------|---|---------|
+| 1 | [What is CV Analyzer](#-1-what-is-cv-analyzer) | 9 | [Data Model](#-9-data-model) |
+| 2 | [Feature Matrix](#-2-feature-matrix) | 10 | [Security Model](#-10-security-model) |
+| 3 | [System Architecture](#-3-system-architecture) | 11 | [Environment Variables](#-11-environment-variables) |
+| 4 | [Technology Stack](#-4-technology-stack) | 12 | [Local Development](#-12-local-development) |
+| 5 | [Repository Map](#-5-repository-map) | 13 | [Testing & Quality Gates](#-13-testing--quality-gates) |
+| 6 | [The Parsing Pipeline](#-6-the-parsing-pipeline) | 14 | [Deployment](#-14-deployment) |
+| 7 | [Request Lifecycle](#-7-request-lifecycle) | 15 | [Roadmap & Tech Debt](#-15-roadmap--technical-debt) |
+| 8 | [API Surface](#-8-api-surface) | 16 | [Contributing](#-16-contributing) |
 
 ---
 
-## Architecture
+## 🧭 1. What is CV Analyzer
 
-```text
-+-----------------------------------------------------------------------+
-|                         FastAPI REST Gateway                          |
-+-----------------------------------------------------------------------+
-       |                                |                        |
-       v                                v                        v
-+------------------+          +-------------------+    +----------------+
-| Supabase Auth    |          | Billing / Quotas  |    | Metrics / Ops  |
-| JWT Verification |          | Stripe Guards     |    | Runtime Guard  |
-+------------------+          +-------------------+    +----------------+
-       |                                |                        |
-       +----------------+---------------+------------------------+
-                        |
-                        v
-         +-----------------------------+
-         |    Pipeline Runtime Engine  |
-         +-----------------------------+
-           /            |            \
-          /             |             \
-         v              v              v
-  +------------+  +------------+  +-------------+
-  | Extraction |  | Normalizer |  | ATS / ML    |
-  | Agent      |  | Agent      |  | Calibrator  |
-  +------------+  +------------+  +-------------+
-         |              |              |
-         +--------------+--------------+
-                        |
-                        v
-         +-----------------------------+
-         |    Storage Adapter Layer    |
-         +-----------------------------+
-           /             |             \
-          v              v              v
-  +---------------+ +-------------+ +----------------+
-  | Local Storage | | AWS S3      | | Local Worker   |
-  | Dev/Mock      | | Production  | | SQLite Sync    |
-  +---------------+ +-------------+ +----------------+
+CV Analyzer is composed of **four cooperating runtimes** that share one domain model:
+
+| Runtime | Technology | Responsibility |
+|---------|-----------|----------------|
+| 🖥️ **Backend API** | FastAPI (ASGI) | REST gateway, parsing pipeline, ATS scoring, billing, auth, quotas, storage, worker sync |
+| 🌐 **Web Portal** | React 18 + Vite | Landing, dashboards, analysis, CV Builder, recruiter workspace, billing UI |
+| 📱 **Mobile Client** | Expo React Native | Upload + history scaffold for on-the-go use |
+| 🔐 **Local Worker** | PySide6 / Qt Quick (QML) | Offline batch processing on the user's own machine; explicit sync only |
+
+The product direction is **hybrid SaaS + local privacy**: the cloud handles accounts, billing, recruiter collaboration, and shared workflows, while the Local Worker keeps sensitive batch processing on the user's machine until a sync is explicitly requested.
+
+```mermaid
+flowchart LR
+    subgraph Clients
+        W[🌐 Web Portal<br/>React + Vite]
+        M[📱 Mobile<br/>Expo RN]
+        L[🔐 Local Worker<br/>PySide6/QML]
+    end
+    subgraph Cloud["☁️ Cloud Backend"]
+        API[FastAPI Gateway]
+        WK[Celery Workers]
+    end
+    subgraph Data["🗄️ Stateful Services"]
+        DB[(PostgreSQL)]
+        RD[(Redis)]
+        S3[(AWS S3)]
+    end
+    W -->|JWT REST| API
+    M -->|JWT REST| API
+    L -->|Worker key sync| API
+    API --> DB
+    API --> RD
+    API --> S3
+    API -.enqueue.-> WK
+    WK --> DB
+    WK --> S3
 ```
-
-### Architectural Blueprints and Design Patterns
-
-The platform uses several standard engineering patterns:
-
-- **Singleton Pattern:** Database session factories, Redis-style rate limit clients, loaded ML models, and runtime settings are initialized once and reused across request handling paths.
-- **Factory Pattern:** Extraction and parsing services select document handlers based on file type, document layout, and available text/OCR signals.
-- **Adapter Pattern:** `services/storage_service.py` abstracts S3 and local disk storage behind a common upload/download URL interface.
-- **Observer/Webhook Pattern:** `routes/billing.py` receives Stripe events, validates webhook signatures, and updates user plan or entitlement records.
-- **Command / Task Runner Pattern:** Parsing and scoring operations are wrapped into service commands; where external workers are not configured, the backend falls back to in-process execution.
-- **Runtime Guard Pattern:** Security and operational flags such as safe mode, kill switch, concurrency limits, and timeouts allow risky paths to be throttled or disabled.
-
-Main runtime layers:
-
-- `main.py` creates the FastAPI application, middleware, lifecycle hooks, and router registration.
-- `routes/` contains API route modules grouped by product area.
-- `services/` contains CV extraction, scoring, AI, storage, recruiter, billing, and report logic.
-- `security/` contains file, storage, runtime, timeout, validation, and redaction guards.
-- `frontend/src/` contains the React application.
-- `local_worker/` contains the QML desktop app and local processing engine.
-- `tests/` contains backend, security, service, integration, and local worker tests.
 
 ---
 
-## Repository Map
+## ✨ 2. Feature Matrix
 
-```text
-.
-|-- main.py                         FastAPI app factory and route registration
-|-- requirements.txt                Python backend dependency pins
-|-- pyproject.toml                  Ruff, mypy, and project metadata
-|-- pytest.ini                      Test configuration
-|-- Dockerfile                      Backend container image
-|-- docker-compose.yml              Local service composition
-|-- alembic/                        Alembic migration environment
-|-- migrations/                     Database migration history
-|-- core/                           Runtime helpers, lifecycle, quotas, metrics
-|-- middleware/                     Request middleware
-|-- models/                         SQLAlchemy/domain model files and model metadata
-|-- routes/                         FastAPI routers
-|-- schemas/                        Pydantic schemas
-|-- security/                       File, S3, timeout, runtime, redaction guards
-|-- services/                       Business logic and processing services
-|-- utils/                          Utility functions
-|-- frontend/                       React/Vite web app
-|-- local_worker/                   Qt Quick/QML desktop worker
-|-- mobile/                         Expo mobile scaffold
-|-- tests/                          Backend and integration tests
-|-- docs/                           Supporting documentation
-|-- sample_cvs/                     Sample inputs
-|-- templates/                      Render/export templates
-|-- themes/                         Shared theme assets/configuration
-```
+### 👤 Candidate / Individual
 
-Important documentation files:
+| Feature | Description |
+|---------|-------------|
+| ATS analysis | Upload PDF/DOCX/TXT → overall + per-section ATS scores, detected/missing skills, recommendations |
+| Score breakdown | Structure, keywords, experience, education, languages, ATS-friendliness, length |
+| AI auto-fix | Deterministic résumé repair first; LLM rewrite only when parse quality is low or rebuild is requested |
+| CV Builder | Template-based generation (DOCX / PDF / HTML / Typst) with plan-gated templates and fonts |
+| Cover letters & interview prep | LLM-assisted cover-letter, interview-question, and answer-evaluation tools |
+| History & sharing | Persisted analyses, notes, favorites, shareable tokens |
 
-- `SECURITY.md` - security posture and reporting notes.
-- `LOCAL_PROCESSING_GUIDE.md` - local processing and privacy guide.
-- `LOCAL_WORKER_PRODUCT_ROADMAP.md` - desktop worker roadmap.
-- `PROJECT_AUDIT_REPORT_2026-06-19.md` - latest full project audit report.
-- `CODEX_AUDIT_FINDINGS.md` - tracked audit findings and remediation notes.
-- `TEST_DOCUMENTATION.md`, `TEST_README.md`, `TEST_WINDOWS.md` - test notes.
+### 🧑‍💼 Recruiter / Hiring
+
+| Feature | Description |
+|---------|-------------|
+| Jobs & batches | Create jobs, upload job descriptions, ingest candidate batches |
+| Candidate ranking | Semantic + keyword match scoring, shortlist probability, strengths/concerns |
+| Decisions & reports | Candidate actions, comments, reminders, exportable reports |
+| Embeddings search | Index CVs, find similar candidates, semantic search |
+| Local processing | Issue worker keys; process privately; sync selected results back |
+
+### 🔐 Local Desktop
+
+| Feature | Description |
+|---------|-------------|
+| Folder batch | Process local folders of PDF/DOCX/TXT resumes offline-first |
+| Local exports | CSV / JSON / HTML outputs stored in a local workspace |
+| Credential safety | API keys stored in local credential storage where available |
+| Explicit sync | Results never leave the machine until the user syncs |
 
 ---
 
-## Backend
-
-The backend is a FastAPI application using SQLAlchemy-style persistence, optional Supabase authentication, optional S3 storage, Stripe billing hooks, Redis-compatible rate limiting/cache paths, and local fallback modes for development.
-
-### Main Backend Entry Points
-
-- `main.py`
-- `database.py`
-- `auth.py`
-- `logging_config.py`
-- `core/app_lifecycle.py`
-- `core/http_runtime.py`
-- `core/metrics.py`
-- `core/quota.py`
-- `core/route_dependencies.py`
-
-### Registered Router Areas
-
-The application registers routers for:
-
-- Recruiter workflows: `routes/recruiter.py`
-- Extended recruiter tools and websocket flows: `routes/recruiter_extended.py`
-- Local recruiter/worker flows: `routes/recruiter_local.py`
-- Downloads: `routes/downloads.py`
-- System status and health: `routes/system.py`
-- CV Builder: `routes/cv_builder.py`
-- Analysis: `routes/analysis.py`
-- Dashboard: `routes/dashboard.py`
-- User data: `routes/user_data.py`
-- AI tools: `routes/ai_tools.py`
-- Billing: `routes/billing.py`
-- CV storage: `routes/cv_storage.py`
-- Worker API: `routes/worker.py`
-- Owner workflow / scoped keys: `routes/owner_workflow.py`
-
-### Key Backend Services
-
-- `services/pdf_text_extractor.py` - PDF extraction and layout handling.
-- `services/section_classifier.py` - section classification.
-- `services/section_resolver.py` - section drift correction.
-- `services/schema_builder.py` - structured CV schema building.
-- `services/ats_scoring.py` and `services/ats_service.py` - ATS scoring.
-- `services/job_match_service.py` - CV/job matching.
-- `services/embedding_service.py` - embeddings and semantic similarity.
-- `services/ml_calibrator.py`, `services/model_runner.py`, `services/ml_model.py` - ML scoring/calibration.
-- `services/cv_autofix_service.py` - CV rewrite/autofix safeguards.
-- `services/cv_builder_service.py` - CV Builder generation.
-- `services/recruiter_service.py` and `services/recruiter_helpers.py` - recruiter workflows.
-- `services/storage_service.py`, `services/s3_service.py`, `services/local_storage_service.py` - storage abstraction.
-- `services/billing_service.py` - billing and entitlements.
-- `services/email_service.py` - email/SMTP integration.
-- `services/report_service.py` - report generation.
-- `services/owner_workflow_service.py` - scoped local worker ownership and permissions.
-
----
-
-## Frontend Web App
-
-The web app lives in `frontend/` and is built with:
-
-- React 18
-- Vite
-- React Router
-- Framer Motion
-- Lucide React icons
-- Supabase client integration
-- Vitest and Testing Library
-
-### Main Web Files
-
-```text
-frontend/src/main.jsx
-frontend/src/App.jsx
-frontend/src/api.js
-frontend/src/style.css
-frontend/src/context/AuthContext.jsx
-frontend/src/context/ThemeContext.jsx
-frontend/src/context/RecruiterSessionContext.jsx
-frontend/src/i18n/
-```
-
-### Important Pages
-
-- `LandingPage.jsx`
-- `DashboardPage.jsx`
-- `AnalyzePage.jsx`
-- `HistoryPage.jsx`
-- `RecruiterPage.jsx`
-- `RecruiterDashboardPage.jsx`
-- `RecruiterHubPage.jsx`
-- `FeedbackPage.jsx`
-- `LoginPage.jsx`
-- `RegisterPage.jsx`
-- `PricingPage.jsx`
-- `PremiumPage.jsx`
-- `SettingsPage.jsx`
-- `CVBuilderPage.jsx`
-- `CoverLetterPage.jsx`
-- `CareerStudioPage.jsx`
-- `TemplateMarketplacePage.jsx`
-- `BlogPage.jsx`
-
-### Frontend Commands
-
-Run from `frontend/`:
-
-```bash
-npm install
-npm run dev
-npm run build
-npm run test
-npm run typecheck
-```
-
-Default development URL:
-
-```text
-http://127.0.0.1:5173/
-```
-
-### Current Web UI Notes
-
-The web UI has recently received:
-
-- More polished landing page visuals.
-- Scroll and pointer-based motion experiments.
-- Feedback/support page improvements.
-- Recruiter page layout refinements.
-- Light theme polish and circular progress fixes.
-
-The largest remaining frontend maintenance issue is `frontend/src/style.css`, which is still very large and should be split into token/base/layout/component/page styles over time.
-
----
-
-## Local Worker Desktop App
-
-The current desktop app is the Qt Quick/QML Local Worker.
-
-The legacy QtWidgets desktop interfaces were removed from the active package path. The active entry point is:
-
-```text
-local_worker/qml_gui.py
-```
-
-The QML app shell is:
-
-```text
-local_worker/qml/Main.qml
-```
-
-### Local Worker Responsibilities
-
-- Select a local CV folder.
-- Process supported files: `.pdf`, `.docx`, `.txt`.
-- Extract text locally.
-- Score and rank candidates locally.
-- Store runs in a local workspace database.
-- Generate local outputs.
-- Manage website sync settings.
-- Submit selected local results to the backend only when the user chooses to sync.
-- Store worker API keys locally via `local_worker/credentials.py`.
-
-### Local Worker Files
-
-```text
-local_worker/qml_gui.py              QML application bridge and Python controller
-local_worker/qml/Main.qml            Main Qt Quick UI
-local_worker/worker.py               Local extraction/scoring/sync engine
-local_worker/workspace.py            Local workspace persistence
-local_worker/owner_workflow.py       Owner/scoped workflow helpers
-local_worker/credentials.py          Local credential storage helpers
-local_worker/run_gui.cmd             Run the QML GUI on Windows
-local_worker/start_here.cmd          Guided Windows start script
-local_worker/install_windows.cmd     Dependency installation helper
-local_worker/build_windows_exe.cmd   PyInstaller build helper
-local_worker/CV Analyzer Local Worker.spec
-local_worker/requirements.txt
-```
-
-### Launch Local Worker
-
-On Windows:
-
-```bat
-cd local_worker
-start_here.cmd
-```
-
-or:
-
-```bat
-run_gui.cmd
-```
-
-From Python:
-
-```bash
-cd local_worker
-python qml_gui.py
-```
-
-### Build Local Worker EXE
-
-```bat
-cd local_worker
-build_windows_exe.cmd
-```
-
-The packaged app should include the QML UI and should not depend on the removed legacy QtWidgets UI files.
-
----
-
-## Mobile Scaffold
-
-The `mobile/` directory contains an Expo React Native scaffold. It is not the primary shipping surface yet, but it provides a base for mobile CV upload/history experiences.
-
-Treat it as a scaffold unless active mobile work is requested.
-
----
-
-## Processing Pipeline
-
-The analysis pipeline combines deterministic parsing, schema building, rule-based ATS scoring, semantic matching, machine-learning calibration, and optional AI-powered recommendations.
-
-### Section Parsing and Linearization
+## 🏗️ 3. System Architecture
 
 ```mermaid
 flowchart TD
-  file["Uploaded File"] --> guard["File Guard / Size / Type Validation"]
-  guard --> extractor["PyMuPDF / DOCX / TXT Extractor"]
-  extractor --> geo["Geometric Block Extractor"]
-  geo --> layout{"Is Multi-column?"}
+    Client[["Client (Web / Mobile / Worker)"]]
 
-  layout -- "Yes" --> lin["Linearize Columns by Geometry"]
-  layout -- "No" --> raw_text["Read Lines Sequentially"]
+    subgraph Gateway["FastAPI Gateway"]
+        MW[Middleware:<br/>CORS · rate limit · abuse · CSRF]
+        AUTH[Supabase JWT verify<br/>algorithm allowlist · JWKS cache]
+        ROUTE[14 Routers · 185 endpoints]
+    end
 
-  lin --> marker["Append Layout Marker"]
-  raw_text --> clean["Clean Noise, Bullets, Tabs"]
-  marker --> clean
+    subgraph Domain["Domain Services (49 modules)"]
+        PIPE[Pipeline Runtime]
+        ATS[ATS Scoring + ML Calibrator]
+        BUILD[CV Builder + Renderers]
+        REC[Recruiter + Embeddings]
+        BILL[Billing + Quota]
+    end
 
-  clean --> detect_lang["Detect Language TR/EN"]
-  detect_lang --> classifier["Section Classifier"]
-  classifier --> resolver["Section Resolver"]
-  resolver --> builder["Pydantic CVSchema Builder"]
-  builder --> scoring["ATS + Semantic + ML Scoring"]
-  scoring --> report["Recommendations / Report / History"]
+    subgraph Infra["Infrastructure"]
+        DB[(PostgreSQL<br/>SQLAlchemy 2.0)]
+        RD[(Redis<br/>cache · rate limit · quota)]
+        S3[(S3 / local storage<br/>SSE-AES256)]
+        CEL[Celery + broker]
+    end
+
+    EXT[[Stripe · Supabase · LLM APIs]]
+
+    Client --> MW --> AUTH --> ROUTE
+    ROUTE --> PIPE & ATS & BUILD & REC & BILL
+    PIPE --> ATS
+    BILL --> EXT
+    AUTH --> EXT
+    ROUTE --> DB & RD & S3
+    ROUTE -.long jobs.-> CEL --> DB & S3
+    REC --> EXT
 ```
 
-### Extraction
+### Design patterns in play
 
-Parsing starts by converting raw PDF, DOCX, and TXT documents into clean structured text.
+| Pattern | Where |
+|---------|-------|
+| **Repository / Service layer** | `services/*` encapsulate data access + business logic behind route handlers |
+| **Factory** | `ai_client_factory`, extraction handler selection by file type / layout |
+| **Strategy** | Storage adapter (local vs S3), fix mode (preserve / light-fix / rebuild) |
+| **Singleton** | DB session factory, Redis clients, loaded ML models, runtime settings |
+| **Pipeline** | `extract → normalize → schema → validate → score` staged transform |
+| **Circuit breaker / kill-switch** | `core/ops_runtime`, `shared._cb_*` guard external dependencies |
 
-1. **File Guard:** Uploads are checked for size, extension, body limits, PDF page/object limits, and DOCX compression safety.
-2. **Geometric Analysis:** `services/pdf_text_extractor.py` analyzes text block positions. If distinct vertical lanes are detected, the system activates column linearization.
-3. **Linearization:** Column blocks are grouped by x-position, sorted vertically, and merged in reading order to avoid mixing unrelated sentences.
-4. **Noise Cleanup:** Stray bullets, duplicated tabs, broken whitespace, and low-value artifacts are normalized.
-5. **Local Worker Path:** `local_worker/worker.py` can execute the same broad extraction idea locally without uploading raw files first.
+---
 
-### Language and Sections
+## 🧰 4. Technology Stack
 
-The parser supports Turkish/English-oriented section detection. Section aliases normalize common resume headings:
+### Backend
 
-```python
-SECTION_ALIASES = {
-    "summary": ["summary", "ozet", "profile", "about", "objective"],
-    "experience": ["experience", "deneyim", "work history", "employment"],
-    "education": ["education", "egitim", "school", "university"],
-    "projects": ["projects", "projeler", "key projects"],
-    "skills": ["skills", "yetenekler", "technical skills", "frontend", "backend"],
-    "certifications": ["certifications", "sertifikalar", "certificates", "awards"],
-    "languages": ["languages", "yabanci diller", "diller"],
-    "interests": ["interests", "hobbies", "ilgi alanlari"],
-}
-```
+| Layer | Library | Version |
+|-------|---------|---------|
+| Web framework | FastAPI | `0.135.1` |
+| ASGI server | Uvicorn | `0.42.0` |
+| ORM | SQLAlchemy | `2.0.47` |
+| Migrations | Alembic | `1.18.4` |
+| Validation | Pydantic | `2.12.5` |
+| Task queue | Celery | `5.6.2` |
+| Cache / limits | redis-py | `7.2.1` |
+| Object storage | boto3 (S3) | `1.42.73` |
+| PDF extraction | pdfplumber / PyPDF2 | `0.11.9` / `3.0.1` |
+| ML scoring | scikit-learn / XGBoost / NumPy | `1.8.0` / `3.2.0` / `2.4.2` |
+| Auth (JWT) | python-jose | `3.5.0` |
+| DB driver | psycopg2-binary | `2.9.11` |
 
-`services/section_resolver.py` then re-evaluates ambiguous blocks. For example, a job-like line incorrectly captured under education can be moved back to experience.
+### Frontend / Mobile / Desktop
 
-### Scoring
+| Layer | Library | Version |
+|-------|---------|---------|
+| UI library | React | `18.2` |
+| Build tool | Vite | `8.0` |
+| Styling | Tailwind CSS | `4.3` |
+| Animation | Framer Motion | `12.36` |
+| Routing | React Router DOM | `6.21` |
+| Auth client | Supabase JS | — |
+| Mobile | Expo / React Native | — |
+| Desktop | PySide6 (Qt Quick / QML) | — |
 
-Scoring uses multiple signals:
+---
 
-- Contact information quality.
-- Required section presence.
-- Formatting and ATS readability.
-- Skill coverage.
-- Keyword coverage.
-- Experience fit.
-- Education signals.
-- Semantic job/CV similarity.
-- ML/rule-based calibration.
-
-### Deterministic ATS Evaluation Rules
-
-The deterministic scoring modules (`services/ats_scoring.py`, `services/ats_service.py`, and related helpers) evaluate the structural quality of a CV before AI suggestions are layered on top.
-
-| Metric | Role in Score | Validation Logic |
-| :--- | :--- | :--- |
-| Contact Quality | Identity and reachability | Email, phone, LinkedIn/GitHub, location, and malformed contact checks. |
-| Section Presence | Resume completeness | Experience, education, skills, summary, projects, certifications, and language sections. |
-| Formatting | ATS readability | Bullet use, overlong sentences, document length, noisy symbols, and parse stability. |
-| Keyword Coverage | Job description match | Required terms, repeated domain keywords, and role-specific vocabulary. |
-| Skill Coverage | Capability match | Required skill overlap, missing skills, adjacent technical terms, and category balance. |
-| Experience | Seniority and relevance | Year extraction, role alignment, responsibility signals, and career continuity. |
-| Semantic Match | Meaning similarity | Embedding cosine similarity between CV and job description. |
-
-### Semantic Similarity and ML Calibration
-
-When embeddings are available, semantic score is calculated with cosine similarity:
+## 🗂️ 5. Repository Map
 
 ```text
-semantic_similarity = cosine_similarity(cv_embedding, job_description_embedding) * 100
+cv-analyzer/
+├── main.py                 # FastAPI app bootstrap (routers, middleware, lifespan)
+├── routes/                 # 14 routers, 185 endpoints
+│   ├── analysis.py         #   ATS analyze (sync/async/pdf), ownership
+│   ├── ai_tools.py         #   auto-fix, rewrite, cover letter, interview, embeddings
+│   ├── cv_builder.py       #   templates, preview, generate, suggest-summary
+│   ├── cv_storage.py       #   S3 upload/download/delete, score breakdown
+│   ├── billing.py          #   Stripe checkout, webhooks, admin ops
+│   ├── recruiter*.py       #   jobs, candidates, ranking, local sync
+│   ├── dashboard.py        #   usage, plan, stats
+│   ├── worker.py           #   local-worker claim/sync
+│   └── system.py           #   health, readiness, ops
+├── services/               # 49 domain services (see §6)
+│   ├── pdf_text_extractor.py   # layout-aware PDF → text
+│   ├── section_classifier.py   # language-agnostic section detection
+│   ├── schema_builder.py       # normalized data → strict CVSchema
+│   ├── extraction_validator.py # parse-quality gate → AI fallback
+│   ├── cv_autofix_service.py   # deterministic repair + AI rewrite orchestration
+│   ├── ats_scoring.py          # section + overall ATS scoring
+│   └── ...
+├── agents/                 # extract_agent, normalize_agent (pipeline stages)
+├── core/                   # http_runtime, ops_runtime, quota, metrics, route_dependencies
+├── models.py               # 30 SQLAlchemy models
+├── schemas/                # Pydantic + CVSchema / CVModel
+├── renderers/              # DOCX / PDF / HTML / Typst template engines
+├── security/               # file_guard, s3_guard, rate_limit, runtime_guard
+├── middleware/             # request middleware
+├── alembic/ · migrations/  # DB migrations
+├── frontend/               # React + Vite web portal
+├── mobile/                 # Expo React Native scaffold
+├── local_worker/           # PySide6 desktop app
+├── tests/                  # 800+ backend tests, golden fixtures
+└── .github/workflows/      # CI: test, lint, frontend, mobile, docker, security
 ```
+
+---
+
+## ⚙️ 6. The Parsing Pipeline
+
+The parsing core is **deterministic-first**: rules and heuristics handle the bulk of CVs cheaply, and the LLM is invoked **only** when a confidence gate detects a low-quality parse. This keeps token spend proportional to difficulty.
 
 ```mermaid
 flowchart TD
-  cv["CV Text + Schema"] --> cv_emb["CV Embedding"]
-  jd["Job Description"] --> jd_emb["JD Embedding"]
-
-  cv_emb --> cos["Cosine Similarity"]
-  jd_emb --> cos
-
-  cos --> blend["ML Calibrator"]
-
-  subgraph Features ["Feature Input Vector"]
-    feat1["Keyword Score"]
-    feat2["Skill Score"]
-    feat3["Experience Score"]
-    feat4["ATS Score"]
-    feat5["Semantic Match"]
-  end
-
-  Features --> blend
-  blend --> calibrated["Calibrated Overall Match Score"]
+    A[📄 Upload PDF/DOCX/TXT] --> B[Extraction<br/>pdf_text_extractor]
+    B --> B1{Layout?}
+    B1 -->|single column| C[Word→line reconstruction]
+    B1 -->|multi-column| C2[Column detection + reflow]
+    C --> D[Page-furniture strip<br/>footers / page numbers]
+    C2 --> D
+    D --> E[Section detection<br/>section_classifier]
+    E --> F[Extract agent<br/>fields + entries]
+    F --> G[Normalize agent]
+    G --> H[Schema build<br/>schema_builder → CVSchema]
+    H --> I{Quality gate<br/>extraction_validator}
+    I -->|score ok| K[ATS scoring + payload]
+    I -->|low score / garbage| J[🤖 LLM re-parse<br/>rebuild mode]
+    J --> K
+    K --> L[Result: scores · skills · builder payload]
 ```
 
-The final score is intentionally blended rather than fully AI-driven:
+### Pipeline stages & key services
 
-```python
-def blend_with_rule_score(rule_score: float, ml_result: float) -> float:
-    return round((rule_score * 0.70) + (ml_result * 0.30), 2)
-```
+| Stage | Service(s) | What it does |
+|-------|-----------|--------------|
+| **Extract** | `pdf_text_extractor` | Font-relative word tolerance (`x_tolerance_ratio`) so tightly-spaced PDFs don't glue words; multi-column detection & reflow; mojibake repair; **page-furniture stripping** (footers / `Page N` / template credits) |
+| **Classify** | `section_classifier`, `section_resolver` | Language-agnostic section detection via aliases + structural signals; qualifier-aware headers (`Research Experience`, `Other Work Experience`) |
+| **Extract fields** | `agents/extract_agent` | Splits contact, summary, experiences (one entry per job), education, skills, projects, certifications, languages |
+| **Normalize** | `agents/normalize_agent` | Canonicalizes dates, bullets, casing, ordering |
+| **Schema** | `schema_builder` | Maps normalized data into a strict `CVSchema`; bullet-glyph normalization (`●○◦…`); routes spoken languages to the languages field; drops substance-less entries |
+| **Validate** | `extraction_validator` | **Quality gate** — detects garbage parses (fragment titles, over-split tables, lost sections, garbage skills) and flips `needs_llm_fallback` |
+| **Score** | `ats_scoring`, `ml_calibrator`, `scoring_service` | Per-section + overall ATS scores; ML calibration with confidence |
+| **Build** | `cv_builder_service`, `renderers/*` | Template rendering to DOCX / PDF / HTML / Typst |
 
-If embeddings fail, the system falls back to deterministic scores and applies caps where needed to avoid inflated uncalibrated matches.
+### Robustness highlights (recent hardening)
 
-### Auto-Fix and Rewrite
+| Problem | Fix |
+|---------|-----|
+| Glued words in tight PDFs (`BachelorofScience`) | Font-relative `x_tolerance_ratio` word splitting |
+| `●`-bulleted jobs collapsing into one entry | Added `●○◦` + glyphs to all bullet regexes → correct per-job splitting |
+| Page footers becoming fake jobs | Page-furniture stripping at extraction time |
+| Spoken languages stuck in skills | Language-name / CEFR-gated routing into the languages field |
+| Table & non-standard layouts shredding into garbage | **Fragmentation quality gate** routes them to LLM re-parse |
 
-Auto-fix and rewrite logic is designed to improve ATS fit while avoiding destructive rewrites:
+---
 
-- Protected section floor logic prevents large accidental content loss.
-- Regression checks can reject changes that reduce the score.
-- Sanitization and formatting safeguards protect generated CV output.
+## 🔄 7. Request Lifecycle
 
-The important rule is that generated improvements must not erase useful resume content. Protected section floor logic compares original and rewritten section density:
+```mermaid
+sequenceDiagram
+    participant U as Client
+    participant MW as Middleware
+    participant A as Auth (Supabase JWT)
+    participant Q as Quota / Rate limit
+    participant R as Route handler
+    participant S as Services
+    participant DB as PostgreSQL
+    participant X as S3 / Redis
 
-```python
-for key in PROTECTED_SECTION_KEYS:
-    source_lines = _non_empty_section_lines(source_sections, key)
-    current_lines = _non_empty_section_lines(current_sections, key)
-    if source_lines and len(current_lines) < len(source_lines):
-        rebuilt_sections[key] = source_lines
-        restored.append(f"{key.upper()} section restored to protect content floor.")
+    U->>MW: HTTPS request (+ Bearer token)
+    MW->>MW: CORS · abuse check · CSRF
+    MW->>A: verify JWT (alg allowlist, JWKS cache)
+    A-->>MW: user claims
+    MW->>Q: consume daily quota / rate limit
+    Q-->>MW: allowed (or 429)
+    MW->>R: dispatch
+    R->>S: business logic (parse / score / build)
+    S->>X: read/write CV file, cache
+    S->>DB: persist analysis / usage
+    DB-->>S: rows
+    S-->>R: result
+    R-->>U: JSON envelope (+ quota headers)
 ```
 
 ---
 
-## Recruiter and Local Sync
+## 🌐 8. API Surface
 
-Recruiter workflows are split between SaaS web flows and local processing flows.
+**185 endpoints across 14 routers**, all under `/api/v1`. Representative sample:
 
-### Web Recruiter
+| Router | Sample endpoints | Purpose |
+|--------|------------------|---------|
+| `analysis` | `POST /analyze`, `/analyze-async`, `/analyze-pdf`, `GET /analysis/{id}` | ATS analysis (sync, async, file) |
+| `cv_storage` | `POST /cv/upload`, `GET /cv/download`, `POST /score/breakdown` | S3 CV storage + full score breakdown |
+| `cv_builder` | `/cv-builder/templates`, `/preview`, `/generate`, `/suggest-summary` | Template-based CV generation |
+| `ai_tools` | `/cv/auto-fix`, `/rewrite-*`, `/cover-letter`, `/interview-*`, `/semantic-search` | AI-assisted tools + embeddings |
+| `billing` | `/billing/*`, `/admin/ops/{health,cost,security}` | Stripe billing + admin operations |
+| `recruiter` | `/recruiter/*` jobs, candidates, ranking, reports | Recruiter workspace |
+| `worker` | claim / sync endpoints | Local Worker integration |
+| `system` | `/health`, readiness, ops | Liveness / readiness probes |
 
-The web recruiter area supports:
+> Responses use a consistent envelope (status, data, error, optional pagination meta) and carry quota headers.
 
-- Job/session management.
-- Job description upload or paste.
-- Batch CV upload.
-- Ranking and candidate pool review.
-- Search/filtering.
-- Decisions.
-- Email templates.
-- Local Worker setup and worker key creation.
+---
 
-### Local Worker Sync
+## 🗃️ 9. Data Model
 
-The Local Worker can operate independently, then sync when requested.
+30 SQLAlchemy models. Core relationships:
 
-Typical flow:
-
-```text
-1. Recruiter creates or selects a job in the website.
-2. Recruiter creates a scoped local worker key.
-3. Local Worker stores the key locally.
-4. Local Worker processes a CV folder on the machine.
-5. User reviews local results.
-6. User clicks Website Sync.
-7. Backend receives allowed results and attaches them to the proper workflow/job.
+```mermaid
+erDiagram
+    User ||--o{ Analysis : owns
+    User ||--o{ CVVersion : stores
+    User ||--o{ UsageDaily : meters
+    User }o--|| Organization : belongs_to
+    Organization ||--o{ RecruiterJob : posts
+    RecruiterJob ||--o{ Candidate : receives
+    RecruiterJob ||--o{ JobApplication : tracks
+    Candidate ||--o{ CandidateAction : has
+    Candidate ||--o{ CandidateComment : has
+    Analysis ||--o{ AnalysisNote : annotated_by
+    Analysis ||--o{ AnalysisShare : shared_via
+    User ||--o{ WorkerKey : issues
+    WorkerKey ||--o{ WorkerSession : authenticates
+    WorkerSession ||--o{ WorkerAnalysisResult : syncs
 ```
 
-### Scoped Permissions
-
-The project includes owner/scoped workflow support. Worker keys can be restricted by permission-style metadata such as claim and submit-result capabilities. The Local Worker UI should expose and respect these permissions where applicable.
-
-If a role/permission appears missing in the desktop UI, check:
-
-- `routes/owner_workflow.py`
-- `services/owner_workflow_service.py`
-- `local_worker/owner_workflow.py`
-- `local_worker/qml_gui.py`
-- `local_worker/qml/Main.qml`
+| Domain | Models |
+|--------|--------|
+| Accounts & billing | `User`, `Organization`, `APISubscription`, `RolePermission`, `QuotaEvent`, `UsageDaily` |
+| Analysis | `Analysis`, `CVVersion`, `AnalysisNote`, `AnalysisShare`, `Favorite` |
+| Recruiter | `RecruiterJob`, `Candidate`, `Job`, `JobApplication`, `CandidateAction`, `CandidateComment`, `Reminder`, `JobTemplate`, `EmailTemplate` |
+| Benchmarks | `ATSBenchmarkGlobal`, `ATSBenchmarkProfession`, `ATSBenchmarkScore` |
+| Local worker | `WorkerKey`, `WorkerSession`, `WorkerClaim`, `WorkerAnalysisResult` |
+| Ops | `AuditLog`, `FailedTask`, `AsyncTaskOwner` |
 
 ---
 
-## Security Model
+## 🛡️ 10. Security Model
 
-Security is treated as a product feature, not a single middleware.
+```mermaid
+flowchart LR
+    A[Upload] --> B[File guard<br/>size · ext · MIME · magic bytes · PDF complexity]
+    B --> C[Virus scan<br/>ClamAV optional]
+    C --> D[Auth<br/>Supabase JWT · alg allowlist · token-length guard]
+    D --> E[Rate limit + abuse<br/>per-IP / per-user]
+    E --> F[Quota<br/>daily + billable]
+    F --> G[Storage guard<br/>S3 key validation · ownership · presigned 60s]
+    G --> H[Audit log + ops events]
+```
 
-### File and Upload Security
-
-- `security/file_guard.py`
-- `security/validators.py`
-- Maximum upload sizes.
-- PDF object/page limits.
-- DOCX zip-bomb/compression limits.
-- Extension and content validation.
-- Local and remote storage separation.
-
-### Runtime and Abuse Controls
-
-- `security/rate_limit.py`
-- `security/timeout_guard.py`
-- `security/runtime_guard.py`
-- Request timeouts.
-- Concurrency limits.
-- Rate limits by IP/user/action.
-- Safe mode and kill switch flags.
-- Maintenance mode.
-
-### Storage Security
-
-- `security/s3_guard.py`
-- S3 server-side encryption settings.
-- Optional IAM role usage.
-- Production guardrails against unsafe local storage.
-- Signed download URL secret for worker fallback downloads.
-
-### Auth and Tenant Controls
-
-- Supabase JWT support.
-- Admin token controls.
-- Billing admin token controls.
-- Quota and entitlement checks.
-- Recruiter/local worker scoped key support.
-
-### Privacy Controls
-
-- Local Worker can process CVs locally.
-- CV text retention is configurable.
-- `CV_VERSION_TEXT_STORAGE_MODE=metadata_only` can store hashes/metadata instead of raw text for version records.
-- Redaction helpers are available in `security/redaction.py`.
-
-### Dependency Audit
-
-The dependency audit test checks Python dependencies with `pip-audit`. Recent vulnerable package pins were updated so the audit can pass with the current `requirements.txt`.
+| Layer | Control |
+|-------|---------|
+| Input | File size/extension/MIME/magic-byte validation, PDF complexity limits, optional ClamAV |
+| Auth | Supabase JWT with algorithm allowlist, JWKS caching, token-length guard |
+| Abuse | Per-IP & per-user rate limits, abuse bans, duplicate-request dedup |
+| Quota | Daily + monthly plan limits, billable usage metering, cost guards |
+| Storage | S3 SSE-AES256, key-format validation, ownership enforcement, 60s presigned URLs |
+| Secrets | Env-var / secret-manager only; **Gitleaks** secret scan in CI |
+| Supply chain | `pip-audit` + `npm audit` (root/frontend/mobile) + Dependency Review in CI |
+| Billing | Stripe webhook HMAC signature verification |
 
 ---
 
-## Environment Variables
+## 🔑 11. Environment Variables
 
-Use `.env.example` as the source reference:
+> Configure via `.env` (never commit secrets). Required values are validated at startup.
+
+| Variable | Purpose |
+|----------|---------|
+| `DATABASE_URL` | PostgreSQL connection (SQLite for dev) |
+| `REDIS_URL` | Cache, rate limiting, quota counters |
+| `SUPABASE_URL`, `SUPABASE_JWT_*` | JWT verification / JWKS |
+| `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET` | Billing + webhook verification |
+| `AWS_*`, `S3_BUCKET`, `STORAGE_BACKEND` | Object storage (`s3` or `local`) |
+| `RATE_LIMIT_IP_*`, `RATE_LIMIT_USER_*` | Per-IP / per-user request ceilings |
+| `USER_PLAN_LIMITS_*`, `COST_*` | Daily quota + cost guards |
+| `CLAMAV_ENABLED`, `ABUSE_PROTECTION_ENABLED`, `CSRF_PROTECTION_ENABLED` | Security toggles |
+| `ENV`, `BUILD_ID`, `GIT_SHA`, `INSTANCE_ID` | Runtime metadata |
+
+---
+
+## 💻 12. Local Development
+
+### Backend
 
 ```bash
-cp .env.example .env
-```
-
-Important groups:
-
-### Core
-
-```env
-DATABASE_URL=sqlite:///./cv_analyzer.db
-ENV=development
-PORT=8001
-API_URL=http://localhost:8001
-```
-
-### Auth
-
-```env
-SUPABASE_JWT_SECRET=
-SUPABASE_URL=
-SUPABASE_KEY=
-```
-
-### AI and Models
-
-```env
-OPENAI_API_KEY=
-ATS_MODEL_PATH=resume_model.pkl
-MODEL_PATH=resume_model.pkl
-ATS_CONFIG_PATH=ats_config.yaml
-```
-
-### Storage
-
-```env
-STORAGE_BACKEND=s3
-AWS_REGION=eu-north-1
-S3_BUCKET=cv-analyzer-storage
-AWS_USE_IAM_ROLE=0
-S3_SSE_ALGORITHM=AES256
-```
-
-For local development, use local storage or mock services where appropriate.
-
-### Local Worker Downloads
-
-```env
-WORKER_DOWNLOAD_SIGNING_SECRET=
-WORKER_DOWNLOAD_URL_TTL_SECONDS=600
-```
-
-In production, `WORKER_DOWNLOAD_SIGNING_SECRET` should be set for signed fallback download URLs.
-
-### Billing
-
-```env
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
-STRIPE_PRICE_ID_FREE=
-STRIPE_PRICE_ID_PRO=
-STRIPE_PRICE_ID_ENTERPRISE=
-```
-
-### Email / Feedback
-
-SMTP variables are defined in `.env.example`. Feedback can be stored locally and email delivery depends on SMTP configuration being present and valid.
-
-### Safety Flags
-
-```env
-SAFE_MODE=0
-MAINTENANCE_MODE=0
-KILL_SWITCH=0
-MOCK_SERVICES=0
-ENABLE_AI_REVIEW=1
-ENABLE_SANITIZER=1
-```
-
----
-
-## Local Development
-
-### Requirements
-
-- Python 3.12+
-- Node.js compatible with the frontend lockfile
-- npm
-- Optional Redis for cache/rate-limit parity
-- Optional PostgreSQL for production-like DB testing
-- Optional Tesseract/OCR stack for OCR paths
-- Windows for the current Local Worker packaging flow
-
-### Backend Setup
-
-```bash
-python -m venv .venv
-.venv\Scripts\activate
+python -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-copy .env.example .env
-python setup_db.py
-uvicorn main:app --reload --port 8001
+alembic upgrade head
+uvicorn main:app --reload --port 8000
 ```
-
-Backend URL:
-
-```text
-http://127.0.0.1:8001
-```
-
-Health/system endpoints depend on enabled routers and configuration.
-
-### Frontend Setup
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Frontend URL:
-
-```text
-http://127.0.0.1:5173
-```
-
-### Local Worker Setup
-
-```bat
-cd local_worker
-install_windows.cmd
-start_here.cmd
-```
-
-or:
-
-```bat
-run_gui.cmd
-```
-
----
-
-## Testing and Validation
-
-### Backend Tests
-
-```bash
-pytest
-```
-
-Run a focused test:
-
-```bash
-pytest tests/test_security_dependency_check.py
-pytest tests/test_local_worker_cli.py
-pytest tests/test_offline_sync.py
-```
-
-### Dependency Audit
-
-```bash
-pip-audit -r requirements.txt --strict --progress-spinner off
-```
-
-### Ruff
-
-```bash
-ruff check .
-```
-
-### Frontend Tests
-
-```bash
-cd frontend
-npm run build
-npm run test
-npm run typecheck
-```
-
-### Local Worker Smoke Checks
-
-Useful checks:
-
-```bash
-pytest tests/test_local_worker_cli.py
-python local_worker/qml_gui.py
-```
-
-For GUI work, also manually check:
-
-- Dashboard page.
-- Analyze flow.
-- Results empty and populated states.
-- History empty and populated states.
-- Website Sync screen.
-- Settings theme toggle.
-- EXE package launch.
-
----
-
-## Packaging and Deployment
-
-### Backend Container
-
-```bash
-docker build -t cv-analyzer .
-```
-
-or:
-
-```bash
-docker compose up --build
-```
-
-### Gunicorn
-
-`gunicorn_config.py` and `start_gunicorn.sh` support production-style ASGI deployment.
 
 ### Frontend
 
 ```bash
 cd frontend
-npm run build
+npm install
+npm run dev        # Vite dev server
+npm run build      # production bundle
 ```
 
-The Vite output is generated in:
+### Background workers (optional)
 
-```text
-frontend/dist
+```bash
+celery -A services.tasks worker --loglevel=info
 ```
 
-### Local Worker EXE
+### Local Worker (desktop)
 
-```bat
+```bash
 cd local_worker
-build_windows_exe.cmd
+pip install -r requirements.txt
+python main.py     # PySide6 / Qt Quick app
 ```
-
-The active package target is the QML Local Worker, not the removed legacy QtWidgets UI.
 
 ---
 
-## Operational Notes
+## 🧪 13. Testing & Quality Gates
 
-### Logs
+| Suite | Command | Coverage |
+|-------|---------|----------|
+| Backend | `pytest tests/ -q` | 800+ tests: parsing, scoring, schema, security, tenancy, billing |
+| Golden CVs | `pytest tests/golden/` | Regression fixtures for known résumé shapes |
+| Frontend | `cd frontend && npm test -- --run` | 100 component/page tests (Vitest + Testing Library) |
+| Lint | `ruff check . --select E9,F63,F7,F82` | Syntax / undefined-name gate |
+| Format | `ruff format --check .` | Code style |
 
-Common development logs in the repository root include:
+### CI (GitHub Actions)
 
-- `backend-dev.log`
-- `backend-dev.err.log`
-- `frontend-dev.log`
-- `frontend-dev.err.log`
-
-Local Worker crash logs are written under the user local app data directory:
-
-```text
-%LOCALAPPDATA%\CV Analyzer Local Worker\crash.log
+```mermaid
+flowchart LR
+    P[Push / PR] --> T[test 3.12]
+    P --> L[lint]
+    P --> F[frontend]
+    P --> M[mobile]
+    P --> D[docker build]
+    P --> B[benchmark]
+    P --> SEC[security: gitleaks · pip-audit · npm audit · dependency review]
+    T & L & F & M & D & B & SEC --> G{All green?}
+    G -->|yes| OK[✅ mergeable]
 ```
 
-### Feedback Records
-
-Feedback/complaint records can be stored locally in:
-
-```text
-feedback_records.jsonl
-```
-
-Email delivery requires SMTP configuration. If feedback appears in the UI but does not arrive in the mailbox, check SMTP environment variables and backend logs.
-
-### Local Databases
-
-Development/test SQLite files may be created locally. These should not be treated as production data.
-
-### Storage
-
-The system supports local and S3-style storage paths. Production should use configured secure storage, encryption, and access controls.
+12 checks gate every PR: `test (3.12)`, `lint`, `frontend`, `mobile`, `docker`, `benchmark`, `local-worker`, `security`, `Secret scan`, `Dependency review`, `Python dependency audit`, `Node dependency audit`.
 
 ---
 
-## Current Technical Debt
+## 🚀 14. Deployment
 
-The latest cleanup removed legacy Local Worker desktop UI files from the active package path and moved the product toward QML only. Remaining high-value cleanup areas:
-
-### 1. Split `frontend/src/style.css`
-
-`frontend/src/style.css` is still very large. Recommended split order:
-
-```text
-frontend/src/styles/tokens.css
-frontend/src/styles/base.css
-frontend/src/styles/layout.css
-frontend/src/styles/components.css
-frontend/src/styles/pages/landing.css
-frontend/src/styles/pages/recruiter.css
-frontend/src/styles/pages/feedback.css
-frontend/src/styles/pages/dashboard.css
+```mermaid
+flowchart TD
+    subgraph Edge
+        N[nginx reverse proxy]
+    end
+    subgraph App["Docker (multi-stage)"]
+        FE[Static frontend bundle]
+        BE[Uvicorn workers]
+        WK[Celery workers]
+    end
+    subgraph Managed
+        PG[(PostgreSQL)]
+        RDS[(Redis)]
+        S3[(S3 bucket)]
+    end
+    Internet --> N
+    N --> FE
+    N --> BE
+    BE --> PG & RDS & S3
+    WK --> PG & S3
 ```
 
-This should be done incrementally with build/test checks after each safe slice.
-
-### 2. Break Up Large Service Files
-
-Some service modules are still large and should be split by responsibility:
-
-- Prompt builders.
-- Parsers.
-- Schema mappers.
-- Scoring rules.
-- Model adapters.
-- Report renderers.
-
-Do this only where tests already cover behavior or where focused tests can be added first.
-
-### 3. QML Local Worker QA
-
-The QML worker should continue to be checked for:
-
-- Website Sync permission display.
-- Scoped worker roles.
-- Empty states.
-- Theme persistence.
-- EXE packaging.
-- Keyboard navigation.
-- Hover/motion artifacts.
-
-### 4. Frontend UI Cleanup
-
-Web UI polish should continue through the existing project UI workflow:
-
-1. Design review.
-2. Token/foundation change.
-3. Motion design pass.
-4. Scoped implementation.
-5. QA review.
-
-Avoid broad redesigns unless explicitly requested.
+- **Multi-stage Docker** build produces a slim runtime image; the frontend is built and served as static assets behind **nginx**.
+- Database migrations run via **Alembic** (`alembic upgrade head`) on release.
+- Storage backend is swappable (`STORAGE_BACKEND=local|s3`) for dev vs production.
 
 ---
 
-## Git Workflow
+## 🗺️ 15. Roadmap & Technical Debt
 
-Recommended flow:
-
-```bash
-git status --short --branch
-git checkout -b codex/<task-name>
-# make scoped changes
-pytest
-cd frontend && npm run build && npm run test && npm run typecheck
-git add <changed-files>
-git commit -m "<clear message>"
-git push -u origin codex/<task-name>
-```
-
-For dependency/security changes, run:
-
-```bash
-pip-audit -r requirements.txt --strict --progress-spinner off
-```
-
-For UI changes, validate at least:
-
-- Desktop: 1440 x 900
-- Tablet: 1024 x 768
-- Mobile: 390 x 844
-
-Key web routes:
-
-- `/`
-- `/dashboard`
-- `/analyze`
-- `/recruiter`
-- `/feedback`
+| Item | Status |
+|------|--------|
+| Multi-job experience splitting (sub-section headers) | ✅ Fixed (per-job entries) |
+| Page-furniture / footer noise removal | ✅ Fixed |
+| Parse-quality → AI fallback gate | ✅ Added (routes shredded layouts to LLM) |
+| Table-layout CV parsing | 🔶 Deterministic parser weak; covered via AI fallback |
+| Embedded date splitting (`June 2024 to September 2024` → start/end) | 🔶 Planned |
+| Non-experience sections (`Leadership Activities`) routed into experience | 🔶 Planned |
+| `core/route_dependencies` legacy mutable-state migration | 🔶 In progress |
+| `datetime.utcnow()` → timezone-aware migration | 🔶 Backlog |
 
 ---
 
-## Status Summary
+## 🤝 16. Contributing
 
-Current mainline status after the latest merge:
+1. **Branch** off `main` (`feat/...`, `fix/...`, `refactor/...`).
+2. **TDD** — write/adjust tests first; keep ≥80% coverage on touched code.
+3. **Lint & format** — `ruff check` + `ruff format` must pass.
+4. **Scoped commits** — conventional-commit style (`feat:`, `fix:`, `refactor:`…); stage only related files.
+5. **PR** — ensure all 12 CI checks are green before requesting review.
 
-- FastAPI backend is active.
-- React/Vite frontend is active.
-- QML Local Worker is the active desktop UI.
-- Legacy Local Worker QtWidgets UI files were removed from the active package path.
-- Dependency audit pins were updated.
-- Main branch contains the latest audit and Local Worker hardening work.
+> Commit/PR conventions and the full development workflow are enforced in CI; see `.github/workflows/`.
+
+---
+
+<div align="center">
+
+**CV Analyzer** — deterministic where it can be, AI where it must be.
+
+</div>
