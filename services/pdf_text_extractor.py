@@ -30,6 +30,33 @@ _MOJIBAKE_MARKERS = ("Ã", "Ä", "Å", "â€™", "â€œ", "â€", "Â")
 _X_TOLERANCE_RATIO = 0.16
 
 
+# Repeating page furniture (footers/headers) that PDF exporters stamp on every
+# page and that otherwise leak into the last section on each page — e.g.
+# "Created by UC Davis Career Center | careercenter.ucdavis.edu 22",
+# "Smith Page 2 of 3". Patterns are deliberately narrow and only applied to
+# short lines so real content is never removed.
+_PAGE_FURNITURE_RES = (
+    re.compile(r"^\s*created by\b.*$", re.I),  # template attribution line
+    re.compile(r"^\s*page\s+\d+(?:\s+of\s+\d+)?\s*$", re.I),  # "Page 2 of 3"
+    re.compile(r"^.{0,40}?\bpage\s+\d+(?:\s+of\s+\d+)?\s*$", re.I),  # "Name Page 2"
+    re.compile(r"^.{0,30}?\b\d{1,3}\s+of\s+\d{1,3}\s*$", re.I),  # "Aduba 1 of 3"
+    re.compile(r"^\s*\S+\.(?:edu|com|org|net)\S*\s*[|\-–]?\s*\d{1,3}\s*$", re.I),  # "site.edu 22"
+)
+
+
+def _strip_page_furniture(text: str) -> str:
+    """Drop repeating footer/header lines (page numbers, template credits)."""
+    if not text:
+        return text
+    kept = []
+    for line in text.split("\n"):
+        probe = line.strip()
+        if probe and len(probe) <= 70 and any(rx.match(probe) for rx in _PAGE_FURNITURE_RES):
+            continue
+        kept.append(line)
+    return "\n".join(kept)
+
+
 def _mojibake_score(text: str) -> int:
     return sum((text or "").count(marker) for marker in _MOJIBAKE_MARKERS)
 
@@ -361,7 +388,7 @@ def extract_pdf_text(
             truncated = len(raw) > max_chars
             if truncated:
                 raw = raw[:max_chars]
-            return fix_decomposed_diacritics(_fix_common_mojibake(raw)), truncated
+            return fix_decomposed_diacritics(_strip_page_furniture(_fix_common_mojibake(raw))), truncated
     except HTTPException:
         raise
     except Exception:
@@ -389,4 +416,4 @@ def extract_pdf_text(
     if truncated:
         logging.getLogger("app.security").warning("pdf_text_truncated: %d > %d", len(raw), max_chars)
         raw = raw[:max_chars]
-    return fix_decomposed_diacritics(_fix_common_mojibake(raw)), truncated
+    return fix_decomposed_diacritics(_strip_page_furniture(_fix_common_mojibake(raw))), truncated

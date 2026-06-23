@@ -1109,8 +1109,18 @@ def build_schema(normalized: Dict[str, Any]) -> CVSchema:
             end_date=_clean(exp.get("end_date", "")),
             bullets=_clean_bullets(exp.get("bullets")),
         )
-        if entry.title or entry.company or entry.bullets:
-            experiences.append(entry)
+        if not (entry.title or entry.company or entry.bullets):
+            continue
+        # Drop substance-less entries that are really misrouted section
+        # headers or page footers (e.g. "LEADERSHIP ACTIVITIES", "Sanchez 1"):
+        # no bullets, no company, no dates, and a title that is ALL-CAPS or a
+        # short fragment. Genuine roles carry bullets, a company, or a date.
+        has_substance = bool(entry.bullets or entry.company or entry.start_date or entry.end_date)
+        if not has_substance:
+            title = entry.title.strip()
+            if title.isupper() or len(title.split()) <= 2:
+                continue
+        experiences.append(entry)
 
     # ── Education (strict: never leaks elsewhere) ──
     education: List[EducationEntry] = []
