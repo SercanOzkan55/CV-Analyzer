@@ -20,6 +20,15 @@ _SECTION_HEADING_RE = re.compile(
 
 _MOJIBAKE_MARKERS = ("Ã", "Ä", "Å", "â€™", "â€œ", "â€", "Â")
 
+# Word-boundary tolerance as a fraction of font size, rather than a fixed
+# point value. pdfplumber's default fixed x_tolerance=3 glues words together
+# in PDFs that position glyphs tightly and omit explicit space characters
+# (common with some resume templates and CMYK/print-oriented exporters). A
+# font-relative tolerance self-adapts: tight layouts split correctly while
+# normally-spaced layouts are unaffected (verified to leave word counts
+# identical across well-behaved CVs).
+_X_TOLERANCE_RATIO = 0.16
+
 
 def _mojibake_score(text: str) -> int:
     return sum((text or "").count(marker) for marker in _MOJIBAKE_MARKERS)
@@ -265,10 +274,10 @@ def _extract_pdfplumber_page(
     *,
     ocr_extract_text: Callable[[bytes], str] | None = None,
 ) -> tuple[list[str], bool]:
-    words = page.extract_words(use_text_flow=False) or []
+    words = page.extract_words(use_text_flow=False, x_tolerance_ratio=_X_TOLERANCE_RATIO) or []
     if not words:
         try:
-            extracted = page.extract_text() or ""
+            extracted = page.extract_text(x_tolerance_ratio=_X_TOLERANCE_RATIO) or ""
         except Exception:
             extracted = ""
         if extracted.strip():

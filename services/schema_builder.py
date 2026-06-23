@@ -71,7 +71,14 @@ def _clean_bullets(bullets: list | None) -> List[str]:
     return out
 
 
-_BULLET_PREFIX_RE = re.compile(r"^\s*[-*•\u2022\u2023\u25aa\u25a0\uf0b7]\s*")
+_BULLET_PREFIX_RE = re.compile(
+    r"^\s*[-*"
+    r"•‣⁃∙·"  # bullet, triangular, hyphen-bullet, operator, middle dot
+    r"▪■●○◦"  # squares, black circle, white circle, white bullet
+    r"▸▹▶▷❖♦"  # triangular markers, diamond bullets
+    r""  # private-use bullet (Wingdings/Symbol exports)
+    r"]\s*"
+)
 _INSTITUTION_WORD_RE = re.compile(
     r"\b(?:university|universit\w*|üniversite\w*|institute|technology|college|school"
     r"|faculty|academy|enstit|okulu|lisesi)\b",
@@ -666,6 +673,193 @@ def _repair_schema(schema: CVSchema, data: Dict[str, Any]) -> None:
     ]
 
 
+_PROFICIENCY_WORDS = (
+    "native",
+    "fluency",
+    "fluent",
+    "bilingual",
+    "mother tongue",
+    "advanced",
+    "proficient",
+    "proficiency",
+    "professional",
+    "upper intermediate",
+    "intermediate",
+    "conversational",
+    "conversant",
+    "elementary",
+    "beginner",
+    "basic",
+    "limited",
+    "working",
+)
+_PROFICIENCY_ALT = "|".join(re.escape(w) for w in _PROFICIENCY_WORDS)
+_PROFICIENCY_FIND_RE = re.compile(r"\b(" + _PROFICIENCY_ALT + r")\b", re.I)
+
+# Recognized spoken-language names (English + native spellings of the most
+# common ones). Used to keep the languages field precise: skill-like phrases
+# that carry a proficiency word but name no language ("Proficient in animal
+# handling", "Microsoft Suite") are rejected, while genuine entries
+# ("English (Fluent)", "Mandarin") are kept.
+_LANGUAGE_NAMES = {
+    "english",
+    "spanish",
+    "french",
+    "german",
+    "italian",
+    "portuguese",
+    "dutch",
+    "russian",
+    "polish",
+    "czech",
+    "slovak",
+    "ukrainian",
+    "romanian",
+    "hungarian",
+    "greek",
+    "turkish",
+    "arabic",
+    "hebrew",
+    "persian",
+    "farsi",
+    "hindi",
+    "urdu",
+    "bengali",
+    "punjabi",
+    "tamil",
+    "telugu",
+    "marathi",
+    "gujarati",
+    "chinese",
+    "mandarin",
+    "cantonese",
+    "japanese",
+    "korean",
+    "vietnamese",
+    "thai",
+    "indonesian",
+    "malay",
+    "tagalog",
+    "filipino",
+    "swahili",
+    "amharic",
+    "yoruba",
+    "igbo",
+    "hausa",
+    "zulu",
+    "afrikaans",
+    "swedish",
+    "norwegian",
+    "danish",
+    "finnish",
+    "icelandic",
+    "estonian",
+    "latvian",
+    "lithuanian",
+    "bulgarian",
+    "serbian",
+    "croatian",
+    "bosnian",
+    "slovenian",
+    "albanian",
+    "macedonian",
+    "catalan",
+    "basque",
+    "galician",
+    "welsh",
+    "irish",
+    "gaelic",
+    "maltese",
+    "georgian",
+    "armenian",
+    "azerbaijani",
+    "kazakh",
+    "uzbek",
+    "mongolian",
+    "nepali",
+    "sinhala",
+    "khmer",
+    "lao",
+    "burmese",
+    "pashto",
+    "kurdish",
+    # native spellings
+    "türkçe",
+    "ingilizce",
+    "almanca",
+    "fransızca",
+    "ispanyolca",
+    "italyanca",
+    "deutsch",
+    "englisch",
+    "französisch",
+    "français",
+    "anglais",
+    "allemand",
+    "espagnol",
+    "español",
+    "inglés",
+    "alemán",
+    "italiano",
+    "português",
+    "русский",
+    "中文",
+    "日本語",
+    "한국어",
+    "العربية",
+}
+_LANGUAGE_NAME_RE = re.compile(
+    r"(?<![a-zçğıöşü])(?:"
+    + "|".join(re.escape(n) for n in sorted(_LANGUAGE_NAMES, key=len, reverse=True))
+    + r")(?![a-zçğıöşü])",
+    re.I,
+)
+
+
+def _has_language_name(text: str) -> bool:
+    """True if *text* mentions a recognized spoken-language name."""
+    return bool(_LANGUAGE_NAME_RE.search(text or ""))
+
+
+# Explicit CEFR / JLPT proficiency *codes* (not free-text level words).
+_CEFR_CODE_RE = re.compile(r"(?<![A-Za-z0-9])(?:[ABC][12]|N[1-5])(?![A-Za-z0-9])")
+_LANG_CONNECTOR_RE = re.compile(
+    r"\b(?:in|of|written|oral|spoken|and|knowledge|skills?|level)\b",
+    re.I,
+)
+
+
+def _normalize_spoken_language(text: str) -> str:
+    """Reorder free-form proficiency phrases into ``Name (Level)`` form.
+
+    ``"Fluent in English"`` → ``"English (Fluent)"``; ``"Native German"`` →
+    ``"German (Native)"``. Entries that already use a structured form
+    (``"English: B2"`` / ``"English (Fluent)"``) or that cannot be reduced to a
+    single clean name are returned unchanged so no information is lost.
+    """
+    t = _strip_bullet_prefix(text).strip(" .;,")
+    if not t:
+        return ""
+    # Already structured (has level marker or colon) → keep as-is.
+    if "(" in t or ":" in t:
+        return t
+    # A comma means a compound phrase (e.g. multiple languages) we should not
+    # mangle into a single "Name (Level)".
+    if "," in t:
+        return t
+    match = _PROFICIENCY_FIND_RE.search(t)
+    if not match:
+        return t
+    level = match.group(1)
+    level = level[:1].upper() + level[1:].lower()
+    name = _PROFICIENCY_FIND_RE.sub("", t)
+    name = _LANG_CONNECTOR_RE.sub("", name)
+    name = re.sub(r"\s+", " ", name).strip(" .,;-()")
+    if not name or len(name.split()) > 3:
+        return t  # could not isolate a clean name — keep original
+    return f"{name} ({level})"
+
+
 def _is_language_item(text: str) -> bool:
     """Return True if *text* looks like a spoken-language entry, not a skill."""
     import re as _re
@@ -980,7 +1174,10 @@ def build_schema(normalized: Dict[str, Any]) -> CVSchema:
     languages: List[str] = []
     for lang in raw_langs:
         if isinstance(lang, str):
-            c = _clean(lang)
+            # Normalize free-form proficiency phrases ("Fluent in English" →
+            # "English (Fluent)") so downstream validation keeps them instead
+            # of rejecting the "fluent in …" shape.
+            c = _clean(_normalize_spoken_language(lang))
             if c:
                 languages.append(c)
         elif isinstance(lang, dict):
@@ -1378,10 +1575,14 @@ def _cross_section_fixup(schema: CVSchema) -> None:
 
 
 def _is_valid_language(text: str) -> bool:
-    """Structural validation: accept entries with proficiency signals or
-    short items without tech / date / URL noise.  No language-name
-    dictionary is consulted."""
-    from utils.section_scorer import is_language_entry
+    """Validate a languages-section entry.
+
+    Section detection sometimes routes skill phrases that merely contain a
+    proficiency word ("Proficient in animal handling", "Microsoft Suite") or
+    stray coursework lines ("Cell Biology") into the languages section. To keep
+    the field precise we require a recognized language name, otherwise we fall
+    back to the structural detector for CEFR-tagged entries.
+    """
     from utils.cv_normalizer import _ISO_LANG_CODES
 
     t = _strip_bullet_prefix(text).strip(" .")
@@ -1395,8 +1596,15 @@ def _is_valid_language(text: str) -> bool:
         return False
     if re.match(r"^(?:proficient|advanced|intermediate|basic|fluent)\s+in\b", t, re.I):
         return False
-    # Permissive mode — items are already in the languages section
-    return is_language_entry(t, strict=False)
+    # A recognized language name is the strongest signal — accept outright.
+    if _has_language_name(t):
+        return True
+    # No language name: accept only entries carrying an explicit CEFR/JLPT
+    # *code* (A1-C2, N1-N5). A bare proficiency *word* ("Proficient",
+    # "Advanced") is not enough — that is what skill phrases like "Microsoft
+    # Suite (Advanced)" or "animal handling (Proficient)" carry after
+    # normalization, and they must not pollute the languages field.
+    return bool(_CEFR_CODE_RE.search(t))
 
 
 # ── Document-level validation ─────────────────────────────────────────

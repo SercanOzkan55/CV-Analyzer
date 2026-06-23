@@ -7,6 +7,9 @@ from services.schema_builder import (
     _clean_list,
     _clean_bullets,
     _is_language_item,
+    _is_valid_language,
+    _normalize_spoken_language,
+    _strip_bullet_prefix,
     _enforce_summary_rules,
 )
 
@@ -41,6 +44,67 @@ class TestCleanBullets:
     def test_filters_empty(self):
         result = _clean_bullets(["- ", "", "Valid bullet"])
         assert len(result) == 1
+
+
+class TestStripBulletPrefix:
+    @pytest.mark.parametrize(
+        "raw,expected",
+        [
+            ("● Manufacturing", "Manufacturing"),  # black circle (U+25CF)
+            ("○ Languages", "Languages"),  # white circle
+            ("◦ Software", "Software"),  # white bullet
+            ("▸ Tools", "Tools"),  # triangular marker
+            ("• Bullet", "Bullet"),  # standard bullet
+            ("- Dash", "Dash"),
+            ("No prefix", "No prefix"),
+        ],
+    )
+    def test_strips_common_bullet_glyphs(self, raw, expected):
+        assert _strip_bullet_prefix(raw) == expected
+
+
+class TestNormalizeSpokenLanguage:
+    @pytest.mark.parametrize(
+        "raw,expected",
+        [
+            ("Fluent in English", "English (Fluent)"),
+            ("Native German", "German (Native)"),
+            ("Fluent in spoken Tagalog", "Tagalog (Fluent)"),
+            ("English: B2", "English: B2"),  # already structured → unchanged
+            ("English (Fluent)", "English (Fluent)"),  # already structured
+        ],
+    )
+    def test_reorders_proficiency_phrases(self, raw, expected):
+        assert _normalize_spoken_language(raw) == expected
+
+
+class TestIsValidLanguage:
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "English (Fluent)",
+            "Spanish",
+            "German (Native)",
+            "Tagalog (Fluent)",
+            "English: B1+ Speaking",
+            "B2",  # bare CEFR code is acceptable inside the languages section
+        ],
+    )
+    def test_accepts_real_languages(self, text):
+        assert _is_valid_language(text) is True
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "animal handling (Proficient)",  # skill phrase, no language name
+            "MS Word (Proficient)",
+            "Molecular Biology (Advanced)",
+            "RELEVANT COURSEWORK",
+            "Microsoft Suite (Advanced)",
+        ],
+    )
+    def test_rejects_skill_and_coursework_phrases(self, text):
+        assert _is_valid_language(text) is False
 
 
 class TestIsLanguageItem:
