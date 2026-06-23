@@ -36,6 +36,13 @@ jobs:
     name: Dependency review
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    # Best-effort: dependency-review-action requires the Dependency Graph
+    # (plus GitHub Advanced Security on private repos). When that is not
+    # enabled the action errors out, which must not block PRs — actual
+    # vulnerability scanning is already covered by the python-audit and
+    # node-audit jobs. Enable Dependency Graph under Settings → Code security
+    # to make this job fully functional.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
