@@ -121,5 +121,20 @@ Button {
         border.color: control.active ? Qt.rgba(control.activeColor.r, control.activeColor.g, control.activeColor.b, 0.45) : "transparent"
         Behavior on color { ColorAnimation { duration: 180 } }
         Behavior on border.color { ColorAnimation { duration: 180 } }
+
+        // Animated active accent bar on the left edge — grows in with a small
+        // overshoot when the item becomes active.
+        Rectangle {
+            anchors.left: parent.left
+            anchors.leftMargin: 3
+            anchors.verticalCenter: parent.verticalCenter
+            width: 3
+            radius: 2
+            color: control.activeColor
+            height: control.active ? parent.height * 0.52 : 0
+            opacity: control.active ? 1 : 0
+            Behavior on height { NumberAnimation { duration: 240; easing.type: Easing.OutBack; easing.overshoot: 1.2 } }
+            Behavior on opacity { NumberAnimation { duration: 160 } }
+        }
     }
 }
