@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Dialogs
 import QtQuick.Layouts
 import QtCore
+import "theme"
 import "components"
 import "pages"
 
@@ -61,7 +62,15 @@ ApplicationWindow {
         }
     }
 
-    onDarkThemeChanged: uiSettings.darkTheme = darkTheme
+    // Keep the new Theme singleton (used by the modular pages) in sync with the
+    // shell's legacy darkTheme toggle + reduced-motion flag, so every screen
+    // re-themes together.
+    function _syncTheme() {
+        Theme.mode = darkTheme ? "dark" : "light"
+        Theme.reducedMotion = (typeof backend !== "undefined") ? !backend.motionEnabled : false
+    }
+
+    onDarkThemeChanged: { uiSettings.darkTheme = darkTheme; _syncTheme() }
     onPageIndexChanged: pageAnimKey += 1
 
     Settings {
@@ -72,6 +81,7 @@ ApplicationWindow {
 
     Component.onCompleted: {
         darkTheme = uiSettings.darkTheme
+        _syncTheme()
     }
 
     property int pageIndex: 0
