@@ -374,6 +374,82 @@ STOPWORDS = {
 }
 MOJIBAKE_MARKERS = ("Ã", "Ä", "Å", "â€™", "â€œ", "â€", "Â")
 
+# Curated skill vocabulary used to extract real skills from a free-text job
+# description when the recruiter did not list explicit required skills. This
+# keeps "required / missing skills" meaningful instead of pulling prose words
+# like "student", "Istanbul" or "3rd-year" out of a summary paragraph.
+TECH_SKILLS = frozenset(
+    {
+        # languages
+        "python", "java", "javascript", "typescript", "c", "c++", "c#", "go",
+        "golang", "rust", "ruby", "php", "swift", "kotlin", "scala", "r",
+        "matlab", "perl", "dart", "objective-c", "sql", "bash", "shell",
+        "powershell", "assembly", "haskell", "elixir", "lua",
+        # frontend
+        "react", "angular", "vue", "svelte", "next.js", "nuxt", "redux",
+        "html", "css", "sass", "scss", "tailwind", "bootstrap", "jquery",
+        "webpack", "vite", "three.js", "qml",
+        # backend / frameworks
+        "node.js", "node", "express", "django", "flask", "fastapi", "spring",
+        "spring boot", "laravel", "rails", ".net", "asp.net", "graphql",
+        "rest", "rest api", "grpc", "websocket", "microservices",
+        # mobile
+        "android", "ios", "react native", "flutter", "xamarin",
+        # data / ml
+        "machine learning", "deep learning", "nlp", "computer vision",
+        "tensorflow", "pytorch", "keras", "scikit-learn", "pandas", "numpy",
+        "data analysis", "data science", "data engineering", "spark",
+        "hadoop", "etl", "tableau", "power bi", "statistics", "opencv",
+        # databases
+        "mysql", "postgresql", "postgres", "mongodb", "redis", "sqlite",
+        "oracle", "sql server", "elasticsearch", "cassandra", "dynamodb",
+        "firebase", "supabase",
+        # cloud / devops
+        "aws", "azure", "gcp", "google cloud", "docker", "kubernetes",
+        "terraform", "ansible", "jenkins", "ci/cd", "git", "github", "gitlab",
+        "linux", "unix", "nginx", "devops", "prometheus", "grafana",
+        # testing
+        "jest", "pytest", "selenium", "cypress", "junit", "playwright",
+        # methods / concepts
+        "agile", "scrum", "kanban", "oop", "algorithms", "data structures",
+        "design patterns", "cybersecurity", "security", "blockchain",
+        "full stack", "full-stack", "web development", "backend", "frontend",
+        "api", "ui/ux", "figma",
+        # business / office
+        "excel", "powerpoint", "word", "sap", "salesforce", "jira",
+        "project management", "accounting", "marketing", "seo",
+        "communication", "leadership", "teamwork", "problem solving",
+    }
+)
+
+# Extra prose/CV words that should never be treated as a skill when falling
+# back to keyword extraction from a description.
+_DERIVE_EXTRA_STOPWORDS = frozenset(
+    {
+        "student", "students", "university", "college", "school", "degree",
+        "bachelor", "master", "phd", "graduate", "graduated", "graduation",
+        "engineering", "engineer", "science", "sciences", "focused", "focus",
+        "passionate", "passion", "building", "build", "scalable", "efficient",
+        "efficiency", "solutions", "solution", "industry", "industries",
+        "world", "real", "real-world", "application", "applications",
+        "system", "systems", "project", "projects", "year", "years",
+        "month", "months", "currently", "based", "various", "strong",
+        "excellent", "good", "great", "knowledge", "understanding",
+        "responsible", "responsibilities", "including", "etc", "using",
+        "able", "well", "high", "level", "new", "junior", "senior", "mid",
+        "intern", "internship", "company", "companies", "position",
+        "candidate", "candidates", "hands", "expertise", "proficient",
+        "familiar", "develop", "developed", "developing", "development",
+        "technology", "technologies", "technical", "health", "web",
+        "computer", "applied", "professional", "professionals",
+        # role-title words (not skills)
+        "developer", "developers", "designer", "analyst", "manager",
+        "specialist", "administrator", "consultant", "coordinator",
+        "architect", "programmer", "tester", "recruiter", "hiring",
+        "seeking", "required", "preferred", "looking", "aday",
+    }
+)
+
 
 class LocalWorkerError(RuntimeError):
     pass
@@ -445,20 +521,92 @@ def _matches_term(text_norm: str, text_tokens: set[str], term: str) -> bool:
     return False
 
 
+_SKILL_DISPLAY = {
+    "c++": "C++", "c#": "C#", "ci/cd": "CI/CD", "node.js": "Node.js",
+    "next.js": "Next.js", "nuxt": "Nuxt", "asp.net": "ASP.NET", ".net": ".NET",
+    "ui/ux": "UI/UX", "nlp": "NLP", "sql": "SQL", "aws": "AWS", "gcp": "GCP",
+    "rest api": "REST API", "rest": "REST", "html": "HTML", "css": "CSS",
+    "oop": "OOP", "seo": "SEO", "etl": "ETL", "grpc": "gRPC", "api": "API",
+    "power bi": "Power BI", "ios": "iOS", "sap": "SAP", "three.js": "Three.js",
+    "qml": "QML", "php": "PHP", "scss": "SCSS", "sql server": "SQL Server",
+    "objective-c": "Objective-C", "full-stack": "Full-Stack",
+    "postgresql": "PostgreSQL", "mysql": "MySQL", "mongodb": "MongoDB",
+    "github": "GitHub", "gitlab": "GitLab", "javascript": "JavaScript",
+    "typescript": "TypeScript", "fastapi": "FastAPI", "tensorflow": "TensorFlow",
+    "pytorch": "PyTorch", "numpy": "NumPy", "scikit-learn": "scikit-learn",
+    "graphql": "GraphQL", "devops": "DevOps", "nuxt": "Nuxt",
+}
+
+
+def _display_skill(skill: str) -> str:
+    if skill in _SKILL_DISPLAY:
+        return _SKILL_DISPLAY[skill]
+    return " ".join(word.capitalize() for word in skill.split())
+
+
 def _derive_keywords(job_description: str, max_items: int = 12) -> list[str]:
-    # Match words starting with any Unicode letter followed by Unicode alphanumeric/symbols
-    words = re.findall(r"[^\W\d_][\w+#./-]{2,}", job_description or "")
-    seen = set()
-    keywords = []
-    for word in words:
+    """Derive required-skill keywords from a free-text description.
+
+    Prefers high-precision matches against a curated skill vocabulary so prose
+    words ("student", "Istanbul", "3rd-year") are not mistaken for skills. Only
+    when no known skill is found does it fall back to filtered keyword
+    extraction (for non-tech descriptions), dropping stopwords, prose words,
+    numbers and very short tokens.
+    """
+    if not job_description:
+        return []
+
+    norm = _normalize(job_description)
+    tokens = _token_set(norm)
+    padded = f" {norm} "
+
+    def _present(skill: str) -> bool:
+        # Strict literal presence only — NOT _matches_term, which expands into
+        # related-skill clusters (docker → kubernetes/aws/…) and would pull in
+        # skills the description never mentions.
+        skill_norm = _normalize(skill)
+        if not skill_norm:
+            return False
+        if " " in skill_norm:
+            return f" {skill_norm} " in padded
+        return skill_norm in tokens
+
+    # 1) High-precision: known skills actually present in the description.
+    #    Listed first so clean skills lead the result.
+    found: list[str] = []
+    seen: set[str] = set()
+    for skill in sorted(TECH_SKILLS, key=len, reverse=True):
+        if _present(skill):
+            disp = _display_skill(skill)
+            key = disp.lower().replace("-", " ")
+            if key not in seen:
+                seen.add(key)
+                found.append(disp)
+
+    # 2) Filtered keyword extraction — catches meaningful non-vocabulary terms
+    #    (incl. non-English role words) while dropping stopwords, prose words,
+    #    numbers and very short tokens.
+    # Lookbehind avoids matching mid-token fragments (e.g. "rd-year" out of
+    # "3rd-year"); the letter start already excludes pure-number tokens.
+    for word in re.findall(r"(?<![\w+#./-])[^\W\d_][\w+#./-]{2,}", job_description):
+        word = word.strip(".,;:/-")
         key = _clean_lower(word)
-        if key in STOPWORDS or key in seen:
+        dedup = key.replace("-", " ")
+        if (
+            not key
+            or key in STOPWORDS
+            or key in _DERIVE_EXTRA_STOPWORDS
+            or dedup in seen
+            or len(key) < 3
+            or any(ch.isdigit() for ch in key)
+        ):
             continue
-        seen.add(key)
-        keywords.append(word)
-        if len(keywords) >= max_items:
+        seen.add(dedup)
+        found.append(word)
+        if len(found) >= max_items:
             break
-    return keywords
+
+    return found[:max_items]
 
 
 def _mojibake_score(text: str) -> int:
