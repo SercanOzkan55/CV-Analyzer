@@ -943,9 +943,14 @@ class LocalWorkerBackend(QObject):
     def progressMaximum(self):
         return self._progress_maximum
 
-    @Property(bool, constant=True)
+    @Property(bool, notify=stateChanged)
     def motionEnabled(self):
         return self._motion_enabled
+
+    @motionEnabled.setter
+    def motionEnabled(self, value: bool):
+        self._motion_enabled = bool(value)
+        self.stateChanged.emit()
 
     @Property(str, notify=syncChanged)
     def syncApiUrl(self):
