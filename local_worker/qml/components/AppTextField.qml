@@ -8,6 +8,7 @@ Rectangle {
     property alias text: field.text
     property string placeholder: ""
     property bool readOnlyField: false
+    property bool password: false
     signal editingFinished()
 
     implicitHeight: 40
@@ -31,6 +32,7 @@ Rectangle {
         selectionColor: Theme.primary
         selectByMouse: true
         readOnly: root.readOnlyField
+        echoMode: root.password ? TextInput.Password : TextInput.Normal
         background: null
         onEditingFinished: root.editingFinished()
     }
