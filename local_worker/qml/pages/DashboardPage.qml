@@ -67,8 +67,9 @@ ScrollView {
             // Folder / privacy card
             AppCard {
                 Layout.fillWidth: true
+                Layout.fillHeight: true
                 Layout.preferredWidth: 2
-                Layout.minimumHeight: 210
+                Layout.minimumHeight: 280
                 ColumnLayout {
                     anchors.fill: parent
                     spacing: Theme.space3
@@ -125,7 +126,8 @@ ScrollView {
             // Overall match score
             AppCard {
                 Layout.fillWidth: true
-                Layout.minimumHeight: 210
+                Layout.fillHeight: true
+                Layout.minimumHeight: 280
                 Layout.preferredWidth: 1
                 ColumnLayout {
                     anchors.fill: parent

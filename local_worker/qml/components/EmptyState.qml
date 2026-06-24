@@ -48,10 +48,30 @@ ColumnLayout {
     }
 
     Button {
+        id: actionBtn
         Layout.alignment: Qt.AlignHCenter
         Layout.topMargin: 4
         visible: root.actionText.length > 0
         text: root.actionText
+        hoverEnabled: true
+        padding: 0
+        implicitHeight: 38
+        implicitWidth: Math.max(120, actionLabel.implicitWidth + 36)
         onClicked: root.actionTriggered()
+        contentItem: Text {
+            id: actionLabel
+            text: actionBtn.text
+            color: "#ffffff"
+            font.pixelSize: Typography.labelSize
+            font.weight: Typography.weightSemiBold
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
+        background: Rectangle {
+            radius: Theme.radiusMd
+            color: actionBtn.down ? Qt.darker(Theme.primary, 1.15)
+                                  : (actionBtn.hovered ? Theme.primaryHover : Theme.primary)
+            Behavior on color { ColorAnimation { duration: Theme.durHover } }
+        }
     }
 }
