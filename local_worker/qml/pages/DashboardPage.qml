@@ -182,7 +182,8 @@ ScrollView {
             // Score distribution
             AppCard {
                 Layout.fillWidth: true
-                Layout.minimumHeight: 200
+                Layout.fillHeight: true
+                Layout.minimumHeight: 230
                 ColumnLayout {
                     anchors.fill: parent
                     spacing: Theme.space3
@@ -214,7 +215,8 @@ ScrollView {
             // Recent analyses
             AppCard {
                 Layout.fillWidth: true
-                Layout.minimumHeight: 200
+                Layout.fillHeight: true
+                Layout.minimumHeight: 230
                 ColumnLayout {
                     anchors.fill: parent
                     spacing: Theme.space3
@@ -229,14 +231,18 @@ ScrollView {
                             onClicked: page.requestPage(3)
                         }
                     }
-                    EmptyState {
+                    // Empty state — centered in the remaining space; no button
+                    // here (the top folder card already offers "Browse Folder").
+                    Item {
                         Layout.fillWidth: true
-                        Layout.topMargin: Theme.space4
+                        Layout.fillHeight: true
                         visible: backend.historyRunCount === 0
-                        title: "No analyses yet"
-                        message: "Pick a CV folder and run your first local match."
-                        actionText: "Browse Folder"
-                        onActionTriggered: page.requestBrowse()
+                        EmptyState {
+                            anchors.centerIn: parent
+                            width: Math.min(parent.width, 360)
+                            title: "No analyses yet"
+                            message: "Pick a CV folder and run your first local match."
+                        }
                     }
                     Repeater {
                         model: backend.historyRunCount > 0 ? backend.historyModel : null
