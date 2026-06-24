@@ -166,10 +166,10 @@ ScrollView {
             columns: width < 720 ? 2 : 4
             columnSpacing: Theme.space4
             rowSpacing: Theme.space4
-            StatCard { Layout.fillWidth: true; label: "Total Analyses"; value: backend.historyRunCount; tint: Theme.secondary }
-            StatCard { Layout.fillWidth: true; label: "Candidate Pool"; value: backend.totalCandidates; tint: Theme.primary }
-            StatCard { Layout.fillWidth: true; label: "Average Score"; value: backend.averageScoreValue; suffix: "%"; tint: Theme.accent }
-            StatCard { Layout.fillWidth: true; label: "Shortlisted"; value: backend.shortlistedCount; tint: Theme.success }
+            StatCard { Layout.fillWidth: true; tilt3d: true; label: "Total Analyses"; value: backend.historyRunCount; tint: Theme.secondary }
+            StatCard { Layout.fillWidth: true; tilt3d: true; label: "Candidate Pool"; value: backend.totalCandidates; tint: Theme.primary }
+            StatCard { Layout.fillWidth: true; tilt3d: true; label: "Average Score"; value: backend.averageScoreValue; suffix: "%"; tint: Theme.accent }
+            StatCard { Layout.fillWidth: true; tilt3d: true; label: "Shortlisted"; value: backend.shortlistedCount; tint: Theme.success }
         }
 
         // ── Distribution + Recent ──
