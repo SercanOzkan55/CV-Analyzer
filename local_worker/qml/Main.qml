@@ -4,6 +4,7 @@ import QtQuick.Dialogs
 import QtQuick.Layouts
 import QtCore
 import "components"
+import "pages"
 
 ApplicationWindow {
     id: root
@@ -82,7 +83,8 @@ ApplicationWindow {
         { title: "Website Sync", glyph: "sync" },
         { title: "Reports", glyph: "reports" },
         { title: "Templates", glyph: "templates" },
-        { title: "Settings", glyph: "settings" }
+        { title: "Settings", glyph: "settings" },
+        { title: "Inbox", glyph: "inbox" }
     ]
 
     function pageTitle() {
@@ -93,6 +95,7 @@ ApplicationWindow {
         if (pageIndex === 4) return "Website Sync"
         if (pageIndex === 5) return "Local Reports"
         if (pageIndex === 6) return "Email Templates"
+        if (pageIndex === 8) return "Inbox & Audit"
         return "Worker Settings"
     }
 
@@ -104,6 +107,7 @@ ApplicationWindow {
         if (pageIndex === 4) return "Connect worker key, test Website access, and sync approved local results."
         if (pageIndex === 5) return "Preview current run output and export local files."
         if (pageIndex === 6) return "Edit local accept/reject message templates and preview variables."
+        if (pageIndex === 8) return "Owner notifications and the local decision audit trail."
         return "Tune local behavior, sync permissions, and desktop preferences."
     }
 
@@ -3488,6 +3492,21 @@ ApplicationWindow {
                             }
                         }
                     }
+                }
+
+                InboxPage {
+                    pageMargin: root.contentMargin
+                    maxWidth: root.contentMaxWidth
+                    surface: root.themeCard
+                    surfaceAlt: root.themeCardAlt
+                    border: root.themeBorder
+                    textColor: root.themeText
+                    textMuted: root.themeText2
+                    subtle: root.themeMuted
+                    primary: root.themePrimary
+                    success: root.themeSuccess
+                    warning: root.themeWarning
+                    danger: root.themeDanger
                 }
             }
         }
