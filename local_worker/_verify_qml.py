@@ -1,6 +1,7 @@
 """Headless QML load verification — loads Main.qml offscreen and reports
 runtime QML errors/warnings without needing a display. Verification gate for
 local-worker QML edits."""
+
 import os
 import sys
 
@@ -35,9 +36,9 @@ engine.load(QUrl.fromLocalFile(str(qml_gui.resource_path("qml/Main.qml"))))
 ok = bool(engine.rootObjects())
 _IGNORE = ("QFontDatabase", "Cannot find font", "Qt no longer ships fonts")
 errors = [
-    m for m in _messages
-    if ("is not defined" in m or "Error" in m or "Unable" in m or "Cannot" in m)
-    and not any(ig in m for ig in _IGNORE)
+    m
+    for m in _messages
+    if ("is not defined" in m or "Error" in m or "Unable" in m or "Cannot" in m) and not any(ig in m for ig in _IGNORE)
 ]
 type_errors = [m for m in _messages if "TypeError" in m or "ReferenceError" in m]
 
