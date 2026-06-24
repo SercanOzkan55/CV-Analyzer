@@ -100,6 +100,15 @@ ScrollView {
                         maximumLineCount: 2
                         wrapMode: Text.WrapAnywhere
                     }
+                    Text {
+                        Layout.fillWidth: true
+                        visible: backend.cvFileCount >= 0
+                        text: backend.cvFileCount > 0
+                              ? (backend.cvFileCount + " supported CV file(s) found")
+                              : "No supported CV files in this folder."
+                        color: backend.cvFileCount > 0 ? Theme.success : Theme.warning
+                        font.pixelSize: Typography.captionSize
+                    }
                     Item { Layout.fillHeight: true }
                     RowLayout {
                         Layout.fillWidth: true

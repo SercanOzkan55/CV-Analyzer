@@ -103,11 +103,23 @@ ScrollView {
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: Theme.space2
-                        AppTextField {
+                        Rectangle {
                             Layout.fillWidth: true
-                            readOnlyField: true
-                            placeholder: "No folder selected"
-                            text: backend.cvFolder
+                            implicitHeight: 40
+                            radius: Theme.radiusMd
+                            color: Theme.surfaceMuted
+                            border.width: 1
+                            border.color: Theme.border
+                            Text {
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 12
+                                verticalAlignment: Text.AlignVCenter
+                                text: backend.cvFolder && backend.cvFolder.length > 0 ? backend.cvFolder : "No folder selected"
+                                color: backend.cvFolder && backend.cvFolder.length > 0 ? Theme.textPrimary : Theme.textMuted
+                                font.pixelSize: Typography.labelSize
+                                elide: Text.ElideMiddle
+                            }
                         }
                         AppButton {
                             text: "Browse"
@@ -117,15 +129,39 @@ ScrollView {
                             onClicked: page.requestBrowseCv()
                         }
                     }
+                    // File-count feedback so an empty / wrong folder is obvious.
+                    Text {
+                        Layout.fillWidth: true
+                        visible: backend.cvFileCount >= 0
+                        text: backend.cvFileCount > 0
+                              ? (backend.cvFileCount + " supported CV file(s) found  ·  .pdf · .docx · .txt")
+                              : "No supported CV files in this folder. Pick the folder that directly contains your CVs."
+                        color: backend.cvFileCount > 0 ? Theme.success : Theme.warning
+                        font.pixelSize: Typography.captionSize
+                        wrapMode: Text.WordWrap
+                    }
 
                     Text { text: "OUTPUT FOLDER"; color: Theme.textMuted; font.pixelSize: Typography.captionSize; font.weight: Typography.weightSemiBold }
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: Theme.space2
-                        AppTextField {
+                        Rectangle {
                             Layout.fillWidth: true
-                            readOnlyField: true
-                            text: backend.outputFolder
+                            implicitHeight: 40
+                            radius: Theme.radiusMd
+                            color: Theme.surfaceMuted
+                            border.width: 1
+                            border.color: Theme.border
+                            Text {
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 12
+                                verticalAlignment: Text.AlignVCenter
+                                text: backend.outputFolder && backend.outputFolder.length > 0 ? backend.outputFolder : "Default output folder"
+                                color: backend.outputFolder && backend.outputFolder.length > 0 ? Theme.textPrimary : Theme.textMuted
+                                font.pixelSize: Typography.labelSize
+                                elide: Text.ElideMiddle
+                            }
                         }
                         AppButton {
                             text: "Browse"

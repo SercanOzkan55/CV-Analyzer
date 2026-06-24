@@ -847,6 +847,23 @@ class LocalWorkerBackend(QObject):
         self._output_folder = value
         self.stateChanged.emit()
 
+    @Property(int, notify=stateChanged)
+    def cvFileCount(self):
+        """Number of supported CV files in the selected folder.
+
+        Returns -1 when no folder is selected so the UI can distinguish
+        "nothing picked yet" from "folder picked but empty" (0).
+        """
+        if not self._cv_folder:
+            return -1
+        try:
+            folder = Path(self._cv_folder)
+            out = Path(self._output_folder) if self._output_folder else folder / "_cv_out"
+            return len(iter_supported_local_files(folder, out))
+        except Exception as exc:
+            logger.warning("cvFileCount scan failed: %s", exc)
+            return 0
+
     @Property(str, notify=stateChanged)
     def jobDescription(self):
         return self._job_description
