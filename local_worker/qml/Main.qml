@@ -1158,9 +1158,38 @@ ApplicationWindow {
             }
 
             StackLayout {
+                id: pageStack
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 currentIndex: root.pageIndex
+
+                // Animated page transition (fade + slide-up). opacity/transform
+                // do not affect layout geometry, so this is safe over the
+                // existing pages. Driven by root.pageAnimKey (bumped on change).
+                opacity: 1
+                transform: Translate { id: pageTranslate }
+
+                Connections {
+                    target: root
+                    function onPageAnimKeyChanged() {
+                        if (typeof backend !== "undefined" && !backend.motionEnabled) {
+                            pageStack.opacity = 1
+                            pageTranslate.y = 0
+                            return
+                        }
+                        pageTransition.restart()
+                    }
+                }
+
+                SequentialAnimation {
+                    id: pageTransition
+                    PropertyAction { target: pageStack; property: "opacity"; value: 0.0 }
+                    PropertyAction { target: pageTranslate; property: "y"; value: 16 }
+                    ParallelAnimation {
+                        NumberAnimation { target: pageStack; property: "opacity"; to: 1.0; duration: 280; easing.type: Easing.OutCubic }
+                        NumberAnimation { target: pageTranslate; property: "y"; to: 0; duration: 360; easing.type: Easing.OutBack; easing.overshoot: 0.6 }
+                    }
+                }
 
                 ScrollView {
                     id: dashboardScroll

@@ -118,6 +118,8 @@ ScrollView {
         Repeater {
             model: backend.notificationsModel
             delegate: Rectangle {
+                id: notifCard
+                required property int index
                 required property string title
                 required property string message
                 required property string candidateName
@@ -131,6 +133,24 @@ ScrollView {
                 border.color: isRead ? inboxPage.border : inboxPage.typeColor(type)
                 border.width: isRead ? 1 : 2
                 implicitHeight: notifCol.implicitHeight + 24
+
+                // Staggered entrance
+                opacity: 0
+                transform: Translate { id: notifShift; x: 18 }
+                Component.onCompleted: {
+                    if (typeof backend !== "undefined" && !backend.motionEnabled) {
+                        opacity = 1; notifShift.x = 0; return
+                    }
+                    notifIn.start()
+                }
+                SequentialAnimation {
+                    id: notifIn
+                    PauseAnimation { duration: Math.max(0, Math.min(notifCard.index, 10)) * 45 }
+                    ParallelAnimation {
+                        NumberAnimation { target: notifCard; property: "opacity"; to: 1; duration: 340; easing.type: Easing.OutCubic }
+                        NumberAnimation { target: notifShift; property: "x"; to: 0; duration: 380; easing.type: Easing.OutCubic }
+                    }
+                }
 
                 RowLayout {
                     anchors.fill: parent
@@ -203,6 +223,8 @@ ScrollView {
         Repeater {
             model: backend.auditModel
             delegate: Rectangle {
+                id: auditCard
+                required property int index
                 required property string action
                 required property string module
                 required property string description
@@ -214,6 +236,24 @@ ScrollView {
                 color: inboxPage.surface
                 border.color: inboxPage.border
                 implicitHeight: auditCol.implicitHeight + 20
+
+                // Staggered entrance
+                opacity: 0
+                transform: Translate { id: auditShift; x: 18 }
+                Component.onCompleted: {
+                    if (typeof backend !== "undefined" && !backend.motionEnabled) {
+                        opacity = 1; auditShift.x = 0; return
+                    }
+                    auditIn.start()
+                }
+                SequentialAnimation {
+                    id: auditIn
+                    PauseAnimation { duration: Math.max(0, Math.min(auditCard.index, 10)) * 40 }
+                    ParallelAnimation {
+                        NumberAnimation { target: auditCard; property: "opacity"; to: 1; duration: 320; easing.type: Easing.OutCubic }
+                        NumberAnimation { target: auditShift; property: "x"; to: 0; duration: 360; easing.type: Easing.OutCubic }
+                    }
+                }
 
                 RowLayout {
                     anchors.fill: parent
