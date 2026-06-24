@@ -33,7 +33,7 @@ Item {
 
         // Track
         ShapePath {
-            strokeColor: Theme.surfaceMuted
+            strokeColor: Theme.border
             strokeWidth: root.thickness
             fillColor: "transparent"
             capStyle: ShapePath.RoundCap
