@@ -26,19 +26,11 @@ Item {
         RowLayout {
             Layout.fillWidth: true
             spacing: Theme.space3
-            ColumnLayout {
-                spacing: 2
-                Text {
-                    text: "Ranked Results"
-                    color: Theme.textPrimary
-                    font.pixelSize: Typography.titleSize
-                    font.weight: Typography.weightBlack
-                }
-                Text {
-                    text: backend.totalCandidates + " candidate" + (backend.totalCandidates === 1 ? "" : "s") + " in this run"
-                    color: Theme.textSecondary
-                    font.pixelSize: Typography.labelSize
-                }
+            Text {
+                text: backend.totalCandidates + " candidate" + (backend.totalCandidates === 1 ? "" : "s") + " in this run"
+                color: Theme.textSecondary
+                font.pixelSize: Typography.subheadingSize
+                font.weight: Typography.weightMedium
             }
             Item { Layout.fillWidth: true }
             SearchField {
