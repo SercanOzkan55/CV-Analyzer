@@ -45,6 +45,12 @@ ScrollView {
                     font.pixelSize: Typography.subheadingSize
                 }
             }
+            Hero3D {
+                Layout.preferredWidth: 92
+                Layout.preferredHeight: 92
+                Layout.alignment: Qt.AlignVCenter
+                visible: page.width > 760
+            }
             AppButton {
                 text: "New Analysis"
                 strong: true
