@@ -4,8 +4,9 @@ import QtQuick.Layouts
 import "../theme"
 import "../components"
 
-// Step-based analysis setup over the existing PySide6 backend. Folder pickers
-// are raised as signals so the shell owns the FolderDialogs.
+// Step-based analysis setup over the existing PySide6 backend. Cards are
+// content-sized (preferredHeight bound to their inner column) because the page
+// scrolls — there is no fixed height to fill against.
 ScrollView {
     id: page
     clip: true
@@ -17,19 +18,20 @@ ScrollView {
     readonly property int maxWidth: 1280
     function contentW() { return Math.max(0, Math.min(availableWidth - gutter * 2, maxWidth)) }
 
-    function _fieldLabel(t) { return t }
-
     ColumnLayout {
         x: Math.max(page.gutter, (page.availableWidth - page.contentW()) / 2)
         y: page.gutter
         width: page.contentW()
         spacing: Theme.space5
 
-        // ── Setup flow / stepper ──
+        // ── Setup flow ──
         AppCard {
+            id: setupCard
             Layout.fillWidth: true
+            Layout.preferredHeight: setupCol.implicitHeight + setupCard.pad * 2
             ColumnLayout {
-                anchors.fill: parent
+                id: setupCol
+                width: parent.width
                 spacing: Theme.space3
                 RowLayout {
                     Layout.fillWidth: true
@@ -79,10 +81,12 @@ ScrollView {
 
             // Local job setup
             AppCard {
+                id: jobCard
                 Layout.fillWidth: true
-                Layout.fillHeight: true
+                Layout.preferredHeight: jobCol.implicitHeight + jobCard.pad * 2
                 ColumnLayout {
-                    anchors.fill: parent
+                    id: jobCol
+                    width: parent.width
                     spacing: Theme.space3
 
                     Text { text: "Local job setup"; color: Theme.textPrimary; font.pixelSize: Typography.headingSize; font.weight: Typography.weightBold }
@@ -135,8 +139,7 @@ ScrollView {
                     Text { text: "JOB DESCRIPTION"; color: Theme.textMuted; font.pixelSize: Typography.captionSize; font.weight: Typography.weightSemiBold }
                     AppTextArea {
                         Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        Layout.minimumHeight: 140
+                        Layout.preferredHeight: 150
                         placeholder: "Paste the job description or role expectations…"
                         text: backend.jobDescription
                         onEditingFinished: backend.jobDescription = text
@@ -146,10 +149,12 @@ ScrollView {
 
             // Scoring criteria
             AppCard {
+                id: scoreCard
                 Layout.fillWidth: true
-                Layout.fillHeight: true
+                Layout.preferredHeight: scoreCol.implicitHeight + scoreCard.pad * 2
                 ColumnLayout {
-                    anchors.fill: parent
+                    id: scoreCol
+                    width: parent.width
                     spacing: Theme.space3
 
                     Text { text: "Scoring criteria"; color: Theme.textPrimary; font.pixelSize: Typography.headingSize; font.weight: Typography.weightBold }
@@ -234,10 +239,13 @@ ScrollView {
 
         // ── Action bar ──
         AppCard {
+            id: actionCard
             Layout.fillWidth: true
             elevated: true
+            Layout.preferredHeight: actionCol.implicitHeight + actionCard.pad * 2
             ColumnLayout {
-                anchors.fill: parent
+                id: actionCol
+                width: parent.width
                 spacing: Theme.space3
                 RowLayout {
                     Layout.fillWidth: true
@@ -277,7 +285,6 @@ ScrollView {
                         onClicked: backend.startAnalysis()
                     }
                 }
-                // Progress (only while running)
                 Rectangle {
                     Layout.fillWidth: true
                     visible: backend.isRunning
