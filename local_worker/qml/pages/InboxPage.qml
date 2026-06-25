@@ -52,6 +52,14 @@ ScrollView {
                 onClicked: backend.markAllNotificationsRead()
             }
             AppButton {
+                text: "Clear all"
+                enabled: backend.notificationCount > 0
+                fill: Theme.surfaceElevated; fillHover: Theme.surfaceMuted
+                fillPressed: Theme.surfaceMuted; stroke: Theme.danger
+                textColor: Theme.danger
+                onClicked: backend.clearAllNotifications()
+            }
+            AppButton {
                 text: "Refresh"
                 fill: Theme.surfaceElevated; fillHover: Theme.surfaceMuted
                 fillPressed: Theme.surfaceMuted; stroke: Theme.border
@@ -89,6 +97,7 @@ ScrollView {
             delegate: AppCard {
                 id: notifCard
                 required property int index
+                required property int notificationId
                 required property string title
                 required property string message
                 required property string candidateName
@@ -156,6 +165,32 @@ ScrollView {
                             text: (notifCard.candidateName ? notifCard.candidateName + "  ·  " : "") + notifCard.createdAt
                             color: Theme.textMuted
                             font.pixelSize: Typography.captionSize
+                        }
+                    }
+
+                    // Delete this notification
+                    Rectangle {
+                        id: delBtn
+                        Layout.alignment: Qt.AlignTop
+                        width: 26; height: 26; radius: 13
+                        color: delArea.containsMouse ? Qt.rgba(Theme.danger.r, Theme.danger.g, Theme.danger.b, 0.16) : "transparent"
+                        border.width: 1
+                        border.color: delArea.containsMouse ? Theme.danger : Theme.border
+                        Behavior on color { ColorAnimation { duration: Theme.durHover } }
+                        Behavior on border.color { ColorAnimation { duration: Theme.durHover } }
+                        Text {
+                            anchors.centerIn: parent
+                            text: "✕"
+                            color: delArea.containsMouse ? Theme.danger : Theme.textMuted
+                            font.pixelSize: 13
+                            font.weight: Typography.weightBold
+                        }
+                        MouseArea {
+                            id: delArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: backend.deleteNotification(notifCard.notificationId)
                         }
                     }
                 }

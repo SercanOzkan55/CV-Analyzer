@@ -1452,6 +1452,26 @@ class LocalWorkerBackend(QObject):
             return
         self.refreshInbox()
 
+    @Slot(int)
+    def deleteNotification(self, notification_id: int):
+        try:
+            self.store.delete_notification(int(notification_id))
+        except Exception as exc:
+            self.toast.emit(f"Could not delete notification: {exc}", "error")
+            return
+        self.refreshInbox()
+
+    @Slot()
+    def clearAllNotifications(self):
+        try:
+            removed = self.store.clear_all_notifications()
+        except Exception as exc:
+            self.toast.emit(f"Could not clear notifications: {exc}", "error")
+            return
+        if removed:
+            self.toast.emit(f"Cleared {removed} notification(s).", "success")
+        self.refreshInbox()
+
     @Slot()
     def refreshSyncQueue(self):
         self._sync_detail = f"{self.syncPendingCount} local result(s) ready for Website sync."

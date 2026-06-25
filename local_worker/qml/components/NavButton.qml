@@ -5,6 +5,7 @@ Button {
     id: control
 
     property bool active: false
+    property bool collapsed: false
     property string glyph: ""
     property color activeColor: "#7c5cff"
     property color activeText: "#ffffff"
@@ -22,6 +23,11 @@ Button {
     hoverEnabled: true
     onClicked: navClicked()
 
+    // Tooltip with the label when collapsed to an icon-only rail.
+    ToolTip.visible: control.collapsed && control.hovered
+    ToolTip.text: control.text
+    ToolTip.delay: 350
+
     // Press contracts the whole item ("kapanma"); hover lifts it slightly.
     scale: down ? 0.95 : (hovered ? 1.015 : 1)
     Behavior on scale { NumberAnimation { duration: down ? 110 : 200; easing.type: Easing.OutCubic } }
@@ -29,8 +35,8 @@ Button {
     contentItem: Row {
         spacing: 12
         anchors.verticalCenter: parent.verticalCenter
-        leftPadding: 14
-        rightPadding: 12
+        leftPadding: control.collapsed ? Math.max(0, (control.width - 20) / 2) : 14
+        rightPadding: control.collapsed ? 0 : 12
 
         Canvas {
             id: navIcon
@@ -108,6 +114,7 @@ Button {
         }
 
         Text {
+            visible: !control.collapsed
             text: control.text
             color: control.active ? control.activeText : (control.hovered ? control.hoverText : control.textColor)
             font.pixelSize: 14

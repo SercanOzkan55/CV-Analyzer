@@ -22,6 +22,8 @@ ApplicationWindow {
     property int pageAnimKey: 0
     property int contentMaxWidth: 1500
     property int contentMargin: 28
+    // Collapsible sidebar: collapses to an icon-only rail so pages fill the screen.
+    property bool sidebarCollapsed: false
     property bool compact: width < 1100
     property bool wide: width > 1550
     property color themeBg: darkTheme ? "#0b1020" : "#f5f7fb"
@@ -408,11 +410,12 @@ ApplicationWindow {
         spacing: 0
 
         Rectangle {
-            Layout.preferredWidth: 246
+            Layout.preferredWidth: root.sidebarCollapsed ? 84 : 246
             Layout.fillHeight: true
             color: root.themeSidebar
             border.width: 0
             Behavior on color { ColorAnimation { duration: 180 } }
+            Behavior on Layout.preferredWidth { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
 
             Rectangle {
                 anchors.right: parent.right
@@ -423,7 +426,7 @@ ApplicationWindow {
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 18
+                anchors.margins: root.sidebarCollapsed ? 16 : 18
                 spacing: 14
 
                 RowLayout {
@@ -433,6 +436,7 @@ ApplicationWindow {
                     Rectangle {
                         Layout.preferredWidth: 46
                         Layout.preferredHeight: 46
+                        Layout.alignment: root.sidebarCollapsed ? Qt.AlignHCenter : Qt.AlignLeft
                         radius: 16
                         gradient: Gradient {
                             GradientStop { position: 0; color: root.themeSuccess }
@@ -453,6 +457,7 @@ ApplicationWindow {
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 1
+                        visible: !root.sidebarCollapsed
                         Text {
                             text: "CV Analyzer"
                             color: root.themeText
@@ -498,6 +503,7 @@ ApplicationWindow {
                             model: root.navItems
                             NavButton {
                                 width: navContainer.width
+                                collapsed: root.sidebarCollapsed
                                 text: modelData.title
                                 glyph: modelData.glyph
                                 active: root.pageIndex === index
@@ -520,6 +526,7 @@ ApplicationWindow {
                 GlassCard {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 176
+                    visible: !root.sidebarCollapsed
                     cardColor: root.themeCardAlt
                     strokeColor: root.themeBorder
                     glowColor: root.themePrimary
@@ -585,6 +592,41 @@ ApplicationWindow {
                     anchors.leftMargin: 22
                     anchors.rightMargin: 22
                     spacing: 14
+
+                    // Sidebar collapse toggle (hamburger). Pages fill more of the
+                    // screen when the rail is collapsed.
+                    Rectangle {
+                        id: navToggle
+                        Layout.preferredWidth: 40
+                        Layout.preferredHeight: 40
+                        Layout.alignment: Qt.AlignVCenter
+                        radius: 12
+                        color: toggleArea.containsMouse ? root.themeSurface2 : "transparent"
+                        border.width: 1
+                        border.color: toggleArea.containsMouse ? root.themeBorder : "transparent"
+                        Behavior on color { ColorAnimation { duration: 140 } }
+                        Behavior on border.color { ColorAnimation { duration: 140 } }
+
+                        Column {
+                            anchors.centerIn: parent
+                            spacing: 4
+                            Repeater {
+                                model: 3
+                                Rectangle {
+                                    width: 18; height: 2; radius: 1
+                                    color: toggleArea.containsMouse ? root.themeText : root.themeText2
+                                    Behavior on color { ColorAnimation { duration: 140 } }
+                                }
+                            }
+                        }
+                        MouseArea {
+                            id: toggleArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.sidebarCollapsed = !root.sidebarCollapsed
+                        }
+                    }
 
                     ColumnLayout {
                         Layout.preferredWidth: 360
