@@ -1,5 +1,6 @@
+from core.timeutils import utcnow
 import pytest
-from datetime import datetime, timedelta
+from datetime import timedelta
 from urllib.parse import parse_qs, urlparse
 from utils.csv_exporter import (
     generate_csv_download,
@@ -66,7 +67,7 @@ def test_csv_exporter():
     assert get_csv_temp_download("missing_id") is None
 
     # 4. Test retrieval (expired)
-    csv_store[download_id]["expires_at"] = datetime.utcnow() - timedelta(minutes=1)
+    csv_store[download_id]["expires_at"] = utcnow() - timedelta(minutes=1)
     assert get_csv_temp_download(download_id) is None
     assert download_id not in csv_store
 
@@ -74,7 +75,7 @@ def test_csv_exporter():
     url2 = generate_csv_download(results, 101)
     id2, token2 = _download_parts(url2)
     assert token2
-    csv_store[id2]["expires_at"] = datetime.utcnow() - timedelta(minutes=1)
+    csv_store[id2]["expires_at"] = utcnow() - timedelta(minutes=1)
 
     deleted = cleanup_csv()
     assert deleted == 1
@@ -105,7 +106,7 @@ def test_json_exporter():
     assert get_json_temp_download("missing_id") is None
 
     # 4. Test retrieval (expired)
-    json_store[download_id]["expires_at"] = datetime.utcnow() - timedelta(minutes=1)
+    json_store[download_id]["expires_at"] = utcnow() - timedelta(minutes=1)
     assert get_json_temp_download(download_id) is None
     assert download_id not in json_store
 
@@ -113,7 +114,7 @@ def test_json_exporter():
     url2 = generate_json_download(results, 102)
     id2, token2 = _download_parts(url2)
     assert token2
-    json_store[id2]["expires_at"] = datetime.utcnow() - timedelta(minutes=1)
+    json_store[id2]["expires_at"] = utcnow() - timedelta(minutes=1)
 
     deleted = cleanup_json()
     assert deleted == 1

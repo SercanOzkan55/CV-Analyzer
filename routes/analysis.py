@@ -5,6 +5,7 @@ It intentionally pulls transitional shared symbols from the already-loading
 main module; later passes can move those shared helpers into services.
 """
 
+from core.timeutils import utcnow
 import ipaddress
 import socket
 import urllib.parse
@@ -217,7 +218,7 @@ def analyze(
 
     # reset daily/monthly counters if a new quota day/month has started
     quota_today = _quota_today_date()
-    now_utc = datetime.utcnow()
+    now_utc = utcnow()
     if db_user.last_reset is None or db_user.last_reset.date() < quota_today:
         db_user.daily_usage = 0
         db_user.last_reset = now_utc
@@ -458,7 +459,7 @@ def _record_analysis_task_owner(task_id: str, db_user, db) -> None:
                 existing.user_id = int(getattr(db_user, "id", 0) or 0)
                 existing.organization_id = getattr(db_user, "organization_id", None)
                 existing.task_type = "analysis"
-                existing.expires_at = datetime.utcnow() + timedelta(hours=24)
+                existing.expires_at = utcnow() + timedelta(hours=24)
             else:
                 db.add(
                     AsyncTaskOwner(
@@ -466,7 +467,7 @@ def _record_analysis_task_owner(task_id: str, db_user, db) -> None:
                         task_type="analysis",
                         user_id=int(getattr(db_user, "id", 0) or 0),
                         organization_id=getattr(db_user, "organization_id", None),
-                        expires_at=datetime.utcnow() + timedelta(hours=24),
+                        expires_at=utcnow() + timedelta(hours=24),
                     )
                 )
             db.commit()
@@ -480,7 +481,7 @@ def _require_analysis_task_owner(task_id: str, db_user, db) -> None:
     try:
         owner_row = db.query(AsyncTaskOwner).filter(AsyncTaskOwner.task_id == str(task_id)).first()
         if owner_row:
-            if owner_row.expires_at and owner_row.expires_at < datetime.utcnow():
+            if owner_row.expires_at and owner_row.expires_at < utcnow():
                 raise HTTPException(status_code=404, detail="Analysis job not found")
             owner = {
                 "user_id": int(owner_row.user_id or 0),
@@ -587,7 +588,7 @@ def analyze_async(
 
     # Daily/monthly quota checks (reuse logic from analyze).
     quota_today = _quota_today_date()
-    now_utc = datetime.utcnow()
+    now_utc = utcnow()
     if db_user.last_reset is None or db_user.last_reset.date() < quota_today:
         db_user.daily_usage = 0
         db_user.last_reset = now_utc
@@ -813,7 +814,7 @@ async def analyze_pdf(
     # reset daily counter if a new day has started
     if db_user.last_reset is None or db_user.last_reset.date() < _quota_today_date():
         db_user.daily_usage = 0
-        db_user.last_reset = datetime.utcnow()
+        db_user.last_reset = utcnow()
 
     # enforce limits: individual users use personal quota; recruiters use org monthly quota
     if db_user.role == "recruiter":
@@ -1144,7 +1145,7 @@ def get_analytics(
     Get analytics data for user's analyses: totals, averages, top jobs.
     """
     from sqlalchemy import func
-    from datetime import datetime, timedelta
+    from datetime import timedelta
 
     supabase_id = user.get("user_id")
     email = user.get("email")
@@ -1169,7 +1170,7 @@ def get_analytics(
     top_jobs = [{"job_title": jt, "count": c} for jt, c in top_jobs]
 
     # Analyses in last 30 days
-    cutoff = datetime.utcnow() - timedelta(days=30)
+    cutoff = utcnow() - timedelta(days=30)
     recent_count = db.query(Analysis).filter(Analysis.user_id == db_user.id, Analysis.created_at >= cutoff).count()
 
     return {
@@ -1197,7 +1198,7 @@ def get_analysis_trends(
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
 
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = utcnow() - timedelta(days=days)
     rows = (
         db.query(
             func.date(Analysis.created_at).label("day"),
@@ -1378,7 +1379,7 @@ def get_usage_history(
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
 
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = utcnow() - timedelta(days=days)
     rows = (
         db.query(UsageDaily)
         .filter(UsageDaily.user_id == db_user.id, UsageDaily.date >= cutoff)

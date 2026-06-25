@@ -4,10 +4,10 @@ Extracted from ``main.py`` to reduce monolith size.
 """
 
 from __future__ import annotations
+from core.timeutils import utcnow
 
 import logging
 import os
-from datetime import datetime
 
 from fastapi import HTTPException
 from sqlalchemy import func
@@ -15,10 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from models import Analysis, Organization, User
 from core.quota import (
-    _normalize_plan,
     _is_premium_plan,
-    _is_admin_user,
-    _resolve_effective_plan,
 )
 
 logger = logging.getLogger("app.user")
@@ -190,7 +187,7 @@ def _ensure_not_expired(user_payload: dict):
         exp_ts = int(exp)
     except (TypeError, ValueError):
         return
-    if exp_ts <= int(datetime.utcnow().timestamp()):
+    if exp_ts <= int(utcnow().timestamp()):
         raise HTTPException(status_code=401, detail="Token expired")
 
 

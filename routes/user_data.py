@@ -5,6 +5,7 @@ It intentionally pulls transitional shared symbols from the already-loading
 main module; later passes can move those shared helpers into services.
 """
 
+from core.timeutils import utcnow
 from fastapi import APIRouter
 from core.runtime_bridge import main_module as _main_module
 from core.route_dependencies import *  # noqa: F403
@@ -471,7 +472,7 @@ def export_my_data(
         )
 
     payload = {
-        "exported_at": datetime.utcnow().isoformat() + "Z",
+        "exported_at": utcnow().isoformat() + "Z",
         "include_raw": bool(include_raw),
         "user": {
             "id": db_user.id,
@@ -720,7 +721,7 @@ def delete_my_data(
 def _purge_expired_cv_versions(db, days: int, limit: int, dry_run: bool = True) -> dict:
     days = max(1, min(int(days), 3650))
     limit = max(1, min(int(limit), 1000))
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = utcnow() - timedelta(days=days)
     rows = (
         db.query(CVVersion)
         .filter(CVVersion.created_at < cutoff)
@@ -836,7 +837,7 @@ def _reminder_type_label(value: str) -> str:
 
 
 def _serialize_reminder(reminder: Reminder) -> dict:
-    now = datetime.utcnow()
+    now = utcnow()
     delta = reminder.event_date - now if reminder.event_date else timedelta()
     hours_left = max(0, int(delta.total_seconds() // 3600))
     days_left = max(0, int((delta.total_seconds() + 86399) // 86400))
@@ -886,7 +887,7 @@ def create_user_reminder(
         raise HTTPException(status_code=400, detail="Title too long")
 
     event_date = _normalize_reminder_datetime(body.event_date)
-    if event_date <= datetime.utcnow():
+    if event_date <= utcnow():
         raise HTTPException(status_code=400, detail="Event date must be in the future")
 
     target_email = _validate_reminder_email(body.target_email or db_user.email or "")
@@ -929,7 +930,7 @@ def update_user_reminder(
         reminder.reminder_type = (body.reminder_type or "other").strip()[:40]
     if body.event_date is not None:
         event_date = _normalize_reminder_datetime(body.event_date)
-        if event_date <= datetime.utcnow():
+        if event_date <= utcnow():
             raise HTTPException(status_code=400, detail="Event date must be in the future")
         reminder.event_date = event_date
         reminder.notified_3d_at = None
@@ -966,7 +967,7 @@ def send_user_reminder_test(
 ):
     db_user = _get_current_db_user(user, db)
     reminder = _get_user_reminder_or_404(db, db_user, reminder_id)
-    delta = reminder.event_date - datetime.utcnow()
+    delta = reminder.event_date - utcnow()
     days_left = max(1, int((delta.total_seconds() + 86399) // 86400))
     if not _send_reminder_email(reminder, days_left, reminder.target_email):
         raise HTTPException(

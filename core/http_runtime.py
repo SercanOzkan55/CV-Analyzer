@@ -1,4 +1,5 @@
 from __future__ import annotations
+from core.timeutils import utcnow
 
 import hashlib
 import hmac
@@ -8,7 +9,6 @@ import os
 import threading as _threading
 import time
 import uuid
-from datetime import datetime
 from time import time as current_time
 
 from fastapi import Depends, HTTPException, Request
@@ -445,7 +445,7 @@ def audit_log(event_type: str, **fields):
     try:
         payload = {
             "event_type": event_type,
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": utcnow().isoformat() + "Z",
             **redact_mapping(fields),
         }
         audit_logger.info("%s", json.dumps(payload, ensure_ascii=False))
@@ -457,7 +457,7 @@ def track_event(event_name: str, **fields):
     try:
         payload = {
             "event_name": event_name,
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": utcnow().isoformat() + "Z",
             **fields,
         }
         audit_log("product_event", **payload)

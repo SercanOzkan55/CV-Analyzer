@@ -1,3 +1,4 @@
+from core.timeutils import utcnow
 from datetime import datetime
 import hashlib
 import os
@@ -742,7 +743,7 @@ def owner_soft_delete_candidate_action(
     )
     if not row:
         raise HTTPException(status_code=404, detail="Candidate action not found")
-    row.deleted_at = datetime.utcnow()
+    row.deleted_at = utcnow()
     db.flush()
     audit = create_audit_log(
         db,
@@ -800,7 +801,7 @@ def owner_anonymize_candidate_action(
     row.cv_file_key = None
     row.cv_file_name = None
     row.cv_file_type = None
-    row.anonymized_at = datetime.utcnow()
+    row.anonymized_at = utcnow()
     db.flush()
     create_audit_log(
         db,

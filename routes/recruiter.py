@@ -1,13 +1,14 @@
+from core.timeutils import utcnow
 import json
 import logging
 import os
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import or_, select, text
+from sqlalchemy import select, text
 
 from auth import verify_supabase_jwt
 from config.aws import MAX_UPLOAD_BYTES
@@ -33,7 +34,6 @@ from services.recruiter_service import (
     delete_email_template as _rc_del_tpl,
     get_email_template as _rc_get_tpl,
     get_email_templates as _rc_get_tpls,
-    get_jobs as _rc_get_jobs,
     get_actions_for_job as _rc_get_actions,
     mark_email_sent as _rc_mark_sent,
     rank_candidates as _rc_rank,
@@ -54,7 +54,6 @@ from services.recruiter_helpers import (
     _MAX_SEARCH_QUERY_LEN,
     _do_send_email,
     _extract_pdf_text,
-    _is_postgres_engine,
     _process_due_reminders,
     _resolve_job_description_text,
     _validate_pdf_upload,
@@ -1838,7 +1837,7 @@ def recruiter_send_email(
             "sent": True,
             "to": candidate_email,
             "subject": rendered["subject"],
-            "timestamp": str(datetime.utcnow()),
+            "timestamp": str(utcnow()),
         }
 
     logger.warning("email_send: provider_returned_false to=%s", candidate_email)
@@ -1946,7 +1945,7 @@ def recruiter_create_reminder(
             status_code=400, detail=f"Invalid event_date format: {e}. Use ISO format (e.g., 2026-05-15T10:00:00)"
         )
 
-    now = datetime.utcnow()
+    now = utcnow()
     if event_date <= now:
         raise HTTPException(status_code=400, detail="Event date must be in the future")
 
@@ -2055,7 +2054,6 @@ async def recruiter_scan_cv(
     Accepts 1-10 images of CV pages, performs OCR text extraction,
     runs the full ATS analysis pipeline, and returns results + downloadable PDF.
     """
-    from fastapi.responses import JSONResponse
 
     _ensure_not_expired(user)
     _main()._metric_request("scan-cv")

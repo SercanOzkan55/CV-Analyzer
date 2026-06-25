@@ -1,3 +1,4 @@
+from core.timeutils import utcnow
 import json
 import logging
 import os
@@ -17,7 +18,6 @@ def _run_pipeline(cv_text, job_description, lang="en"):
 
 try:
     from celery import Celery, Task
-    from celery.exceptions import SoftTimeLimitExceeded
 
     # Prefer Celery only if Redis broker/backend are reachable. If Redis is
     # not available (e.g. in CI), fall back to a synchronous LocalTask so the
@@ -197,11 +197,10 @@ try:
             """Automatically clean up expired claims and restore worker quotas."""
             from database import SessionLocal
             from models import WorkerClaim, WorkerKey, QuotaEvent
-            from datetime import datetime
 
             db = SessionLocal()
             try:
-                now = datetime.utcnow()
+                now = utcnow()
                 expired_claims = (
                     db.query(WorkerClaim)
                     .filter(WorkerClaim.status == "claimed", WorkerClaim.claim_expires_at < now)
@@ -321,11 +320,10 @@ except Exception:
     def _cleanup_expired_claims():
         from database import SessionLocal
         from models import WorkerClaim, WorkerKey, QuotaEvent
-        from datetime import datetime
 
         db = SessionLocal()
         try:
-            now = datetime.utcnow()
+            now = utcnow()
             expired_claims = (
                 db.query(WorkerClaim).filter(WorkerClaim.status == "claimed", WorkerClaim.claim_expires_at < now).all()
             )

@@ -3,11 +3,10 @@ Temporary download endpoints for local processing results.
 Serves CSV/JSON exports with automatic cleanup.
 """
 
-from datetime import datetime
+from core.timeutils import utcnow
 import hashlib
-import io
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import or_
 
@@ -57,7 +56,7 @@ def _require_download_owner(download_data: dict, x_api_key: str | None, db) -> N
 
     if not subscription:
         raise HTTPException(status_code=401, detail="Invalid or inactive API key")
-    if subscription.expires_at and subscription.expires_at < datetime.utcnow():
+    if subscription.expires_at and subscription.expires_at < utcnow():
         raise HTTPException(status_code=401, detail="API key expired")
     if owner_subscription_id and int(subscription.id) != int(owner_subscription_id):
         raise HTTPException(status_code=403, detail="Download access denied")

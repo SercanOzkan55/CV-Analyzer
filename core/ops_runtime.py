@@ -5,6 +5,7 @@ backward-compatible attribute access via ``getattr(main, ...)``.
 """
 
 from __future__ import annotations
+from core.timeutils import utcnow
 
 import gc as _gc
 import ipaddress
@@ -13,7 +14,6 @@ import logging
 import os
 import threading as _threading
 import time
-from datetime import datetime
 
 from core.metrics import (
     _GUARD_REJECT_LOCK,
@@ -271,7 +271,7 @@ def _record_ops_event(kind: str, status: str = "info", **fields) -> None:
     event = {
         "kind": str(kind or "event"),
         "status": str(status or "info"),
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": utcnow().isoformat() + "Z",
         **redact_mapping(fields),
     }
     _push_limited_event(_ops_events, _ops_events_lock, event)
@@ -286,7 +286,7 @@ def _record_security_event(
     event = {
         "kind": str(kind or "security_event"),
         "severity": str(severity or "medium"),
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": utcnow().isoformat() + "Z",
         "path": getattr(getattr(request, "url", None), "path", fields.pop("path", "")),
         "client_ip": _safe_request_ip(request),
         **redact_mapping(fields),
@@ -314,7 +314,7 @@ def _record_ai_usage(
         "output_chars": int(output_chars or 0),
         "estimated_tokens": tokens,
         "estimated_cost_usd": round((tokens / 1000.0) * per_1k, 6),
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": utcnow().isoformat() + "Z",
     }
     _push_limited_event(_ai_usage_events, _ai_usage_events_lock, event)
 
