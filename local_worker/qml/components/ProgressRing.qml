@@ -10,6 +10,9 @@ Item {
     property color tint: Theme.primary
     property int thickness: 10
     property string caption: ""
+    // Font scales with the ring so the value fits small rings (e.g. 56px) and
+    // still reads well on large ones. Callers may override.
+    property int valueFontSize: Math.max(11, Math.round(Math.min(width, height) * 0.26))
 
     implicitWidth: 150
     implicitHeight: 150
@@ -65,7 +68,7 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             text: Math.round(root.animatedValue) + "%"
             color: Theme.textPrimary
-            font.pixelSize: Typography.titleSize
+            font.pixelSize: root.valueFontSize
             font.weight: Typography.weightBlack
         }
         Text {
@@ -73,7 +76,7 @@ Item {
             visible: root.caption.length > 0
             text: root.caption
             color: Theme.textMuted
-            font.pixelSize: Typography.captionSize
+            font.pixelSize: Math.max(9, Math.round(root.valueFontSize * 0.5))
         }
     }
 }
