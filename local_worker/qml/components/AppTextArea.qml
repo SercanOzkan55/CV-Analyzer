@@ -3,6 +3,9 @@ import QtQuick.Controls
 import "../theme"
 
 // Themed multi-line text input with a focus ring and internal scrolling.
+// Uses the Flickable + TextArea.flickable pattern so wrap mode reliably wraps
+// to the viewport width (no horizontal clipping); mono mode keeps the natural
+// width so wide tables can scroll sideways.
 Rectangle {
     id: root
     property alias text: area.text
@@ -19,19 +22,18 @@ Rectangle {
     border.color: area.activeFocus ? Theme.primary : Theme.border
     Behavior on border.color { ColorAnimation { duration: Theme.durHover } }
 
-    ScrollView {
-        id: sv
+    Flickable {
+        id: flick
         anchors.fill: parent
         anchors.margins: 6
         clip: true
-        // In wrap mode the content tracks the viewport so text wraps instead of
-        // scrolling horizontally; in mono mode it keeps its natural width so wide
-        // tables can scroll sideways.
-        contentWidth: root.mono ? area.implicitWidth : availableWidth
+        boundsBehavior: Flickable.StopAtBounds
 
-        TextArea {
+        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+        ScrollBar.horizontal: ScrollBar { policy: root.mono ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
+
+        TextArea.flickable: TextArea {
             id: area
-            width: root.mono ? Math.max(implicitWidth, sv.availableWidth) : sv.availableWidth
             placeholderText: root.placeholder
             placeholderTextColor: Theme.textMuted
             color: Theme.textPrimary
