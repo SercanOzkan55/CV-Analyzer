@@ -1043,6 +1043,27 @@ class LocalWorkerBackend(QObject):
     def averageScoreValue(self):
         return int(round(average_score(self._results_model.rows())))
 
+    @Property("QVariantList", notify=metricsChanged)
+    def compareRows(self):
+        """All current candidates as plain dicts for the Compare page."""
+        out = []
+        for row in self._results_model.rows():
+            out.append(
+                {
+                    "name": candidate_name_from_row(row),
+                    "fileName": Path(row.get("file", "")).name or "Unknown CV",
+                    "email": row.get("email") or "",
+                    "score": int(float(row.get("score") or 0)),
+                    "decision": decision_label(row.get("decision", "")),
+                    "confidence": row.get("confidence", "medium"),
+                    "matched": list_to_text(row.get("matched_skills")),
+                    "missing": list_to_text(row.get("missing_skills")),
+                    "risks": list_to_text(row.get("risk_flags")),
+                    "sync": row.get("sync_status", "offline_ready"),
+                }
+            )
+        return out
+
     @Property(str, notify=metricsChanged)
     def averageScore(self):
         rows = self._results_model.rows()

@@ -104,7 +104,8 @@ ApplicationWindow {
         { title: "Reports", glyph: "reports" },
         { title: "Templates", glyph: "templates" },
         { title: "Settings", glyph: "settings" },
-        { title: "Inbox", glyph: "inbox" }
+        { title: "Inbox", glyph: "inbox" },
+        { title: "Compare", glyph: "compare" }
     ]
 
     function pageTitle() {
@@ -116,6 +117,7 @@ ApplicationWindow {
         if (pageIndex === 5) return "Local Reports"
         if (pageIndex === 6) return "Email Templates"
         if (pageIndex === 8) return "Inbox & Audit"
+        if (pageIndex === 9) return "Compare Candidates"
         return "Worker Settings"
     }
 
@@ -128,6 +130,7 @@ ApplicationWindow {
         if (pageIndex === 5) return "Preview current run output and export local files."
         if (pageIndex === 6) return "Edit local accept/reject message templates and preview variables."
         if (pageIndex === 8) return "Owner notifications and the local decision audit trail."
+        if (pageIndex === 9) return "Compare 2–4 ranked candidates side by side."
         return "Tune local behavior, sync permissions, and desktop preferences."
     }
 
@@ -752,6 +755,10 @@ ApplicationWindow {
                 }
 
                 InboxPage {}
+
+                CompareCandidatesPage {
+                    onRequestPage: (index) => { root.pageIndex = index }
+                }
             }
         }
     }

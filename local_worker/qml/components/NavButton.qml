@@ -92,6 +92,11 @@ Button {
                     ctx.beginPath()
                     ctx.moveTo(3, 11); ctx.lineTo(7, 11); ctx.lineTo(8.5, 14); ctx.lineTo(11.5, 14); ctx.lineTo(13, 11); ctx.lineTo(17, 11)
                     ctx.lineTo(15, 4); ctx.lineTo(5, 4); ctx.closePath(); ctx.stroke()
+                } else if (control.glyph === "compare") {
+                    ctx.beginPath(); ctx.moveTo(3, 16.5); ctx.lineTo(17, 16.5); ctx.stroke()
+                    ctx.beginPath(); ctx.moveTo(6, 16.5); ctx.lineTo(6, 9); ctx.stroke()
+                    ctx.beginPath(); ctx.moveTo(10, 16.5); ctx.lineTo(10, 4); ctx.stroke()
+                    ctx.beginPath(); ctx.moveTo(14, 16.5); ctx.lineTo(14, 11); ctx.stroke()
                 } else {
                     ctx.beginPath(); ctx.arc(10, 10, 3, 0, Math.PI * 2); ctx.stroke()
                     for (var i = 0; i < 8; i++) {
