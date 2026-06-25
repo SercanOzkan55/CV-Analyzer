@@ -35,7 +35,7 @@ Item {
 
             // ── Actions ──
             AppCard {
-                Layout.preferredWidth: 248
+                Layout.preferredWidth: 200
                 Layout.fillHeight: true
                 ColumnLayout {
                     anchors.fill: parent
@@ -97,7 +97,7 @@ Item {
             AppCard {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.minimumWidth: 360
+                Layout.minimumWidth: 380
                 ColumnLayout {
                     anchors.fill: parent
                     spacing: Theme.space3
@@ -154,7 +154,7 @@ Item {
 
             // ── Live preview ──
             AppCard {
-                Layout.preferredWidth: 384
+                Layout.preferredWidth: 340
                 Layout.fillHeight: true
                 ColumnLayout {
                     anchors.fill: parent

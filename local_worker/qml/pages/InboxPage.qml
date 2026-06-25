@@ -64,7 +64,7 @@ ScrollView {
                 fill: Theme.surfaceElevated; fillHover: Theme.surfaceMuted
                 fillPressed: Theme.surfaceMuted; stroke: Theme.border
                 textColor: Theme.textPrimary
-                onClicked: backend.refreshInbox()
+                onClicked: backend.manualRefreshInbox()
             }
         }
 
