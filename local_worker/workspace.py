@@ -479,6 +479,16 @@ class WorkspaceStore:
             cursor = conn.execute(sql, params)
             return int(cursor.rowcount or 0)
 
+    def delete_notification(self, notification_id: int) -> int:
+        with self._connect() as conn:
+            cursor = conn.execute("DELETE FROM notifications WHERE id = ?", (int(notification_id),))
+            return int(cursor.rowcount or 0)
+
+    def clear_all_notifications(self) -> int:
+        with self._connect() as conn:
+            cursor = conn.execute("DELETE FROM notifications")
+            return int(cursor.rowcount or 0)
+
     def list_pending_sync_results(self, limit: int = 100) -> list[dict]:
         with self._connect() as conn:
             rows = conn.execute(
