@@ -4,6 +4,7 @@ Extracted from ``main.py`` to reduce monolith size.
 """
 
 from __future__ import annotations
+from core.timeutils import utcnow
 
 import json
 import logging
@@ -339,7 +340,7 @@ def _send_reminder_email(reminder: Reminder, days_left: int, recipient: str) -> 
 
 
 def _process_due_reminders(db):
-    now = datetime.utcnow()
+    now = utcnow()
     today = now.date()
     window_end = datetime.combine(today + timedelta(days=3), datetime.max.time())
     reminders = (

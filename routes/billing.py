@@ -5,6 +5,7 @@ It intentionally pulls transitional shared symbols from the already-loading
 main module; later passes can move those shared helpers into services.
 """
 
+from core.timeutils import utcnow
 from fastapi import APIRouter
 import requests
 
@@ -217,7 +218,7 @@ def _ops_storage_status() -> dict:
 
 def _aggregate_ai_usage(limit: int = 300) -> dict:
     events = _recent_events(_ai_usage_events, limit)
-    today = datetime.utcnow().date().isoformat()
+    today = utcnow().date().isoformat()
     today_events = [event for event in _ai_usage_events if str(event.get("timestamp", "")).startswith(today)]
     by_endpoint: dict[str, dict] = {}
     for event in today_events:
@@ -1049,7 +1050,7 @@ def create_contact_sales_request(
             "requested_plan": plan_type,
             "company_name": company_name,
             "message": message,
-            "created_at": datetime.utcnow().isoformat() + "Z",
+            "created_at": utcnow().isoformat() + "Z",
         }
         try:
             response = requests.post(crm_webhook_url, json=payload, timeout=10)

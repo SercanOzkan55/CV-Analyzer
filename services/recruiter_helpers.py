@@ -1,5 +1,5 @@
+from core.timeutils import utcnow
 import io
-import json
 import logging
 import os
 from datetime import datetime, timedelta
@@ -454,7 +454,7 @@ def _send_reminder_email(reminder: Reminder, days_left: int, recipient: str) -> 
 
 
 def _process_due_reminders(db):
-    now = datetime.utcnow()
+    now = utcnow()
     today = now.date()
     window_end = datetime.combine(today + timedelta(days=3), datetime.max.time())
     reminders = (
@@ -499,5 +499,5 @@ def _ensure_not_expired(user_payload: dict):
         exp_ts = int(exp)
     except (TypeError, ValueError):
         return
-    if exp_ts <= int(datetime.utcnow().timestamp()):
+    if exp_ts <= int(utcnow().timestamp()):
         raise HTTPException(status_code=401, detail="Token expired")

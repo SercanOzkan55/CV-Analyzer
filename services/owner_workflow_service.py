@@ -1,6 +1,6 @@
 from __future__ import annotations
+from core.timeutils import utcnow
 
-from datetime import datetime
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -354,4 +354,4 @@ def record_candidate_status_event(
 
 def mark_notification_read(notification: Notification) -> None:
     notification.is_read = True
-    notification.read_at = datetime.utcnow()
+    notification.read_at = utcnow()

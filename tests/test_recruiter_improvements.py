@@ -3,12 +3,12 @@ Tests for improved recruiter endpoints with validation, error handling, and prop
 Covers: search endpoint, email validation, reminders, batch upload validation, and response formats.
 """
 
-from datetime import datetime, timedelta
-import json
+from core.timeutils import utcnow
+from datetime import timedelta
 import pytest
 from auth import verify_supabase_jwt
 import main as main_module
-from models import AuditLog, Candidate, Organization, User, Reminder, CandidateAction, Notification, RecruiterJob
+from models import AuditLog, Candidate, Organization, User, CandidateAction, Notification, RecruiterJob
 
 
 @pytest.fixture(autouse=True)
@@ -437,7 +437,7 @@ def test_reminders_requires_future_date(client, db_session):
     }
 
     # Past date
-    past_date = (datetime.utcnow() - timedelta(days=1)).isoformat()
+    past_date = (utcnow() - timedelta(days=1)).isoformat()
     resp = client.post(
         "/api/v1/recruiter/reminders",
         json={
@@ -459,7 +459,7 @@ def test_reminders_requires_title(client, db_session):
         "email": recruiter.email,
     }
 
-    future_date = (datetime.utcnow() + timedelta(days=1)).isoformat()
+    future_date = (utcnow() + timedelta(days=1)).isoformat()
 
     # Empty title
     resp = client.post(

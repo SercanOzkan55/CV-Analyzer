@@ -4,11 +4,11 @@ Extracted from ``main.py`` to reduce monolith size.
 """
 
 from __future__ import annotations
+from core.timeutils import utcnow
 
 import json
 import logging
 import os
-import threading as _threading
 import time
 from datetime import datetime, timedelta
 
@@ -17,11 +17,9 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from core.metrics import _metric_quota_hit, _metric_error
 from core.ops_runtime import (
-    _audit_event,
     _record_ai_usage,
     _record_ops_event,
 )
-from security.redaction import redact_for_log
 
 try:
     from zoneinfo import ZoneInfo
@@ -38,11 +36,11 @@ _QUOTA_RESET_TIMEZONE = (
 
 def _quota_now() -> datetime:
     if ZoneInfo is None:
-        return datetime.utcnow()
+        return utcnow()
     try:
         return datetime.now(ZoneInfo(_QUOTA_RESET_TIMEZONE))
     except Exception:
-        return datetime.utcnow()
+        return utcnow()
 
 
 def _quota_today_date():
@@ -442,7 +440,6 @@ def _check_cost_guard(scope: str, limit: int) -> None:
 # ── Billable usage ───────────────────────────────────────────────────────
 def _consume_billable_usage(db, db_user, endpoint: str, response=None):
     """Consume one dashboard-visible daily usage unit for billable actions."""
-    from models import User, Organization
 
     if db_user is None:
         return None
@@ -452,7 +449,7 @@ def _consume_billable_usage(db, db_user, endpoint: str, response=None):
         return None
 
     quota_today = _quota_today_date()
-    now_utc = datetime.utcnow()
+    now_utc = utcnow()
     try:
         if db_user.last_reset is None or db_user.last_reset.date() < quota_today:
             db_user.daily_usage = 0
@@ -536,7 +533,7 @@ def _record_usage_daily(db, user_id: int):
     try:
         from models import UsageDaily
 
-        today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today = utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         row = db.query(UsageDaily).filter(UsageDaily.user_id == user_id, UsageDaily.date == today).first()
         if row:
             row.count = (row.count or 0) + 1

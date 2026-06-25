@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+from core.timeutils import utcnow
+from datetime import timedelta
 import io
 import zipfile
 
@@ -236,7 +237,7 @@ def test_worker_auth_success_fail_revoked_and_expired(client, db_session, recrui
     expired = _create_worker_key(
         client,
         job_id=test_job.id,
-        expires_at=datetime.utcnow() - timedelta(minutes=1),
+        expires_at=utcnow() - timedelta(minutes=1),
     )
     assert client.post("/api/worker/auth", json={"api_key": expired["api_key"]}).status_code == 401
 
@@ -385,7 +386,7 @@ def test_expired_claim_submit_refunds_and_rejects(client, db_session, recruiter_
     item = _claim_one(client, headers, test_job.id)
 
     claim = db_session.query(WorkerClaim).filter_by(id=item["claim_id"]).one()
-    claim.claim_expires_at = datetime.utcnow() - timedelta(minutes=1)
+    claim.claim_expires_at = utcnow() - timedelta(minutes=1)
     db_session.commit()
 
     response = _submit_result(client, headers, test_job.id, item)
@@ -420,7 +421,7 @@ def test_revoked_session_cannot_submit_result(client, db_session, recruiter_user
     item = _claim_one(client, headers, test_job.id)
 
     session = db_session.query(WorkerSession).filter_by(worker_key_id=created["id"]).one()
-    session.revoked_at = datetime.utcnow()
+    session.revoked_at = utcnow()
     db_session.commit()
 
     response = _submit_result(client, headers, test_job.id, item)
@@ -470,7 +471,7 @@ def test_expired_claim_refund_runs_on_next_claim(client, db_session, recruiter_u
     item = _claim_one(client, headers, test_job.id)
 
     claim = db_session.query(WorkerClaim).filter_by(id=item["claim_id"]).one()
-    claim.claim_expires_at = datetime.utcnow() - timedelta(minutes=1)
+    claim.claim_expires_at = utcnow() - timedelta(minutes=1)
     db_session.commit()
 
     response = client.post(f"/api/worker/jobs/{test_job.id}/claim", headers=headers, json={"limit": 1})

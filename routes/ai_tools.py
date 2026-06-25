@@ -5,6 +5,7 @@ It intentionally pulls transitional shared symbols from the already-loading
 main module; later passes can move those shared helpers into services.
 """
 
+from core.timeutils import utcnow
 from fastapi import APIRouter
 from core.runtime_bridge import main_module as _main_module
 from core.route_dependencies import *  # noqa: F403
@@ -709,7 +710,7 @@ def submit_feedback(
     db_user = get_or_create_user(db, supabase_id, email)
 
     payload = {
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": utcnow().isoformat() + "Z",
         "user_id": str(db_user.id) if getattr(db_user, "id", None) is not None else None,
         "supabase_id": supabase_id,
         "email": email,
