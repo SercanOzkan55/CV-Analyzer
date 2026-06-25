@@ -102,28 +102,12 @@ ScrollView {
                 value: backend.syncLastSyncedCount
                 tint: Theme.secondary
             }
-            // Quota can be "-" when disconnected, so it is not a count-up StatCard.
-            AppCard {
+            // Quota can be "-" when disconnected, so it is shown verbatim.
+            StatCard {
                 Layout.fillWidth: true
-                pad: Theme.space4
-                Layout.preferredHeight: 116
-                hoverable: true
-                ColumnLayout {
-                    anchors.fill: parent
-                    spacing: Theme.space2
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Text { Layout.fillWidth: true; text: "Quota"; color: Theme.textSecondary; font.pixelSize: Typography.labelSize; font.weight: Typography.weightMedium }
-                        Rectangle { width: 9; height: 9; radius: 4.5; color: Theme.success; Layout.alignment: Qt.AlignTop }
-                    }
-                    Text {
-                        text: backend.syncConnected ? backend.syncQuotaRemaining : "—"
-                        color: Theme.textPrimary
-                        font.pixelSize: Typography.displaySize
-                        font.weight: Typography.weightBlack
-                    }
-                    Text { text: "Remaining scans"; color: Theme.textMuted; font.pixelSize: Typography.captionSize }
-                }
+                label: "Quota"
+                displayText: backend.syncConnected ? String(backend.syncQuotaRemaining) : "—"
+                tint: Theme.success
             }
         }
 

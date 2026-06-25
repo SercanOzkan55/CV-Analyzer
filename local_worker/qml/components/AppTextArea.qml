@@ -20,12 +20,18 @@ Rectangle {
     Behavior on border.color { ColorAnimation { duration: Theme.durHover } }
 
     ScrollView {
+        id: sv
         anchors.fill: parent
         anchors.margins: 6
         clip: true
+        // In wrap mode the content tracks the viewport so text wraps instead of
+        // scrolling horizontally; in mono mode it keeps its natural width so wide
+        // tables can scroll sideways.
+        contentWidth: root.mono ? area.implicitWidth : availableWidth
 
         TextArea {
             id: area
+            width: root.mono ? Math.max(implicitWidth, sv.availableWidth) : sv.availableWidth
             placeholderText: root.placeholder
             placeholderTextColor: Theme.textMuted
             color: Theme.textPrimary

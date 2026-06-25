@@ -1,92 +1,61 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../theme"
+import "../components"
 
-// Inbox & Audit page — surfaces owner notifications and the local audit trail
-// that the worker already writes to the SQLite workspace. Theme colors are
-// passed in by Main.qml; data comes from the global `backend` context object.
+// Inbox & Audit — owner notifications + the local decision audit trail the
+// worker writes to the SQLite workspace. The shell already renders the page
+// title/subtitle, so this page leads with the action bar (no duplicate header).
+// All data comes from the global `backend` context object; stays on device.
 ScrollView {
-    id: inboxPage
+    id: page
     clip: true
 
-    // ── Theme (bound from Main.qml) ──
-    property int pageMargin: 28
-    property int maxWidth: 1100
-    property color surface: "#101624"
-    property color surfaceAlt: "#151b2e"
-    property color border: "#27314a"
-    property color textColor: "#f5f7ff"
-    property color textMuted: "#a6b0cf"
-    property color subtle: "#66708f"
-    property color primary: "#7c5cff"
-    property color success: "#22c55e"
-    property color warning: "#f59e0b"
-    property color danger: "#ef4444"
+    readonly property int gutter: Theme.space6
+    readonly property int maxWidth: 1100
+    function contentW() { return Math.max(0, Math.min(availableWidth - gutter * 2, maxWidth)) }
 
-    function availableContentWidth() {
-        return Math.max(0, Math.min(availableWidth - pageMargin * 2, maxWidth))
-    }
-
-    function typeColor(t) {
-        if (t === "accepted" || t === "success") return success
-        if (t === "rejected" || t === "error") return danger
-        if (t === "needs_manual_review" || t === "warning") return warning
-        return primary
+    function typeTint(t) {
+        if (t === "accepted" || t === "success") return Theme.success
+        if (t === "rejected" || t === "error") return Theme.danger
+        if (t === "needs_manual_review" || t === "warning") return Theme.warning
+        return Theme.primary
     }
 
     Component.onCompleted: backend.refreshInbox()
 
     ColumnLayout {
-        x: Math.max(inboxPage.pageMargin, (inboxPage.availableWidth - inboxPage.availableContentWidth()) / 2)
-        y: 28
-        width: inboxPage.availableContentWidth()
-        spacing: 16
+        x: Math.max(page.gutter, (page.availableWidth - page.contentW()) / 2)
+        y: page.gutter
+        width: page.contentW()
+        spacing: Theme.space4
 
-        // ── Header ──
+        // ── Action bar ──
         RowLayout {
             Layout.fillWidth: true
-            spacing: 12
+            spacing: Theme.space2
 
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 2
-                Text {
-                    text: "Inbox & Audit"
-                    color: inboxPage.textColor
-                    font.pixelSize: 22
-                    font.bold: true
-                }
-                Text {
-                    text: "Owner notifications and the local decision audit trail. Stays on this device."
-                    color: inboxPage.textMuted
-                    font.pixelSize: 13
-                }
-            }
-
-            Rectangle {
+            AppBadge {
                 visible: backend.unreadNotificationCount > 0
-                radius: 11
-                color: inboxPage.danger
-                implicitHeight: 22
-                implicitWidth: Math.max(22, unreadLabel.implicitWidth + 16)
-                Text {
-                    id: unreadLabel
-                    anchors.centerIn: parent
-                    text: backend.unreadNotificationCount + " new"
-                    color: "#ffffff"
-                    font.pixelSize: 12
-                    font.bold: true
-                }
+                text: backend.unreadNotificationCount + " new"
+                tint: Theme.danger
             }
+            Item { Layout.fillWidth: true }
 
-            Button {
+            AppButton {
                 text: "Mark all read"
                 enabled: backend.unreadNotificationCount > 0
+                fill: Theme.surfaceElevated; fillHover: Theme.surfaceMuted
+                fillPressed: Theme.surfaceMuted; stroke: Theme.border
+                textColor: Theme.textPrimary
                 onClicked: backend.markAllNotificationsRead()
             }
-
-            Button {
+            AppButton {
                 text: "Refresh"
+                fill: Theme.surfaceElevated; fillHover: Theme.surfaceMuted
+                fillPressed: Theme.surfaceMuted; stroke: Theme.border
+                textColor: Theme.textPrimary
                 onClicked: backend.refreshInbox()
             }
         }
@@ -94,30 +63,30 @@ ScrollView {
         // ── Notifications ──
         Text {
             text: "Notifications (" + backend.notificationCount + ")"
-            color: inboxPage.textColor
-            font.pixelSize: 15
-            font.bold: true
-            Layout.topMargin: 4
+            color: Theme.textPrimary
+            font.pixelSize: Typography.subheadingSize
+            font.weight: Typography.weightSemiBold
+            Layout.topMargin: 2
         }
 
-        Rectangle {
+        AppCard {
             Layout.fillWidth: true
             visible: backend.notificationCount === 0
-            radius: 12
-            color: inboxPage.surface
-            border.color: inboxPage.border
-            implicitHeight: 70
+            Layout.preferredHeight: 88
             Text {
                 anchors.centerIn: parent
+                width: parent.width - Theme.space5 * 2
+                horizontalAlignment: Text.AlignHCenter
                 text: "No notifications yet. Run a local analysis to generate candidate decisions."
-                color: inboxPage.subtle
-                font.pixelSize: 13
+                color: Theme.textMuted
+                font.pixelSize: Typography.labelSize
+                wrapMode: Text.WordWrap
             }
         }
 
         Repeater {
             model: backend.notificationsModel
-            delegate: Rectangle {
+            delegate: AppCard {
                 id: notifCard
                 required property int index
                 required property string title
@@ -128,11 +97,11 @@ ScrollView {
                 required property string createdAt
 
                 Layout.fillWidth: true
-                radius: 12
-                color: isRead ? inboxPage.surface : inboxPage.surfaceAlt
-                border.color: isRead ? inboxPage.border : inboxPage.typeColor(type)
+                pad: Theme.space4
+                Layout.preferredHeight: notifRow.implicitHeight + notifCard.pad * 2
+                color: isRead ? Theme.surface : Theme.surfaceElevated
+                border.color: isRead ? Theme.border : page.typeTint(type)
                 border.width: isRead ? 1 : 2
-                implicitHeight: notifCol.implicitHeight + 24
 
                 // Staggered entrance
                 opacity: 0
@@ -153,43 +122,40 @@ ScrollView {
                 }
 
                 RowLayout {
-                    anchors.fill: parent
-                    anchors.margins: 12
-                    spacing: 12
+                    id: notifRow
+                    width: parent.width
+                    spacing: Theme.space3
 
                     Rectangle {
                         Layout.alignment: Qt.AlignTop
-                        width: 10
-                        height: 10
-                        radius: 5
-                        color: inboxPage.typeColor(type)
-                        opacity: isRead ? 0.35 : 1.0
+                        Layout.topMargin: 3
+                        width: 10; height: 10; radius: 5
+                        color: page.typeTint(notifCard.type)
+                        opacity: notifCard.isRead ? 0.35 : 1.0
                     }
-
                     ColumnLayout {
-                        id: notifCol
                         Layout.fillWidth: true
                         spacing: 3
                         Text {
                             Layout.fillWidth: true
-                            text: title || "Notification"
-                            color: inboxPage.textColor
-                            font.pixelSize: 14
-                            font.bold: !isRead
+                            text: notifCard.title || "Notification"
+                            color: Theme.textPrimary
+                            font.pixelSize: Typography.labelSize
+                            font.weight: notifCard.isRead ? Typography.weightMedium : Typography.weightBold
                             wrapMode: Text.WordWrap
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: message
-                            color: inboxPage.textMuted
-                            font.pixelSize: 13
+                            visible: notifCard.message.length > 0
+                            text: notifCard.message
+                            color: Theme.textSecondary
+                            font.pixelSize: Typography.captionSize
                             wrapMode: Text.WordWrap
-                            visible: message.length > 0
                         }
                         Text {
-                            text: (candidateName ? candidateName + "  •  " : "") + createdAt
-                            color: inboxPage.subtle
-                            font.pixelSize: 11
+                            text: (notifCard.candidateName ? notifCard.candidateName + "  ·  " : "") + notifCard.createdAt
+                            color: Theme.textMuted
+                            font.pixelSize: Typography.captionSize
                         }
                     }
                 }
@@ -199,30 +165,27 @@ ScrollView {
         // ── Audit log ──
         Text {
             text: "Audit log (" + backend.auditCount + ")"
-            color: inboxPage.textColor
-            font.pixelSize: 15
-            font.bold: true
-            Layout.topMargin: 10
+            color: Theme.textPrimary
+            font.pixelSize: Typography.subheadingSize
+            font.weight: Typography.weightSemiBold
+            Layout.topMargin: Theme.space2
         }
 
-        Rectangle {
+        AppCard {
             Layout.fillWidth: true
             visible: backend.auditCount === 0
-            radius: 12
-            color: inboxPage.surface
-            border.color: inboxPage.border
-            implicitHeight: 70
+            Layout.preferredHeight: 88
             Text {
                 anchors.centerIn: parent
                 text: "No audit entries yet."
-                color: inboxPage.subtle
-                font.pixelSize: 13
+                color: Theme.textMuted
+                font.pixelSize: Typography.labelSize
             }
         }
 
         Repeater {
             model: backend.auditModel
-            delegate: Rectangle {
+            delegate: AppCard {
                 id: auditCard
                 required property int index
                 required property string action
@@ -232,10 +195,8 @@ ScrollView {
                 required property string createdAt
 
                 Layout.fillWidth: true
-                radius: 10
-                color: inboxPage.surface
-                border.color: inboxPage.border
-                implicitHeight: auditCol.implicitHeight + 20
+                pad: Theme.space4
+                Layout.preferredHeight: auditRow.implicitHeight + auditCard.pad * 2
 
                 // Staggered entrance
                 opacity: 0
@@ -256,57 +217,44 @@ ScrollView {
                 }
 
                 RowLayout {
-                    anchors.fill: parent
-                    anchors.margins: 11
-                    spacing: 12
+                    id: auditRow
+                    width: parent.width
+                    spacing: Theme.space3
 
                     ColumnLayout {
-                        id: auditCol
                         Layout.fillWidth: true
                         spacing: 2
                         Text {
                             Layout.fillWidth: true
-                            text: action + (module ? "  •  " + module : "")
-                            color: inboxPage.textColor
-                            font.pixelSize: 13
-                            font.bold: true
+                            text: auditCard.action + (auditCard.module ? "  ·  " + auditCard.module : "")
+                            color: Theme.textPrimary
+                            font.pixelSize: Typography.labelSize
+                            font.weight: Typography.weightSemiBold
                             wrapMode: Text.WordWrap
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: description
-                            color: inboxPage.textMuted
-                            font.pixelSize: 12
+                            visible: auditCard.description.length > 0
+                            text: auditCard.description
+                            color: Theme.textSecondary
+                            font.pixelSize: Typography.captionSize
                             wrapMode: Text.WordWrap
-                            visible: description.length > 0
                         }
                         Text {
-                            text: createdAt
-                            color: inboxPage.subtle
-                            font.pixelSize: 11
+                            text: auditCard.createdAt
+                            color: Theme.textMuted
+                            font.pixelSize: Typography.captionSize
                         }
                     }
-
-                    Rectangle {
+                    StatusBadge {
                         Layout.alignment: Qt.AlignVCenter
-                        visible: status.length > 0
-                        radius: 9
-                        color: status === "success" ? inboxPage.success : (status === "error" ? inboxPage.danger : inboxPage.subtle)
-                        implicitHeight: 18
-                        implicitWidth: statusLabel.implicitWidth + 14
-                        Text {
-                            id: statusLabel
-                            anchors.centerIn: parent
-                            text: status
-                            color: "#ffffff"
-                            font.pixelSize: 10
-                            font.bold: true
-                        }
+                        visible: auditCard.status.length > 0
+                        status: auditCard.status
                     }
                 }
             }
         }
 
-        Item { Layout.preferredHeight: 24 }
+        Item { Layout.preferredHeight: Theme.space5 }
     }
 }

@@ -9,6 +9,9 @@ AppCard {
     property string label: ""
     property real value: 0
     property string suffix: ""
+    // When set, shown verbatim instead of the count-up number (for non-numeric
+    // values like "—" or formatted strings).
+    property string displayText: ""
     property string delta: ""
     property bool deltaPositive: true
     property color tint: Theme.primary
@@ -49,10 +52,12 @@ AppCard {
         }
 
         Text {
-            text: Math.round(root.animatedValue) + root.suffix
+            text: root.displayText.length > 0 ? root.displayText : Math.round(root.animatedValue) + root.suffix
             color: Theme.textPrimary
             font.pixelSize: Typography.displaySize
             font.weight: Typography.weightBlack
+            elide: Text.ElideRight
+            Layout.fillWidth: true
         }
 
         Text {
