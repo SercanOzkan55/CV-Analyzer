@@ -46,28 +46,12 @@ ScrollView {
             rowSpacing: Theme.space4
 
             StatCard { Layout.fillWidth: true; label: "Candidates"; value: backend.totalCandidates; tint: Theme.info }
-            // Average is a formatted string ("-" when no run), so not a count-up card.
-            AppCard {
+            // Average is a formatted string ("-" when no run), so shown verbatim.
+            StatCard {
                 Layout.fillWidth: true
-                pad: Theme.space4
-                Layout.preferredHeight: 116
-                hoverable: true
-                ColumnLayout {
-                    anchors.fill: parent
-                    spacing: Theme.space2
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Text { Layout.fillWidth: true; text: "Average score"; color: Theme.textSecondary; font.pixelSize: Typography.labelSize; font.weight: Typography.weightMedium; elide: Text.ElideRight }
-                        Rectangle { width: 9; height: 9; radius: 4.5; color: Theme.secondary; Layout.alignment: Qt.AlignTop }
-                    }
-                    Text {
-                        text: backend.averageScoreValue > 0 ? backend.averageScore : "—"
-                        color: Theme.textPrimary
-                        font.pixelSize: Typography.displaySize
-                        font.weight: Typography.weightBlack
-                    }
-                    Text { text: "Current run"; color: Theme.textMuted; font.pixelSize: Typography.captionSize }
-                }
+                label: "Average score"
+                displayText: backend.averageScoreValue > 0 ? backend.averageScore : "—"
+                tint: Theme.secondary
             }
             StatCard { Layout.fillWidth: true; label: "Shortlisted"; value: backend.shortlistedCount; tint: Theme.success }
             StatCard { Layout.fillWidth: true; label: "Review"; value: backend.reviewCount; tint: Theme.warning }
@@ -164,7 +148,7 @@ ScrollView {
         AppCard {
             id: previewCard
             Layout.fillWidth: true
-            Layout.preferredHeight: 460
+            Layout.preferredHeight: page.hasReport ? 460 : 300
             ColumnLayout {
                 anchors.fill: parent
                 spacing: Theme.space4
@@ -199,15 +183,18 @@ ScrollView {
                     text: backend.reportPreview
                 }
 
-                EmptyState {
+                Item {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.alignment: Qt.AlignCenter
                     visible: !page.hasReport
-                    title: "No report yet"
-                    message: "Run a local analysis to generate CSV, JSON, an HTML report and a sync manifest. They will appear here and in your output folder."
-                    actionText: "Start analysis"
-                    onActionTriggered: page.requestPage(1)
+                    EmptyState {
+                        anchors.centerIn: parent
+                        width: Math.min(parent.width, 460)
+                        title: "No report yet"
+                        message: "Run a local analysis to generate CSV, JSON, an HTML report and a sync manifest. They will appear here and in your output folder."
+                        actionText: "Start analysis"
+                        onActionTriggered: page.requestPage(1)
+                    }
                 }
             }
         }

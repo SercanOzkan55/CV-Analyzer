@@ -57,12 +57,16 @@ Item {
         }
 
         // ── Empty state (no run yet) ──
-        EmptyState {
+        Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             visible: !page.hasData
-            title: "No results yet"
-            message: "Run a local analysis from the Analyze tab to rank candidates here."
+            EmptyState {
+                anchors.centerIn: parent
+                width: Math.min(parent.width, 420)
+                title: "No results yet"
+                message: "Run a local analysis from the Analyze tab to rank candidates here."
+            }
         }
 
         // ── Master / detail ──

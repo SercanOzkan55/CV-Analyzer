@@ -709,20 +709,7 @@ ApplicationWindow {
                     onRequestPage: (index) => { root.pageIndex = index }
                 }
 
-                InboxPage {
-                    pageMargin: root.contentMargin
-                    maxWidth: root.contentMaxWidth
-                    surface: root.themeCard
-                    surfaceAlt: root.themeCardAlt
-                    border: root.themeBorder
-                    textColor: root.themeText
-                    textMuted: root.themeText2
-                    subtle: root.themeMuted
-                    primary: root.themePrimary
-                    success: root.themeSuccess
-                    warning: root.themeWarning
-                    danger: root.themeDanger
-                }
+                InboxPage {}
             }
         }
     }
