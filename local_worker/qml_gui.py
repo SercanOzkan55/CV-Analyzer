@@ -1429,9 +1429,11 @@ class LocalWorkerBackend(QObject):
 
     @Slot()
     def refreshHistory(self):
-        self._history_model.set_rows(self.store.list_runs(limit=12))
+        rows = self.store.list_runs(limit=12)
+        self._history_model.set_rows(rows)
         self.metricsChanged.emit()
         self.syncChanged.emit()
+        self.toast.emit(f"History refreshed — {len(rows)} run(s).", "info")
 
     @Slot()
     def refreshInbox(self):
@@ -1442,6 +1444,11 @@ class LocalWorkerBackend(QObject):
         except Exception as exc:
             logger.warning("refreshInbox failed: %s", exc)
         self.inboxChanged.emit()
+
+    @Slot()
+    def manualRefreshInbox(self):
+        self.refreshInbox()
+        self.toast.emit(f"Inbox refreshed — {self.notificationCount} notification(s).", "info")
 
     @Slot()
     def markAllNotificationsRead(self):
@@ -1474,8 +1481,10 @@ class LocalWorkerBackend(QObject):
 
     @Slot()
     def refreshSyncQueue(self):
-        self._sync_detail = f"{self.syncPendingCount} local result(s) ready for Website sync."
+        count = self.syncPendingCount
+        self._sync_detail = f"{count} local result(s) ready for Website sync."
         self.syncChanged.emit()
+        self.toast.emit(f"Sync queue refreshed — {count} pending.", "info")
 
     @Slot()
     def saveWorkerKey(self):
