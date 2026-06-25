@@ -14,6 +14,7 @@ Button {
     property color hoverBg: "#111827"
     property color activeIcon: "#a78bfa"
     property color mutedIcon: "#8e9abf"
+    readonly property bool motionOn: typeof backend === "undefined" || backend.motionEnabled
     signal navClicked()
 
     height: 44
@@ -21,8 +22,9 @@ Button {
     hoverEnabled: true
     onClicked: navClicked()
 
-    scale: down ? 0.985 : (hovered ? 1.02 : 1)
-    Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+    // Press contracts the whole item ("kapanma"); hover lifts it slightly.
+    scale: down ? 0.95 : (hovered ? 1.015 : 1)
+    Behavior on scale { NumberAnimation { duration: down ? 110 : 200; easing.type: Easing.OutCubic } }
 
     contentItem: Row {
         spacing: 12
@@ -121,6 +123,30 @@ Button {
         border.color: control.active ? Qt.rgba(control.activeColor.r, control.activeColor.g, control.activeColor.b, 0.45) : "transparent"
         Behavior on color { ColorAnimation { duration: 180 } }
         Behavior on border.color { ColorAnimation { duration: 180 } }
+
+        // Hover "hallucination": a soft accent glow blooms over the item on
+        // hover (a preview, distinct from the solid active state), contracts on
+        // press, and is hidden once the item is actually active. Full activation
+        // only happens on click — hover never fully "opens" the item.
+        Rectangle {
+            id: halo
+            anchors.fill: parent
+            radius: parent.radius
+            visible: opacity > 0.001
+            opacity: control.motionOn
+                     ? (control.active ? 0 : (control.down ? 0.05 : (control.hovered ? 0.18 : 0)))
+                     : 0
+            transformOrigin: Item.Center
+            scale: (control.hovered && !control.down) ? 1.0 : 0.85
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
+                GradientStop { position: 0.0; color: Qt.rgba(control.activeColor.r, control.activeColor.g, control.activeColor.b, 0.9) }
+                GradientStop { position: 0.55; color: Qt.rgba(control.activeColor.r, control.activeColor.g, control.activeColor.b, 0.22) }
+                GradientStop { position: 1.0; color: Qt.rgba(control.activeColor.r, control.activeColor.g, control.activeColor.b, 0.0) }
+            }
+            Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+            Behavior on scale { NumberAnimation { duration: 280; easing.type: Easing.OutBack; easing.overshoot: 0.7 } }
+        }
 
         // Animated active accent bar on the left edge — grows in with a small
         // overshoot when the item becomes active.
