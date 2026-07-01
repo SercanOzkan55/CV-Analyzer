@@ -1,3 +1,4 @@
+from core.timeutils import utcnow
 import secrets
 import hashlib
 import hmac
@@ -148,7 +149,7 @@ def _verify_download_token(token: str) -> tuple[int, int | None, datetime]:
         if not hmac.compare_digest(signature, expected):
             raise ValueError("bad signature")
         expires_at = datetime.fromtimestamp(int(exp_raw))
-        if expires_at < datetime.utcnow():
+        if expires_at < utcnow():
             raise ValueError("expired")
         return int(claim_raw), (int(cv_raw) if int(cv_raw) > 0 else None), expires_at
     except Exception:
@@ -275,7 +276,7 @@ def _active_worker_key_filter(now: datetime):
 
 
 def _month_start(now: datetime | None = None) -> datetime:
-    now = now or datetime.utcnow()
+    now = now or utcnow()
     return datetime(now.year, now.month, 1)
 
 
@@ -298,7 +299,7 @@ def _completed_this_month_for_keys(db: Session, organization_id: int, key_ids: s
 def _worker_quota_snapshot(
     db: Session, organization_id: int, plan: str | None = None, now: datetime | None = None
 ) -> dict:
-    now = now or datetime.utcnow()
+    now = now or utcnow()
     normalized_plan = _normalize_worker_plan(plan)
     monthly_limit = int(LOCAL_WORKER_PLAN_LIMITS.get(normalized_plan, 0))
 
@@ -507,7 +508,7 @@ def _worker_config_example(api_base_url: str) -> str:
 
 
 def _release_expired_claims(db: Session, organization_id: int, now: datetime | None = None) -> int:
-    now = now or datetime.utcnow()
+    now = now or utcnow()
     expired_claims = (
         db.query(WorkerClaim)
         .filter(
@@ -543,13 +544,13 @@ def _release_expired_claims(db: Session, organization_id: int, now: datetime | N
 def get_current_worker(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     session_hash = hash_key(credentials.credentials)
     ws = db.query(WorkerSession).filter(WorkerSession.access_token_hash == session_hash).first()
-    if not ws or ws.revoked_at or ws.expires_at < datetime.utcnow():
+    if not ws or ws.revoked_at or ws.expires_at < utcnow():
         raise HTTPException(status_code=401, detail="Invalid or expired session")
     wk = db.query(WorkerKey).filter(WorkerKey.id == ws.worker_key_id).first()
-    if not wk or wk.revoked_at or (wk.expires_at and wk.expires_at < datetime.utcnow()):
+    if not wk or wk.revoked_at or (wk.expires_at and wk.expires_at < utcnow()):
         raise HTTPException(status_code=401, detail="Worker key revoked or expired")
 
-    ws.last_seen_at = datetime.utcnow()
+    ws.last_seen_at = utcnow()
     db.commit()
     return {"session": ws, "key": wk}
 
@@ -743,8 +744,8 @@ def revoke_worker_key(key_id: int, db: Session = Depends(get_db), recruiter=Depe
     if not wk:
         raise HTTPException(status_code=404, detail="Key not found")
 
-    wk.revoked_at = datetime.utcnow()
-    db.query(WorkerSession).filter(WorkerSession.worker_key_id == key_id).update({"revoked_at": datetime.utcnow()})
+    wk.revoked_at = utcnow()
+    db.query(WorkerSession).filter(WorkerSession.worker_key_id == key_id).update({"revoked_at": utcnow()})
     db.commit()
     audit_log("worker_key_revoked", worker_key_id=key_id, organization_id=recruiter.organization_id)
     return {"message": "Revoked"}
@@ -755,7 +756,7 @@ def list_worker_sessions(
     db: Session = Depends(get_db),
     recruiter=Depends(recruiter_required),
 ):
-    now = datetime.utcnow()
+    now = utcnow()
     rows = (
         db.query(WorkerSession, WorkerKey)
         .join(WorkerKey, WorkerSession.worker_key_id == WorkerKey.id)
@@ -792,14 +793,14 @@ def worker_auth(request: Request, req: WorkerAuthRequest, db: Session = Depends(
     if not wk or wk.revoked_at:
         audit_log("worker_auth_failed", reason="invalid_or_revoked", key_hash_prefix=key_hash[:12])
         raise HTTPException(status_code=401, detail="Invalid or revoked key")
-    if wk.expires_at and wk.expires_at < datetime.utcnow():
+    if wk.expires_at and wk.expires_at < utcnow():
         audit_log("worker_auth_failed", reason="expired", worker_key_id=wk.id, organization_id=wk.organization_id)
         raise HTTPException(status_code=401, detail="Key expired")
 
     session_token = "sess_" + secrets.token_urlsafe(32)
     session_hash = hash_key(session_token)
     expires_in = 3600
-    expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+    expires_at = utcnow() + timedelta(seconds=expires_in)
 
     ws = WorkerSession(
         worker_key_id=wk.id,
@@ -809,7 +810,7 @@ def worker_auth(request: Request, req: WorkerAuthRequest, db: Session = Depends(
         access_token_hash=session_hash,
         expires_at=expires_at,
     )
-    wk.last_used_at = datetime.utcnow()
+    wk.last_used_at = utcnow()
     db.add(ws)
     db.commit()
     audit_log(
@@ -918,7 +919,7 @@ def worker_claim(
         WorkerClaim.organization_id == wk.organization_id,
         WorkerClaim.candidate_action_id != None,
         WorkerClaim.status == "claimed",
-        WorkerClaim.claim_expires_at >= datetime.utcnow(),
+        WorkerClaim.claim_expires_at >= utcnow(),
     )
     completed_action_subq = db.query(WorkerAnalysisResult.candidate_action_id).filter(
         WorkerAnalysisResult.job_id == jobId,
@@ -945,7 +946,7 @@ def worker_claim(
     )
 
     if not actions:
-        return ClaimResponse(items=[], claim_expires_at=datetime.utcnow())
+        return ClaimResponse(items=[], claim_expires_at=utcnow())
 
     candidates = [(_ensure_candidate_for_action(db, action), action) for action in actions]
     db.flush()
@@ -959,7 +960,7 @@ def worker_claim(
             WorkerClaim.organization_id == wk.organization_id,
             WorkerClaim.candidate_id.in_(candidate_ids),
             WorkerClaim.status == "claimed",
-            WorkerClaim.claim_expires_at >= datetime.utcnow(),
+            WorkerClaim.claim_expires_at >= utcnow(),
         )
         .all()
     }
@@ -980,7 +981,7 @@ def worker_claim(
     ]
 
     if not candidates:
-        return ClaimResponse(items=[], claim_expires_at=datetime.utcnow())
+        return ClaimResponse(items=[], claim_expires_at=utcnow())
 
     actual_count = len(candidates)
     db.query(WorkerKey).filter(WorkerKey.organization_id == wk.organization_id).with_for_update().all()
@@ -1002,7 +1003,7 @@ def worker_claim(
         .filter(
             WorkerKey.id == wk.id,
             WorkerKey.revoked_at == None,
-            or_(WorkerKey.expires_at == None, WorkerKey.expires_at > datetime.utcnow()),
+            or_(WorkerKey.expires_at == None, WorkerKey.expires_at > utcnow()),
             (WorkerKey.quota_used + WorkerKey.quota_reserved + actual_count) <= WorkerKey.quota_limit,
         )
         .update({WorkerKey.quota_reserved: WorkerKey.quota_reserved + actual_count}, synchronize_session=False)
@@ -1013,7 +1014,7 @@ def worker_claim(
         raise HTTPException(status_code=402, detail="Quota exceeded or key revoked")
 
     items = []
-    claim_expires_at = datetime.utcnow() + timedelta(minutes=30)
+    claim_expires_at = utcnow() + timedelta(minutes=30)
     for c, action in candidates:
         wc = WorkerClaim(
             worker_key_id=wk.id,
@@ -1035,9 +1036,7 @@ def worker_claim(
             )
             file_type = action.cv_file_type or _file_type_from_name(file_name, "pdf")
         else:
-            signed_expires_at = min(
-                claim_expires_at, datetime.utcnow() + timedelta(seconds=_DOWNLOAD_TOKEN_TTL_SECONDS)
-            )
+            signed_expires_at = min(claim_expires_at, utcnow() + timedelta(seconds=_DOWNLOAD_TOKEN_TTL_SECONDS))
             download_token = _sign_download_token(wc.id, c.id, signed_expires_at)
             download_url = f"{request.url_for('worker_download_cv', claim_id=wc.id)}?token={download_token}"
             file_name = _safe_download_filename(action.candidate_name, wc.id)
@@ -1089,7 +1088,7 @@ def worker_download_cv(claim_id: int, token: str, db: Session = Depends(get_db))
     claim = db.query(WorkerClaim).filter(WorkerClaim.id == claim_id).first()
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
-    now = datetime.utcnow()
+    now = utcnow()
     session = db.query(WorkerSession).filter(WorkerSession.id == claim.worker_session_id).first()
     key = db.query(WorkerKey).filter(WorkerKey.id == claim.worker_key_id).first()
     if not session or session.revoked_at or session.expires_at < now:
@@ -1187,7 +1186,7 @@ def worker_submit_results(
         raise HTTPException(status_code=400, detail="No active claim found for candidate")
     if req.cv_id is not None and claim.cv_id is not None and req.cv_id != claim.cv_id:
         raise HTTPException(status_code=400, detail="Result CV does not match active claim")
-    if claim.claim_expires_at < datetime.utcnow():
+    if claim.claim_expires_at < utcnow():
         claim.status = "expired"
         wk_locked = db.query(WorkerKey).filter(WorkerKey.id == wk.id).with_for_update().first()
         if wk_locked:
@@ -1320,7 +1319,7 @@ def worker_submit_results(
     )
 
     claim.status = "completed"
-    claim.completed_at = datetime.utcnow()
+    claim.completed_at = utcnow()
 
     # Atomic transfer from reserved to used
     updated = (
@@ -1364,7 +1363,7 @@ def worker_submit_results(
 @router.post("/worker/heartbeat")
 def worker_heartbeat(worker=Depends(get_current_worker), db: Session = Depends(get_db)):
     ws = worker["session"]
-    ws.last_seen_at = datetime.utcnow()
+    ws.last_seen_at = utcnow()
     db.commit()
     return {"status": "ok"}
 
@@ -1398,7 +1397,7 @@ def worker_dashboard_progress(job_id: int, db: Session = Depends(get_db), recrui
             WorkerClaim.organization_id == recruiter.organization_id,
             WorkerClaim.job_id == job_id,
             WorkerClaim.status == "claimed",
-            WorkerClaim.claim_expires_at >= datetime.utcnow(),
+            WorkerClaim.claim_expires_at >= utcnow(),
         )
         .count()
     )
@@ -1523,7 +1522,7 @@ def worker_offline_sync(req: OfflineSyncRequest, worker=Depends(get_current_work
         .filter(
             WorkerKey.id == wk.id,
             WorkerKey.revoked_at == None,
-            or_(WorkerKey.expires_at == None, WorkerKey.expires_at > datetime.utcnow()),
+            or_(WorkerKey.expires_at == None, WorkerKey.expires_at > utcnow()),
             (WorkerKey.quota_used + WorkerKey.quota_reserved + actual_count) <= WorkerKey.quota_limit,
         )
         .update({WorkerKey.quota_used: WorkerKey.quota_used + actual_count}, synchronize_session=False)

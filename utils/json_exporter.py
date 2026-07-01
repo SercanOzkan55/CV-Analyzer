@@ -3,6 +3,7 @@ JSON export utilities for local processing results.
 Generates downloadable JSON files with temporary URLs.
 """
 
+from core.timeutils import utcnow
 import json
 import uuid
 from datetime import datetime, timedelta
@@ -35,7 +36,7 @@ def generate_json_download(
         "metadata": {
             "job_id": job_id,
             "total_results": len(results),
-            "exported_at": datetime.utcnow().isoformat(),
+            "exported_at": utcnow().isoformat(),
             "format_version": "1.0",
         },
         "results": results,
@@ -45,7 +46,7 @@ def generate_json_download(
 
     # Generate temporary download ID
     download_id = f"json_{uuid.uuid4()}"
-    expires_at = datetime.utcnow() + timedelta(hours=1)
+    expires_at = utcnow() + timedelta(hours=1)
 
     _temp_downloads[download_id] = {
         "content": json_content,
@@ -75,7 +76,7 @@ def get_temp_download(download_id: str) -> Dict[str, Any]:
     download = _temp_downloads[download_id]
 
     # Check expiration
-    if datetime.utcnow() > download["expires_at"]:
+    if utcnow() > download["expires_at"]:
         del _temp_downloads[download_id]
         return None
 
@@ -84,7 +85,7 @@ def get_temp_download(download_id: str) -> Dict[str, Any]:
 
 def cleanup_expired_downloads():
     """Clean up expired temporary downloads."""
-    current_time = datetime.utcnow()
+    current_time = utcnow()
     expired = [download_id for download_id, data in _temp_downloads.items() if current_time > data["expires_at"]]
 
     for download_id in expired:

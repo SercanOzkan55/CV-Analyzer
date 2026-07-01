@@ -1,6 +1,7 @@
 import csv
 import hashlib
 import json
+import logging
 import os
 import re
 import sys
@@ -8,6 +9,8 @@ import tempfile
 import traceback
 from datetime import UTC, datetime
 from pathlib import Path
+
+logger = logging.getLogger("local_worker.gui")
 
 try:
     from PySide6.QtCore import (
@@ -500,6 +503,108 @@ class HistoryListModel(QAbstractListModel):
         self.endResetModel()
 
 
+class NotificationListModel(QAbstractListModel):
+    IdRole = Qt.UserRole + 1
+    TitleRole = Qt.UserRole + 2
+    MessageRole = Qt.UserRole + 3
+    CandidateRole = Qt.UserRole + 4
+    TypeRole = Qt.UserRole + 5
+    IsReadRole = Qt.UserRole + 6
+    CreatedRole = Qt.UserRole + 7
+
+    def __init__(self):
+        super().__init__()
+        self._rows: list[dict] = []
+
+    def rowCount(self, parent=QModelIndex()) -> int:
+        return 0 if parent.isValid() else len(self._rows)
+
+    def data(self, index: QModelIndex, role: int):
+        if not index.isValid() or index.row() >= len(self._rows):
+            return None
+        row = self._rows[index.row()]
+        if role == self.IdRole:
+            return int(row.get("id") or 0)
+        if role == self.TitleRole:
+            return row.get("title", "")
+        if role == self.MessageRole:
+            return row.get("message", "")
+        if role == self.CandidateRole:
+            return row.get("candidate_name", "")
+        if role == self.TypeRole:
+            return row.get("type", "info")
+        if role == self.IsReadRole:
+            return bool(row.get("is_read"))
+        if role == self.CreatedRole:
+            return row.get("created_at", "")
+        return None
+
+    def roleNames(self):
+        return {
+            self.IdRole: QByteArray(b"notificationId"),
+            self.TitleRole: QByteArray(b"title"),
+            self.MessageRole: QByteArray(b"message"),
+            self.CandidateRole: QByteArray(b"candidateName"),
+            self.TypeRole: QByteArray(b"type"),
+            self.IsReadRole: QByteArray(b"isRead"),
+            self.CreatedRole: QByteArray(b"createdAt"),
+        }
+
+    def set_rows(self, rows: list[dict]):
+        self.beginResetModel()
+        self._rows = list(rows)
+        self.endResetModel()
+
+
+class AuditListModel(QAbstractListModel):
+    IdRole = Qt.UserRole + 1
+    ActionRole = Qt.UserRole + 2
+    ModuleRole = Qt.UserRole + 3
+    DescriptionRole = Qt.UserRole + 4
+    StatusRole = Qt.UserRole + 5
+    CreatedRole = Qt.UserRole + 6
+
+    def __init__(self):
+        super().__init__()
+        self._rows: list[dict] = []
+
+    def rowCount(self, parent=QModelIndex()) -> int:
+        return 0 if parent.isValid() else len(self._rows)
+
+    def data(self, index: QModelIndex, role: int):
+        if not index.isValid() or index.row() >= len(self._rows):
+            return None
+        row = self._rows[index.row()]
+        if role == self.IdRole:
+            return int(row.get("id") or 0)
+        if role == self.ActionRole:
+            return row.get("action_type", "")
+        if role == self.ModuleRole:
+            return row.get("module", "")
+        if role == self.DescriptionRole:
+            return row.get("description", "")
+        if role == self.StatusRole:
+            return row.get("status", "")
+        if role == self.CreatedRole:
+            return row.get("created_at", "")
+        return None
+
+    def roleNames(self):
+        return {
+            self.IdRole: QByteArray(b"auditId"),
+            self.ActionRole: QByteArray(b"action"),
+            self.ModuleRole: QByteArray(b"module"),
+            self.DescriptionRole: QByteArray(b"description"),
+            self.StatusRole: QByteArray(b"status"),
+            self.CreatedRole: QByteArray(b"createdAt"),
+        }
+
+    def set_rows(self, rows: list[dict]):
+        self.beginResetModel()
+        self._rows = list(rows)
+        self.endResetModel()
+
+
 class WebsiteSyncWorker(QObject):
     status = Signal(str)
     done = Signal(dict)
@@ -626,6 +731,7 @@ class LocalWorkerBackend(QObject):
     templateChanged = Signal()
     reportChanged = Signal()
     syncChanged = Signal()
+    inboxChanged = Signal()
     toast = Signal(str, str)
 
     def __init__(self):
@@ -633,6 +739,9 @@ class LocalWorkerBackend(QObject):
         self.store = WorkspaceStore()
         self._results_model = ResultListModel()
         self._history_model = HistoryListModel()
+        self._notification_model = NotificationListModel()
+        self._audit_model = AuditListModel()
+        self._unread_count = 0
         self._thread: QThread | None = None
         self._worker: AnalysisWorker | None = None
         self._sync_thread: QThread | None = None
@@ -675,6 +784,7 @@ class LocalWorkerBackend(QObject):
         self._load_template_fields()
         self.refreshHistory()
         self.refreshSyncQueue()
+        self.refreshInbox()
 
     @Property(QObject, constant=True)
     def resultsModel(self):
@@ -683,6 +793,30 @@ class LocalWorkerBackend(QObject):
     @Property(QObject, constant=True)
     def historyModel(self):
         return self._history_model
+
+    @Property(QObject, constant=True)
+    def notificationsModel(self):
+        return self._notification_model
+
+    @Property(QObject, constant=True)
+    def auditModel(self):
+        return self._audit_model
+
+    @Property(int, notify=inboxChanged)
+    def unreadNotificationCount(self):
+        return self._unread_count
+
+    @Property(int, notify=inboxChanged)
+    def notificationCount(self):
+        return self._notification_model.rowCount()
+
+    @Property(int, notify=inboxChanged)
+    def auditCount(self):
+        return self._audit_model.rowCount()
+
+    @Property(str, notify=inboxChanged)
+    def inboxBadge(self):
+        return str(self._unread_count) if self._unread_count else ""
 
     @Property(str, notify=stateChanged)
     def jobName(self):
@@ -712,6 +846,25 @@ class LocalWorkerBackend(QObject):
     def outputFolder(self, value: str):
         self._output_folder = value
         self.stateChanged.emit()
+
+    @Property(int, notify=stateChanged)
+    def cvFileCount(self):
+        """Number of supported CV files in the selected folder.
+
+        Returns -1 when no folder is selected so the UI can distinguish
+        "nothing picked yet" from "folder picked but empty" (0).
+        """
+        if not self._cv_folder:
+            return -1
+        try:
+            folder = Path(self._cv_folder)
+            # Mirror the analysis default (folder/cv_analyzer_results) so the
+            # excluded output dir matches what a run actually writes to.
+            out = Path(self._output_folder) if self._output_folder else folder / "cv_analyzer_results"
+            return len(iter_supported_local_files(folder, out))
+        except Exception as exc:
+            logger.warning("cvFileCount scan failed: %s", exc)
+            return 0
 
     @Property(str, notify=stateChanged)
     def jobDescription(self):
@@ -792,9 +945,14 @@ class LocalWorkerBackend(QObject):
     def progressMaximum(self):
         return self._progress_maximum
 
-    @Property(bool, constant=True)
+    @Property(bool, notify=stateChanged)
     def motionEnabled(self):
         return self._motion_enabled
+
+    @motionEnabled.setter
+    def motionEnabled(self, value: bool):
+        self._motion_enabled = bool(value)
+        self.stateChanged.emit()
 
     @Property(str, notify=syncChanged)
     def syncApiUrl(self):
@@ -886,6 +1044,27 @@ class LocalWorkerBackend(QObject):
     @Property(int, notify=metricsChanged)
     def averageScoreValue(self):
         return int(round(average_score(self._results_model.rows())))
+
+    @Property("QVariantList", notify=metricsChanged)
+    def compareRows(self):
+        """All current candidates as plain dicts for the Compare page."""
+        out = []
+        for row in self._results_model.rows():
+            out.append(
+                {
+                    "name": candidate_name_from_row(row),
+                    "fileName": Path(row.get("file", "")).name or "Unknown CV",
+                    "email": row.get("email") or "",
+                    "score": int(float(row.get("score") or 0)),
+                    "decision": decision_label(row.get("decision", "")),
+                    "confidence": row.get("confidence", "medium"),
+                    "matched": list_to_text(row.get("matched_skills")),
+                    "missing": list_to_text(row.get("missing_skills")),
+                    "risks": list_to_text(row.get("risk_flags")),
+                    "sync": row.get("sync_status", "offline_ready"),
+                }
+            )
+        return out
 
     @Property(str, notify=metricsChanged)
     def averageScore(self):
@@ -1273,14 +1452,70 @@ class LocalWorkerBackend(QObject):
 
     @Slot()
     def refreshHistory(self):
-        self._history_model.set_rows(self.store.list_runs(limit=12))
+        rows = self.store.list_runs(limit=12)
+        self._history_model.set_rows(rows)
         self.metricsChanged.emit()
         self.syncChanged.emit()
 
     @Slot()
+    def manualRefreshHistory(self):
+        self.refreshHistory()
+        self.toast.emit(f"History refreshed — {self.historyRunCount} run(s).", "info")
+
+    @Slot()
+    def refreshInbox(self):
+        try:
+            self._notification_model.set_rows(self.store.list_notifications(limit=200))
+            self._audit_model.set_rows(self.store.list_audit_logs(limit=200))
+            self._unread_count = self.store.count_unread_notifications()
+        except Exception as exc:
+            logger.warning("refreshInbox failed: %s", exc)
+        self.inboxChanged.emit()
+
+    @Slot()
+    def manualRefreshInbox(self):
+        self.refreshInbox()
+        self.toast.emit(f"Inbox refreshed — {self.notificationCount} notification(s).", "info")
+
+    @Slot()
+    def markAllNotificationsRead(self):
+        try:
+            self.store.mark_notifications_read()
+        except Exception as exc:
+            self.toast.emit(f"Could not mark notifications read: {exc}", "error")
+            return
+        self.refreshInbox()
+
+    @Slot(int)
+    def deleteNotification(self, notification_id: int):
+        try:
+            self.store.delete_notification(int(notification_id))
+        except Exception as exc:
+            self.toast.emit(f"Could not delete notification: {exc}", "error")
+            return
+        self.refreshInbox()
+
+    @Slot()
+    def clearAllNotifications(self):
+        try:
+            removed = self.store.clear_all_notifications()
+        except Exception as exc:
+            self.toast.emit(f"Could not clear notifications: {exc}", "error")
+            return
+        if removed:
+            self.toast.emit(f"Cleared {removed} notification(s).", "success")
+        self.refreshInbox()
+
+    @Slot()
     def refreshSyncQueue(self):
-        self._sync_detail = f"{self.syncPendingCount} local result(s) ready for Website sync."
+        count = self.syncPendingCount
+        self._sync_detail = f"{count} local result(s) ready for Website sync."
         self.syncChanged.emit()
+
+    @Slot()
+    def manualRefreshSyncQueue(self):
+        self.refreshSyncQueue()
+        self.toast.emit(f"Sync queue refreshed — {self.syncPendingCount} pending.", "info")
 
     @Slot()
     def saveWorkerKey(self):
@@ -1519,6 +1754,7 @@ class LocalWorkerBackend(QObject):
         self._is_running = False
         self._set_status(message)
         self.refreshHistory()
+        self.refreshInbox()
         self._refresh_report_preview()
         self.syncChanged.emit()
         self.toast.emit("Local analysis completed.", "success")

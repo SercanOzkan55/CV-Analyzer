@@ -3,6 +3,7 @@ CSV export utilities for local processing results.
 Generates downloadable CSV files with temporary URLs.
 """
 
+from core.timeutils import utcnow
 import csv
 import io
 import uuid
@@ -71,7 +72,7 @@ def generate_csv_download(
 
     # Generate temporary download ID
     download_id = f"csv_{uuid.uuid4()}"
-    expires_at = datetime.utcnow() + timedelta(hours=1)
+    expires_at = utcnow() + timedelta(hours=1)
 
     _temp_downloads[download_id] = {
         "content": csv_content,
@@ -101,7 +102,7 @@ def get_temp_download(download_id: str) -> Dict[str, Any]:
     download = _temp_downloads[download_id]
 
     # Check expiration
-    if datetime.utcnow() > download["expires_at"]:
+    if utcnow() > download["expires_at"]:
         del _temp_downloads[download_id]
         return None
 
@@ -110,7 +111,7 @@ def get_temp_download(download_id: str) -> Dict[str, Any]:
 
 def cleanup_expired_downloads():
     """Clean up expired temporary downloads."""
-    current_time = datetime.utcnow()
+    current_time = utcnow()
     expired = [download_id for download_id, data in _temp_downloads.items() if current_time > data["expires_at"]]
 
     for download_id in expired:

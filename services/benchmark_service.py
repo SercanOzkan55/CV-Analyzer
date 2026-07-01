@@ -5,14 +5,13 @@ Provides percentile calculations and comparison data without exposing
 individual users.
 """
 
+from core.timeutils import utcnow
 import logging
 import re
 import unicodedata
-from datetime import datetime
 from difflib import SequenceMatcher
 
 from sqlalchemy.orm import Session
-from sqlalchemy import func as sa_func
 
 from models import ATSBenchmarkGlobal, ATSBenchmarkProfession, ATSBenchmarkScore
 
@@ -1074,7 +1073,7 @@ def _update_global_aggregate(db: Session, new_score: float) -> None:
     row.total_cvs += 1
     row.sum_ats += new_score
     row.avg_ats = round(row.sum_ats / row.total_cvs, 2)
-    row.updated_at = datetime.utcnow()
+    row.updated_at = utcnow()
 
     # Recompute median from stored scores (sampled for perf)
     all_scores = [
@@ -1100,7 +1099,7 @@ def _update_profession_aggregate(db: Session, profession: str, new_score: float)
     row.total_cvs += 1
     row.sum_ats += new_score
     row.avg_ats = round(row.sum_ats / row.total_cvs, 2)
-    row.updated_at = datetime.utcnow()
+    row.updated_at = utcnow()
 
     # Recompute median & top 10% for this profession
     prof_scores = [

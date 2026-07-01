@@ -39,7 +39,11 @@ _PAGE_FURNITURE_RES = (
     re.compile(r"^\s*created by\b.*$", re.I),  # template attribution line
     re.compile(r"^\s*page\s+\d+(?:\s+of\s+\d+)?\s*$", re.I),  # "Page 2 of 3"
     re.compile(r"^.{0,40}?\bpage\s+\d+(?:\s+of\s+\d+)?\s*$", re.I),  # "Name Page 2"
-    re.compile(r"^.{0,30}?\b\d{1,3}\s+of\s+\d{1,3}\s*$", re.I),  # "Aduba 1 of 3"
+    # Bare page count like "1 of 3" / "12 of 20" only. The prefixed variant
+    # ("Aduba 1 of 3") is intentionally NOT matched: it is structurally
+    # indistinguishable from real content such as "Rated top 2 of 50" or
+    # "Ranked 1 of 500", so matching it silently dropped achievement lines.
+    re.compile(r"^\s*\d{1,3}\s+of\s+\d{1,2}\s*$", re.I),  # "1 of 3"
     re.compile(r"^\s*\S+\.(?:edu|com|org|net)\S*\s*[|\-–]?\s*\d{1,3}\s*$", re.I),  # "site.edu 22"
 )
 

@@ -5,6 +5,7 @@ Button {
     id: control
 
     property bool active: false
+    property bool collapsed: false
     property string glyph: ""
     property color activeColor: "#7c5cff"
     property color activeText: "#ffffff"
@@ -14,6 +15,7 @@ Button {
     property color hoverBg: "#111827"
     property color activeIcon: "#a78bfa"
     property color mutedIcon: "#8e9abf"
+    readonly property bool motionOn: typeof backend === "undefined" || backend.motionEnabled
     signal navClicked()
 
     height: 44
@@ -21,14 +23,20 @@ Button {
     hoverEnabled: true
     onClicked: navClicked()
 
-    scale: down ? 0.985 : (hovered ? 1.02 : 1)
-    Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+    // Tooltip with the label when collapsed to an icon-only rail.
+    ToolTip.visible: control.collapsed && control.hovered
+    ToolTip.text: control.text
+    ToolTip.delay: 350
+
+    // Press contracts the whole item ("kapanma"); hover lifts it slightly.
+    scale: down ? 0.95 : (hovered ? 1.015 : 1)
+    Behavior on scale { NumberAnimation { duration: down ? 110 : 200; easing.type: Easing.OutCubic } }
 
     contentItem: Row {
         spacing: 12
         anchors.verticalCenter: parent.verticalCenter
-        leftPadding: 14
-        rightPadding: 12
+        leftPadding: control.collapsed ? Math.max(0, (control.width - 20) / 2) : 14
+        rightPadding: control.collapsed ? 0 : 12
 
         Canvas {
             id: navIcon
@@ -80,6 +88,15 @@ Button {
                 } else if (control.glyph === "templates") {
                     rect(3, 5, 14, 10, 2)
                     ctx.beginPath(); ctx.moveTo(4, 6); ctx.lineTo(10, 11); ctx.lineTo(16, 6); ctx.stroke()
+                } else if (control.glyph === "inbox") {
+                    ctx.beginPath()
+                    ctx.moveTo(3, 11); ctx.lineTo(7, 11); ctx.lineTo(8.5, 14); ctx.lineTo(11.5, 14); ctx.lineTo(13, 11); ctx.lineTo(17, 11)
+                    ctx.lineTo(15, 4); ctx.lineTo(5, 4); ctx.closePath(); ctx.stroke()
+                } else if (control.glyph === "compare") {
+                    ctx.beginPath(); ctx.moveTo(3, 16.5); ctx.lineTo(17, 16.5); ctx.stroke()
+                    ctx.beginPath(); ctx.moveTo(6, 16.5); ctx.lineTo(6, 9); ctx.stroke()
+                    ctx.beginPath(); ctx.moveTo(10, 16.5); ctx.lineTo(10, 4); ctx.stroke()
+                    ctx.beginPath(); ctx.moveTo(14, 16.5); ctx.lineTo(14, 11); ctx.stroke()
                 } else {
                     ctx.beginPath(); ctx.arc(10, 10, 3, 0, Math.PI * 2); ctx.stroke()
                     for (var i = 0; i < 8; i++) {
@@ -102,6 +119,7 @@ Button {
         }
 
         Text {
+            visible: !control.collapsed
             text: control.text
             color: control.active ? control.activeText : (control.hovered ? control.hoverText : control.textColor)
             font.pixelSize: 14
@@ -117,5 +135,44 @@ Button {
         border.color: control.active ? Qt.rgba(control.activeColor.r, control.activeColor.g, control.activeColor.b, 0.45) : "transparent"
         Behavior on color { ColorAnimation { duration: 180 } }
         Behavior on border.color { ColorAnimation { duration: 180 } }
+
+        // Hover "hallucination": a soft accent glow blooms over the item on
+        // hover (a preview, distinct from the solid active state), contracts on
+        // press, and is hidden once the item is actually active. Full activation
+        // only happens on click — hover never fully "opens" the item.
+        Rectangle {
+            id: halo
+            anchors.fill: parent
+            radius: parent.radius
+            visible: opacity > 0.001
+            opacity: control.motionOn
+                     ? (control.active ? 0 : (control.down ? 0.05 : (control.hovered ? 0.18 : 0)))
+                     : 0
+            transformOrigin: Item.Center
+            scale: (control.hovered && !control.down) ? 1.0 : 0.85
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
+                GradientStop { position: 0.0; color: Qt.rgba(control.activeColor.r, control.activeColor.g, control.activeColor.b, 0.9) }
+                GradientStop { position: 0.55; color: Qt.rgba(control.activeColor.r, control.activeColor.g, control.activeColor.b, 0.22) }
+                GradientStop { position: 1.0; color: Qt.rgba(control.activeColor.r, control.activeColor.g, control.activeColor.b, 0.0) }
+            }
+            Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+            Behavior on scale { NumberAnimation { duration: 280; easing.type: Easing.OutBack; easing.overshoot: 0.7 } }
+        }
+
+        // Animated active accent bar on the left edge — grows in with a small
+        // overshoot when the item becomes active.
+        Rectangle {
+            anchors.left: parent.left
+            anchors.leftMargin: 3
+            anchors.verticalCenter: parent.verticalCenter
+            width: 3
+            radius: 2
+            color: control.activeColor
+            height: control.active ? parent.height * 0.52 : 0
+            opacity: control.active ? 1 : 0
+            Behavior on height { NumberAnimation { duration: 240; easing.type: Easing.OutBack; easing.overshoot: 1.2 } }
+            Behavior on opacity { NumberAnimation { duration: 160 } }
+        }
     }
 }

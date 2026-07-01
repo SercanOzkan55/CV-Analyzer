@@ -3,13 +3,14 @@ Local processing mode for recruiters - zero data retention.
 CVs are processed and results returned without saving to database.
 """
 
+from core.timeutils import utcnow
 import secrets
 import os
 import logging
 import hashlib
 
 logger = logging.getLogger(__name__)
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import List
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Header, UploadFile, Request
@@ -18,10 +19,9 @@ from sqlalchemy.orm import Session
 
 from config.aws import MAX_UPLOAD_BYTES
 from database import get_db
-from models import APISubscription, Organization, RecruiterJob
+from models import APISubscription, RecruiterJob
 from routes.recruiter import recruiter_required
 from security.file_guard import read_upload_limited
-from utils.cv_processor import process_cv_batch
 from utils.csv_exporter import generate_csv_download
 from utils.json_exporter import generate_json_download
 
@@ -78,7 +78,7 @@ def validate_api_key(api_key: str, db: Session, lock: bool = False) -> APISubscr
         raise HTTPException(status_code=401, detail="Invalid or inactive API key")
 
     # Check expiration
-    if subscription.expires_at and subscription.expires_at < datetime.utcnow():
+    if subscription.expires_at and subscription.expires_at < utcnow():
         raise HTTPException(status_code=401, detail="API key expired")
 
     return subscription
@@ -129,7 +129,7 @@ async def generate_subscription_key(
     subscription = APISubscription(
         organization_id=org_id,
         monthly_limit=1000,  # Default 1000 CVs/month
-        expires_at=datetime.utcnow() + timedelta(days=365),  # 1 year
+        expires_at=utcnow() + timedelta(days=365),  # 1 year
     )
     subscription.set_api_key(raw_key)
 
@@ -170,7 +170,7 @@ async def rotate_subscription_key(
     subscription = APISubscription(
         organization_id=org_id,
         monthly_limit=1000,
-        expires_at=datetime.utcnow() + timedelta(days=365),
+        expires_at=utcnow() + timedelta(days=365),
     )
     subscription.set_api_key(raw_key)
     db.add(subscription)
@@ -306,7 +306,7 @@ async def process_cvs_local_mode(
 
     # Update usage
     subscription.monthly_usage += len(files)
-    subscription.last_used_at = datetime.utcnow()
+    subscription.last_used_at = utcnow()
     db.add(subscription)
     db.commit()
 
@@ -330,7 +330,7 @@ async def process_cvs_local_mode(
             "total_cvs": len(results),
             "job_id": job_id,
             "job_title": job.title,
-            "processed_at": datetime.utcnow().isoformat(),
+            "processed_at": utcnow().isoformat(),
         },
         "downloads": {"json": json_url, "csv": csv_url},
         "usage": {
@@ -412,7 +412,7 @@ async def process_linkedin_export_zip(
     check_monthly_quota(subscription, actual_cvs)  # Final check
 
     subscription.monthly_usage += actual_cvs
-    subscription.last_used_at = datetime.utcnow()
+    subscription.last_used_at = utcnow()
     db.add(subscription)
     db.commit()
 
@@ -437,7 +437,7 @@ async def process_linkedin_export_zip(
             "job_id": job_id,
             "job_title": job.title,
             "source": "LinkedIn Export",
-            "processed_at": datetime.utcnow().isoformat(),
+            "processed_at": utcnow().isoformat(),
         },
         "downloads": {"json": json_url, "csv": csv_url},
         "usage": {
@@ -504,7 +504,7 @@ async def process_linkedin_export_large(
     # Process in chunks
     from utils.cv_processor import process_cv_batch_chunked
 
-    session_id = str(datetime.utcnow().timestamp())
+    session_id = str(utcnow().timestamp())
 
     try:
         results, summary = await process_cv_batch_chunked(
@@ -520,7 +520,7 @@ async def process_linkedin_export_large(
         check_monthly_quota(subscription, actual_cvs)
 
         subscription.monthly_usage += actual_cvs
-        subscription.last_used_at = datetime.utcnow()
+        subscription.last_used_at = utcnow()
         db.add(subscription)
         db.commit()
 
@@ -545,7 +545,7 @@ async def process_linkedin_export_large(
                 **summary,
                 "job_id": job_id,
                 "job_title": job.title,
-                "processed_at": datetime.utcnow().isoformat(),
+                "processed_at": utcnow().isoformat(),
             },
             "results": results[:100],  # Return top 100 for preview
             "total_results": len(results),

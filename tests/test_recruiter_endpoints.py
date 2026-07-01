@@ -3,7 +3,8 @@ Recruiter endpoint isolation tests.
 Uses db_session and client fixtures from conftest.py (per-function isolation).
 """
 
-from datetime import datetime, timedelta
+from core.timeutils import utcnow
+from datetime import timedelta
 
 import pytest
 
@@ -219,7 +220,7 @@ def test_top_candidates_org_scope(client, db_session):
 def test_pagination_and_top_ordering(client, db_session):
     org_a, _, recruiter, cand_a, _ = _setup_two_orgs(db_session)
 
-    times = [datetime.utcnow() - timedelta(days=i) for i in range(3)]
+    times = [utcnow() - timedelta(days=i) for i in range(3)]
     scores = [10.0, 30.0, 20.0]
     for t, s in zip(times, scores):
         db_session.add(
@@ -277,7 +278,7 @@ def test_top_candidates_filters(client, db_session):
     for c in resp.json()["top_candidates"]:
         assert c["final_score"] >= 25
 
-    now = datetime.utcnow()
+    now = utcnow()
     start = (now - timedelta(hours=1)).isoformat()
     end = (now + timedelta(hours=1)).isoformat()
     resp = client.get(f"/api/v1/recruiter/top_candidates?start_date={start}&end_date={end}")

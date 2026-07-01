@@ -464,6 +464,31 @@ class WorkspaceStore:
             for row in rows
         ]
 
+    def count_unread_notifications(self) -> int:
+        with self._connect() as conn:
+            row = conn.execute("SELECT COUNT(*) FROM notifications WHERE is_read = 0").fetchone()
+        return int(row[0] or 0)
+
+    def mark_notifications_read(self, run_id: int | None = None) -> int:
+        sql = "UPDATE notifications SET is_read = 1 WHERE is_read = 0"
+        params: tuple = ()
+        if run_id:
+            sql += " AND run_id = ?"
+            params = (run_id,)
+        with self._connect() as conn:
+            cursor = conn.execute(sql, params)
+            return int(cursor.rowcount or 0)
+
+    def delete_notification(self, notification_id: int) -> int:
+        with self._connect() as conn:
+            cursor = conn.execute("DELETE FROM notifications WHERE id = ?", (int(notification_id),))
+            return int(cursor.rowcount or 0)
+
+    def clear_all_notifications(self) -> int:
+        with self._connect() as conn:
+            cursor = conn.execute("DELETE FROM notifications")
+            return int(cursor.rowcount or 0)
+
     def list_pending_sync_results(self, limit: int = 100) -> list[dict]:
         with self._connect() as conn:
             rows = conn.execute(

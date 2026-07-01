@@ -5,6 +5,7 @@ It intentionally pulls transitional shared symbols from the already-loading
 main module; later passes can move those shared helpers into services.
 """
 
+from core.timeutils import utcnow
 from fastapi import APIRouter
 from core.runtime_bridge import main_module as _main_module
 from core.route_dependencies import *  # noqa: F403
@@ -424,7 +425,7 @@ def save_analysis_note(
 
     if existing:
         existing.content = body.content.strip()[:2000]
-        existing.updated_at = datetime.utcnow()
+        existing.updated_at = utcnow()
         db.commit()
         return {"id": existing.id, "updated": True}
     else:
@@ -518,7 +519,7 @@ def get_usage_streak(
         return {"current_streak": 0, "longest_streak": 0, "total_active_days": 0}
 
     dates = sorted(set(r[0].date() if hasattr(r[0], "date") else r[0] for r in rows), reverse=True)
-    today = datetime.utcnow().date()
+    today = utcnow().date()
 
     # Current streak
     current = 0
