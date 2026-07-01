@@ -799,10 +799,12 @@ def _derive_keywords(job_description: str, max_items: int = 12) -> list[str]:
     """Derive required-skill keywords from a free-text description.
 
     Prefers high-precision matches against a curated skill vocabulary so prose
-    words ("student", "Istanbul", "3rd-year") are not mistaken for skills. Only
-    when no known skill is found does it fall back to filtered keyword
-    extraction (for non-tech descriptions), dropping stopwords, prose words,
-    numbers and very short tokens.
+    words ("student", "Istanbul", "3rd-year") are not mistaken for skills, then
+    merges in filtered keyword extraction so meaningful non-vocabulary terms —
+    including non-English role words like "geliştirici" — are still captured
+    (dropping stopwords, prose words, numbers and very short tokens). The two
+    passes are combined (not fallback-only) so mixed descriptions keep both
+    their known skills and their non-vocabulary terms.
     """
     if not job_description:
         return []
@@ -818,7 +820,11 @@ def _derive_keywords(job_description: str, max_items: int = 12) -> list[str]:
         skill_norm = _normalize(skill)
         if not skill_norm:
             return False
-        if " " in skill_norm:
+        # Multi-word AND single-character skills ("c", "r") use the spaced
+        # literal check: the tokenizer requires 2+ chars, so single letters
+        # never appear in `tokens`. Spacing-based matching keeps "C"/"R" out of
+        # "C++"/"C#"/"C-level" (those stay glued as one token).
+        if " " in skill_norm or len(skill_norm) == 1:
             return f" {skill_norm} " in padded
         return skill_norm in tokens
 
@@ -832,6 +838,9 @@ def _derive_keywords(job_description: str, max_items: int = 12) -> list[str]:
             key = disp.lower().replace("-", " ")
             if key not in seen:
                 seen.add(key)
+                # Also mark constituent words so a longer skill suppresses its
+                # sub-tokens ("REST API" prevents duplicate "REST" and "API").
+                seen.update(key.split())
                 found.append(disp)
 
     # 2) Filtered keyword extraction — catches meaningful non-vocabulary terms
