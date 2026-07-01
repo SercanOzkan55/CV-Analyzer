@@ -12,7 +12,7 @@ class TestStripPageFurniture:
             "Created by UC Davis Career Center | careercenter.ucdavis.edu 22",
             "Page 2 of 3",
             "Diaz-Ortiz Page 1",
-            "Aduba 1 of 3",
+            "1 of 3",
             "careercenter.ucdavis.edu 36",
         ],
     )
@@ -30,6 +30,9 @@ class TestStripPageFurniture:
             "Managed a portfolio of 3 of the company's largest accounts",  # "3 of" mid-sentence
             "Built the landing page for the 2024 product launch",  # has "page" but real
             "Senior Engineer at example.com",  # url but no trailing page number
+            "Ranked 1 of 500 in the national olympiad",  # achievement, not a footer
+            "Rated top 2 of 50",  # short achievement ending in "N of M"
+            "Completed 8 of 10 sprints ahead of schedule",  # "N of M" content
         ],
     )
     def test_keeps_real_content(self, keep):

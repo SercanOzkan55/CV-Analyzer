@@ -783,6 +783,56 @@ _LANGUAGE_NAMES = {
     "burmese",
     "pashto",
     "kurdish",
+    # additional world languages (recall for less-common but real languages
+    # that carry only a proficiency word, no CEFR code)
+    "somali",
+    "wolof",
+    "malayalam",
+    "kannada",
+    "odia",
+    "oriya",
+    "assamese",
+    "sindhi",
+    "tigrinya",
+    "oromo",
+    "luxembourgish",
+    "belarusian",
+    "tibetan",
+    "uyghur",
+    "tajik",
+    "turkmen",
+    "kyrgyz",
+    "dari",
+    "fula",
+    "fulani",
+    "twi",
+    "akan",
+    "shona",
+    "xhosa",
+    "sesotho",
+    "sotho",
+    "tswana",
+    "kinyarwanda",
+    "chichewa",
+    "lingala",
+    "quechua",
+    "guarani",
+    "maori",
+    "hawaiian",
+    "samoan",
+    "fijian",
+    "tongan",
+    "esperanto",
+    "latin",
+    "sanskrit",
+    "yiddish",
+    "flemish",
+    "frisian",
+    "breton",
+    "occitan",
+    "haitian creole",
+    "creole",
+    "sign language",
     # native spellings
     "türkçe",
     "ingilizce",
@@ -846,6 +896,11 @@ def _normalize_spoken_language(text: str) -> str:
     # A comma means a compound phrase (e.g. multiple languages) we should not
     # mangle into a single "Name (Level)".
     if "," in t:
+        return t
+    # Multiple language names joined by "and"/"&"/"/" (no comma) would otherwise
+    # be collapsed into one garbled token ("English and French" → "English
+    # French (Fluent)"). Keep the original so both languages survive.
+    if len(_LANGUAGE_NAME_RE.findall(t)) >= 2:
         return t
     match = _PROFICIENCY_FIND_RE.search(t)
     if not match:
