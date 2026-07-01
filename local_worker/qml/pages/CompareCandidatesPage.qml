@@ -24,6 +24,25 @@ ScrollView {
         for (var i = 0; i < selected.length; i++) m = Math.max(m, selected[i].score)
         return m
     }
+    // How many selected candidates share the top score (for a unique "Top" mark).
+    readonly property int topCount: {
+        var n = 0
+        for (var i = 0; i < selected.length; i++) if (selected[i].score === maxScore) n++
+        return n
+    }
+
+    // backend.compareRows returns fresh dicts on every metricsChanged, so re-bind
+    // the current selection to the new dicts (by fileName) and drop any that no
+    // longer exist — keeps the comparison columns live instead of stale.
+    onAllRowsChanged: {
+        var fresh = []
+        for (var i = 0; i < selected.length; i++) {
+            for (var j = 0; j < allRows.length; j++) {
+                if (allRows[j].fileName === selected[i].fileName) { fresh.push(allRows[j]); break }
+            }
+        }
+        selected = fresh
+    }
 
     function isSelected(cand) {
         for (var i = 0; i < selected.length; i++)
@@ -178,7 +197,9 @@ ScrollView {
                     delegate: AppCard {
                         id: col
                         required property var modelData
-                        readonly property bool isTop: modelData.score === page.maxScore && page.maxScore >= 0
+                        // Only badge a single, unambiguous top scorer — if two
+                        // candidates tie for the max, neither is marked "Top".
+                        readonly property bool isTop: modelData.score === page.maxScore && page.maxScore >= 0 && page.topCount === 1
                         Layout.alignment: Qt.AlignTop
                         implicitWidth: 280
                         Layout.preferredHeight: colCol.implicitHeight + col.pad * 2

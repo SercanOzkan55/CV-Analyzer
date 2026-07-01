@@ -858,7 +858,9 @@ class LocalWorkerBackend(QObject):
             return -1
         try:
             folder = Path(self._cv_folder)
-            out = Path(self._output_folder) if self._output_folder else folder / "_cv_out"
+            # Mirror the analysis default (folder/cv_analyzer_results) so the
+            # excluded output dir matches what a run actually writes to.
+            out = Path(self._output_folder) if self._output_folder else folder / "cv_analyzer_results"
             return len(iter_supported_local_files(folder, out))
         except Exception as exc:
             logger.warning("cvFileCount scan failed: %s", exc)
@@ -1454,7 +1456,11 @@ class LocalWorkerBackend(QObject):
         self._history_model.set_rows(rows)
         self.metricsChanged.emit()
         self.syncChanged.emit()
-        self.toast.emit(f"History refreshed — {len(rows)} run(s).", "info")
+
+    @Slot()
+    def manualRefreshHistory(self):
+        self.refreshHistory()
+        self.toast.emit(f"History refreshed — {self.historyRunCount} run(s).", "info")
 
     @Slot()
     def refreshInbox(self):
@@ -1505,7 +1511,11 @@ class LocalWorkerBackend(QObject):
         count = self.syncPendingCount
         self._sync_detail = f"{count} local result(s) ready for Website sync."
         self.syncChanged.emit()
-        self.toast.emit(f"Sync queue refreshed — {count} pending.", "info")
+
+    @Slot()
+    def manualRefreshSyncQueue(self):
+        self.refreshSyncQueue()
+        self.toast.emit(f"Sync queue refreshed — {self.syncPendingCount} pending.", "info")
 
     @Slot()
     def saveWorkerKey(self):
