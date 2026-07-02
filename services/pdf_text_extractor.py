@@ -61,6 +61,28 @@ def _strip_page_furniture(text: str) -> str:
     return "\n".join(kept)
 
 
+# Symbol fonts (Wingdings/Webdings) extract as Unicode private-use codepoints
+# (e.g. U+F076, U+F0B7). Downstream classifiers treat them as opaque letters,
+# which breaks bullet detection and pollutes skills/languages.
+_PRIVATE_USE_RE = re.compile("[\ue000-\uf8ff]+")
+
+
+def _normalize_private_use_glyphs(text: str) -> str:
+    """Turn leading symbol-font glyphs into real bullets; drop the rest."""
+    if not text or not _PRIVATE_USE_RE.search(text):
+        return text
+    out = []
+    for line in text.split("\n"):
+        stripped = line.lstrip()
+        if stripped and _PRIVATE_USE_RE.match(stripped):
+            indent = line[: len(line) - len(stripped)]
+            line = indent + "• " + _PRIVATE_USE_RE.sub(" ", stripped).strip()
+        else:
+            line = _PRIVATE_USE_RE.sub(" ", line)
+        out.append(line)
+    return "\n".join(out)
+
+
 def _mojibake_score(text: str) -> int:
     return sum((text or "").count(marker) for marker in _MOJIBAKE_MARKERS)
 
@@ -392,7 +414,9 @@ def extract_pdf_text(
             truncated = len(raw) > max_chars
             if truncated:
                 raw = raw[:max_chars]
-            return fix_decomposed_diacritics(_strip_page_furniture(_fix_common_mojibake(raw))), truncated
+            return fix_decomposed_diacritics(
+                _strip_page_furniture(_normalize_private_use_glyphs(_fix_common_mojibake(raw)))
+            ), truncated
     except HTTPException:
         raise
     except Exception:
@@ -420,4 +444,6 @@ def extract_pdf_text(
     if truncated:
         logging.getLogger("app.security").warning("pdf_text_truncated: %d > %d", len(raw), max_chars)
         raw = raw[:max_chars]
-    return fix_decomposed_diacritics(_strip_page_furniture(_fix_common_mojibake(raw))), truncated
+    return fix_decomposed_diacritics(
+        _strip_page_furniture(_normalize_private_use_glyphs(_fix_common_mojibake(raw)))
+    ), truncated

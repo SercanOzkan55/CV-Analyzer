@@ -89,9 +89,26 @@ _DEGREE_WORD_RE = re.compile(
     r"|degree|diploma|associate|ph\.?\s*d|lisans|mühendisliğ\w*|muhendisli\w*)\b",
     re.I,
 )
+# Language-agnostic date-range value: optional month word (any language)
+# before the year, dash OR connector-word separators (to/until/ile/bis/à/
+# hasta/a...), and "present" words across supported languages.
+_DATE_MONTH_OPT = r"(?:[A-Za-zÀ-ɏ]{2,12}\.?\s+)?"
+_DATE_SEP_ANY = (
+    r"(?:[-–—~→]|\bto\b|\buntil\b|\btill?\b|\bthrough\b"
+    r"|\bile\b|\bbis\b|\bau\b|\bà\b|\bhasta\b|\bal?\b)"
+)
+_PRESENT_WORDS_ANY = (
+    r"present|current|ongoing|now|today"
+    r"|halen|devam\s+ediyor|günümüz|şu\s+an"
+    r"|heute|aktuell|laufend"
+    r"|aujourd'hui|présent|actuel(?:lement)?|en\s+cours"
+    r"|presente|actual(?:idad|mente)?"
+    r"|oggi|attuale|atual(?:mente)?"
+    r"|الآن|حاليا"
+)
 _DATE_RANGE_VALUE_RE = re.compile(
-    r"^\s*((?:19|20)\d{2}|\d{1,2}[/.]\s*(?:19|20)\d{2})\s*[-\u2013\u2014]\s*"
-    r"((?:19|20)\d{2}|\d{2}|\d{1,2}[/.]\s*(?:19|20)\d{2}|present|current|ongoing|halen|devam\s+ediyor)\s*$",
+    rf"^\s*({_DATE_MONTH_OPT}(?:19|20)\d{{2}}|\d{{1,2}}[/.]\s*(?:19|20)\d{{2}})\s*{_DATE_SEP_ANY}\s*"
+    rf"({_DATE_MONTH_OPT}(?:19|20)\d{{2}}|\d{{2}}|\d{{1,2}}[/.]\s*(?:19|20)\d{{2}}|{_PRESENT_WORDS_ANY})\s*$",
     re.I,
 )
 _YEAR_RANGE_RE = re.compile(r"^\s*(?:19|20)\d{2}\s*[-\u2013\u2014]\s*(?:19|20)?\d{2}\s*$")
@@ -271,6 +288,35 @@ def _find_name_candidate(data: Dict[str, Any]) -> str:
             ):
                 return candidate.title()
     return ""
+
+
+# Education debris that leaks into skills sections of messy CVs: degree
+# abbreviations (B.Tech, M.Sc, CBSE...), school-class tokens (10th/12th) and
+# bare grade numbers ("62.2"). Deliberately narrow — "Scrum Master" or the
+# language "C" must never match.
+_GARBAGE_SKILL_RE = re.compile(
+    r"\b[bm]\.?\s*tech\b"
+    r"|\b[bm]\.?\s*sc\b"
+    r"|\bm\.?b\.?a\.?\b"
+    r"|\bph\.?d\b"
+    r"|\bc\.?b\.?s\.?e\b|\bi\.?c\.?s\.?e\b"
+    r"|\b(?:ssc|hsc)\b"
+    r"|\b1[02]\s*th\b"
+    r"|\b(?:bachelor|master|diploma)s?\s+(?:of|in|degree)\b"
+    r"|^(?:bachelor|master|diploma)s?$"
+    r"|\bmatriculation\b",
+    re.I,
+)
+
+
+def _is_garbage_skill_token(text: str) -> bool:
+    value = _clean(text)
+    if not value:
+        return True
+    # Pure numbers / percentages ("62.2", "10", "80.34%") are grades, not skills.
+    if re.fullmatch(r"[\d\s.,%/+-]*\d[\d\s.,%/+-]*", value):
+        return True
+    return bool(_GARBAGE_SKILL_RE.search(value))
 
 
 def _split_date_range_value(value: str) -> tuple[str, str]:
@@ -1401,17 +1447,19 @@ def _sanitize_schema(schema: CVSchema) -> None:
     # ── Education: drop entries without any meaningful content ──
     schema.education = [edu for edu in schema.education if edu.degree or edu.school]
 
-    # ── Skills: remove items that are really dates or URLs ──
+    # ── Skills: remove items that are really dates, URLs or education debris ──
     _date_like = re.compile(r"^\d{4}\s*[-–]\s*\d{4}$|^\d{1,2}/\d{4}$")
-    schema.skills = [s for s in schema.skills if s and not _date_like.match(s) and not re.match(r"https?://", s, re.I)]
+
+    def _keep_skill(s: str) -> bool:
+        return bool(
+            s and not _date_like.match(s) and not re.match(r"https?://", s, re.I) and not _is_garbage_skill_token(s)
+        )
+
+    schema.skills = [s for s in schema.skills if _keep_skill(s)]
     # Reflect into skills_categorized too
     if schema.skills_categorized:
         for cat in list(schema.skills_categorized):
-            cleaned = [
-                s
-                for s in schema.skills_categorized[cat]
-                if s and not _date_like.match(s) and not re.match(r"https?://", s, re.I)
-            ]
+            cleaned = [s for s in schema.skills_categorized[cat] if _keep_skill(s)]
             if cleaned:
                 schema.skills_categorized[cat] = cleaned
             else:

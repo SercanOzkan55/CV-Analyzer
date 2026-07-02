@@ -1986,16 +1986,34 @@ def _parse_experience_entries(lines: list[str]) -> list[dict]:
         r"(?:\d{1,2}[/.]\s*)?(?:19|20)\d{2}"
         r"|[A-Za-z\u00C0-\u024F\u0400-\u04FF]{2,12}\.?\s+(?:19|20)\d{2}"
     )
-    _date_sep = r"[-\u2013\u2014]"
+    # Separator: dash family OR a range connector word in any supported
+    # language (en: to/until/till/through, tr: ile, de: bis, fr: a/au,
+    # es/it/pt: a/al/hasta).  Word forms carry word boundaries so they never
+    # split month names or glued tokens like "2019to2020".
+    _date_sep = (
+        r"(?:[-–—~→]"
+        r"|\bto\b|\buntil\b|\btill?\b|\bthrough\b"
+        r"|\bile\b|\bbis\b|\bau\b|\bà\b|\bhasta\b|\bal?\b)"
+    )
+    # "still working here" words across supported languages.
+    _present_words = (
+        r"present|current|ongoing|now|today|to\s+date|till\s+date"
+        r"|halen|devam\s+ediyor|günümüz|şu\s+an"
+        r"|heute|aktuell|laufend|gegenwärtig"
+        r"|aujourd'hui|présent|actuel(?:lement)?|en\s+cours"
+        r"|presente|actual(?:idad|mente)?|hasta\s+ahora"
+        r"|oggi|attuale|ad\s+oggi|atual(?:mente)?"
+        r"|الآن|حاليا|حتى\s+الآن"
+    )
     _date_range_anywhere_re = re.compile(
         rf"\(?\s*(?:tarih|date|duration|period)?\s*[:：]?\s*"
         rf"(?P<start>{_date_token})\s*{_date_sep}\s*"
-        rf"(?P<end>{_date_token}|present|current|ongoing|halen|devam\s+ediyor)\s*\)?",
+        rf"(?P<end>{_date_token}|{_present_words})\s*\)?",
         re.I | re.UNICODE,
     )
     _date_range_full_re = re.compile(
         rf"^\(?\s*(?P<start>{_date_token})\s*{_date_sep}\s*"
-        rf"(?P<end>{_date_token}|present|current|ongoing|halen|devam\s+ediyor)\s*\)?$",
+        rf"(?P<end>{_date_token}|{_present_words})\s*\)?$",
         re.I | re.UNICODE,
     )
     _date_range_reversed_re = re.compile(
@@ -2239,12 +2257,40 @@ def _parse_experience_entries(lines: list[str]) -> list[dict]:
 
         cleaned_date_line, range_start, range_end = _extract_date_range(line)
         if range_start or range_end:
+            residue = cleaned_date_line if cleaned_date_line != line else ""
+            residue_words = len(residue.split()) if residue else 0
+            # A dated line whose residue LOOKS LIKE a header ("Pharmacy
+            # Intern, CVS Health, CA June 2024 to September 2024") starts the
+            # next job when the current entry is already established.
+            # Prose sentences that merely contain a date range ("Worked at X
+            # from June 2019 to March 2020 doing ...") must NOT split — they
+            # start lowercase/with an action verb or run long.
+            residue_is_header = (
+                residue
+                and 3 <= residue_words <= 12
+                and not residue[0].islower()
+                and not _starts_with_action_verb(residue)
+            )
+            established = bool(current.get("bullets") or current.get("start_date") or current.get("end_date"))
+            if residue_is_header and established:
+                entries.append(current)
+                current = _new_entry(line)
+                continue
             if not current.get("start_date"):
                 current["start_date"] = range_start
             if not current.get("end_date"):
                 current["end_date"] = range_end
-            if cleaned_date_line and cleaned_date_line != line and not current.get("location"):
-                current["location"] = cleaned_date_line
+            if residue:
+                # Role-like short residue is the job-title line ("Application
+                # Development Associate. Jan 2019 to Jan 2020"); long residue
+                # is a dated prose sentence and belongs in bullets; short
+                # non-role residue is a location.
+                if not current.get("company") and _looks_like_role(residue) and residue_words <= 8:
+                    current["company"] = residue.strip(" .")
+                elif residue_words > 6:
+                    current["bullets"].append(line.strip())
+                elif not current.get("location"):
+                    current["location"] = residue
             continue
 
         if (not current.get("start_date") and not current.get("end_date")) and _is_date_like(line):
@@ -2267,6 +2313,24 @@ def _parse_experience_entries(lines: list[str]) -> list[dict]:
                 current["location"] = parts[1].strip()
             continue
 
+        # Lowercase-starting lines are wrapped continuations of the previous
+        # sentence, never a new job header — attach them to the bullets
+        # instead of letting the new-entry branch below turn each fragment
+        # ("houses from the given construction drawings.") into its own entry.
+        if (
+            line
+            and line[0].islower()
+            and (
+                current.get("bullets")
+                or (current.get("title") and (current.get("company") or current.get("start_date")))
+            )
+        ):
+            if current.get("bullets"):
+                current["bullets"][-1] = (current["bullets"][-1].rstrip() + " " + line).strip()
+            else:
+                current["bullets"].append(line)
+            continue
+
         if current.get("company") and current.get("title"):
             # In PDF text, experience descriptions often lose their bullet
             # marker. Long/action-like continuation lines belong to the
@@ -2287,6 +2351,36 @@ def _parse_experience_entries(lines: list[str]) -> list[dict]:
 
     if current:
         entries.append(current)
+
+    def _merge_wrapped_bullets(bullets: list[str]) -> list[str]:
+        """Re-join hard-wrapped PDF lines that were split into fake bullets.
+
+        A bullet starting lowercase while the previous one has no terminal
+        punctuation is a wrapped continuation, not a new bullet.
+        """
+        merged: list[str] = []
+        for bullet in bullets:
+            prev = merged[-1] if merged else ""
+            if (
+                merged
+                and bullet
+                and bullet[0].islower()
+                and prev
+                and prev[-1] not in ".!?:;"
+                and len(prev) + len(bullet) < 600
+            ):
+                merged[-1] = f"{prev} {bullet}"
+            else:
+                merged.append(bullet)
+        return merged
+
+    for entry in entries:
+        entry["bullets"] = _merge_wrapped_bullets(entry.get("bullets") or [])
+        # Company/role swap repair: "Accenture" as title with the role text in
+        # company happens when the company line precedes the role line.
+        title, company = entry.get("title", ""), entry.get("company", "")
+        if title and company and _looks_like_role(company) and not _looks_like_role(title):
+            entry["title"], entry["company"] = company, title
 
     return [entry for entry in entries if entry.get("title") or entry.get("bullets")]
 
