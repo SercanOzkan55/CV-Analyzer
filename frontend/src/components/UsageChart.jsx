@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { BarChart2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../i18n/LanguageContext'
 import { fetchUsageHistory } from '../api'
 
 /**
@@ -10,6 +11,7 @@ import { fetchUsageHistory } from '../api'
  */
 export default function UsageChart() {
   const { token } = useAuth()
+  const { t } = useLanguage()
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -44,11 +46,24 @@ export default function UsageChart() {
   }
 
   const maxCount = Math.max(1, ...days.map(d => d.count))
+  const total = days.reduce((s, d) => s + d.count, 0)
 
   if (loading) {
     return (
       <div className="usage-chart-skeleton">
         <div className="skeleton skeleton-line" style={{ width: '100%', height: 120 }} />
+      </div>
+    )
+  }
+
+  // Empty state — a flat row of zero-height bars reads as "broken", so show a
+  // friendly placeholder until the first analysis lands.
+  if (total === 0) {
+    return (
+      <div className="usage-chart usage-chart-empty">
+        <div className="usage-empty-icon"><BarChart2 size={26} /></div>
+        <h4>{t('dashboard.usage_empty_title')}</h4>
+        <p>{t('dashboard.usage_empty_desc')}</p>
       </div>
     )
   }
@@ -60,7 +75,7 @@ export default function UsageChart() {
           const h = Math.max(4, (d.count / maxCount) * 100)
           const isToday = i === days.length - 1
           return (
-            <div key={d.date} className="usage-chart-col" title={`${d.label}: ${d.count} analiz`}>
+            <div key={d.date} className="usage-chart-col" title={`${d.label}: ${d.count} ${t('dashboard.usage_unit')}`}>
               <motion.div
                 className={`usage-chart-bar ${isToday ? 'today' : ''} ${d.count === 0 ? 'empty' : ''}`}
                 initial={{ height: 0 }}
@@ -84,8 +99,8 @@ export default function UsageChart() {
         ))}
       </div>
       <div className="usage-chart-summary">
-        <span>Son 30 gün: <strong>{days.reduce((s, d) => s + d.count, 0)}</strong> analiz</span>
-        <span>Bugün: <strong>{days[days.length - 1]?.count || 0}</strong></span>
+        <span>{t('dashboard.usage_last_30')}: <strong>{total}</strong> {t('dashboard.usage_unit')}</span>
+        <span>{t('dashboard.usage_today')}: <strong>{days[days.length - 1]?.count || 0}</strong></span>
       </div>
     </div>
   )

@@ -105,6 +105,44 @@
   padding: 0.25rem 0;
 }
 
+/* Empty state — shown until the first analysis produces activity. */
+.usage-chart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 150px;
+  text-align: center;
+  padding: 1rem;
+}
+
+.usage-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  color: var(--color-accent, #7c5cff);
+  background: color-mix(in srgb, var(--color-accent, #7c5cff) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent, #7c5cff) 28%, transparent);
+}
+
+.usage-chart-empty h4 {
+  margin: 0.25rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text, #f4f7ff);
+}
+
+.usage-chart-empty p {
+  margin: 0;
+  max-width: 320px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--color-text-muted, #8994a8);
+}
+
 .usage-chart-bars {
   display: flex;
   align-items: flex-end;

@@ -18,6 +18,7 @@ import { getScoreColor } from '../utils/scoreColors'
 import OnboardingModal from '../components/OnboardingModal'
 import QuotaWarningBanner from '../components/QuotaWarningBanner'
 import UsageChart from '../components/UsageChart'
+import TiltCard from '../components/TiltCard'
 import FavoritesList from '../components/FavoritesList'
 import StreakBadge from '../components/StreakBadge'
 import InsightsPanel from '../components/InsightsPanel'
@@ -143,15 +144,18 @@ function ScoreTrendChart({ history }) {
   const rawMin = Math.min(...scores)
   const rawMax = Math.max(...scores)
   const padding = Math.max((rawMax - rawMin) * 0.2, 8)
-  const minS = Math.max(0, Math.floor((rawMin - padding) / 5) * 5)
-  const maxS = Math.min(100, Math.ceil((rawMax + padding) / 5) * 5)
-  const rangeY = maxS - minS || 1
+  let minS = Math.max(0, Math.floor((rawMin - padding) / 5) * 5)
+  let maxS = Math.min(100, Math.ceil((rawMax + padding) / 5) * 5)
+  let rangeY = maxS - minS || 1
 
-  // Generate nice Y-axis ticks
-  const step = rangeY <= 20 ? 5 : rangeY <= 50 ? 10 : 25
+  // Generate nice Y-axis ticks. Align the bounds to the tick step so gridlines
+  // are evenly spaced — avoids a cramped extra tick near the top (e.g. 80 & 85).
+  const step = rangeY <= 15 ? 5 : rangeY <= 40 ? 10 : rangeY <= 80 ? 20 : 25
+  minS = Math.max(0, Math.floor(minS / step) * step)
+  maxS = Math.min(100, Math.ceil(maxS / step) * step)
+  rangeY = maxS - minS || 1
   const yTicks = []
   for (let v = minS; v <= maxS; v += step) yTicks.push(v)
-  if (yTicks[yTicks.length - 1] < maxS) yTicks.push(maxS)
 
   const chartH = H - PY - PB
 
@@ -216,12 +220,17 @@ function ScoreTrendChart({ history }) {
           <title>{p.date}: {p.score}%</title>
         </g>
       ))}
-      {/* X-axis date labels */}
-      {points.map((p, i) => (
-        (data.length <= 6 || i % Math.ceil(data.length / 6) === 0 || i === data.length - 1) && (
-          <text key={`d${i}`} x={p.x} y={H - 8} textAnchor="middle" fontSize="8" fill="var(--color-text-muted)">{p.date}</text>
-        )
-      ))}
+      {/* X-axis date labels — skip consecutive duplicates so multiple analyses
+          on the same day don't render "24 May" three times in a row. */}
+      {(() => {
+        let lastShown = null
+        return points.map((p, i) => {
+          const atInterval = data.length <= 6 || i % Math.ceil(data.length / 6) === 0 || i === data.length - 1
+          if (!atInterval || p.date === lastShown) return null
+          lastShown = p.date
+          return <text key={`d${i}`} x={p.x} y={H - 8} textAnchor="middle" fontSize="8" fill="var(--color-text-muted)">{p.date}</text>
+        })
+      })()}
     </svg>
   )
 }
@@ -490,7 +499,7 @@ export default function DashboardPage() {
 
         {/* ── Score Trend Chart ──────────────────────── */}
         {trendHistory.length >= 2 && (
-          <motion.div
+          <TiltCard
             className="card db-trend-card"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -504,16 +513,16 @@ export default function DashboardPage() {
               </div>
               {remoteTrends.length >= 2 && (
                 <span className="text-muted text-xs">
-                  {trendLoading ? 'Syncing...' : 'Database trend'}
+                  {trendLoading ? t('dashboard.syncing') : t('dashboard.db_trend')}
                 </span>
               )}
             </div>
             <ScoreTrendChart history={trendHistory} />
-          </motion.div>
+          </TiltCard>
         )}
 
         {/* ── Usage Activity Chart ─────────────────────── */}
-        <motion.div
+        <TiltCard
           className="card db-chart-card"
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -523,11 +532,11 @@ export default function DashboardPage() {
           <div className="db-section-header">
             <div className="db-section-title">
               <Activity size={15} style={{ color: 'var(--color-accent)' }} />
-              Kullanım Aktivitesi
+              {t('dashboard.usage_activity')}
             </div>
           </div>
           <UsageChart />
-        </motion.div>
+        </TiltCard>
 
         {/* ── Main Grid ─────────────────────────────────── */}
         <div className="db-main-grid">

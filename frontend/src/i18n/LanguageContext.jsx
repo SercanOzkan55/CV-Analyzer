@@ -66,6 +66,16 @@ function getBrowserLang() {
   return supported[bl] || 'en'
 }
 
+// Initial language: a persisted manual choice wins over everything (survives
+// refresh and new sessions); otherwise fall back to the browser language.
+function getInitialLang() {
+  try {
+    const manual = localStorage.getItem('cv_lang_manual')
+    if (manual && translations[manual]) return manual
+  } catch {}
+  return getBrowserLang()
+}
+
 // Detect language by IP geolocation — supports all 6 languages
 async function detectLanguageByIP() {
   const CACHE_KEY = 'cv_ip_lang_cache'
@@ -124,8 +134,8 @@ async function detectLanguageByIP() {
 }
 
 export function LanguageProvider({ children }) {
-  // Start with browser language instantly (no flash of wrong language)
-  const [lang, setLangState] = useState(getBrowserLang)
+  // Start with the persisted manual choice (or browser language) instantly.
+  const [lang, setLangState] = useState(getInitialLang)
   const [countryCode, setCountryCode] = useState(() => {
     try {
       const cached = localStorage.getItem('cv_ip_lang_cache')
@@ -137,12 +147,12 @@ export function LanguageProvider({ children }) {
   const regionKey = COUNTRY_TO_REGION[countryCode] || 'DEFAULT'
   const pricing = PRICING_CONFIG[regionKey]
 
-  // Manual selection by user (EN/TR buttons) — persists across navigation
+  // Manual selection by user (EN/TR buttons) — persisted so it survives
+  // navigation, hard refresh, and future sessions; IP detection never overrides it.
   const setLang = useCallback((newLang) => {
     if (translations[newLang]) {
       setLangState(newLang)
-      // Mark as manually selected so IP detection won't override during this session
-      try { sessionStorage.setItem('cv_lang_manual', newLang) } catch {}
+      try { localStorage.setItem('cv_lang_manual', newLang) } catch {}
       document.documentElement.lang = newLang
       document.documentElement.dir = RTL_LANGUAGES.includes(newLang) ? 'rtl' : 'ltr'
     }
@@ -162,15 +172,9 @@ export function LanguageProvider({ children }) {
       const hasConsent = localStorage.getItem('cookie_consent') === 'accepted'
       if (!hasConsent) return
 
-      // Clear manual flag on hard refresh so IP detection kicks in
-      const isReload = performance?.navigation?.type === 1 ||
-        (performance?.getEntriesByType?.('navigation')?.[0]?.type === 'reload')
-      if (isReload) {
-        try { sessionStorage.removeItem('cv_lang_manual') } catch {}
-      }
-
-      // If user manually selected a language in this session, keep it
-      const manual = (() => { try { return sessionStorage.getItem('cv_lang_manual') } catch { return null } })()
+      // A persisted manual choice always wins and is never overridden by IP —
+      // it survives navigation, hard refresh and future sessions.
+      const manual = (() => { try { return localStorage.getItem('cv_lang_manual') } catch { return null } })()
       if (manual && translations[manual]) {
         setLangState(manual)
         document.documentElement.lang = manual
@@ -181,7 +185,7 @@ export function LanguageProvider({ children }) {
       // Otherwise detect by IP
       detectLanguageByIP().then(({ lang: detectedLang, cc }) => {
         setCountryCode(cc)
-        const manual = (() => { try { return sessionStorage.getItem('cv_lang_manual') } catch { return null } })()
+        const manual = (() => { try { return localStorage.getItem('cv_lang_manual') } catch { return null } })()
         if (!manual && detectedLang && translations[detectedLang]) {
           setLangState(detectedLang)
           document.documentElement.lang = detectedLang
