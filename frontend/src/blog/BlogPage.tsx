@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Filter, PenLine, Sparkles } from "lucide-react";
+import { Filter, PenLine, Sparkles, FileText } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -142,7 +142,7 @@ export default function BlogPage() {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                 >
-                  <div className="blog-empty-icon">📝</div>
+                  <div className="blog-empty-icon"><FileText size={30} strokeWidth={1.6} /></div>
                   <p style={{ color: "var(--color-text-muted)" }}>{t("blog.no_posts_in_category")}</p>
                 </motion.div>
               ) : (
