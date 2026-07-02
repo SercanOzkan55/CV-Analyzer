@@ -225,6 +225,29 @@
   background: linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 55%);
   pointer-events: none;
 }
+/* Gradient cover: subtle dot texture + a large category glyph (replaces stock photos). */
+.blog-card-cover-pattern {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.16) 1px, transparent 1.5px);
+  background-size: 16px 16px;
+  opacity: 0.55;
+  pointer-events: none;
+}
+.blog-card-cover-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #fff;
+  opacity: 0.24;
+  transition: transform 0.55s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease;
+  pointer-events: none;
+}
+.blog-card:hover .blog-card-cover-icon {
+  transform: translate(-50%, -50%) scale(1.12) rotate(-5deg);
+  opacity: 0.32;
+}
 .blog-card-badges {
   position: absolute;
   top: 14px;

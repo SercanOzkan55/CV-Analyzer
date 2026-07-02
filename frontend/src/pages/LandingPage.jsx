@@ -239,8 +239,8 @@ function KineticHeroStage({ t, scrollYProgress }) {
     const bounds = event.currentTarget.getBoundingClientRect()
     const x = (event.clientX - bounds.left) / bounds.width - 0.5
     const y = (event.clientY - bounds.top) / bounds.height - 0.5
-    rotateX.set(y * -18)
-    rotateY.set(x * 22)
+    rotateX.set(y * -13)
+    rotateY.set(x * 16)
   }
 
   const resetTilt = () => {
@@ -286,7 +286,7 @@ function KineticHeroStage({ t, scrollYProgress }) {
             <strong>94%</strong>
           </div>
           <div className="hero-metric-tile hero-metric-tile-b">
-            <span>Match</span>
+            <span>{t('landing.hero_float_match_label')}</span>
             <strong>82%</strong>
           </div>
           <div className="hero-flow-line hero-flow-line-a" />
@@ -305,8 +305,8 @@ function KineticHeroStage({ t, scrollYProgress }) {
         >
           <div className="hero-kinetic-panel hero-kinetic-panel-left">
             <div className="hero-panel-icon"><Target size={16} /></div>
-            <span>Role fit</span>
-            <strong>High</strong>
+            <span>{t('landing.hero_float_fit_label')}</span>
+            <strong>{t('landing.hero_float_fit_value')}</strong>
           </div>
         </motion.div>
 
@@ -318,8 +318,8 @@ function KineticHeroStage({ t, scrollYProgress }) {
         >
           <div className="hero-kinetic-panel hero-kinetic-panel-right">
             <div className="hero-panel-icon"><Sparkles size={16} /></div>
-            <span>Signals</span>
-            <strong>12 found</strong>
+            <span>{t('landing.hero_float_match_label')}</span>
+            <strong>{t('landing.hero_float_match_value')}</strong>
           </div>
         </motion.div>
 
@@ -331,8 +331,8 @@ function KineticHeroStage({ t, scrollYProgress }) {
         >
           <div className="hero-kinetic-panel hero-kinetic-panel-bottom">
             <div className="hero-panel-icon"><Zap size={16} /></div>
-            <span>Rewrite</span>
-            <strong>Ready</strong>
+            <span>{t('landing.hero_float_rewrite_label')}</span>
+            <strong>{t('landing.hero_float_rewrite_value')}</strong>
           </div>
         </motion.div>
       </motion.div>
@@ -361,7 +361,7 @@ export default function LandingPage() {
     { title: t('landing.feature_ai_title'),       desc: t('landing.feature_ai_desc') },
     { title: t('landing.feature_ats_title'),      desc: t('landing.feature_ats_desc') },
     { title: t('landing.feature_skills_title'),   desc: t('landing.feature_skills_desc') },
-    { title: 'Multi-Language Support',            desc: t('landing.feature_multi_desc') },
+    { title: t('landing.feature_multi_title'),    desc: t('landing.feature_multi_desc') },
     { title: t('landing.feature_history_title'),  desc: t('landing.feature_history_desc') },
     { title: t('landing.feature_recruiter_title'),desc: t('landing.feature_recruiter_desc') },
   ]
@@ -517,13 +517,9 @@ export default function LandingPage() {
                   </div>
 
                   <div className="lp-flip-card-face lp-flip-card-back">
-                    <span className="lp-flip-kicker">Signal layer {String(i + 1).padStart(2, '0')}</span>
+                    <span className="lp-flip-kicker">{t('landing.feature_kicker')} {String(i + 1).padStart(2, '0')}</span>
                     <h3>{f.title}</h3>
                     <p>{f.desc}</p>
-                    <div className="lp-flip-meta">
-                      <span>Inspect depth</span>
-                      <ArrowRight size={15} />
-                    </div>
                   </div>
                 </div>
               </motion.article>

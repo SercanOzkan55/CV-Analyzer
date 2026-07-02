@@ -1,5 +1,8 @@
 import React from "react";
-import { Calendar, Clock, Eye, Globe, Loader2, MessageCircle, ThumbsUp } from "lucide-react";
+import {
+  Calendar, Clock, Eye, Globe, Loader2, MessageCircle, ThumbsUp,
+  Cpu, Brain, Palette, BarChart3, ShieldCheck, Cloud, Briefcase, FileText,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { formatDate, readingTime, getAvatarColor, getInitials, type BlogPost } from "../blogStore";
 import { useTranslation } from "../useTranslation";
@@ -14,6 +17,17 @@ const CATEGORY_GRADIENTS: Record<string, string> = {
   Güvenlik: "linear-gradient(135deg, #ef4444, #f43f5e)",
   Cloud: "linear-gradient(135deg, #0ea5e9, #38bdf8)",
   Kariyer: "linear-gradient(135deg, #c084fc, #f472b6)",
+};
+
+// A category glyph replaces clichéd stock photos on the cover.
+const CATEGORY_ICONS: Record<string, React.ElementType> = {
+  Teknoloji: Cpu,
+  "Yapay Zeka": Brain,
+  Tasarım: Palette,
+  "Veri Bilimi": BarChart3,
+  Güvenlik: ShieldCheck,
+  Cloud: Cloud,
+  Kariyer: Briefcase,
 };
 
 export default function BlogCard({ post }: { post: BlogPost }) {
@@ -34,6 +48,7 @@ export default function BlogCard({ post }: { post: BlogPost }) {
   const displayTitle = isTranslated && translated ? translated.title : post.title;
   const displaySummary = isTranslated && translated ? translated.summary : post.summary;
   const catGradient = CATEGORY_GRADIENTS[post.category] || "var(--gradient-accent)";
+  const CoverIcon = CATEGORY_ICONS[post.category] || FileText;
 
   return (
     <article
@@ -43,9 +58,10 @@ export default function BlogCard({ post }: { post: BlogPost }) {
       tabIndex={0}
       onKeyDown={e => e.key === "Enter" && navigate(`/blog/${post.slug}`)}
     >
-      {/* Image */}
-      <div className="blog-card-img-wrap">
-        <img src={post.image} alt={post.title} className="blog-card-img" />
+      {/* Cover — category gradient + subtle pattern & glyph (no stock photos) */}
+      <div className="blog-card-img-wrap" style={{ background: catGradient }}>
+        <div className="blog-card-cover-pattern" />
+        <CoverIcon size={78} strokeWidth={1.4} className="blog-card-cover-icon" />
         <div className="blog-card-img-overlay" />
 
         {/* Badges overlay */}
