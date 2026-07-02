@@ -335,6 +335,35 @@ def _check_date_integrity(extracted: dict) -> List[str]:
     return issues
 
 
+# Explicit experience section headers across supported languages. Matched only
+# against short standalone lines so prose mentions never count.
+_EXP_HEADER_LINE_RE = re.compile(
+    r"^(?:work|professional|employment|job)?\s*(?:experiences?|history)\b"
+    r"|^(?:[iİı]ş\s+)?deneyim(?:ler)?i?\b|^tecrübe(?:ler)?\b"
+    r"|^berufserfahrung\b|^arbeitserfahrung\b"
+    r"|^expériences?(?:\s+professionnelles?)?\b"
+    r"|^experiencia\s+(?:laboral|profesional)\b"
+    r"|^esperienza\s+lavorativa\b|^experiência\s+profissional\b"
+    r"|^الخبرات\b|^الخبرة\b",
+    re.I,
+)
+
+_EXP_DATE_RANGE_RE = re.compile(
+    r"(?:19|20)\d{2}\s*(?:[-–—]|\bto\b|\bile\b|\bbis\b|\bà\b|\bhasta\b)\s*"
+    r"(?:(?:19|20)\d{2}|present|current|halen|devam|heute|aujourd'hui|actual)",
+    re.I,
+)
+
+
+def _has_experience_evidence(raw_text: str) -> bool:
+    """Structural evidence that the CV really contains an experience section."""
+    for line in (raw_text or "").split("\n"):
+        stripped = line.strip(" \t:·•|-–—")
+        if stripped and len(stripped) <= 44 and _EXP_HEADER_LINE_RE.match(stripped):
+            return True
+    return len(_EXP_DATE_RANGE_RE.findall(raw_text or "")) >= 2
+
+
 def validate_extraction(
     raw_text: str,
     extracted: dict,
@@ -456,14 +485,18 @@ def validate_extraction(
 
     # ── 6. Section Counts ────────────────────────────────────────────────
 
-    # Check if raw text has experience-like content but extracted has none
+    # Check if raw text has experience-like content but extracted has none.
+    # Keyword counting alone misfires on student CVs whose summaries say
+    # "gaining industry experience..." — so beyond keyword signals we require
+    # structural evidence: an explicit section header line, or at least two
+    # date-range lines (typical of real employment entries).
     exp_signals = re.findall(
         r"\b(?:experience|deneyim|intern|staj|worked|managed|developed)\b",
         raw_text,
         re.I,
     )
     exp_entries = extracted.get("experiences", [])
-    if len(exp_signals) >= 3 and not exp_entries:
+    if len(exp_signals) >= 3 and not exp_entries and _has_experience_evidence(raw_text):
         issues.append("experience_section_lost")
         score -= 10
 
