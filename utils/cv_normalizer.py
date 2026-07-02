@@ -58,8 +58,11 @@ _BIRTH_LINE_RE = re.compile(
 )
 
 _DEGREE_RE = re.compile(
+    # "associate" alone is NOT a degree signal — it is one of the most common
+    # job-title words (Sales Associate, Application Development Associate).
+    # Only degree-context forms count: "Associate degree" / "Associate of Arts".
     r"\b(?:b\.?s\.?c?|m\.?s\.?c?|b\.?a|m\.?a|ph\.?d|m\.?b\.?a"
-    r"|bachelor|master|diploma|associate|degree"
+    r"|bachelor|master|diploma|associate(?:'s)?\s+(?:degree|of)|degree"
     r"|lisans|y[uü]ksek\s*lisans|doktora|[oö]n\s*lisans"
     r"|m[u\u00fc]hendisli[gk\u011f]\w*|engineering)\b",
     re.I,
@@ -295,6 +298,7 @@ def _has_job_signal(text: str) -> bool:
         r"\b(?:engineer|developer|manager|analyst|consultant|director"
         r"|lead|senior|junior|intern|coordinator|specialist|designer"
         r"|architect|administrator|officer|assistant|head\s+of"
+        r"|associate|executive|scientist|technician|trainee|representative"
         r"|mühendis|geliştirici|müdür|uzman|stajyer)\b",
         re.I,
     )

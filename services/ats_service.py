@@ -776,11 +776,20 @@ QUANTIFICATION_PATTERNS = [
 
 
 def _find_sections(cv_text: str) -> List[str]:
-    text = clean_lower(cv_text)
+    """Detect CV sections from header-LIKE lines only.
+
+    Searching aliases anywhere in the text misreports sections: a summary
+    saying "gaining industry experience..." made the report claim an
+    Experience section exists. Real section headers are short lines that
+    START with the alias, so only those count.
+    """
+    header_lines = [line.strip(" \t:·•|-–—_") for line in clean_lower(cv_text).split("\n")]
+    header_lines = [line for line in header_lines if line and len(line) <= 60]
     found = []
     for canon, aliases in SECTION_ALIASES.items():
         for alias in aliases:
-            if re.search(r"\b" + re.escape(clean_lower(alias)) + r"\b", text):
+            rx = re.compile(r"^" + re.escape(clean_lower(alias)) + r"\b")
+            if any(rx.match(line) for line in header_lines):
                 found.append(canon)
                 break
     return found
