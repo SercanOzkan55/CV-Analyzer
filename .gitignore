@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 !.env.production.example
+deploy/ssl/
 
 # Python
 *.pyc

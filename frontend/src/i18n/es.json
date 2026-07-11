@@ -320,6 +320,7 @@
     "billing_title": "Facturación",
     "billing_subtitle": "Gestiona tu suscripción, facturas y método de pago.",
     "manage_billing": "Gestionar facturación",
+    "billing_coming_soon": "Próximamente",
     "redirecting": "Redirigiendo..."
   },
   "premium": {

@@ -1,9 +1,9 @@
 # CV Analyzer — cvanalyzer.dev Production Launch Runbook
 
-Single-domain deploy: one VM runs `docker compose` (Postgres+pgvector, Redis,
-backend, nginx serving the built frontend and proxying `/api`). Payments stay
-OFF for the beta (`STRIPE_SECRET_KEY` empty), blog stays hidden
-(`VITE_ENABLE_BLOG=false`).
+Single-domain deploy: one VM runs `docker compose` (Redis, backend, nginx
+serving the built frontend and proxying `/api`). PostgreSQL and authentication
+stay on Supabase. Payments and blog stay hidden for beta
+(`VITE_ENABLE_BILLING=false`, `VITE_ENABLE_BLOG=false`).
 
 ## 1. Google Cloud VM
 
@@ -14,7 +14,7 @@ gcloud compute instances create cvanalyzer-prod \
   --zone=europe-west3-a \
   --machine-type=e2-standard-2 \
   --image-family=ubuntu-2404-lts-amd64 --image-project=ubuntu-os-cloud \
-  --boot-disk-size=40GB --boot-disk-type=pd-balanced \
+  --boot-disk-size=30GB --boot-disk-type=pd-balanced \
   --tags=http-server,https-server
 
 gcloud compute firewall-rules create allow-http  --allow tcp:80  --target-tags=http-server
@@ -42,33 +42,35 @@ git clone <REPO_URL> cv-analyzer && cd cv-analyzer
 cp .env.production.example .env            # fill EVERY empty value
 cp frontend/.env.production.example frontend/.env.production  # fill Supabase values
 
-# TLS: nginx.conf expects ./ssl/cert.pem + ./ssl/key.pem
-sudo apt-get install -y certbot
-sudo certbot certonly --standalone -d cvanalyzer.dev -d www.cvanalyzer.dev
-mkdir -p ssl
-sudo cp /etc/letsencrypt/live/cvanalyzer.dev/fullchain.pem ssl/cert.pem
-sudo cp /etc/letsencrypt/live/cvanalyzer.dev/privkey.pem  ssl/key.pem
-# (certbot renew hook should re-copy + `docker compose restart nginx`)
+# Cloudflare Dashboard -> SSL/TLS -> Origin Server -> Create certificate.
+# Cover cvanalyzer.dev and *.cvanalyzer.dev, then save the PEM files locally:
+mkdir -p deploy/ssl
+nano deploy/ssl/origin.pem
+nano deploy/ssl/origin-key.pem
+chmod 600 deploy/ssl/origin-key.pem
 
-docker compose up -d --build
-docker compose logs -f app   # wait for "app marked READY"
+docker compose -f docker-compose.prod.yml config --quiet
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml logs -f app
 ```
 
 Alembic migrations: the app self-creates missing tables, but run
-`docker compose exec app alembic upgrade heads` once to be explicit.
+`docker compose -f docker-compose.prod.yml exec app alembic upgrade heads` once
+to be explicit.
 
-## 3. Name.com DNS
+## 3. Cloudflare DNS and TLS
 
-Name.com → cvanalyzer.dev → DNS Records:
+Cloudflare -> cvanalyzer.dev -> DNS -> Records:
 
-| Type  | Host | Answer            | TTL |
-|-------|------|-------------------|-----|
-| A     | @    | `<cvanalyzer-ip>` | 300 |
-| A/CNAME | www | `<cvanalyzer-ip>` / `cvanalyzer.dev` | 300 |
+| Type  | Host | Answer            | TTL  | Proxy   |
+|-------|------|-------------------|------|---------|
+| A     | @    | `<cvanalyzer-ip>` | Auto | Proxied |
+| CNAME | www  | `cvanalyzer.dev`  | Auto | Proxied |
 
-Doğrulama: `nslookup cvanalyzer.dev` statik IP'yi dönmeli. (Certbot'u DNS
-yayıldıktan sonra çalıştır; 80 portu boş olmalı — compose'u certbot'tan sonra
-başlat ya da certbot öncesi `docker compose stop nginx`.)
+Cloudflare -> SSL/TLS -> Overview altında encryption mode **Full (strict)**
+olmalı. `nslookup cvanalyzer.dev` Cloudflare IP'lerini döndürür; origin IP'nin
+gizli kalması normaldir. Origin certificate yalnızca Cloudflare ile origin
+arasındaki bağlantı içindir.
 
 ## 4. Supabase redirect URLs
 
@@ -98,7 +100,7 @@ verilerin gerçekten gittiğini `/api/v1/me/data-summary` 401/404 ile doğrula).
 ## 6. Beta launch checklist
 
 - [ ] `ENV=production`, `MOCK_SERVICES=0` (aksi halde auth mock'a düşer — kritik)
-- [ ] Stripe anahtarları boş → Pricing upgrade butonları "coming soon" davranışında
+- [ ] Stripe anahtarları boş ve `VITE_ENABLE_BILLING=false`
 - [ ] `VITE_ENABLE_BLOG=false`
 - [ ] `ADMIN_TOKEN`, `BILLING_ADMIN_TOKEN`, `WORKER_DOWNLOAD_SIGNING_SECRET` set
 - [ ] Smoke script yeşil + elle akış tamam

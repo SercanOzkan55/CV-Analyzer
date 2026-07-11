@@ -418,6 +418,7 @@
     "billing_title": "Billing",
     "billing_subtitle": "Manage your subscription, invoices, and payment method.",
     "manage_billing": "Manage Billing",
+    "billing_coming_soon": "Coming soon",
     "redirecting": "Redirecting...",
     "corporate_detected_title": "Corporate Account Detected",
     "corporate_detected_desc": "Since you are using a business domain, you have unlocked a 20% Enterprise discount and a free batch processing trial.",

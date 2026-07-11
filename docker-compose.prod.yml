@@ -1,0 +1,86 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: >-
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --requirepass ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+      --appendonly yes
+      --bind 0.0.0.0
+      --timeout 300
+      --tcp-keepalive 60
+    expose:
+      - "6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ENV: production
+      MOCK_SERVICES: "0"
+      DATABASE_URL: ${DATABASE_URL:?Set the Supabase DATABASE_URL in .env}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}@redis:6379/1
+      TRUSTED_PROXY_COUNT: "1"
+    expose:
+      - "8001"
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - applogs:/app/logs
+      - backups:/app/backups
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=3).read()"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
+  frontend-build:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    volumes:
+      - frontend-dist:/output
+    restart: "no"
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx.production.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/ssl/origin.pem:/etc/nginx/ssl/origin.pem:ro
+      - ./deploy/ssl/origin-key.pem:/etc/nginx/ssl/origin-key.pem:ro
+      - frontend-dist:/usr/share/nginx/html:ro
+    depends_on:
+      app:
+        condition: service_healthy
+      frontend-build:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- --no-check-certificate --header='Host: cvanalyzer.dev' https://localhost/health >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  redisdata:
+  applogs:
+  backups:
+  frontend-dist:
