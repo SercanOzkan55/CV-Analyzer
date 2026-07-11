@@ -8,4 +8,4 @@ Disallow: /recruiter
 Disallow: /premium
 Disallow: /cv-builder
 
-Sitemap: https://cvanalyzer.app/sitemap.xml
+Sitemap: https://cvanalyzer.dev/sitemap.xml
