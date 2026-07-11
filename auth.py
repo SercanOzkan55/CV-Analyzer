@@ -271,7 +271,9 @@ def verify_supabase_jwt(authorization: str = Header(None)):
 
             # jwcrypto accepts JSON string; ensure key is serializable
             jwk_key = jwk_mod.JWK(**key_obj)
-            pem = jwk_key.export_to_pem(public_key=True, password=None)
+            # jwcrypto's export_to_pem has no public_key kwarg; the default
+            # (no args) exports the public key, which is all JWKS provides.
+            pem = jwk_key.export_to_pem()
             payload = jwt.decode(token, pem, algorithms=[alg], **_jwt_decode_kwargs())
         except Exception:
             _jwt_fail()
