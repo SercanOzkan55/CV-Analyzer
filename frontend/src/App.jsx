@@ -58,6 +58,8 @@ const AIAgentHubPage = lazy(() => import("./pages/AIAgentHubPage"))
 
 // ---------- CONFIG ----------
 
+import { BLOG_ENABLED } from "./config/features"
+
 const PRIVATE_MODE = import.meta.env.VITE_PRIVATE_MODE === 'true'
 const REGISTRATION_DISABLED = PRIVATE_MODE || import.meta.env.VITE_REGISTRATION_DISABLED === 'true'
 
@@ -142,8 +144,8 @@ function AnimatedRoutes() {
         <Route path="/terms" element={<PageTransition><TermsPage /></PageTransition>} />
         <Route path="/about" element={<PageTransition><AboutPage /></PageTransition>} />
         <Route path="/shared/:shareToken" element={<PageTransition><SharedAnalysisPage /></PageTransition>} />
-        <Route path="/blog" element={PRIVATE_MODE ? <PrivateRoute><PageTransition><BlogPage /></PageTransition></PrivateRoute> : <PageTransition><BlogPage /></PageTransition>} />
-        <Route path="/blog/:slug" element={PRIVATE_MODE ? <PrivateRoute><PageTransition><BlogDetailPage /></PageTransition></PrivateRoute> : <PageTransition><BlogDetailPage /></PageTransition>} />
+        {BLOG_ENABLED && <Route path="/blog" element={PRIVATE_MODE ? <PrivateRoute><PageTransition><BlogPage /></PageTransition></PrivateRoute> : <PageTransition><BlogPage /></PageTransition>} />}
+        {BLOG_ENABLED && <Route path="/blog/:slug" element={PRIVATE_MODE ? <PrivateRoute><PageTransition><BlogDetailPage /></PageTransition></PrivateRoute> : <PageTransition><BlogDetailPage /></PageTransition>} />}
         <Route path="*" element={<PageTransition><NotFoundPage /></PageTransition>} />
       </Routes>
     </AnimatePresence>

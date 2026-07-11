@@ -369,18 +369,22 @@ def analyze(
         raise
 
     # --- Auto-save candidate and its embedding for later semantic retrieval ---
+    # Only for organization accounts: candidate search is org-scoped, so an
+    # org-less Candidate row is unreachable and would keep raw CV text alive
+    # with no owner after account deletion.
     try:
-        cv_embedding = _maybe_get_analysis_candidate_embedding(body.cv_text)
-        cand = Candidate(
-            organization_id=db_user.organization_id,
-            cv_text=body.cv_text,
-        )
-        db.add(cand)
-        db.commit()
-        db.refresh(cand)
-        if cv_embedding:
-            # Save embedding using helper (handles DB types)
-            save_candidate_embedding(db, cand.id, cv_embedding)
+        if db_user.organization_id is not None:
+            cv_embedding = _maybe_get_analysis_candidate_embedding(body.cv_text)
+            cand = Candidate(
+                organization_id=db_user.organization_id,
+                cv_text=body.cv_text,
+            )
+            db.add(cand)
+            db.commit()
+            db.refresh(cand)
+            if cv_embedding:
+                # Save embedding using helper (handles DB types)
+                save_candidate_embedding(db, cand.id, cv_embedding)
     except Exception:
         try:
             db.rollback()
@@ -951,16 +955,20 @@ async def analyze_pdf(
                 db.commit()
                 db.refresh(analysis_record)
 
-                cv_embedding = _maybe_get_analysis_candidate_embedding(text)
-                cand = Candidate(
-                    organization_id=db_user.organization_id,
-                    cv_text=text,
-                )
-                db.add(cand)
-                db.commit()
-                db.refresh(cand)
-                if cv_embedding:
-                    save_candidate_embedding(db, cand.id, cv_embedding)
+                # Org accounts only — see the same guard in the text-analyze
+                # path: org-less Candidate rows are unreachable and outlive
+                # account deletion.
+                if db_user.organization_id is not None:
+                    cv_embedding = _maybe_get_analysis_candidate_embedding(text)
+                    cand = Candidate(
+                        organization_id=db_user.organization_id,
+                        cv_text=text,
+                    )
+                    db.add(cand)
+                    db.commit()
+                    db.refresh(cand)
+                    if cv_embedding:
+                        save_candidate_embedding(db, cand.id, cv_embedding)
 
                 # Link uploaded CV to user Data Center
                 try:
