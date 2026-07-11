@@ -26,7 +26,7 @@ export default function Footer() {
           <h4>{t('landing.footer_company')}</h4>
           <Link to="/about">{t('about.title')}</Link>
           {BLOG_ENABLED && <Link to="/blog">{t('nav.blog') || 'Blog'}</Link>}
-          <a href="mailto:support@cvanalyzer.app">{t('landing.footer_contact')}</a>
+          <a href="mailto:support@cvanalyzer.dev">{t('landing.footer_contact')}</a>
         </div>
 
         <div className="footer-col">

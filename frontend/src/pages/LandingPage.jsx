@@ -723,7 +723,7 @@ export default function LandingPage() {
               <li>{t('pricing.enterprise_f4')}</li>
               <li>{t('pricing.enterprise_f5')}</li>
             </ul>
-            <a href="mailto:sales@cvanalyzer.app" className="btn-outline btn-full">{t('pricing.enterprise_cta')}</a>
+            <a href="mailto:sales@cvanalyzer.dev" className="btn-outline btn-full">{t('pricing.enterprise_cta')}</a>
           </motion.div>
         </motion.div>
       </motion.section>

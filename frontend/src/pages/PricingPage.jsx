@@ -31,7 +31,7 @@ export default function PricingPage() {
 
   const publicContactSalesHref =
     import.meta.env.VITE_CONTACT_SALES_URL ||
-    'mailto:sales@cvanalyzer.local?subject=Enterprise%20plan%20inquiry'
+    'mailto:sales@cvanalyzer.dev?subject=Enterprise%20plan%20inquiry'
 
   async function onUpgrade(targetPlan) {
     if (!user || !token) return
