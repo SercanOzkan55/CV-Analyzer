@@ -44,6 +44,8 @@ services:
     volumes:
       - applogs:/app/logs
       - backups:/app/backups
+      - ./resume_model.pkl:/app/resume_model.pkl:ro
+      - ./models/score_calibrator.pkl:/app/models/score_calibrator.pkl:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=3).read()"]
       interval: 30s
@@ -67,6 +69,9 @@ services:
       DATABASE_URL: ${DATABASE_URL:?Set the Supabase DATABASE_URL in .env}
       REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}@redis:6379/1
     command: celery -A services.tasks:celery_app worker --loglevel=info --concurrency=1 -Q default,pdf_processing,ai_tasks
+    volumes:
+      - ./resume_model.pkl:/app/resume_model.pkl:ro
+      - ./models/score_calibrator.pkl:/app/models/score_calibrator.pkl:ro
     depends_on:
       redis:
         condition: service_healthy
