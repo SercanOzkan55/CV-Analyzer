@@ -2,6 +2,8 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    env_file:
+      - .env
     command: >-
       redis-server
       --maxmemory 256mb
@@ -74,7 +76,7 @@ services:
       frontend-build:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- --no-check-certificate --header='Host: cvanalyzer.dev' https://localhost/health >/dev/null"]
+      test: ["CMD-SHELL", "wget -qO- --no-check-certificate --header='Host: cvanalyzer.dev' https://127.0.0.1/health >/dev/null"]
       interval: 30s
       timeout: 5s
       retries: 5

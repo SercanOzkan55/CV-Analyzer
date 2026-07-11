@@ -40,6 +40,7 @@ RUN pip install --no-index --find-links=/wheels -r requirements.txt
 
 # Copy source
 COPY . /app
+RUN sed -i 's/\r$//' /app/start_gunicorn.sh /app/gunicorn_config.py
 RUN chown -R appuser:appuser /app
 
 USER appuser
