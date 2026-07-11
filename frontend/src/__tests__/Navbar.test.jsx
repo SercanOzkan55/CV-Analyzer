@@ -67,7 +67,12 @@ describe('Navbar', () => {
       expect(screen.getByText('nav.features')).toBeInTheDocument()
       expect(screen.getByText('nav.pricing')).toBeInTheDocument()
       expect(screen.getByText('nav.faq')).toBeInTheDocument()
-      expect(screen.getByText('Blog')).toBeInTheDocument()
+    })
+
+    it('hides the blog link while VITE_ENABLE_BLOG is off', () => {
+      renderNavbar()
+
+      expect(screen.queryByText('Blog')).not.toBeInTheDocument()
     })
 
     it('does not show dashboard or analyze links', () => {

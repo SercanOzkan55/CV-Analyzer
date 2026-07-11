@@ -51,6 +51,9 @@ def _ensure_mock_sqlite_schema_columns():
         _ensure_sqlite_column(connection, "candidate_actions", "cv_file_key", "cv_file_key VARCHAR")
         _ensure_sqlite_column(connection, "candidate_actions", "cv_file_name", "cv_file_name VARCHAR")
         _ensure_sqlite_column(connection, "candidate_actions", "cv_file_type", "cv_file_type VARCHAR")
+        _ensure_sqlite_column(connection, "candidate_actions", "assigned_user_id", "assigned_user_id INTEGER")
+        _ensure_sqlite_column(connection, "candidate_actions", "deleted_at", "deleted_at DATETIME")
+        _ensure_sqlite_column(connection, "candidate_actions", "anonymized_at", "anonymized_at DATETIME")
 
 
 def _configure_logging():

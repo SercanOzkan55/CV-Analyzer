@@ -53,11 +53,16 @@ def index_cv_embedding(
         raise HTTPException(status_code=500, detail="Failed to compute CV embedding")
 
     db_user = get_or_create_user(db, user.get("user_id"), user.get("email"))
+    organization_id = getattr(db_user, "organization_id", None)
+    if organization_id is None:
+        # Candidate search is org-scoped; an org-less row can never be
+        # retrieved and would retain raw CV text past account deletion.
+        raise HTTPException(status_code=400, detail="Candidate indexing requires an organization account")
     candidate = Candidate(
         name=body.name,
         email=body.email,
         cv_text=text_value,
-        organization_id=getattr(db_user, "organization_id", None),
+        organization_id=organization_id,
     )
     db.add(candidate)
     db.commit()
