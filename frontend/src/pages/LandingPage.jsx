@@ -10,7 +10,6 @@ import { useLanguage } from '../i18n/LanguageContext'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import AnimatedBackground from '../components/AnimatedBackground'
-import TestimonialCarousel from '../components/TestimonialCarousel'
 import CircularProgress from '../components/CircularProgress'
 import { SectionTitle } from '../components/ui'
 import useAnimatedCounter from '../hooks/useAnimatedCounter'
@@ -671,11 +670,6 @@ export default function LandingPage() {
             )
           })}
         </motion.div>
-      </motion.section>
-
-      {/* ── Testimonials ─────────────────────────────────── */}
-      <motion.section id="testimonials" className="section section-alt" style={{ padding: 0 }} {...revealSectionProps}>
-        <TestimonialCarousel t={t} />
       </motion.section>
 
       {/* ── Pricing ──────────────────────────────────────── */}
