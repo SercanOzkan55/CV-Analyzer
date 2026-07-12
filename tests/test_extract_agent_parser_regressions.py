@@ -1,4 +1,32 @@
-from agents.extract_agent import extract_structured
+from agents.extract_agent import _merge_wrapped_lines, extract_structured
+
+
+def test_wrapped_pdf_word_is_dehyphenated():
+    merged = _merge_wrapped_lines(
+        "Active project devel-\nopment showcased on GitHub. Seeking a Software Engineering role."
+    )
+
+    assert "development showcased" in merged
+    assert "devel- opment" not in merged
+
+
+def test_multi_column_name_rescue_accepts_engineering_title():
+    result = extract_structured(
+        """multi_col_fixed
+SKILLS
+Innovator from Govt.
+
+SUKHVINDER SINGH
+ELECTRICAL ENGINEERING
+
+EXPERIENCE
+Site Engineer
+Acme Ltd.
+2010 - 2013
+"""
+    )
+
+    assert result["full_name"] == "SUKHVINDER SINGH"
 
 
 def test_visual_cv_leading_name_and_work_background_are_not_misrouted():

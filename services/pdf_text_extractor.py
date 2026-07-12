@@ -13,7 +13,7 @@ from fastapi import HTTPException
 
 _SECTION_HEADING_RE = re.compile(
     r"\b(profile|summary|objective|about|skills?|proficient|experience|employment|work|history"
-    r"|projects?|education|academic|certifications?|languages?|personal|executive"
+    r"|projects?|education|academic|certifications?|languages?|personal|executive|impact"
     r"|deneyim|egitim|e\u011fitim|yetenek|beceri|projeler|diller|profil|ozet|\u00f6zet)\b",
     re.I,
 )
@@ -113,6 +113,44 @@ def _line_tolerance(words: list[dict]) -> float:
     return max(3.0, min(6.0, median(heights) * 0.35))
 
 
+def _line_words_to_text(words: list[dict]) -> str:
+    ordered = sorted(words, key=lambda word: float(word["x0"]))
+    parts: list[str] = []
+    index = 0
+
+    while index < len(ordered):
+        text = str(ordered[index].get("text") or "")
+        if len(text) != 1 or not text.isalpha():
+            parts.append(text)
+            index += 1
+            continue
+
+        end = index
+        while end < len(ordered):
+            value = str(ordered[end].get("text") or "")
+            if len(value) != 1 or not value.isalpha():
+                break
+            end += 1
+
+        run = ordered[index:end]
+        if len(run) < 5:
+            parts.extend(str(word.get("text") or "") for word in run)
+            index = end
+            continue
+
+        gaps = [max(0.0, float(run[pos + 1]["x0"]) - float(run[pos]["x1"])) for pos in range(len(run) - 1)]
+        baseline = median(sorted(gaps)[: max(1, len(gaps) // 2)]) if gaps else 0.0
+        word_gap = max(4.0, baseline * 2.0)
+        rebuilt = str(run[0].get("text") or "")
+        for pos, word in enumerate(run[1:]):
+            separator = " " if gaps[pos] > word_gap else ""
+            rebuilt += separator + str(word.get("text") or "")
+        parts.append(rebuilt)
+        index = end
+
+    return " ".join(part for part in parts if part).strip()
+
+
 def _words_to_lines(words: list[dict]) -> list[str]:
     if not words:
         return []
@@ -126,7 +164,7 @@ def _words_to_lines(words: list[dict]) -> list[str]:
     for word in ordered:
         top = float(word["top"])
         if current and abs(top - current_top) > tolerance:
-            lines.append(" ".join(str(w["text"]) for w in sorted(current, key=lambda w: float(w["x0"]))))
+            lines.append(_line_words_to_text(current))
             current = [word]
             current_top = top
         else:
@@ -134,7 +172,7 @@ def _words_to_lines(words: list[dict]) -> list[str]:
             current_top = (current_top + top) / 2.0
 
     if current:
-        lines.append(" ".join(str(w["text"]) for w in sorted(current, key=lambda w: float(w["x0"]))))
+        lines.append(_line_words_to_text(current))
     return [line.strip() for line in lines if line.strip()]
 
 

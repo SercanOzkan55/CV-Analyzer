@@ -812,6 +812,10 @@ export default function AnalyzePage() {
     }
   }
 
+  function autoFixTextIsUnchanged() {
+    return editedText.trim() === String(autoFixResult?.optimized_cv_text || '').trim()
+  }
+
   async function handleExportAutoFix(format) {
     if (!autoFixResult || !editedText.trim()) {
       setAutoFixError(t('analyze.no_file'))
@@ -822,9 +826,18 @@ export default function AnalyzePage() {
       setExportLoading(format)
       setAutoFixError(null)
 
+      const useStructuredPayload = autoFixTextIsUnchanged()
+      if (useStructuredPayload && autoFixResult.export_safe === false) {
+        setAutoFixError(autoFixResult.export_warning || 'This CV must be reviewed before export.')
+        return
+      }
+
       const response = await exportAutoFixedCV(token, {
         optimized_cv_text: editedText,
+        builder_payload: useStructuredPayload ? autoFixResult.builder_payload : undefined,
+        job_description: jobDesc,
         output_format: format,
+        lang,
       })
 
       const blob = await response.blob()
@@ -1803,7 +1816,7 @@ export default function AnalyzePage() {
                         type="button"
                         className="btn-primary"
                         onClick={() => handleExportAutoFix('pdf')}
-                        disabled={exportLoading === 'pdf'}
+                        disabled={exportLoading === 'pdf' || (autoFixResult.export_safe === false && autoFixTextIsUnchanged())}
                       >
                         {exportLoading === 'pdf' ? t('analyze.autofix_exporting') : t('analyze.autofix_export_pdf')}
                       </button>
@@ -1811,7 +1824,7 @@ export default function AnalyzePage() {
                         type="button"
                         className="btn-outline"
                         onClick={() => handleExportAutoFix('docx')}
-                        disabled={exportLoading === 'docx'}
+                        disabled={exportLoading === 'docx' || (autoFixResult.export_safe === false && autoFixTextIsUnchanged())}
                       >
                         {exportLoading === 'docx' ? t('analyze.autofix_exporting') : t('analyze.autofix_export_docx')}
                       </button>

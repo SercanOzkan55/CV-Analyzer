@@ -371,6 +371,12 @@ def _merge_wrapped_lines(text: str) -> str:
                 continue
 
         # ── Contact / birth / education lines must stay separate ──
+        # Rejoin words split by a discretionary PDF line-end hyphen before
+        # structural keyword guards inspect the continuation line.
+        if buffer.endswith("-") and line[:1].islower():
+            buffer = buffer[:-1] + line
+            continue
+
         if _MERGE_CONTACT_LABEL_RE.match(line) or _MERGE_CONTACT_SIGNAL_RE.search(line):
             if buffer:
                 merged.append(buffer)
@@ -605,6 +611,8 @@ def extract_structured(cv_text: str) -> Dict:
             return True
         if any(ch.isdigit() for ch in low) or any(tok in low for tok in ("@", "http", "www.", "/", "|")):
             return True
+        if re.search(r"\bfrom\b", low):
+            return True
         if low in {"skills", "communication", "languages", "education", "projects", "sql", "java"}:
             return True
         return False
@@ -619,7 +627,7 @@ def extract_structured(cv_text: str) -> Dict:
         return any(ch.islower() for ch in text_value) or text_value.isupper()
 
     _job_title_re = re.compile(
-        r"\b(?:engineer|developer|analyst|designer|architect|manager|researcher"
+        r"\b(?:engineer(?:ing)?|developer|analyst|designer|architect|manager|researcher"
         r"|intern|consultant|specialist|student|officer|assistant)\b",
         re.I,
     )
@@ -638,6 +646,7 @@ def extract_structured(cv_text: str) -> Dict:
             "summary",
             "experience",
             "work background",
+            "career timeline",
         }
         for idx, candidate in enumerate(raw_lines[:60]):
             if candidate.lower() in skip_headers:

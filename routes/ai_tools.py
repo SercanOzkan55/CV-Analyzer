@@ -11,6 +11,7 @@ from core.runtime_bridge import main_module as _main_module
 from core.route_dependencies import *  # noqa: F403
 from services.ai_feature_service import ensure_ai_rewrite_allowed
 from services.owner_workflow_service import create_owner_notification
+from schemas.cv_model import CVModel
 from typing import List, Optional
 
 
@@ -399,6 +400,7 @@ class CVRewriteRequest(BaseModel):
 
 class CVAutoFixExportRequest(BaseModel):
     optimized_cv_text: str
+    builder_payload: dict | None = None
     job_description: str | None = ""
     template: str = "classic"
     output_format: str = "docx"
@@ -602,11 +604,15 @@ def export_auto_fixed_cv(
     db_user = get_or_create_user(db, supabase_id, email)
     effective_plan = _resolve_effective_plan(db, db_user)
 
-    cv_model = structured_text_to_builder_payload(
-        body.optimized_cv_text,
-        job_description=body.job_description or "",
-        lang=body.lang,
-    )
+    if body.builder_payload:
+        cv_model = CVModel.from_mapping(body.builder_payload)
+        cv_model.ensure_skills_categorized()
+    else:
+        cv_model = structured_text_to_builder_payload(
+            body.optimized_cv_text,
+            job_description=body.job_description or "",
+            lang=body.lang,
+        )
     cv_data = cv_model.model_dump()
     cv_data["template"] = body.template
     cv_data["output_format"] = body.output_format

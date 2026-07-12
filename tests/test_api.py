@@ -263,6 +263,61 @@ def test_cv_auto_fix_export_html_returns_html(client):
     assert b"<" in resp.content
 
 
+def test_cv_auto_fix_export_prefers_first_parse_builder_payload(client, monkeypatch):
+    from io import BytesIO
+
+    import routes.ai_tools as ai_tools_routes
+
+    captured = {}
+
+    def fake_build_cv(**kwargs):
+        captured.update(kwargs["cv_data"])
+        return {
+            "buffer": BytesIO(b"structured-export"),
+            "filename": "Jane_Doe.html",
+            "content_type": "text/html; charset=utf-8",
+        }
+
+    monkeypatch.setattr(ai_tools_routes, "build_cv", fake_build_cv)
+    payload = {
+        "optimized_cv_text": ("Jane Doe\njane@example.com\n\nPROJECTS\nProject One\n- Optimized project bullet"),
+        "builder_payload": {
+            "full_name": "Jane Doe",
+            "title": "Backend Engineer",
+            "email": "jane@example.com",
+            "phone": "+90 555 123 45 67",
+            "location": "Istanbul, Turkey",
+            "projects": [
+                {
+                    "name": "Project One",
+                    "description": "",
+                    "bullets": ["Preserved structured project bullet"],
+                }
+            ],
+            "education": [
+                {
+                    "degree": "B.Sc. Computer Engineering",
+                    "school": "Example University",
+                    "start_date": "2021",
+                    "end_date": "2025",
+                }
+            ],
+            "skills_categorized": {"Technical Skills": ["Python", "FastAPI"]},
+            "languages": ["Turkish", "English"],
+        },
+        "output_format": "html",
+        "template": "classic",
+        "lang": "en",
+    }
+
+    resp = client.post("/api/v1/cv/auto-fix/export", json=payload)
+
+    assert resp.status_code == 200
+    assert captured["phone"] == "+90 555 123 45 67"
+    assert captured["projects"][0]["bullets"] == ["Preserved structured project bullet"]
+    assert captured["languages"] == ["Turkish", "English"]
+
+
 def test_cv_auto_fix_parse_endpoint_returns_builder_payload(client):
     payload = {
         "optimized_cv_text": "John Doe\njohn@example.com\n\nPROFESSIONAL SUMMARY\nPython developer.\n\nEXPERIENCE\nBackend Developer\n- Built FastAPI services\n\nSKILLS\nPython, FastAPI, SQL",
