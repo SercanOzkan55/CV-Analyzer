@@ -346,6 +346,9 @@ def _noise_section(line: str) -> str | None:
 
 
 def _clean_lines(text: str) -> list[str]:
+    from services.pdf_text_extractor import _normalize_private_use_glyphs
+
+    text = _normalize_private_use_glyphs(text)
     lines = []
     for line in text.split("\n"):
         clean = unicodedata.normalize("NFC", line)
@@ -1138,6 +1141,20 @@ def _normalize_language_lines(lines: list[str]) -> list[str]:
     for line in lines:
         if not line:
             continue
+        detailed_match = re.match(
+            r"^([A-Za-z\u00C0-\u024F\u0400-\u04FF\u011E\u011F\u0130\u0131\u015E\u015F\u00C7\u00E7\u00D6\u00F6\u00DC\u00FC ]{2,24})\s*:\s*(.+)$",
+            line,
+        )
+        if detailed_match:
+            language_name = detailed_match.group(1).strip()
+            detail = detailed_match.group(2).strip()
+            if (
+                language_name.lower() in _KNOWN_LANGS
+                and re.search(_LEVELS_PATTERN, detail, re.I)
+                and re.search(_SUBSKILLS_PATTERN, detail, re.I)
+            ):
+                items.append(f"{language_name}: {detail}")
+                continue
         parts = re.split(r"\s*[|;/]\s*", line)
         if len(parts) == 1:
             parts = re.split(r"\s{2,}", line)
@@ -2286,6 +2303,20 @@ def _parse_experience_entries(lines: list[str]) -> list[dict]:
                 current["location"] = parts[1].strip()
             continue
 
+        # A hard-wrapped continuation may begin with an acronym or proper
+        # noun ("TCP vs UDP", "LLMs", "AWS"), so lowercase-only detection
+        # is insufficient. Explicit bullet/header/date lines were handled
+        # above; an unfinished prior bullet owns this continuation.
+        if current.get("bullets"):
+            previous_bullet = current["bullets"][-1].rstrip()
+            if (
+                previous_bullet
+                and previous_bullet[-1] not in ".!?:;"
+                and not (len(line.split()) <= 8 and _looks_like_role(line))
+            ):
+                current["bullets"][-1] = f"{previous_bullet} {line}".strip()
+                continue
+
         # Lowercase-starting lines are wrapped continuations of the previous
         # sentence, never a new job header — attach them to the bullets
         # instead of letting the new-entry branch below turn each fragment
@@ -2505,13 +2536,7 @@ def _parse_education_entries(lines: list[str]) -> list[dict]:
         if "|" in line:
             parts = [p.strip() for p in line.split("|") if p.strip()]
             if len(parts) >= 2:
-                if (
-                    current
-                    and current.get("school")
-                    and not current.get("degree")
-                    and not current.get("start_date")
-                    and not current.get("end_date")
-                ):
+                if current and current.get("school") and not current.get("degree"):
                     pass  # merge into current
                 else:
                     if current:
@@ -2519,7 +2544,10 @@ def _parse_education_entries(lines: list[str]) -> list[dict]:
                     current = _new_edu_entry()
                 for part in parts:
                     lp = part.lower()
-                    if any(kw in lp for kw in university_keywords):
+                    part_gpa = re.search(r"\b\d(?:\.\d{1,2})?\s*/\s*(?:4(?:\.0+)?|5(?:\.0+)?)\b", part)
+                    if "gpa" in lp or "cgpa" in lp or part_gpa:
+                        current["gpa"] = re.sub(r"^\s*(?:c?gpa)\s*:\s*", "", part, flags=re.I).strip()
+                    elif any(kw in lp for kw in university_keywords):
                         current["school"] = part
                     elif re.search(r"(?:19|20)\d{2}\s*(?:[-–]|to)\s*", part, re.I):
                         current["start_date"], current["end_date"] = _parse_date_range(part)
@@ -2634,16 +2662,44 @@ def _parse_education_entries(lines: list[str]) -> list[dict]:
         else:
             expanded.append(entry)
 
+    normalized_entries: list[dict] = []
+    pending_school: dict | None = None
+    school_context: dict[str, str] = {}
     for entry in expanded:
+        if entry.get("school") and not entry.get("degree") and not entry.get("gpa"):
+            if pending_school is not None:
+                normalized_entries.append(pending_school)
+            pending_school = entry
+            school_context = {key: entry.get(key, "") for key in ("school", "start_date", "end_date", "location")}
+            continue
+
+        if entry.get("degree") and not entry.get("school") and school_context:
+            for key, value in school_context.items():
+                if value and not entry.get(key):
+                    entry[key] = value
+            pending_school = None
+        elif pending_school is not None:
+            normalized_entries.append(pending_school)
+            pending_school = None
+
+        if entry.get("school"):
+            school_context = {key: entry.get(key, "") for key in ("school", "start_date", "end_date", "location")}
+        normalized_entries.append(entry)
+
+    if pending_school is not None:
+        normalized_entries.append(pending_school)
+
+    for entry in normalized_entries:
         for key in ("degree", "school", "start_date", "end_date", "gpa", "field", "location"):
             entry.setdefault(key, "")
 
-    return expanded
+    return normalized_entries
 
 
 def _extract_categorized_skills(lines: list[str]) -> tuple[dict[str, list[str]], list[str]]:
     categories: dict[str, list[str]] = {}
     uncategorized: list[str] = []
+    last_category = ""
 
     for raw in lines or []:
         line = str(raw or "").strip()
@@ -2652,13 +2708,23 @@ def _extract_categorized_skills(lines: list[str]) -> tuple[dict[str, list[str]],
         if ":" in line:
             category, values = line.split(":", 1)
             category_clean = category.strip()
+            values = values.lstrip(" |")
             items = [item.strip(" -*•") for item in re.split(r"\s*[,;/|]\s*", values) if item.strip(" -*•")]
             if category_clean and items:
                 categories.setdefault(category_clean, [])
                 for item in items:
                     if item not in categories[category_clean]:
                         categories[category_clean].append(item)
+                last_category = category_clean
                 continue
+        if (
+            last_category
+            and len(line.split()) <= 3
+            and categories.get(last_category)
+            and not re.match(r"^\s*[-*•]\s+", line)
+        ):
+            categories[last_category][-1] = f"{categories[last_category][-1]} {line}".strip()
+            continue
         if re.match(r"^\s*[-*•]\s+", line):
             uncategorized.append(re.sub(r"^\s*[-*•]\s+", "", line).strip())
         else:
@@ -2723,6 +2789,11 @@ _KNOWN_TECHS = {
     "flask",
     "spring",
     "node",
+    "nodejs",
+    "nextjs",
+    "reactjs",
+    "vuejs",
+    "aspnet",
     "express",
     "sql",
     "mysql",
@@ -2897,6 +2968,11 @@ def _parse_project_entries(lines: list[str]) -> list[dict]:
             return False
 
         is_continuation_word = bool(_PROJECT_CONTINUATION_RE.match(text))
+
+        if current_entry and current_entry.get("bullets"):
+            previous_bullet = current_entry["bullets"][-1].rstrip()
+            if previous_bullet and previous_bullet[-1] not in ".!?:;":
+                return True
 
         first_char = text[0] if text else ""
         if first_char.islower() or is_continuation_word:
@@ -3167,6 +3243,8 @@ def _assess_export_safety(source_text: str, model: CVModel) -> tuple[bool, dict]
         hard_fails.append(f"location_is_section_heading: '{model.location}'")
     if re.search(r"\b(?:location preference|skype)\s*:", model.summary or "", re.I):
         hard_fails.append("summary_contains_header_contact_fields")
+    if re.search(r"\(cid:\d+\)", model.model_dump_json(), re.I):
+        hard_fails.append("unmapped_pdf_glyphs")
 
     if hard_fails != list(report.get("hard_fails") or []):
         report = dict(report)

@@ -563,12 +563,16 @@ def _repair_schema(schema: CVSchema, data: Dict[str, Any]) -> None:
         if period_key and period_key in seen_edu_period:
             existing_idx = seen_edu_period[period_key]
             existing = deduped_edu[existing_idx]
+            existing_degree = re.sub(r"\W+", "", existing.degree.lower())
+            incoming_degree = re.sub(r"\W+", "", edu.degree.lower())
+            if existing_degree and incoming_degree and existing_degree == incoming_degree:
+                continue
             if _weak_edu_degree(edu.degree):
                 continue
             if _weak_edu_degree(existing.degree):
                 deduped_edu[existing_idx] = edu
                 seen_edu.add(key)
-            continue
+                continue
         if key and key not in seen_edu:
             seen_edu.add(key)
             if period_key:
@@ -637,9 +641,6 @@ def _repair_schema(schema: CVSchema, data: Dict[str, Any]) -> None:
                 )
             )
             continue
-        if proj.name and proj.description and _looks_like_tech_list(proj.description):
-            proj.name = f"{proj.name} - {proj.description}"
-            proj.description = ""
         expanded_projects.append(proj)
     schema.projects = expanded_projects
 
@@ -2211,9 +2212,9 @@ _CANONICAL_ORDER = [
     "summary",
     "experience",
     "projects",
-    "education",
     "skills",
     "certifications",
+    "education",
     "languages",
     "interests",
     "misc",

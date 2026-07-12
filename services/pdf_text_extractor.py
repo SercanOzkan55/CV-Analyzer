@@ -44,7 +44,7 @@ _PAGE_FURNITURE_RES = (
     # indistinguishable from real content such as "Rated top 2 of 50" or
     # "Ranked 1 of 500", so matching it silently dropped achievement lines.
     re.compile(r"^\s*\d{1,3}\s+of\s+\d{1,2}\s*$", re.I),  # "1 of 3"
-    re.compile(r"^\s*\S+\.(?:edu|com|org|net)\S*\s*[|\-–]?\s*\d{1,3}\s*$", re.I),  # "site.edu 22"
+    re.compile(r"^\s*\S+\.(?:edu|com|org|net)\S*\s+(?:[|\-–]\s*)?\d{1,3}\s*$", re.I),  # "site.edu 22"
 )
 
 
@@ -65,20 +65,27 @@ def _strip_page_furniture(text: str) -> str:
 # (e.g. U+F076, U+F0B7). Downstream classifiers treat them as opaque letters,
 # which breaks bullet detection and pollutes skills/languages.
 _PRIVATE_USE_RE = re.compile("[\ue000-\uf8ff]+")
+_CID_GLYPH_RE = re.compile(r"\(cid:\s*\d+\)", re.I)
+_CID_BULLET_RE = re.compile(r"\(cid:\s*127\)", re.I)
 
 
 def _normalize_private_use_glyphs(text: str) -> str:
     """Turn leading symbol-font glyphs into real bullets; drop the rest."""
-    if not text or not _PRIVATE_USE_RE.search(text):
+    if not text or not (_PRIVATE_USE_RE.search(text) or _CID_GLYPH_RE.search(text)):
         return text
     out = []
     for line in text.split("\n"):
         stripped = line.lstrip()
-        if stripped and _PRIVATE_USE_RE.match(stripped):
+        leading_cid = _CID_GLYPH_RE.match(stripped) if stripped else None
+        if stripped and (_PRIVATE_USE_RE.match(stripped) or leading_cid):
             indent = line[: len(line) - len(stripped)]
-            line = indent + "• " + _PRIVATE_USE_RE.sub(" ", stripped).strip()
+            stripped = _PRIVATE_USE_RE.sub(" ", stripped)
+            stripped = _CID_GLYPH_RE.sub(" ", stripped, count=1).strip()
+            line = indent + "• " + stripped
         else:
             line = _PRIVATE_USE_RE.sub(" ", line)
+        line = _CID_BULLET_RE.sub("•", line)
+        line = _CID_GLYPH_RE.sub(" ", line)
         out.append(line)
     return "\n".join(out)
 
@@ -115,13 +122,24 @@ def _line_tolerance(words: list[dict]) -> float:
 
 def _line_words_to_text(words: list[dict]) -> str:
     ordered = sorted(words, key=lambda word: float(word["x0"]))
+    gaps = [max(0.0, float(ordered[pos + 1]["x0"]) - float(ordered[pos]["x1"])) for pos in range(len(ordered) - 1)]
+    ordinary_gaps = [gap for gap in gaps if gap > 0.0]
+    baseline_gap = median(sorted(ordinary_gaps)[: max(1, len(ordinary_gaps) // 2)]) if len(ordinary_gaps) >= 2 else 0.0
+    column_gap = max(24.0, baseline_gap * 8.0)
+    structural_boundaries = {pos for pos, gap in enumerate(gaps) if gap >= column_gap}
+
     parts: list[str] = []
     index = 0
+
+    def append_part(value: str, start_index: int) -> None:
+        if start_index > 0 and start_index - 1 in structural_boundaries:
+            parts.append("|")
+        parts.append(value)
 
     while index < len(ordered):
         text = str(ordered[index].get("text") or "")
         if len(text) != 1 or not text.isalpha():
-            parts.append(text)
+            append_part(text, index)
             index += 1
             continue
 
@@ -134,18 +152,19 @@ def _line_words_to_text(words: list[dict]) -> str:
 
         run = ordered[index:end]
         if len(run) < 5:
-            parts.extend(str(word.get("text") or "") for word in run)
+            for offset, word in enumerate(run):
+                append_part(str(word.get("text") or ""), index + offset)
             index = end
             continue
 
-        gaps = [max(0.0, float(run[pos + 1]["x0"]) - float(run[pos]["x1"])) for pos in range(len(run) - 1)]
-        baseline = median(sorted(gaps)[: max(1, len(gaps) // 2)]) if gaps else 0.0
+        run_gaps = [max(0.0, float(run[pos + 1]["x0"]) - float(run[pos]["x1"])) for pos in range(len(run) - 1)]
+        baseline = median(sorted(run_gaps)[: max(1, len(run_gaps) // 2)]) if run_gaps else 0.0
         word_gap = max(4.0, baseline * 2.0)
         rebuilt = str(run[0].get("text") or "")
         for pos, word in enumerate(run[1:]):
-            separator = " " if gaps[pos] > word_gap else ""
+            separator = " " if run_gaps[pos] > word_gap else ""
             rebuilt += separator + str(word.get("text") or "")
-        parts.append(rebuilt)
+        append_part(rebuilt, index)
         index = end
 
     return " ".join(part for part in parts if part).strip()

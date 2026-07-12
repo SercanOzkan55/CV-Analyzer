@@ -180,6 +180,31 @@ class TestBuildSchema:
         assert schema.full_name == ""
         assert schema.experiences == []
 
+    def test_keeps_distinct_degrees_from_same_school_and_period(self):
+        normalized = {
+            "education": [
+                {
+                    "school": "Example University",
+                    "degree": "B.Sc. in Computer Engineering",
+                    "start_date": "2022",
+                    "end_date": "Present",
+                    "gpa": "3.82 / 4.00",
+                },
+                {
+                    "school": "Example University",
+                    "degree": "B.Sc. in Industrial Engineering (Transferred)",
+                    "start_date": "2022",
+                    "end_date": "Present",
+                    "gpa": "3.41 / 4.00",
+                },
+            ]
+        }
+
+        schema = build_schema(normalized)
+
+        assert len(schema.education) == 2
+        assert {entry.gpa for entry in schema.education} == {"3.82 / 4.00", "3.41 / 4.00"}
+
     def test_drops_substanceless_header_entry(self):
         # An ALL-CAPS section header that leaked into experience with no
         # bullets, company, or dates must not become a fake job.

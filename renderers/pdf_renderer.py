@@ -10,6 +10,7 @@ from fpdf import FPDF
 
 from renderers.blocks import (
     _clean,
+    _looks_like_tech_list,
     render_education,
     render_experience,
     render_header,
@@ -84,14 +85,15 @@ class _PDF(FPDF):
 def render_pdf(cv_model: CVModel, template: str = "classic", font_override: str = "") -> BytesIO:
     theme = load_theme(template, font_override=font_override)
     font_name = theme.get("font", "Arial")
-    body_size = 10.0
-    header_size = 16.0
-    section_size = 12.0
-    spacing = float(theme.get("spacing", 3))
-    margin_mm = float(theme.get("margin_cm", 1.5)) * 10
-    lh = 5.0  # tighter line height
-    bullet_indent = 10.0
-    bullet_text_offset = 20.0
+    reference_layout = (template or "classic").strip().lower() == "classic"
+    body_size = 8.6 if reference_layout else 10.0
+    header_size = 19.0 if reference_layout else 16.0
+    section_size = 10.5 if reference_layout else 12.0
+    spacing = 2.2 if reference_layout else float(theme.get("spacing", 3))
+    margin_mm = 19.0 if reference_layout else float(theme.get("margin_cm", 1.5)) * 10
+    lh = 4.25 if reference_layout else 5.0
+    bullet_indent = 1.0 if reference_layout else 10.0
+    bullet_text_offset = 5.0 if reference_layout else 20.0
 
     # ── Section headers: prefer original CV headers, fallback to localized ──
     _titles = getattr(cv_model, "section_titles", None) or {}
@@ -459,6 +461,51 @@ def render_pdf(cv_model: CVModel, template: str = "classic", font_override: str 
         pdf.set_x(pdf.l_margin)
         pdf.set_font(font_family, "", body_size)
 
+    def _dual_cell(
+        left: str,
+        right: str,
+        *,
+        left_bold: bool = False,
+        right_bold: bool = False,
+        fs: float | None = None,
+    ) -> None:
+        """Render a compact left/right metadata row without flattening fields."""
+        left_text = _clean(left)
+        right_text = _clean(right)
+        if not right_text:
+            _cell(left_text, bold=left_bold, fs=fs)
+            return
+
+        size = fs or body_size
+        gap = 2.0
+        pdf.set_font(font_family, "B" if right_bold else "", size)
+        right_w = min(max(pdf.get_string_width(right_text) + 2.0, usable_w * 0.22), usable_w * 0.45)
+        left_w = max(usable_w - right_w - gap, usable_w * 0.45)
+
+        pdf.set_font(font_family, "B" if left_bold else "", size)
+        left_lines = _wrap_text(left_text, left_w) if left_text else []
+        pdf.set_font(font_family, "B" if right_bold else "", size)
+        right_lines = _wrap_text(right_text, right_w)
+        row_count = max(len(left_lines), len(right_lines), 1)
+        needed_height = row_count * lh
+        if check_height(pdf.get_y(), needed_height, pdf.h, pdf.b_margin):
+            new_page(pdf)
+
+        start_y = pdf.get_y()
+        for row in range(row_count):
+            if row < len(left_lines):
+                pdf.set_font(font_family, "B" if left_bold else "", size)
+                pdf.set_xy(pdf.l_margin, start_y + row * lh)
+                pdf.cell(left_w, lh, left_lines[row], ln=False, align="L")
+            if row < len(right_lines):
+                pdf.set_font(font_family, "B" if right_bold else "", size)
+                pdf.set_xy(pdf.l_margin + left_w + gap, start_y + row * lh)
+                pdf.cell(right_w, lh, right_lines[row], ln=False, align="R")
+
+        pdf.set_y(start_y + needed_height)
+        pdf.set_x(pdf.l_margin)
+        pdf.set_font(font_family, "", body_size)
+
     def _section_header(title: str):
         """Draw section title with underline."""
         pdf.ln(spacing * 0.4)
@@ -510,7 +557,14 @@ def render_pdf(cv_model: CVModel, template: str = "classic", font_override: str 
             _cell(hl, bold=True, fs=header_size, align="C")
         else:
             _cell(hl, fs=body_size, align="C")
-    _gap()
+    if reference_layout:
+        _gap(0.2)
+        pdf.set_line_width(0.45)
+        pdf.set_draw_color(35, 35, 35)
+        pdf.line(pdf.l_margin, pdf.get_y(), pdf.l_margin + usable_w, pdf.get_y())
+        pdf.ln(spacing * 0.2)
+    else:
+        _gap()
 
     # ── Section rendering helpers ──
     def _render_summary():
@@ -542,6 +596,26 @@ def render_pdf(cv_model: CVModel, template: str = "classic", font_override: str 
             return
         _section_header(_h("experience"))
         for exp in cv_model.experiences:
+            if reference_layout:
+                title = _clean(getattr(exp, "title", "") or "")
+                company = _clean(getattr(exp, "company", "") or "")
+                location = _clean(getattr(exp, "location", "") or "")
+                header = " | ".join(part for part in (title, company) if part)
+                start = _clean(getattr(exp, "start_date", "") or "")
+                end = _clean(getattr(exp, "end_date", "") or "")
+                dates = " – ".join(part for part in (start, end) if part)
+                bullets = list(getattr(exp, "bullets", None) or [])
+                block_h = max(1, _estimate_block_lines([header, location, dates, *bullets])) * lh
+                if check_height(pdf.get_y(), block_h, pdf.h, pdf.b_margin):
+                    new_page(pdf)
+                _dual_cell(header, location, left_bold=True, right_bold=True)
+                if dates:
+                    _dual_cell("", dates, fs=body_size - 0.2)
+                for bullet in bullets:
+                    _bullet(bullet)
+                _gap(0.25)
+                continue
+
             lines = render_experience(exp)
             has_title = bool((getattr(exp, "title", "") or "").strip() or (getattr(exp, "company", "") or "").strip())
             block_h = _estimate_block_lines(lines) * lh + spacing
@@ -561,7 +635,34 @@ def render_pdf(cv_model: CVModel, template: str = "classic", font_override: str 
         if not cv_model.education:
             return
         _section_header(_h("education"))
+        last_school_group: tuple[str, str, str] | None = None
         for edu in cv_model.education:
+            if reference_layout:
+                school = _clean(getattr(edu, "school", "") or "")
+                degree = _clean(getattr(edu, "degree", "") or "")
+                field = _clean(getattr(edu, "field", "") or "")
+                start = _clean(getattr(edu, "start_date", "") or "")
+                end = _clean(getattr(edu, "end_date", "") or "")
+                dates = " – ".join(part for part in (start, end) if part)
+                group = (school.lower(), start.lower(), end.lower())
+                if school and group != last_school_group:
+                    _dual_cell(school, dates, left_bold=True, right_bold=True)
+                    last_school_group = group
+                elif dates and not school:
+                    _dual_cell("", dates, right_bold=True)
+
+                degree_text = degree + (f" in {field}" if field else "")
+                gpa = _clean(getattr(edu, "gpa", "") or "")
+                gpa_value = re.sub(r"^\s*(?:c?gpa)\s*:\s*", "", gpa, flags=re.I)
+                gpa_text = f"GPA: {gpa_value}" if gpa_value else ""
+                if degree_text or gpa_text:
+                    _dual_cell(degree_text, gpa_text, fs=body_size)
+                location = _clean(getattr(edu, "location", "") or "")
+                if location:
+                    _cell(location, fs=body_size - 0.2)
+                _gap(0.12)
+                continue
+
             edu_lines = render_education(edu)
             for i, txt in enumerate(edu_lines):
                 _cell(txt, bold=(i == 0))
@@ -614,6 +715,24 @@ def render_pdf(cv_model: CVModel, template: str = "classic", font_override: str 
             return
         _section_header(_h("projects"))
         for proj in cv_model.projects:
+            if reference_layout:
+                name = _clean(getattr(proj, "name", "") or "")
+                description = _clean(getattr(proj, "description", "") or "")
+                bullets = list(getattr(proj, "bullets", None) or [])
+                block_h = max(1, _estimate_block_lines([name, description, *bullets])) * lh
+                if check_height(pdf.get_y(), block_h, pdf.h, pdf.b_margin):
+                    new_page(pdf)
+                if name and description and _looks_like_tech_list(description):
+                    _dual_cell(name, description, left_bold=True, right_bold=True)
+                else:
+                    _cell(name, bold=True)
+                    if description:
+                        _cell(description)
+                for bullet in bullets:
+                    _bullet(bullet)
+                _gap(0.18)
+                continue
+
             proj_lines = render_project(proj)
             has_name = bool((getattr(proj, "name", "") or "").strip())
             block_h = _estimate_block_lines(proj_lines) * lh + spacing
@@ -633,13 +752,29 @@ def render_pdf(cv_model: CVModel, template: str = "classic", font_override: str 
         certs = getattr(cv_model, "certifications", None) or []
         if not certs:
             return
-        _section_header(_h("certifications"))
+        cert_lines = []
         for cert in certs:
-            name = _clean(getattr(cert, "name", "") or "")
-            issuer = _clean(getattr(cert, "issuer", "") or "")
-            date = _clean(getattr(cert, "date", "") or "")
-            parts = [p for p in [name, issuer, date] if p]
-            _cell(" \u2013 ".join(parts))
+            parts = [
+                _clean(value)
+                for value in (
+                    getattr(cert, "name", "") or "",
+                    getattr(cert, "issuer", "") or "",
+                    getattr(cert, "date", "") or "",
+                )
+                if value
+            ]
+            cert_lines.append(" | ".join(parts))
+
+        if reference_layout:
+            section_height = (1 + _estimate_block_lines(cert_lines)) * lh + spacing
+            if check_height(pdf.get_y(), section_height, pdf.h, pdf.b_margin):
+                new_page(pdf)
+        _section_header(_h("certifications"))
+        for cert_line in cert_lines:
+            if reference_layout:
+                _bullet(cert_line)
+            else:
+                _cell(cert_line.replace(" | ", " \u2013 "))
         _gap(0.2)
 
     def _render_languages():

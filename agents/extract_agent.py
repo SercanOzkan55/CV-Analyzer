@@ -525,8 +525,10 @@ def _clean_noise_lines(text: str) -> str:
             continue
         # Preserve bullet markers – only strip leading noise on non-bullet lines
         if not _BULLET_PREFIX_RE.match(stripped):
-            stripped = re.sub(r"^[\s|–—\-:,;]+", "", stripped)
-        stripped = re.sub(r"[\s|–—\-:,;]+$", "", stripped)
+            stripped = re.sub(r"^[\s|–—\-:]+", "", stripped)
+        # Keep sentence punctuation on wrapped lines. Only remove standalone
+        # visual separators that are surrounded by whitespace.
+        stripped = re.sub(r"\s+[|–—-]\s*$", "", stripped)
         cleaned.append(stripped)
     return "\n".join(cleaned)
 
@@ -595,6 +597,26 @@ def extract_structured(cv_text: str) -> Dict:
         text = _merge_wrapped_lines(text)
         text = re.sub(r"[ \t]+", " ", text).strip()
         header_lines, sections, dropped, section_titles, section_sources = _sections_from_classifier(text)
+
+    # Classifier resolution can stop a section at a page boundary even when
+    # the same section continues on the next page. The deterministic header
+    # parser keeps that continuation. Prefer it only when the classifier
+    # already recognized the section and the deterministic result is richer.
+    from services.cv_autofix_service import _parse_sections as _parse_sections_deterministic
+
+    _, deterministic_sections, _ = _parse_sections_deterministic(text)
+    for section_key in (
+        "experience",
+        "projects",
+        "education",
+        "skills",
+        "certifications",
+        "languages",
+    ):
+        candidate = [line for line in deterministic_sections.get(section_key, []) if line]
+        current_lines = [line for line in sections.get(section_key, []) if line]
+        if section_key in section_titles and len(candidate) > len(current_lines):
+            sections[section_key] = deterministic_sections[section_key]
 
     name, title_lines, contacts, leftover = _extract_contact_block(header_lines, sections.get("contact", []))
 
@@ -745,7 +767,26 @@ def extract_structured(cv_text: str) -> Dict:
         skills_flat = _normalize_skill_lines(skill_lines)
     projects = _parse_project_entries(project_lines)
     languages = _normalize_language_lines(language_lines)
-    certifications = [{"name": l, "issuer": "", "date": ""} for l in cert_lines]
+    certifications = []
+    for cert_line in cert_lines:
+        cleaned_cert = re.sub(
+            r"^\s*[-*•‣–—▪■●○◦]\s*",
+            "",
+            cert_line,
+        ).strip()
+        if not cleaned_cert:
+            continue
+        cert_parts = [part.strip() for part in cleaned_cert.split("|") if part.strip()]
+        cert_name = cert_parts[0]
+        cert_date = ""
+        cert_issuer = ""
+        if len(cert_parts) >= 2:
+            if re.search(r"\b(?:19|20)\d{2}\b", cert_parts[-1]):
+                cert_date = cert_parts[-1]
+                cert_issuer = " | ".join(cert_parts[1:-1])
+            else:
+                cert_issuer = " | ".join(cert_parts[1:])
+        certifications.append({"name": cert_name, "issuer": cert_issuer, "date": cert_date})
     interests = _normalize_list_section(interest_lines)
     misc = [l.strip() for l in misc_lines if l.strip()]
 
