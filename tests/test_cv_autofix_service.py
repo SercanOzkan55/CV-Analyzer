@@ -3,7 +3,10 @@ from unittest.mock import patch, MagicMock
 
 from services.cv_autofix_service import (
     auto_fix_cv_text,
+    _assess_export_safety,
+    _build_safe_export_model,
     _parse_sections,
+    _parse_education_entries,
     _looks_like_person_name,
     _header_has_contact,
     _clean_lines,
@@ -14,6 +17,7 @@ from services.cv_autofix_service import (
     _noise_section,
     _enforce_protected_section_floor,
 )
+from schemas.cv_model import CVModel
 
 
 def test_parse_experience_entries_splits_multiple_bullet_jobs():
@@ -143,6 +147,75 @@ AWS Cloud Practitioner
     assert warnings
 
 
+def test_safe_export_model_preserves_facts_and_rejects_project_title_summary():
+    source = CVModel.from_mapping(
+        {
+            "full_name": "Ahmet Bugra Kuscu",
+            "email": "ahmet@example.com",
+            "phone": "+90 555 111 22 33",
+            "linkedin": "https://example.com/ahmet",
+            "projects": [
+                {
+                    "name": "WHO WANTS TO BE A MILLIONAIRE",
+                    "description": "TCP client-server quiz game",
+                    "bullets": ["Implemented synchronized multiplayer scoring"],
+                }
+            ],
+            "skills": ["Java", "TCP"],
+            "languages": ["Turkish", "English"],
+        }
+    )
+    candidate = CVModel.from_mapping(
+        {
+            "full_name": "Ahmet Bugra Kuscu",
+            "email": "ahmet@example.com",
+            "summary": "TO BE A MILLIONAIRE. Core skills include Java and TCP.",
+            "projects": [
+                {
+                    "name": "WHO WANTS TO BE A MILLIONAIRE",
+                    "bullets": ["WHO WANTS TO BE A MILLIONAIRE"],
+                }
+            ],
+        }
+    )
+
+    with patch("services.cv_autofix_service.structured_text_to_builder_payload", return_value=candidate):
+        merged = _build_safe_export_model(source, "optimized", used_ai=True)
+
+    assert merged.summary == ""
+    assert merged.phone == source.phone
+    assert merged.linkedin == source.linkedin
+    assert merged.projects == source.projects
+    assert merged.languages == ["Turkish", "English"]
+
+
+def test_export_safety_rejects_lost_source_phone():
+    source_text = "John Doe\njohn@example.com\nPhone: +1 555 123 4567\n\nSUMMARY\nBackend engineer"
+    incomplete = CVModel(full_name="John Doe", email="john@example.com", summary="Backend engineer")
+
+    export_safe, report = _assess_export_safety(source_text, incomplete)
+
+    assert export_safe is False
+    assert any("phone_lost" in issue for issue in report["hard_fails"])
+
+
+def test_education_parser_handles_date_before_curly_apostrophe_degree():
+    entries = _parse_education_entries(
+        [
+            "2022-2027",
+            "BACHELOR’S DEGREE",
+            "ISTANBUL HEALTH AND TECHNOLOGY",
+            "UNIVERSITY (İSTÜN)",
+        ]
+    )
+
+    assert len(entries) == 1
+    assert entries[0]["degree"] == "BACHELOR’S DEGREE"
+    assert entries[0]["school"] == "ISTANBUL HEALTH AND TECHNOLOGY UNIVERSITY (İSTÜN)"
+    assert entries[0]["start_date"] == "2022"
+    assert entries[0]["end_date"] == "2027"
+
+
 @patch("services.cv_autofix_service.analyze_cv")
 def test_auto_fix_cv_text(mock_analyze):
     # Mock the ATS analyzer to avoid full service run
@@ -163,6 +236,7 @@ Dev at Corp
     assert "builder_payload" in result
     assert result["score_delta"] == 0.0  # 80 - 80
     assert result["builder_payload"]["full_name"] == "John Doe"
+    assert result["export_safe"] is True
 
 
 @patch("services.cv_autofix_service.analyze_cv")

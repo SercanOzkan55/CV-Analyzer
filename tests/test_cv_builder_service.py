@@ -9,7 +9,11 @@ from services.cv_builder_service import (
     _estimate_content_size,
     _normalize_link_value,
     _build_header_data,
+    _anomaly_detection_model,
+    compile_cv_model,
+    _pre_render_sanity_check,
 )
+from schemas.cv_model import CVModel
 
 
 def test_compact_for_one_page_strict(monkeypatch):
@@ -89,6 +93,71 @@ def test_build_header_data():
     assert loc == "New York"
     assert "john@example.com" in contact
     assert "+1234567" in contact
+
+
+def test_pre_render_sanity_keeps_spaced_international_phone():
+    model = CVModel(full_name="Jane Doe", phone="+90 555 123 45 67")
+
+    _pre_render_sanity_check(model)
+
+    assert model.phone == "+90 555 123 45 67"
+
+
+def test_pre_render_sanity_drops_too_short_phone():
+    model = CVModel(full_name="Jane Doe", phone="123 45")
+
+    _pre_render_sanity_check(model)
+
+    assert model.phone == ""
+
+
+def test_pre_render_sanity_keeps_portfolio_domain():
+    model = CVModel(full_name="Jane Doe", linkedin="portfolio.github.io/jane/")
+
+    _pre_render_sanity_check(model)
+
+    assert model.linkedin == "portfolio.github.io/jane/"
+
+
+def test_anomaly_filter_keeps_detailed_cefr_language():
+    model = CVModel(
+        full_name="Jane Doe",
+        languages=["English (Speaking: B1, Writing: B2, Reading: B2)"],
+    )
+
+    _anomaly_detection_model(model)
+
+    assert model.languages == ["English (Speaking: B1, Writing: B2, Reading: B2)"]
+
+
+def test_compile_model_does_not_duplicate_project_description():
+    model = compile_cv_model(
+        {
+            "full_name": "Jane Doe",
+            "projects": [
+                {
+                    "name": "Portfolio",
+                    "description": "Built a responsive portfolio",
+                    "bullets": [],
+                }
+            ],
+        }
+    )
+
+    assert model.projects[0].description == ""
+    assert model.projects[0].bullets == ["Built a responsive portfolio"]
+
+
+def test_compile_model_does_not_repeat_bare_project_name_as_bullet():
+    model = compile_cv_model(
+        {
+            "full_name": "Jane Doe",
+            "projects": [{"name": "Portfolio", "description": "", "bullets": []}],
+        }
+    )
+
+    assert model.projects[0].name == "Portfolio"
+    assert model.projects[0].bullets == []
 
 
 @patch("docx.Document")

@@ -383,7 +383,8 @@ def render_pdf(cv_model: CVModel, template: str = "classic", font_override: str 
     pdf = _PDF()
     font_family = _register_font(pdf, font_name)
     pdf.set_margins(margin_mm, margin_mm, margin_mm)
-    pdf.set_auto_page_break(auto=True, margin=margin_mm)
+    bottom_margin_mm = min(margin_mm, 12.0)
+    pdf.set_auto_page_break(auto=True, margin=bottom_margin_mm)
     pdf.add_page()
 
     usable_w = pdf.w - pdf.l_margin - pdf.r_margin
@@ -460,7 +461,7 @@ def render_pdf(cv_model: CVModel, template: str = "classic", font_override: str 
 
     def _section_header(title: str):
         """Draw section title with underline."""
-        pdf.ln(spacing * 0.6)
+        pdf.ln(spacing * 0.4)
         if check_height(pdf.get_y(), lh * 2, pdf.h, pdf.b_margin):
             new_page(pdf)
         pdf.set_font(font_family, "B", section_size)
@@ -476,7 +477,7 @@ def render_pdf(cv_model: CVModel, template: str = "classic", font_override: str 
         pdf.set_line_width(0.3)
         pdf.set_draw_color(150, 150, 150)
         pdf.line(pdf.l_margin, y, pdf.l_margin + usable_w, y)
-        pdf.ln(spacing * 0.3)
+        pdf.ln(spacing * 0.15)
         pdf.set_font(font_family, "", body_size)
 
     def _bullet(text: str):

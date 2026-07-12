@@ -1501,33 +1501,6 @@ def _pipeline_to_structured_text(
             contacts.append(val)
 
     summary = (normalized.get("summary") or "").strip()
-    if not summary:
-        skills_for_summary = [
-            str(skill).strip()
-            for skill in (normalized.get("skills") or normalized.get("skill") or [])
-            if str(skill).strip()
-        ][:6]
-        education_for_summary = normalized.get("education") or []
-        projects_for_summary = normalized.get("projects") or normalized.get("project") or []
-        degree = ""
-        if education_for_summary and isinstance(education_for_summary[0], dict):
-            degree = str(education_for_summary[0].get("degree") or "").strip()
-        project_names = [
-            str((proj or {}).get("name") or (proj or {}).get("title") or "").strip()
-            for proj in projects_for_summary
-            if isinstance(proj, dict) and str((proj or {}).get("name") or (proj or {}).get("title") or "").strip()
-        ][:2]
-        if skills_for_summary or degree or project_names:
-            subject = degree.title() if degree else "Professional"
-            if project_names and skills_for_summary:
-                summary = (
-                    f"{subject} with project experience in {', '.join(project_names)}. "
-                    f"Core skills include {', '.join(skills_for_summary)}."
-                )
-            elif skills_for_summary:
-                summary = f"{subject} with core skills in {', '.join(skills_for_summary)}."
-            elif project_names:
-                summary = f"{subject} with project experience in {', '.join(project_names)}."
 
     # ── experience ──
     experience_lines: list[str] = []
@@ -2392,7 +2365,7 @@ _DEGREE_RE = re.compile(
     r"B\.?\s*E(?:ng)?\.?|M\.?\s*E(?:ng)?\.?|"
     r"Ph\.?\s*D\.?|M\.?\s*B\.?\s*A\.?|"
     r"Bachelor|Master|Diploma|Associate|Doctor(?:ate)?|Certificate"
-    r")(?:\s|[.,]|$)",
+    r")(?:\s|[.,'\u2019]|$)",
     re.I,
 )
 # Standalone degree / profession titles on their own line
@@ -2466,6 +2439,13 @@ def _new_edu_entry() -> dict:
 
 def _parse_date_range(line: str) -> tuple:
     """Parse a date range from a line, return (start, end)."""
+    compact_match = re.match(
+        r"^\s*((?:19|20)\d{2})\s*[-\u2013\u2014]\s*((?:19|20)\d{2}|present|current)\s*$",
+        line,
+        re.I,
+    )
+    if compact_match:
+        return compact_match.group(1), compact_match.group(2)
     if "–" in line:
         s, e = [p.strip() for p in line.split("–", 1)]
     elif " - " in line:
@@ -2570,7 +2550,11 @@ def _parse_education_entries(lines: list[str]) -> list[dict]:
         if _looks_like_degree(line):
             deg_clean, sd, ed = _extract_paren_dates(line)
             # If current entry already has a school but no degree, fill it in
-            if current and current.get("school") and not current.get("degree"):
+            if (
+                current
+                and not current.get("degree")
+                and (current.get("school") or current.get("start_date") or current.get("end_date"))
+            ):
                 current["degree"] = deg_clean
                 if sd:
                     current["start_date"] = sd
@@ -2607,17 +2591,18 @@ def _parse_education_entries(lines: list[str]) -> list[dict]:
 
         # ── 5. First unrecognised line with no current → treat as school ──
         # (degrees and university-keyword lines are already handled above)
+        if re.search(r"(?:19|20)\d{2}", line):
+            if current is None:
+                current = _new_edu_entry()
+            current["start_date"], current["end_date"] = _parse_date_range(line)
+            continue
+
         if current is None:
             current = _new_edu_entry()
             current["school"] = line
             continue
 
-        # ── 6. Date-only line ──
-        if re.search(r"(?:19|20)\d{2}", line):
-            current["start_date"], current["end_date"] = _parse_date_range(line)
-            continue
-
-        # ── 7. Fallback: school or extra info ──
+        # ── 6. Fallback: school or extra info ──
         if not current.get("school"):
             current["school"] = line
         else:
@@ -3075,6 +3060,121 @@ def structured_text_to_builder_payload(
     model.skills = _normalize_list_section([str(skill) for skill in (model.skills or [])])
     model.ensure_skills_categorized()
     return model
+
+
+_SUMMARY_PROJECT_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "be",
+    "of",
+    "the",
+    "to",
+    "wants",
+    "who",
+}
+
+UNSAFE_EXPORT_WARNING = (
+    "Automatic export was blocked because this CV layout could not be parsed reliably. "
+    "Review and edit the optimized text, or retry with a single-column PDF or DOCX file."
+)
+
+
+def _summary_starts_with_project_title(summary: str, projects: list) -> bool:
+    first_sentence = re.split(r"[.!?]", str(summary or ""), maxsplit=1)[0]
+    first_tokens = {
+        token
+        for token in re.findall(r"[a-z0-9+#]+", clean_lower(first_sentence))
+        if token not in _SUMMARY_PROJECT_STOPWORDS
+    }
+    if not first_tokens or len(first_sentence.split()) > 8:
+        return False
+
+    for project in projects or []:
+        name = getattr(project, "name", "") if not isinstance(project, dict) else project.get("name", "")
+        project_tokens = {
+            token
+            for token in re.findall(r"[a-z0-9+#]+", clean_lower(str(name or "")))
+            if token not in _SUMMARY_PROJECT_STOPWORDS
+        }
+        if project_tokens and first_tokens.issubset(project_tokens):
+            return True
+    return False
+
+
+def _build_safe_export_model(
+    source_model: CVModel,
+    optimized_text: str,
+    *,
+    used_ai: bool,
+) -> CVModel:
+    """Merge optimized prose with factual fields from the trusted first parse."""
+    try:
+        candidate = structured_text_to_builder_payload(optimized_text, lang=source_model.language or "en")
+    except (TypeError, ValueError):
+        return source_model.model_copy(deep=True)
+
+    safe = candidate.model_copy(deep=True)
+
+    # Identity and contact facts must never be inferred again during export.
+    for field in ("full_name", "title", "email", "phone", "location", "linkedin"):
+        source_value = getattr(source_model, field, "")
+        if source_value:
+            setattr(safe, field, source_value)
+
+    if not source_model.summary:
+        if not used_ai or _summary_starts_with_project_title(safe.summary, source_model.projects):
+            safe.summary = ""
+    elif not safe.summary:
+        safe.summary = source_model.summary
+
+    # Keep employment facts from the first parse, while allowing safely
+    # rewritten bullets when entries still line up one-to-one.
+    if source_model.experiences and len(safe.experiences) == len(source_model.experiences):
+        merged_experiences = []
+        for source_exp, candidate_exp in zip(source_model.experiences, safe.experiences):
+            merged = source_exp.model_copy(deep=True)
+            if candidate_exp.bullets:
+                merged.bullets = list(candidate_exp.bullets)
+            merged_experiences.append(merged)
+        safe.experiences = merged_experiences
+    else:
+        safe.experiences = [entry.model_copy(deep=True) for entry in source_model.experiences]
+
+    # These sections contain factual data. Preserve them exactly until AI
+    # rewriting is performed on structured fields rather than free-form text.
+    safe.education = [entry.model_copy(deep=True) for entry in source_model.education]
+    safe.projects = [entry.model_copy(deep=True) for entry in source_model.projects]
+    safe.certifications = [entry.model_copy(deep=True) for entry in source_model.certifications]
+    safe.skills = list(source_model.skills)
+    safe.skills_categorized = {key: list(values) for key, values in source_model.skills_categorized.items()}
+    safe.languages = list(source_model.languages)
+    safe.interests = list(source_model.interests)
+    safe.misc = list(source_model.misc)
+    safe.social_links = list(source_model.social_links)
+    safe.language = source_model.language
+    safe.ensure_skills_categorized()
+    return safe
+
+
+def _assess_export_safety(source_text: str, model: CVModel) -> tuple[bool, dict]:
+    from services.extraction_validator import validate_extraction
+
+    report = validate_extraction(source_text, model.model_dump())
+    hard_fails = list(report.get("hard_fails") or [])
+
+    if model.location and _canonical_section(model.location):
+        hard_fails.append(f"location_is_section_heading: '{model.location}'")
+    if re.search(r"\b(?:location preference|skype)\s*:", model.summary or "", re.I):
+        hard_fails.append("summary_contains_header_contact_fields")
+
+    if hard_fails != list(report.get("hard_fails") or []):
+        report = dict(report)
+        report["hard_fails"] = hard_fails
+        report["needs_llm_fallback"] = True
+        report["quality_score"] = max(0, int(report.get("quality_score", 100)) - 10)
+
+    return not bool(report.get("needs_llm_fallback")), report
 
 
 def _diff_preview(before_text: str, after_text: str) -> list[str]:
@@ -3565,8 +3665,17 @@ def auto_fix_cv_text(
         "output_format": "docx",
         "lang": lang,
     }
-    builder_model = CVModel.from_mapping(builder_payload)
-    builder_model.ensure_skills_categorized()
+    source_builder_model = CVModel.from_mapping(builder_payload)
+    source_builder_model.ensure_skills_categorized()
+    builder_model = _build_safe_export_model(
+        source_builder_model,
+        optimized_text,
+        used_ai=used_ai,
+    )
+    export_safe, extraction_quality = _assess_export_safety(cv_text, builder_model)
+    export_warning = "" if export_safe else UNSAFE_EXPORT_WARNING
+    if export_warning and export_warning not in warnings:
+        warnings.append(export_warning)
 
     return {
         "original_cv_text": cv_text,
@@ -3585,6 +3694,9 @@ def auto_fix_cv_text(
         "applied_changes": applied_changes,
         "diff_preview": _diff_preview(cv_text, optimized_text),
         "builder_payload": builder_model.model_dump(),
+        "export_safe": export_safe,
+        "export_warning": export_warning,
+        "extraction_quality": extraction_quality,
     }
 
 
