@@ -320,6 +320,7 @@
     "billing_title": "Facturación",
     "billing_subtitle": "Gestiona tu suscripción, facturas y método de pago.",
     "manage_billing": "Gestionar facturación",
+    "billing_coming_soon": "Próximamente",
     "redirecting": "Redirigiendo..."
   },
   "premium": {
@@ -515,17 +516,17 @@
     "title": "Política de Privacidad",
     "last_updated": "Última actualización",
     "section1_title": "1. Información que recopilamos",
-    "section1_text": "Recopilamos la información que usted proporciona directamente, como su dirección de correo electrónico y nombre al registrarse. Los CV cargados se procesan temporalmente y no se almacenan permanentemente.",
+    "section1_text": "Recopilamos la información que usted proporciona directamente, como su dirección de correo electrónico y nombre al registrarse. Cuando sube un CV para análisis, procesamos el documento y guardamos el texto del CV, los resultados del análisis y, en su caso, el archivo subido en su cuenta, para que pueda acceder a su historial, versiones de CV guardadas y registros de candidatos. Puede eliminar estos datos en cualquier momento.",
     "section2_title": "2. Uso de la información",
     "section2_text": "Utilizamos su información para proporcionar y mejorar nuestro servicio de análisis de CV. No vendemos sus datos personales a terceros.",
     "section3_title": "3. Almacenamiento y seguridad",
-    "section3_text": "Sus datos se almacenan de forma segura con cifrado estándar de la industria. Los CV se procesan en memoria y no se conservan después del análisis.",
+    "section3_text": "Sus datos se almacenan de forma segura con cifrado estándar de la industria, en tránsito y en reposo. Los CV subidos y los resultados de análisis permanecen en su cuenta hasta que usted los elimine. Puede borrar registros individuales desde el Centro de Datos o eliminar su cuenta en Ajustes para eliminar permanentemente todos los datos asociados.",
     "section4_title": "4. Cookies y seguimiento",
     "section4_text": "Utilizamos cookies esenciales para autenticación y preferencias. La detección de ubicación por IP se usa para configurar automáticamente su idioma.",
     "section5_title": "5. Sus derechos",
     "section5_text": "Puede solicitar acceso, corrección o eliminación de sus datos personales en cualquier momento a través de la configuración de su cuenta.",
     "section6_title": "6. Contacto",
-    "section6_text": "Si tiene preguntas, contáctenos en support@cvanalyzer.app."
+    "section6_text": "Si tiene preguntas, contáctenos en support@cvanalyzer.dev."
   },
   "terms": {
     "title": "Términos de Servicio",

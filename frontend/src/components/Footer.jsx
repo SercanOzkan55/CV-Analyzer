@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { useLanguage } from '../i18n/LanguageContext'
+import { BLOG_ENABLED } from '../config/features'
 
 export default function Footer() {
   const { t } = useLanguage()
@@ -24,8 +25,8 @@ export default function Footer() {
         <div className="footer-col">
           <h4>{t('landing.footer_company')}</h4>
           <Link to="/about">{t('about.title')}</Link>
-          <Link to="/blog">{t('nav.blog') || 'Blog'}</Link>
-          <a href="mailto:support@cvanalyzer.app">{t('landing.footer_contact')}</a>
+          {BLOG_ENABLED && <Link to="/blog">{t('nav.blog') || 'Blog'}</Link>}
+          <a href="mailto:support@cvanalyzer.dev">{t('landing.footer_contact')}</a>
         </div>
 
         <div className="footer-col">

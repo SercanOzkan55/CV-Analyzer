@@ -356,6 +356,199 @@ def _delete_analysis_records_for_user(db, user_id: int) -> dict:
     }
 
 
+_ORG_DATA_ADMIN_ROLES = {"admin", "owner"}
+
+
+def _can_manage_org_data(db_user: User) -> bool:
+    """Org-wide privacy operations (bulk delete/export) are owner/admin only."""
+    from services.owner_workflow_service import normalize_role
+
+    return normalize_role(getattr(db_user, "role", None)) in _ORG_DATA_ADMIN_ROLES
+
+
+def _delete_recruiter_rows_for_user(db, user_id: int) -> dict:
+    """Delete recruiter-owned rows: jobs the user created (with dependent
+    candidate actions/results), actions the user recorded, and comments.
+
+    Mirrors the DB-level ON DELETE CASCADE chain explicitly so the mock
+    SQLite backend (no FK enforcement) ends up in the same state as Postgres.
+    """
+    from models import (
+        CandidateAction,
+        CandidateComment,
+        EmailTemplate,
+        RecruiterJob,
+        WorkerAnalysisResult,
+    )
+
+    job_ids = [row[0] for row in db.query(RecruiterJob.id).filter(RecruiterJob.created_by == user_id).all()]
+    action_query = db.query(CandidateAction.id).filter(CandidateAction.recruiter_id == user_id)
+    if job_ids:
+        action_query = db.query(CandidateAction.id).filter(
+            (CandidateAction.recruiter_id == user_id) | (CandidateAction.job_id.in_(job_ids))
+        )
+    action_ids = {row[0] for row in action_query.all()}
+
+    deleted_comments = 0
+    deleted_actions = 0
+    deleted_worker_results = 0
+    if action_ids:
+        deleted_comments = (
+            db.query(CandidateComment)
+            .filter(CandidateComment.candidate_action_id.in_(action_ids))
+            .delete(synchronize_session=False)
+        )
+        db.query(WorkerAnalysisResult).filter(WorkerAnalysisResult.candidate_action_id.in_(action_ids)).update(
+            {"candidate_action_id": None}, synchronize_session=False
+        )
+        deleted_actions = (
+            db.query(CandidateAction).filter(CandidateAction.id.in_(action_ids)).delete(synchronize_session=False)
+        )
+    deleted_comments += int(
+        db.query(CandidateComment)
+        .filter(CandidateComment.author_user_id == user_id)
+        .delete(synchronize_session=False)
+        or 0
+    )
+
+    deleted_jobs = 0
+    if job_ids:
+        deleted_worker_results = (
+            db.query(WorkerAnalysisResult)
+            .filter(WorkerAnalysisResult.job_id.in_(job_ids))
+            .delete(synchronize_session=False)
+        )
+        deleted_jobs = db.query(RecruiterJob).filter(RecruiterJob.id.in_(job_ids)).delete(synchronize_session=False)
+
+    deleted_email_templates = (
+        db.query(EmailTemplate).filter(EmailTemplate.created_by == user_id).delete(synchronize_session=False)
+    )
+
+    return {
+        "deleted_recruiter_jobs": int(deleted_jobs or 0),
+        "deleted_candidate_actions": int(deleted_actions or 0),
+        "deleted_candidate_comments": int(deleted_comments or 0),
+        "deleted_worker_analysis_results": int(deleted_worker_results or 0),
+        "deleted_email_templates": int(deleted_email_templates or 0),
+    }
+
+
+def _delete_personal_rows_for_user(db, user_id: int) -> dict:
+    """Delete remaining user-owned rows not covered by CV/analysis helpers."""
+    from models import AnalysisNote, AnalysisShare, AsyncTaskOwner, Favorite, JobTemplate, Notification, UsageDaily
+
+    counts = {
+        "deleted_job_applications": db.query(JobApplication)
+        .filter(JobApplication.user_id == user_id)
+        .delete(synchronize_session=False),
+        "deleted_job_templates": db.query(JobTemplate)
+        .filter(JobTemplate.user_id == user_id)
+        .delete(synchronize_session=False),
+        "deleted_usage_days": db.query(UsageDaily)
+        .filter(UsageDaily.user_id == user_id)
+        .delete(synchronize_session=False),
+        "deleted_reminders": db.query(Reminder).filter(Reminder.created_by == user_id).delete(synchronize_session=False),
+        "deleted_favorites_extra": db.query(Favorite)
+        .filter(Favorite.user_id == user_id)
+        .delete(synchronize_session=False),
+        "deleted_shares_extra": db.query(AnalysisShare)
+        .filter(AnalysisShare.user_id == user_id)
+        .delete(synchronize_session=False),
+        "deleted_notes_extra": db.query(AnalysisNote)
+        .filter(AnalysisNote.user_id == user_id)
+        .delete(synchronize_session=False),
+        "deleted_async_task_owners": db.query(AsyncTaskOwner)
+        .filter(AsyncTaskOwner.user_id == user_id)
+        .delete(synchronize_session=False),
+        "deleted_notifications": db.query(Notification)
+        .filter(Notification.recipient_user_id == user_id)
+        .delete(synchronize_session=False),
+    }
+    return {key: int(value or 0) for key, value in counts.items()}
+
+
+def _scrub_user_references(db, user_id: int) -> None:
+    """Null out SET NULL-style references so the app_users row can be removed
+    identically on backends without FK enforcement (mock SQLite)."""
+    from models import AuditLog, CandidateAction, Notification, WorkerKey
+
+    db.query(CandidateAction).filter(CandidateAction.assigned_user_id == user_id).update(
+        {"assigned_user_id": None}, synchronize_session=False
+    )
+    db.query(AuditLog).filter(AuditLog.actor_user_id == user_id).update(
+        {"actor_user_id": None}, synchronize_session=False
+    )
+    db.query(Notification).filter(Notification.actor_user_id == user_id).update(
+        {"actor_user_id": None}, synchronize_session=False
+    )
+    db.query(WorkerKey).filter(WorkerKey.created_by_user_id == user_id).update(
+        {"created_by_user_id": None}, synchronize_session=False
+    )
+
+
+@router.delete("/api/v1/me/account")
+def delete_my_account(
+    confirm: str = Query(..., min_length=6, max_length=6),
+    user=Depends(verify_supabase_jwt),
+    db=Depends(get_db),
+):
+    """Permanently delete the current user's account and all associated data.
+
+    The frontend calls this before removing the Supabase auth user, so this
+    endpoint is the single place that guarantees "delete my account" really
+    removes CV texts, stored files, analyses, and recruiter records.
+    """
+    if confirm != "DELETE":
+        raise HTTPException(status_code=400, detail="confirm=DELETE is required")
+
+    db_user = _get_current_db_user(user, db)
+    user_id = int(db_user.id)
+    summary: dict[str, object] = {}
+
+    try:
+        cv_rows = db.query(CVVersion).filter(CVVersion.user_id == user_id).all()
+        cv_summary = _delete_cv_versions_for_user(db, db_user, cv_rows)
+        summary.update(cv_summary)
+        if cv_summary.get("blocked_cv_versions"):
+            # Storage objects survived; removing the account row anyway would
+            # orphan those files with no owner left to retry. Abort so the
+            # auth user is preserved and deletion can be retried.
+            _record_ops_event(
+                "account_delete",
+                "blocked_storage",
+                user_id=user_id,
+                blocked_cv_versions=int(cv_summary.get("blocked_cv_versions") or 0),
+            )
+            raise HTTPException(
+                status_code=502,
+                detail="Stored CV files could not be deleted; the account was not removed. Please try again.",
+            )
+
+        summary.update(_delete_analysis_records_for_user(db, user_id))
+        summary.update(_delete_recruiter_rows_for_user(db, user_id))
+        summary.update(_delete_personal_rows_for_user(db, user_id))
+        _scrub_user_references(db, user_id)
+
+        db.query(User).filter(User.id == user_id).delete(synchronize_session=False)
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        logger.exception("privacy:account_delete_failed user=%s", user_id)
+        raise HTTPException(status_code=500, detail="Account deletion failed")
+
+    try:
+        audit_fields = {key: value for key, value in summary.items() if isinstance(value, (int, bool))}
+        audit_fields["file_error_count"] = len(summary.get("file_errors") or [])
+        audit_log("privacy_account_delete", user_id=user_id, **audit_fields)
+    except Exception:
+        pass
+    _record_ops_event("account_delete", "ok", user_id=user_id)
+    return {"deleted": True, "summary": summary}
+
+
 @router.get("/api/v1/me/data-summary")
 def get_my_data_summary(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
     """Return a privacy-oriented summary of data held for the current user."""
@@ -445,14 +638,9 @@ def export_my_data(
     candidates = []
     comments = []
     worker_results = []
+    include_org_data = db_user.organization_id is not None and _can_manage_org_data(db_user)
     if db_user.organization_id is not None:
-        candidates = (
-            db.query(Candidate)
-            .filter(Candidate.organization_id == db_user.organization_id)
-            .order_by(Candidate.created_at.desc())
-            .limit(500)
-            .all()
-        )
+        # Comments are the user's own words — always exportable.
         comments = (
             db.query(CandidateComment)
             .filter(
@@ -460,6 +648,14 @@ def export_my_data(
                 CandidateComment.author_user_id == db_user.id,
             )
             .order_by(CandidateComment.created_at.desc())
+            .limit(500)
+            .all()
+        )
+    if include_org_data:
+        candidates = (
+            db.query(Candidate)
+            .filter(Candidate.organization_id == db_user.organization_id)
+            .order_by(Candidate.created_at.desc())
             .limit(500)
             .all()
         )
@@ -474,6 +670,7 @@ def export_my_data(
     payload = {
         "exported_at": utcnow().isoformat() + "Z",
         "include_raw": bool(include_raw),
+        "organization_data_included": include_org_data,
         "user": {
             "id": db_user.id,
             "email": db_user.email,
@@ -676,16 +873,22 @@ def delete_my_data(
             deleted_candidates = 0
             deleted_worker_results = 0
             if db_user.organization_id is not None:
-                deleted_worker_results = (
-                    db.query(WorkerAnalysisResult)
-                    .filter(WorkerAnalysisResult.organization_id == db_user.organization_id)
-                    .delete(synchronize_session=False)
-                )
-                deleted_candidates = (
-                    db.query(Candidate)
-                    .filter(Candidate.organization_id == db_user.organization_id)
-                    .delete(synchronize_session=False)
-                )
+                # Wiping org-wide candidates/results affects every member's
+                # work — only owner/admin may do it; others keep the
+                # user-scoped deletions above and get an explicit marker.
+                if _can_manage_org_data(db_user):
+                    deleted_worker_results = (
+                        db.query(WorkerAnalysisResult)
+                        .filter(WorkerAnalysisResult.organization_id == db_user.organization_id)
+                        .delete(synchronize_session=False)
+                    )
+                    deleted_candidates = (
+                        db.query(Candidate)
+                        .filter(Candidate.organization_id == db_user.organization_id)
+                        .delete(synchronize_session=False)
+                    )
+                else:
+                    summary["organization_data_skipped"] = "owner_or_admin_role_required"
 
             summary.update(
                 {

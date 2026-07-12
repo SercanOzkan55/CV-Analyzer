@@ -2,7 +2,16 @@
 
 import pytest
 
-from services.pdf_text_extractor import _strip_page_furniture
+from services.pdf_text_extractor import (
+    _detect_columns_from_heading_rows,
+    _line_words_to_text,
+    _looks_like_section_heading,
+    _strip_page_furniture,
+)
+
+
+def _word(text, x0, x1, top):
+    return {"text": text, "x0": x0, "x1": x1, "top": top, "bottom": top + 12}
 
 
 class TestStripPageFurniture:
@@ -41,3 +50,35 @@ class TestStripPageFurniture:
 
     def test_empty_input(self):
         assert _strip_page_furniture("") == ""
+
+
+def test_parallel_impact_heading_detects_two_column_resume():
+    words = [
+        _word("Executive", 40, 105, 174),
+        _word("Profile", 110, 158, 174),
+        _word("Key", 370, 397, 174),
+        _word("Impact", 402, 451, 174),
+        _word("Areas", 456, 496, 174),
+        _word("Education", 40, 110, 390),
+        _word("Key", 370, 397, 390),
+        _word("Skills", 402, 440, 390),
+    ]
+
+    assert _looks_like_section_heading("Key Impact Areas") is True
+    columns = _detect_columns_from_heading_rows(words, 595)
+    assert len(columns) == 2
+    assert columns[0][1] < columns[1][0]
+
+
+def test_spaced_glyph_title_is_reconstructed_from_coordinates():
+    letters = []
+    x = 20.0
+    for char in "COMPUTER":
+        letters.append(_word(char, x, x + 7, 100))
+        x += 9.5
+    x += 7.0
+    for char in "ENGINEER":
+        letters.append(_word(char, x, x + 7, 100))
+        x += 9.5
+
+    assert _line_words_to_text(letters) == "COMPUTER ENGINEER"

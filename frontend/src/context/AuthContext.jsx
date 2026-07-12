@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { fetchUsage } from '../api'
+import { deleteMyAccount, fetchUsage } from '../api'
 
 /**
  * @typedef {Object} AuthContextValue
@@ -226,6 +226,11 @@ export function AuthProvider({ children }) {
 
   async function deleteUser() {
     const userId = user?.id
+    // Purge all application data (CV texts, stored files, analyses, recruiter
+    // records) before removing the auth user — the Supabase RPC only deletes
+    // the auth.users row. If the purge fails we abort so no orphaned data
+    // survives behind a deleted login.
+    await deleteMyAccount(token)
     const { error } = await supabase.rpc('delete_user')
     if (error) throw error
     setUser(null)

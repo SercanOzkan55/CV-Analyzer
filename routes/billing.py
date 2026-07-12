@@ -708,7 +708,7 @@ def _build_contact_sales_mailto_url(
     owner_type: str,
     message: str,
 ) -> str:
-    sales_email = os.getenv("CONTACT_SALES_EMAIL", "sales@cvanalyzer.local").strip()
+    sales_email = os.getenv("CONTACT_SALES_EMAIL", "sales@cvanalyzer.dev").strip()
     subject = f"Enterprise plan inquiry ({plan_type})"
     body = (
         f"Email: {user_email}\n"

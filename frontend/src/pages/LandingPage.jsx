@@ -10,7 +10,6 @@ import { useLanguage } from '../i18n/LanguageContext'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import AnimatedBackground from '../components/AnimatedBackground'
-import TestimonialCarousel from '../components/TestimonialCarousel'
 import CircularProgress from '../components/CircularProgress'
 import { SectionTitle } from '../components/ui'
 import useAnimatedCounter from '../hooks/useAnimatedCounter'
@@ -341,6 +340,112 @@ function KineticHeroStage({ t, scrollYProgress }) {
 }
 
 // ─── Main LandingPage ────────────────────────────────────────────
+function ScrollAnalysisStory({ t }) {
+  const sectionRef = useRef(null)
+  const prefersReducedMotion = useReducedMotion()
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ['start end', 'end start'],
+  })
+  const rotateY = useTransform(scrollYProgress, [0, 0.5, 1], [-28, 152, 332])
+  const rotateX = useTransform(scrollYProgress, [0, 0.5, 1], [10, -6, 8])
+  const objectY = useTransform(scrollYProgress, [0, 0.5, 1], [72, 0, -72])
+  const objectScale = useTransform(scrollYProgress, [0, 0.5, 1], [0.86, 1, 0.88])
+  const ringRotate = useTransform(scrollYProgress, [0, 1], [-35, 325])
+  const scanY = useTransform(scrollYProgress, [0.12, 0.82], ['8%', '88%'])
+
+  const objectMotion = prefersReducedMotion
+    ? { rotateX: 0, rotateY: -12, y: 0, scale: 1 }
+    : { rotateX, rotateY, y: objectY, scale: objectScale }
+
+  return (
+    <section ref={sectionRef} className="lp-scroll-story" aria-labelledby="scroll-story-title">
+      <div className="lp-scroll-story-sticky">
+        <motion.div
+          className="lp-scroll-story-copy"
+          initial={prefersReducedMotion ? false : { opacity: 0, y: 24 }}
+          whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.5 }}
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <span className="lp-scroll-story-kicker">CV intelligence / 03</span>
+          <h2 id="scroll-story-title">{t('landing.demo_title')}</h2>
+          <p>{t('landing.demo_subtitle')}</p>
+          <div className="lp-scroll-story-signals" aria-label={t('landing.demo_title')}>
+            <span><FileText size={15} /> CV</span>
+            <span><Brain size={15} /> AI Match</span>
+            <span><CheckCircle2 size={15} /> ATS 94%</span>
+          </div>
+        </motion.div>
+
+        <div className="lp-scroll-scene" aria-hidden="true">
+          <motion.div
+            className="lp-scroll-orbit lp-scroll-orbit-outer"
+            style={prefersReducedMotion ? undefined : { rotate: ringRotate }}
+          >
+            <span className="lp-scroll-orbit-node lp-scroll-orbit-node-a" />
+            <span className="lp-scroll-orbit-node lp-scroll-orbit-node-b" />
+          </motion.div>
+          <div className="lp-scroll-orbit lp-scroll-orbit-inner" />
+
+          <motion.div className="lp-scroll-object" style={objectMotion}>
+            <div className="lp-scroll-sheet lp-scroll-sheet-front">
+              <div className="lp-scroll-sheet-topline">
+                <span className="lp-scroll-sheet-mark"><FileText size={18} /></span>
+                <span>Candidate profile</span>
+                <strong>01</strong>
+              </div>
+              <div className="lp-scroll-sheet-heading" />
+              <div className="lp-scroll-sheet-subheading" />
+              <div className="lp-scroll-sheet-grid">
+                <div>
+                  <span className="lp-scroll-sheet-label">Experience</span>
+                  <i /><i /><i />
+                </div>
+                <div className="lp-scroll-sheet-score">
+                  <strong>82</strong>
+                  <span>Match</span>
+                </div>
+              </div>
+              <div className="lp-scroll-sheet-skills">
+                <span>React</span><span>Python</span><span>SQL</span>
+              </div>
+              <motion.div
+                className="lp-scroll-sheet-scan"
+                style={prefersReducedMotion ? { top: '48%' } : { top: scanY }}
+              />
+            </div>
+
+            <div className="lp-scroll-sheet lp-scroll-sheet-back">
+              <div className="lp-scroll-sheet-topline">
+                <span className="lp-scroll-sheet-mark"><Target size={18} /></span>
+                <span>Evidence map</span>
+                <strong>02</strong>
+              </div>
+              <div className="lp-scroll-evidence-ring">
+                <span>94%</span>
+                <small>ATS ready</small>
+              </div>
+              <div className="lp-scroll-evidence-row"><span>Role fit</span><strong>High</strong></div>
+              <div className="lp-scroll-evidence-row"><span>Signals</span><strong>12 found</strong></div>
+              <div className="lp-scroll-evidence-row"><span>Rewrite</span><strong>Ready</strong></div>
+            </div>
+
+            <div className="lp-scroll-sheet-edge" />
+          </motion.div>
+
+          <div className="lp-scroll-scene-caption lp-scroll-scene-caption-left">
+            <span>INPUT</span><strong>Structured CV</strong>
+          </div>
+          <div className="lp-scroll-scene-caption lp-scroll-scene-caption-right">
+            <span>OUTPUT</span><strong>Actionable evidence</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export default function LandingPage() {
   const { t, pricing } = useLanguage()
   const prefersReducedMotion = useReducedMotion()
@@ -528,6 +633,8 @@ export default function LandingPage() {
         </motion.div>
       </motion.section>
 
+      <ScrollAnalysisStory t={t} />
+
       {/* ── How It Works ─────────────────────────────────── */}
       <motion.section className="section section-alt" {...revealSectionProps}>
         <SectionTitle title={t('landing.how_title')} subtitle={t('landing.how_subtitle')} />
@@ -559,11 +666,6 @@ export default function LandingPage() {
             )
           })}
         </motion.div>
-      </motion.section>
-
-      {/* ── Testimonials ─────────────────────────────────── */}
-      <motion.section id="testimonials" className="section section-alt" style={{ padding: 0 }} {...revealSectionProps}>
-        <TestimonialCarousel t={t} />
       </motion.section>
 
       {/* ── Pricing ──────────────────────────────────────── */}
@@ -611,7 +713,7 @@ export default function LandingPage() {
               <li>{t('pricing.enterprise_f4')}</li>
               <li>{t('pricing.enterprise_f5')}</li>
             </ul>
-            <a href="mailto:sales@cvanalyzer.app" className="btn-outline btn-full">{t('pricing.enterprise_cta')}</a>
+            <a href="mailto:sales@cvanalyzer.dev" className="btn-outline btn-full">{t('pricing.enterprise_cta')}</a>
           </motion.div>
         </motion.div>
       </motion.section>

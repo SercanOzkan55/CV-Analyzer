@@ -1,32 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://cvanalyzer.app/</loc>
+    <loc>https://cvanalyzer.dev/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://cvanalyzer.app/pricing</loc>
+    <loc>https://cvanalyzer.dev/pricing</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://cvanalyzer.app/login</loc>
+    <loc>https://cvanalyzer.dev/login</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://cvanalyzer.app/register</loc>
+    <loc>https://cvanalyzer.dev/register</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://cvanalyzer.app/privacy</loc>
+    <loc>https://cvanalyzer.dev/privacy</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://cvanalyzer.app/terms</loc>
+    <loc>https://cvanalyzer.dev/terms</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>

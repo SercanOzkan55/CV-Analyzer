@@ -425,6 +425,7 @@
     "billing_title": "Faturalama",
     "billing_subtitle": "Aboneliğinizi, faturalarınızı ve ödeme yönteminizi yönetin.",
     "manage_billing": "Faturalamayı Yönet",
+    "billing_coming_soon": "Yakında",
     "redirecting": "Yönlendiriliyor...",
     "corporate_detected_title": "Kurumsal Hesap Tespit Edildi",
     "corporate_detected_desc": "Şirket domaini kullandığınız için Enterprise paketine özel %20 indirim ve ücretsiz toplu deneme kazandınız.",
@@ -660,17 +661,17 @@
     "title": "Gizlilik Politikası",
     "last_updated": "Son Güncelleme",
     "section1_title": "1. Topladığımız Bilgiler",
-    "section1_text": "Kayıt olurken e-posta adresiniz ve adınız gibi doğrudan sağladığınız bilgileri topluyoruz. Analiz için CV yüklediğinizde, belgeyi sonuç üretmek amacıyla geçici olarak işliyoruz. Yüklenen dosyalarınızı kalıcı olarak saklamıyoruz.",
+    "section1_text": "Kayıt olurken e-posta adresiniz ve adınız gibi doğrudan sağladığınız bilgileri topluyoruz. Analiz için CV yüklediğinizde, geçmişinize, kayıtlı CV versiyonlarınıza ve aday kayıtlarınıza erişebilmeniz için belgeyi işliyor; CV metnini, analiz sonuçlarını ve varsa yüklenen dosyayı hesabınızda saklıyoruz. Bu verileri dilediğiniz zaman silebilirsiniz.",
     "section2_title": "2. Bilgilerinizi Nasıl Kullanıyoruz",
     "section2_text": "Bilgilerinizi CV analiz hizmetimizi sunmak ve iyileştirmek, analizlerinizi işlemek, hesabınızı yönetmek ve hizmet güncellemelerini iletmek için kullanıyoruz. Kişisel verilerinizi üçüncü taraflara satmıyoruz.",
     "section3_title": "3. Veri Saklama ve Güvenlik",
-    "section3_text": "Verileriniz endüstri standardı şifreleme kullanılarak güvenli bir şekilde saklanır. Yüklenen CV'ler bellekte işlenir ve analiz tamamlandıktan sonra saklanmaz. Hesap verileri güvenli, şifreli sunucularda tutulur.",
+    "section3_text": "Verileriniz aktarım sırasında ve depolamada endüstri standardı şifreleme ile güvenli şekilde saklanır. Yüklenen CV'ler ve analiz sonuçları siz silene kadar hesabınızda saklı kalır. Tekil kayıtları Veri Merkezi'nden silebilir veya Ayarlar'dan hesabınızı silerek tüm ilişkili verilerin kalıcı olarak kaldırılmasını sağlayabilirsiniz.",
     "section4_title": "4. Çerezler ve İzleme",
     "section4_text": "Kimlik doğrulama ve tercihler (dil ve tema gibi) için gerekli çerezler kullanıyoruz. Dilinizi otomatik ayarlamak için IP tabanlı konum tespiti kullanıyoruz. Üçüncü taraf reklam izleyicileri kullanılmamaktadır.",
     "section5_title": "5. Haklarınız",
     "section5_text": "Kişisel verilerinize erişim, düzeltme veya silme talebinde bulunabilirsiniz. Hesabınızı ve tüm ilişkili verileri Ayarlar sayfasından silebilirsiniz.",
     "section6_title": "6. İletişim",
-    "section6_text": "Bu gizlilik politikası hakkında sorularınız varsa, lütfen support@cvanalyzer.app adresinden bize ulaşın."
+    "section6_text": "Bu gizlilik politikası hakkında sorularınız varsa, lütfen support@cvanalyzer.dev adresinden bize ulaşın."
   },
   "terms": {
     "title": "Kullanım Koşulları",

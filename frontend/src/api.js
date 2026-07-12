@@ -258,6 +258,17 @@ export async function fetchMe(token) {
   return res.json()
 }
 
+export async function deleteMyAccount(token) {
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers['Authorization'] = auth
+  const res = await fetch(`${BASE}/api/v1/me/account?confirm=DELETE`, {
+    method: 'DELETE',
+    headers,
+  })
+  return jsonOrThrow(res, 'Account deletion failed')
+}
+
 export async function fetchSpecializationBenchmarks(token) {
   const headers = {}
   const auth = authHeaderFrom(token)

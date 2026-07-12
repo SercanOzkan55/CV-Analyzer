@@ -320,6 +320,7 @@
     "billing_title": "Abrechnung",
     "billing_subtitle": "Verwalten Sie Ihr Abonnement, Rechnungen und Zahlungsmethode.",
     "manage_billing": "Abrechnung verwalten",
+    "billing_coming_soon": "Demnächst",
     "redirecting": "Weiterleitung..."
   },
   "premium": {
@@ -515,17 +516,17 @@
     "title": "Datenschutzrichtlinie",
     "last_updated": "Letzte Aktualisierung",
     "section1_title": "1. Erhobene Informationen",
-    "section1_text": "Wir erfassen Informationen, die Sie direkt angeben, wie E-Mail-Adresse und Name bei der Registrierung. Hochgeladene Lebensläufe werden vorübergehend verarbeitet und nicht dauerhaft gespeichert.",
+    "section1_text": "Wir erfassen Informationen, die Sie direkt angeben, wie E-Mail-Adresse und Name bei der Registrierung. Wenn Sie einen Lebenslauf zur Analyse hochladen, verarbeiten wir das Dokument und speichern den CV-Text, die Analyseergebnisse und gegebenenfalls die hochgeladene Datei in Ihrem Konto, damit Sie auf Ihren Verlauf, gespeicherte CV-Versionen und Kandidatendaten zugreifen können. Sie können diese Daten jederzeit löschen.",
     "section2_title": "2. Verwendung der Informationen",
     "section2_text": "Wir verwenden Ihre Informationen, um unseren Lebenslauf-Analysedienst bereitzustellen und zu verbessern. Wir verkaufen Ihre persönlichen Daten nicht an Dritte.",
     "section3_title": "3. Datenspeicherung und Sicherheit",
-    "section3_text": "Ihre Daten werden mit branchenüblicher Verschlüsselung sicher gespeichert. Lebensläufe werden im Arbeitsspeicher verarbeitet und nach der Analyse nicht aufbewahrt.",
+    "section3_text": "Ihre Daten werden mit branchenüblicher Verschlüsselung bei Übertragung und Speicherung gesichert. Hochgeladene Lebensläufe und Analyseergebnisse bleiben in Ihrem Konto gespeichert, bis Sie sie löschen. Einzelne Einträge können Sie im Data Center löschen oder Ihr Konto in den Einstellungen entfernen, wodurch alle zugehörigen Daten dauerhaft gelöscht werden.",
     "section4_title": "4. Cookies und Tracking",
     "section4_text": "Wir verwenden essentielle Cookies für Authentifizierung und Einstellungen. IP-basierte Standorterkennung wird zur automatischen Spracheinstellung verwendet.",
     "section5_title": "5. Ihre Rechte",
     "section5_text": "Sie können jederzeit Zugang, Berichtigung oder Löschung Ihrer persönlichen Daten über Ihre Kontoeinstellungen anfordern.",
     "section6_title": "6. Kontakt",
-    "section6_text": "Bei Fragen kontaktieren Sie uns unter support@cvanalyzer.app."
+    "section6_text": "Bei Fragen kontaktieren Sie uns unter support@cvanalyzer.dev."
   },
   "terms": {
     "title": "Nutzungsbedingungen",

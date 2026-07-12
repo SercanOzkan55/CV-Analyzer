@@ -11,6 +11,7 @@ import {
   createBillingPortalSession,
   createContactSalesRequest,
 } from '../api'
+import { BILLING_ENABLED } from '../config/features'
 
 const PLAN_ANALYTICS_META = {
   free: { billing_period: 'monthly', price: 0, currency: 'USD' },
@@ -31,10 +32,10 @@ export default function PricingPage() {
 
   const publicContactSalesHref =
     import.meta.env.VITE_CONTACT_SALES_URL ||
-    'mailto:sales@cvanalyzer.local?subject=Enterprise%20plan%20inquiry'
+    'mailto:sales@cvanalyzer.dev?subject=Enterprise%20plan%20inquiry'
 
   async function onUpgrade(targetPlan) {
-    if (!user || !token) return
+    if (!BILLING_ENABLED || !user || !token) return
     try {
       setBusyKey(`upgrade-${targetPlan}`)
       const planMeta = PLAN_ANALYTICS_META[targetPlan] || PLAN_ANALYTICS_META.pro
@@ -223,9 +224,13 @@ export default function PricingPage() {
                   type="button"
                   className={`${p.popular ? 'btn-primary' : 'btn-outline'} btn-full`}
                   onClick={() => onUpgrade(p.key)}
-                  disabled={busyKey.length > 0}
+                  disabled={!BILLING_ENABLED || busyKey.length > 0}
                 >
-                  {busyKey === `upgrade-${p.key}` ? t('pricing.redirecting') : p.cta}
+                  {!BILLING_ENABLED
+                    ? t('pricing.billing_coming_soon')
+                    : busyKey === `upgrade-${p.key}`
+                      ? t('pricing.redirecting')
+                      : p.cta}
                 </button>
               ) : (
                 <Link to={user ? '#' : '/register'} className={`${p.popular ? 'btn-primary' : 'btn-outline'} btn-full`}>
@@ -313,7 +318,7 @@ export default function PricingPage() {
           </div>
         </motion.div>
 
-        {user && (
+        {user && BILLING_ENABLED && (
           <motion.div
             className="card"
             style={{ marginTop: 24 }}

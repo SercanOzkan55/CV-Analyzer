@@ -2579,9 +2579,7 @@ def compile_cv_model(cv_data: dict | CVModel) -> CVModel:
         # GUARD: if project has description but no bullets, promote description to bullet
         if p.description and not p.bullets:
             p.bullets = [p.description]
-        # GUARD: every named project must have at least one bullet
-        if p.name and not p.bullets and not p.description:
-            p.bullets = [p.name]
+            p.description = ""
 
     # -------- certifications --------
     for c in model.certifications:
@@ -2658,10 +2656,14 @@ def _pre_render_sanity_check(model: CVModel) -> None:
     # Contact
     if model.email and not re.search(r"@.+\.", model.email):
         model.email = ""
-    if model.phone and not re.search(r"\d{4,}", model.phone):
+    if model.phone and len(re.sub(r"\D", "", model.phone)) < 8:
         model.phone = ""
     if hasattr(model, "linkedin"):
-        if model.linkedin and not re.search(r"linkedin\.com|github\.com|https?://", model.linkedin, re.I):
+        if model.linkedin and not re.search(
+            r"(?:https?://|www\.|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:/|$))",
+            model.linkedin,
+            re.I,
+        ):
             model.linkedin = ""
 
     # Education: drop empty entries
@@ -3002,7 +3004,14 @@ def _anomaly_detection_model(model: CVModel) -> None:
             t = lang.strip()
             if not t or len(t) <= 1:
                 continue
-            if len(t.split()) > 6:
+            has_proficiency_detail = bool(
+                re.search(
+                    r"\b(?:[ABC][12]|native|fluent|advanced|intermediate|beginner|proficient)\b",
+                    t,
+                    re.I,
+                )
+            )
+            if len(t.split()) > 6 and not has_proficiency_detail:
                 continue
             if _tech_re.search(t):
                 continue

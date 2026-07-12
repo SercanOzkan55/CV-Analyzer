@@ -320,6 +320,7 @@
     "billing_title": "Facturation",
     "billing_subtitle": "Gérez votre abonnement, factures et mode de paiement.",
     "manage_billing": "Gérer la facturation",
+    "billing_coming_soon": "Bientôt disponible",
     "redirecting": "Redirection..."
   },
   "premium": {
@@ -519,17 +520,17 @@
     "title": "Politique de Confidentialité",
     "last_updated": "Dernière mise à jour",
     "section1_title": "1. Informations collectées",
-    "section1_text": "Nous collectons les informations que vous fournissez directement, telles que votre adresse e-mail et votre nom lors de l'inscription. Les CV uploadés sont traités temporairement et ne sont pas stockés de façon permanente.",
+    "section1_text": "Nous collectons les informations que vous fournissez directement, telles que votre adresse e-mail et votre nom lors de l'inscription. Lorsque vous téléversez un CV pour analyse, nous traitons le document et conservons le texte du CV, les résultats d'analyse et, le cas échéant, le fichier téléversé dans votre compte, afin que vous puissiez accéder à votre historique, vos versions de CV enregistrées et vos fiches candidats. Vous pouvez supprimer ces données à tout moment.",
     "section2_title": "2. Utilisation des informations",
     "section2_text": "Nous utilisons vos informations pour fournir et améliorer notre service d'analyse de CV. Nous ne vendons pas vos données personnelles à des tiers.",
     "section3_title": "3. Stockage et sécurité",
-    "section3_text": "Vos données sont stockées de manière sécurisée avec un chiffrement standard. Les CV sont traités en mémoire et ne sont pas conservés après l'analyse.",
+    "section3_text": "Vos données sont stockées de manière sécurisée avec un chiffrement standard, en transit et au repos. Les CV téléversés et les résultats d'analyse restent dans votre compte jusqu'à ce que vous les supprimiez. Vous pouvez supprimer des enregistrements individuels depuis le Centre de Données ou supprimer votre compte dans les Paramètres pour effacer définitivement toutes les données associées.",
     "section4_title": "4. Cookies et suivi",
     "section4_text": "Nous utilisons des cookies essentiels pour l'authentification et les préférences. La détection de localisation par IP est utilisée pour définir automatiquement votre langue.",
     "section5_title": "5. Vos droits",
     "section5_text": "Vous pouvez demander l'accès, la correction ou la suppression de vos données personnelles à tout moment via les paramètres de votre compte.",
     "section6_title": "6. Contact",
-    "section6_text": "Pour toute question, contactez-nous à support@cvanalyzer.app."
+    "section6_text": "Pour toute question, contactez-nous à support@cvanalyzer.dev."
   },
   "terms": {
     "title": "Conditions d'Utilisation",

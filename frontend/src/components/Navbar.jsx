@@ -13,6 +13,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/LanguageContext'
 import { useTheme } from '../context/ThemeContext'
+import { BLOG_ENABLED } from '../config/features'
 import NotificationCenter from './NotificationCenter'
 
 const langLabels = { en: 'EN', tr: 'TR' }
@@ -85,7 +86,7 @@ export default function Navbar() {
               <a href="#features" className="nav-link">{t('nav.features')}</a>
               <a href="#pricing" className="nav-link">{t('nav.pricing')}</a>
               <a href="#faq" className="nav-link">{t('nav.faq')}</a>
-              <NavLink to="/blog" active={location.pathname === '/blog'}>Blog</NavLink>
+              {BLOG_ENABLED && <NavLink to="/blog" active={location.pathname === '/blog'}>Blog</NavLink>}
             </>
           ) : (
             <>
@@ -135,7 +136,7 @@ export default function Navbar() {
                 {planLoading ? '...' : plan === 'free' ? t('nav.premium_preview') : t('nav.premium')}
               </NavLink>
               <NavLink to="/recruiter" active={location.pathname === '/recruiter'}>{t('nav.recruiter')}</NavLink>
-              <NavLink to="/blog" active={location.pathname === '/blog'}>Blog</NavLink>
+              {BLOG_ENABLED && <NavLink to="/blog" active={location.pathname === '/blog'}>Blog</NavLink>}
             </>
           )}
         </div>
