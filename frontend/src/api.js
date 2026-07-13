@@ -124,6 +124,25 @@ export async function autoFixCv(token, file, jobDescription, { lang = 'en', useA
   return res.json()
 }
 
+export async function importJobDescriptionUrl(token, url) {
+  const body = new FormData()
+  body.append('url', url)
+  const headers = {}
+  const auth = authHeaderFrom(token)
+  if (auth) headers.Authorization = auth
+
+  const res = await fetch(`${BASE}/api/v1/job-description/import-url`, {
+    method: 'POST',
+    headers,
+    body,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Job import failed: ${res.status}`)
+  }
+  return res.json()
+}
+
 export async function optimizeLinkedIn(token, payload = {}) {
   const headers = {
     'Content-Type': 'application/json',

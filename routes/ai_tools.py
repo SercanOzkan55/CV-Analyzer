@@ -5,6 +5,9 @@ It intentionally pulls transitional shared symbols from the already-loading
 main module; later passes can move those shared helpers into services.
 """
 
+import difflib
+import re
+
 from core.timeutils import utcnow
 from fastapi import APIRouter
 from core.runtime_bridge import main_module as _main_module
@@ -293,6 +296,117 @@ def _build_cv_change_summary(original_text: str, optimized_text: str, max_items:
     }
 
 
+def _build_cv_review_operations(original_text: str, optimized_text: str) -> list[dict]:
+    """Return ordered line blocks that can be accepted or rejected safely."""
+    before = str(original_text or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    after = str(optimized_text or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    matcher = difflib.SequenceMatcher(a=before, b=after, autojunk=False)
+    operations = []
+    for index, (tag, i1, i2, j1, j2) in enumerate(matcher.get_opcodes()):
+        operations.append(
+            {
+                "id": f"change-{index}",
+                "kind": tag,
+                "before_lines": before[i1:i2],
+                "after_lines": after[j1:j2],
+                "accepted": True,
+            }
+        )
+    return operations
+
+
+def _build_recruiter_snapshot(builder_payload: dict) -> dict:
+    payload = dict(builder_payload or {})
+    experiences = list(payload.get("experiences") or [])
+    latest = experiences[0] if experiences else {}
+    categorized = payload.get("skills_categorized") or {}
+    skills = []
+    for values in categorized.values():
+        for value in values or []:
+            clean = str(value or "").strip()
+            if clean and clean not in skills:
+                skills.append(clean)
+    for value in payload.get("skills") or []:
+        clean = str(value or "").strip()
+        if clean and clean not in skills:
+            skills.append(clean)
+
+    return {
+        "full_name": str(payload.get("full_name") or ""),
+        "title": str(payload.get("title") or latest.get("title") or ""),
+        "summary": str(payload.get("summary") or ""),
+        "top_skills": skills[:8],
+        "latest_experience": {
+            "title": str(latest.get("title") or ""),
+            "company": str(latest.get("company") or ""),
+            "dates": " - ".join(
+                value for value in (str(latest.get("start_date") or ""), str(latest.get("end_date") or "")) if value
+            ),
+        },
+        "project_count": len(payload.get("projects") or []),
+        "education_count": len(payload.get("education") or []),
+    }
+
+
+def _build_validation_center(result: dict, original_text: str, optimized_text: str) -> dict:
+    quality = dict(result.get("extraction_quality") or {})
+    hard_fails = [str(item) for item in quality.get("hard_fails") or []]
+    lowered_fails = " ".join(hard_fails).lower()
+    has_unmapped_glyphs = bool(re.search(r"\(cid:\d+\)", optimized_text, re.I))
+    export_safe = bool(result.get("export_safe"))
+
+    checks = [
+        {
+            "id": "export_gate",
+            "status": "pass" if export_safe else "fail",
+            "blocking": True,
+            "label": "Safe export gate",
+            "detail": "Structured output passed factual and extraction checks."
+            if export_safe
+            else str(result.get("export_warning") or "Manual review is required before export."),
+        },
+        {
+            "id": "contacts",
+            "status": "fail" if any(key in lowered_fails for key in ("email_lost", "phone_lost", "name_")) else "pass",
+            "blocking": True,
+            "label": "Identity and contact fields",
+            "detail": "Name, email and phone fields were compared with the source text.",
+        },
+        {
+            "id": "glyphs",
+            "status": "fail" if has_unmapped_glyphs else "pass",
+            "blocking": True,
+            "label": "PDF glyph integrity",
+            "detail": "No unmapped CID glyphs remain." if not has_unmapped_glyphs else "Unmapped PDF glyphs remain.",
+        },
+        {
+            "id": "protected_sections",
+            "status": "fail" if "section_lost" in lowered_fails else "pass",
+            "blocking": True,
+            "label": "Protected CV sections",
+            "detail": "Education, projects, skills, certifications and languages are guarded against silent loss.",
+        },
+        {
+            "id": "manual_review",
+            "status": "review" if result.get("used_ai") else "pass",
+            "blocking": False,
+            "label": "AI wording review",
+            "detail": "Review rewritten wording before export; factual fields remain source-protected."
+            if result.get("used_ai")
+            else "No AI wording rewrite was used.",
+        },
+    ]
+
+    return {
+        "checks": checks,
+        "blocking_issues": [check["id"] for check in checks if check["blocking"] and check["status"] == "fail"],
+        "review_operations": _build_cv_review_operations(original_text, optimized_text),
+        "ats_readable_text": optimized_text,
+        "recruiter_snapshot": _build_recruiter_snapshot(result.get("builder_payload") or {}),
+        "quality_score": quality.get("quality_score"),
+    }
+
+
 @router.post("/api/v1/cv/auto-fix")
 @rate_limit(f"{RATE_LIMIT_IP_ANALYZE_PDF_PER_MIN}/minute")
 async def auto_fix_cv_pdf(
@@ -379,6 +493,7 @@ async def auto_fix_cv_pdf(
 
     optimized_text = str(result.get("optimized_cv_text") or result.get("optimized_text") or "")
     result["change_summary"] = _build_cv_change_summary(cv_text, optimized_text)
+    result["validation_center"] = _build_validation_center(result, cv_text, optimized_text)
     _record_ai_usage(
         endpoint="cv-auto-fix",
         user_id=getattr(db_user, "id", None),
@@ -400,6 +515,7 @@ class CVRewriteRequest(BaseModel):
 
 class CVAutoFixExportRequest(BaseModel):
     optimized_cv_text: str
+    original_cv_text: str | None = ""
     builder_payload: dict | None = None
     job_description: str | None = ""
     template: str = "classic"
@@ -613,6 +729,16 @@ def export_auto_fixed_cv(
             job_description=body.job_description or "",
             lang=body.lang,
         )
+    if body.original_cv_text:
+        from services.cv_autofix_service import _assess_export_safety
+
+        export_safe, safety_report = _assess_export_safety(body.original_cv_text, cv_model)
+        if not export_safe:
+            issues = [str(item) for item in safety_report.get("hard_fails") or []]
+            detail = "Edited CV failed safe-export validation"
+            if issues:
+                detail += ": " + "; ".join(issues[:4])
+            raise HTTPException(status_code=422, detail=detail)
     cv_data = cv_model.model_dump()
     cv_data["template"] = body.template
     cv_data["output_format"] = body.output_format

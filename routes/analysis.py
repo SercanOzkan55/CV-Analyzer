@@ -6,7 +6,9 @@ main module; later passes can move those shared helpers into services.
 """
 
 from core.timeutils import utcnow
+import json
 import ipaddress
+import re
 import socket
 import urllib.parse
 
@@ -546,6 +548,69 @@ def _validate_job_import_url(raw_url: str) -> str:
             raise HTTPException(status_code=403, detail="Import URL host is not allowed")
 
     return url
+
+
+def _find_job_posting_json_ld(value):
+    if isinstance(value, dict):
+        item_type = value.get("@type")
+        types = item_type if isinstance(item_type, list) else [item_type]
+        if any(str(candidate).lower() == "jobposting" for candidate in types if candidate):
+            return value
+        for nested in value.values():
+            found = _find_job_posting_json_ld(nested)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for nested in value:
+            found = _find_job_posting_json_ld(nested)
+            if found:
+                return found
+    return None
+
+
+def _clean_imported_job_text(value: str) -> str:
+    from lxml import html
+
+    raw = str(value or "")
+    try:
+        text = html.fromstring(f"<div>{raw}</div>").text_content()
+    except Exception:
+        text = re.sub(r"<[^>]+>", " ", raw)
+    text = re.sub(r"[ \t\f\v]+", " ", text)
+    text = re.sub(r"\n\s*\n+", "\n", text)
+    return text.strip()
+
+
+def _extract_job_description_html(contents: bytes) -> dict:
+    from lxml import html
+
+    document = html.fromstring(contents)
+    for node in document.xpath("//script|//style|//noscript|//svg"):
+        parent = node.getparent()
+        if parent is not None:
+            parent.remove(node)
+
+    for script in html.fromstring(contents).xpath("//script[@type='application/ld+json']"):
+        try:
+            payload = json.loads(script.text or "")
+        except (TypeError, ValueError):
+            continue
+        posting = _find_job_posting_json_ld(payload)
+        if not posting:
+            continue
+        organization = posting.get("hiringOrganization") or {}
+        company = organization.get("name") if isinstance(organization, dict) else ""
+        description = _clean_imported_job_text(posting.get("description") or "")
+        title = _clean_imported_job_text(posting.get("title") or "")
+        if description:
+            return {"title": title, "company": str(company or "").strip(), "description": description}
+
+    candidates = document.xpath("//main | //article")
+    root = candidates[0] if candidates else document
+    description = _clean_imported_job_text(root.text_content())
+    title_nodes = document.xpath("//h1[1]/text() | //title[1]/text()")
+    title = _clean_imported_job_text(title_nodes[0]) if title_nodes else ""
+    return {"title": title, "company": "", "description": description}
 
 
 @router.post("/api/v1/analyze-async")
@@ -1280,6 +1345,64 @@ def export_analysis_pdf(
 
 
 # ── Integration Options ────────────────────────────────────────
+
+
+@router.post("/api/v1/job-description/import-url")
+@rate_limit(f"{RATE_LIMIT_IP_MATCH_PER_MIN}/minute")
+def import_job_description_url(
+    url: str = Form(...),
+    user=Depends(verify_supabase_jwt),
+):
+    """Import a public job posting without allowing redirects or private-network access."""
+    import requests
+
+    _ensure_not_expired(user)
+    safe_url = _validate_job_import_url(url)
+    try:
+        response = requests.get(
+            safe_url,
+            timeout=10,
+            allow_redirects=False,
+            stream=True,
+            headers={"User-Agent": "CVAnalyzer-JobImporter/1.0"},
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=400, detail=f"Job URL could not be fetched: {exc}")
+
+    if 300 <= response.status_code < 400:
+        raise HTTPException(status_code=400, detail="Job URL redirects are not allowed")
+    if response.status_code >= 400:
+        raise HTTPException(status_code=400, detail=f"Job URL returned HTTP {response.status_code}")
+
+    content_type = str(response.headers.get("content-type") or "").lower()
+    if "text/html" not in content_type and "application/xhtml+xml" not in content_type:
+        raise HTTPException(status_code=400, detail="Job URL must return an HTML page")
+    max_bytes = 2 * 1024 * 1024
+    try:
+        content_length = int(response.headers.get("content-length") or 0)
+    except (TypeError, ValueError):
+        content_length = 0
+    if content_length > max_bytes:
+        raise HTTPException(status_code=413, detail="Job page is too large")
+
+    chunks = []
+    total = 0
+    for chunk in response.iter_content(chunk_size=64 * 1024):
+        if not chunk:
+            continue
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(status_code=413, detail="Job page is too large")
+        chunks.append(chunk)
+    contents = b"".join(chunks)
+
+    extracted = _extract_job_description_html(contents)
+    description = str(extracted.get("description") or "").strip()
+    if len(description) < 80:
+        raise HTTPException(status_code=422, detail="A usable job description could not be extracted")
+    extracted["description"] = description[:20000]
+    extracted["source_url"] = safe_url
+    return extracted
 
 
 @router.post("/api/v1/integrations/import-jobs")

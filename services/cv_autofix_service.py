@@ -3183,6 +3183,7 @@ def _build_safe_export_model(
     optimized_text: str,
     *,
     used_ai: bool,
+    allow_translated_narrative: bool = False,
 ) -> CVModel:
     """Merge optimized prose with factual fields from the trusted first parse."""
     try:
@@ -3210,6 +3211,8 @@ def _build_safe_export_model(
         merged_experiences = []
         for source_exp, candidate_exp in zip(source_model.experiences, safe.experiences):
             merged = source_exp.model_copy(deep=True)
+            if allow_translated_narrative and candidate_exp.title:
+                merged.title = candidate_exp.title
             if candidate_exp.bullets:
                 merged.bullets = list(candidate_exp.bullets)
             merged_experiences.append(merged)
@@ -3217,10 +3220,34 @@ def _build_safe_export_model(
     else:
         safe.experiences = [entry.model_copy(deep=True) for entry in source_model.experiences]
 
-    # These sections contain factual data. Preserve them exactly until AI
-    # rewriting is performed on structured fields rather than free-form text.
-    safe.education = [entry.model_copy(deep=True) for entry in source_model.education]
-    safe.projects = [entry.model_copy(deep=True) for entry in source_model.projects]
+    # Preserve factual identifiers exactly. Translation mode may use rewritten
+    # narrative fields only when entries still line up one-to-one.
+    if allow_translated_narrative and len(safe.education) == len(source_model.education):
+        translated_education = []
+        for source_edu, candidate_edu in zip(source_model.education, safe.education):
+            merged = source_edu.model_copy(deep=True)
+            if candidate_edu.degree:
+                merged.degree = candidate_edu.degree
+            if candidate_edu.field:
+                merged.field = candidate_edu.field
+            translated_education.append(merged)
+        safe.education = translated_education
+    else:
+        safe.education = [entry.model_copy(deep=True) for entry in source_model.education]
+
+    if allow_translated_narrative and len(safe.projects) == len(source_model.projects):
+        translated_projects = []
+        for source_project, candidate_project in zip(source_model.projects, safe.projects):
+            merged = source_project.model_copy(deep=True)
+            if candidate_project.description:
+                merged.description = candidate_project.description
+            if candidate_project.bullets:
+                merged.bullets = list(candidate_project.bullets)
+            translated_projects.append(merged)
+        safe.projects = translated_projects
+    else:
+        safe.projects = [entry.model_copy(deep=True) for entry in source_model.projects]
+
     safe.certifications = [entry.model_copy(deep=True) for entry in source_model.certifications]
     safe.skills = list(source_model.skills)
     safe.skills_categorized = {key: list(values) for key, values in source_model.skills_categorized.items()}
@@ -3457,6 +3484,9 @@ def auto_fix_cv_text(
 ) -> dict:
     cv_text = _guard_text(cv_text, "cv_text")
     job_description = (job_description or "").strip()
+    from services.language_service import detect_language
+
+    source_language = detect_language(cv_text)
 
     # ═══ PIPELINE FIRST: raw → extract → normalize → JSON ═══
     # This handles multi-column, broken lines, GPA, bullet separation, etc.
@@ -3749,6 +3779,7 @@ def auto_fix_cv_text(
         source_builder_model,
         optimized_text,
         used_ai=used_ai,
+        allow_translated_narrative=bool(used_ai and source_language != lang),
     )
     export_safe, extraction_quality = _assess_export_safety(cv_text, builder_model)
     export_warning = "" if export_safe else UNSAFE_EXPORT_WARNING
@@ -3762,6 +3793,9 @@ def auto_fix_cv_text(
         "after_ats": after_ats,
         "score_delta": score_delta,
         "used_ai": used_ai,
+        "source_language": source_language,
+        "output_language": lang,
+        "translation_requested": bool(source_language != lang),
         "dropped_sections": dropped_sections,
         "structured_sections": sorted(structured_sections.keys()),
         "detected_mode": detected_mode,

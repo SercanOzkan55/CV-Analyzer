@@ -45,3 +45,586 @@
 @import './styles/support-notifications.css';
 @import './styles/feedback-polish.css';
 @import './styles/worker-polish.css';
+/* ATS validation center */
+.job-url-import {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin: 10px 0 12px;
+}
+
+.job-url-input-wrap {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--bg-input);
+  color: var(--color-text-secondary);
+}
+
+.job-url-input-wrap:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 20%, transparent);
+}
+
+.job-url-input-wrap input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.job-url-error {
+  margin: -5px 0 10px;
+}
+
+.ats-validation-route {
+  width: 100%;
+}
+
+.ats-validation-launcher {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
+  align-items: end;
+  gap: 20px;
+}
+
+.ats-validation-launcher h3,
+.ats-validation-launcher p {
+  margin: 0;
+}
+
+.ats-validation-launcher h3 {
+  margin-top: 4px;
+}
+
+.ats-validation-launcher-kicker,
+.ats-validation-kicker {
+  color: var(--status-info);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.ats-language-control {
+  display: grid;
+  gap: 6px;
+}
+
+.ats-language-control span {
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.ats-language-control select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--bg-input);
+  color: var(--color-text);
+  padding: 0 10px;
+}
+
+.ats-validation-launch-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ats-validation-center {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ats-validation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ats-validation-header h3 {
+  margin: 5px 0 0;
+  font-size: 1.25rem;
+}
+
+.ats-variant-badge {
+  display: inline-flex;
+  margin-top: 9px;
+  padding: 3px 8px;
+  border: 1px solid var(--status-info-border);
+  border-radius: 999px;
+  background: var(--status-info-bg);
+  color: var(--status-info);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.ats-translation-badge {
+  margin-left: 6px;
+  border-color: var(--status-success-border);
+  background: var(--status-success-bg);
+  color: var(--status-success);
+}
+
+.ats-export-state {
+  min-width: 160px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid;
+  border-radius: 7px;
+}
+
+.ats-export-state.is-safe {
+  color: var(--status-success);
+  border-color: var(--status-success-border);
+  background: var(--status-success-bg);
+}
+
+.ats-export-state.is-blocked {
+  color: var(--status-danger);
+  border-color: var(--status-danger-border);
+  background: var(--status-danger-bg);
+}
+
+.ats-export-state span,
+.ats-export-state strong {
+  display: block;
+}
+
+.ats-export-state span {
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+}
+
+.ats-export-state strong {
+  font-size: 0.86rem;
+}
+
+.ats-score-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ats-score-grid > div {
+  padding: 14px 18px;
+  border-right: 1px solid var(--color-border);
+}
+
+.ats-score-grid > div:last-child {
+  border-right: 0;
+}
+
+.ats-score-grid span,
+.ats-score-grid strong {
+  display: block;
+}
+
+.ats-score-grid span {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.ats-score-grid strong {
+  margin-top: 3px;
+  font-size: 1.3rem;
+  color: var(--color-text);
+}
+
+.ats-checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1px;
+  background: var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ats-check {
+  min-width: 0;
+  display: flex;
+  gap: 9px;
+  padding: 12px 14px;
+  background: var(--color-bg-secondary);
+}
+
+.ats-check-pass > svg {
+  color: var(--status-success);
+}
+
+.ats-check-review > svg {
+  color: var(--status-warning);
+}
+
+.ats-check-fail > svg {
+  color: var(--status-danger);
+}
+
+.ats-check strong,
+.ats-check span {
+  display: block;
+}
+
+.ats-check strong {
+  color: var(--color-text);
+  font-size: 0.78rem;
+}
+
+.ats-check span {
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+.ats-view-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+}
+
+.ats-view-tabs button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ats-view-tabs button:hover,
+.ats-view-tabs button.active {
+  border-color: var(--color-border);
+  background: var(--bg-input);
+  color: var(--color-text);
+}
+
+.ats-view-tabs button:focus-visible,
+.ats-change-actions button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.ats-view-panel {
+  min-height: 390px;
+  padding: 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ats-text-preview,
+.ats-text-editor {
+  width: 100%;
+  height: 360px;
+  min-height: 360px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--bg-input);
+  color: var(--color-text);
+  padding: 14px;
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.recruiter-snapshot {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(220px, 0.7fr);
+  gap: 18px;
+  min-height: 340px;
+  padding: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: var(--bg-input);
+}
+
+.recruiter-snapshot-main > span,
+.recruiter-snapshot-facts span {
+  color: var(--color-text-secondary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.recruiter-snapshot-main h4 {
+  margin: 8px 0 2px;
+  font-size: 1.45rem;
+}
+
+.recruiter-snapshot-main > strong {
+  color: var(--status-info);
+}
+
+.recruiter-snapshot-main p {
+  max-width: 68ch;
+  margin-top: 18px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.recruiter-snapshot-facts {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.recruiter-snapshot-facts > div {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.recruiter-snapshot-facts strong,
+.recruiter-snapshot-facts span {
+  display: block;
+}
+
+.recruiter-snapshot-facts strong {
+  margin-top: 4px;
+  font-size: 0.85rem;
+}
+
+.recruiter-skill-list {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-self: end;
+}
+
+.recruiter-skill-list span {
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+}
+
+.ats-change-review {
+  padding: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ats-change-review-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ats-change-review-head span,
+.ats-change-review-head strong {
+  display: block;
+}
+
+.ats-change-review-head span {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+}
+
+.ats-change-review-head strong {
+  margin-top: 2px;
+  font-size: 0.9rem;
+}
+
+.ats-change-review-head > div:last-child {
+  display: flex;
+  gap: 6px;
+}
+
+.ats-change-list {
+  display: grid;
+  gap: 8px;
+  max-height: 430px;
+  overflow: auto;
+  padding-right: 3px;
+}
+
+.ats-change-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-left-width: 3px;
+  border-radius: 6px;
+  background: var(--bg-input);
+}
+
+.ats-change-item.is-accepted {
+  border-left-color: var(--status-success);
+}
+
+.ats-change-item.is-rejected {
+  border-left-color: var(--status-danger);
+}
+
+.ats-change-copy {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ats-change-copy > div {
+  min-width: 0;
+}
+
+.ats-change-copy span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-text-secondary);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.ats-change-copy pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+  font: 0.72rem/1.45 "JetBrains Mono", Consolas, monospace;
+}
+
+.ats-change-actions {
+  display: flex;
+  gap: 4px;
+  align-self: start;
+}
+
+.ats-change-actions button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.ats-change-actions button.active.accept {
+  border-color: var(--status-success-border);
+  background: var(--status-success-bg);
+  color: var(--status-success);
+}
+
+.ats-change-actions button.active.reject {
+  border-color: var(--status-danger-border);
+  background: var(--status-danger-bg);
+  color: var(--status-danger);
+}
+
+.ats-validation-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+}
+
+.ats-validation-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.ats-validation-error {
+  margin-top: 12px;
+}
+
+@media (max-width: 900px) {
+  .ats-score-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ats-score-grid > div:nth-child(2) {
+    border-right: 0;
+  }
+
+  .ats-score-grid > div:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .recruiter-snapshot {
+    grid-template-columns: 1fr;
+  }
+
+  .recruiter-skill-list {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .ats-validation-launcher {
+    grid-template-columns: 1fr;
+  }
+
+  .ats-validation-launch-actions {
+    grid-column: 1;
+  }
+
+  .ats-validation-header,
+  .ats-change-review-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ats-export-state {
+    width: 100%;
+  }
+
+  .ats-change-copy {
+    grid-template-columns: 1fr;
+  }
+
+  .ats-validation-actions > button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ats-validation-center *,
+  .ats-validation-launcher * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

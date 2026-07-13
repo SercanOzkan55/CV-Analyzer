@@ -192,6 +192,90 @@ def test_safe_export_model_preserves_facts_and_rejects_project_title_summary():
     assert merged.languages == ["Turkish", "English"]
 
 
+def test_safe_export_translation_keeps_identifiers_and_uses_translated_narrative():
+    source = CVModel.from_mapping(
+        {
+            "full_name": "Jane Doe",
+            "experiences": [
+                {
+                    "title": "Yazılım Mühendisi",
+                    "company": "Acme Teknoloji",
+                    "start_date": "2022",
+                    "end_date": "Present",
+                    "bullets": ["Güvenilir API servisleri geliştirdi"],
+                }
+            ],
+            "projects": [
+                {
+                    "name": "CV Analyzer",
+                    "description": "Özgeçmiş analiz platformu",
+                    "bullets": ["ATS analiz akışı geliştirdi"],
+                }
+            ],
+            "education": [
+                {
+                    "degree": "Bilgisayar Mühendisliği Lisans",
+                    "school": "Örnek Üniversitesi",
+                    "start_date": "2018",
+                    "end_date": "2022",
+                    "gpa": "3.50 / 4.00",
+                }
+            ],
+            "skills": ["Python", "FastAPI"],
+        }
+    )
+    candidate = CVModel.from_mapping(
+        {
+            "full_name": "Jane Doe",
+            "experiences": [
+                {
+                    "title": "Software Engineer",
+                    "company": "Translated Company",
+                    "start_date": "changed",
+                    "end_date": "changed",
+                    "bullets": ["Developed reliable API services"],
+                }
+            ],
+            "projects": [
+                {
+                    "name": "Translated Project Name",
+                    "description": "Resume analysis platform",
+                    "bullets": ["Developed an ATS analysis pipeline"],
+                }
+            ],
+            "education": [
+                {
+                    "degree": "B.Sc. in Computer Engineering",
+                    "school": "Translated University",
+                    "start_date": "changed",
+                    "end_date": "changed",
+                    "gpa": "changed",
+                }
+            ],
+            "skills": ["Invented Skill"],
+        }
+    )
+
+    with patch("services.cv_autofix_service.structured_text_to_builder_payload", return_value=candidate):
+        merged = _build_safe_export_model(
+            source,
+            "translated",
+            used_ai=True,
+            allow_translated_narrative=True,
+        )
+
+    assert merged.experiences[0].title == "Software Engineer"
+    assert merged.experiences[0].company == "Acme Teknoloji"
+    assert merged.experiences[0].start_date == "2022"
+    assert merged.experiences[0].bullets == ["Developed reliable API services"]
+    assert merged.projects[0].name == "CV Analyzer"
+    assert merged.projects[0].description == "Resume analysis platform"
+    assert merged.education[0].school == "Örnek Üniversitesi"
+    assert merged.education[0].degree == "B.Sc. in Computer Engineering"
+    assert merged.education[0].gpa == "3.50 / 4.00"
+    assert merged.skills == ["Python", "FastAPI"]
+
+
 def test_export_safety_rejects_lost_source_phone():
     source_text = "John Doe\njohn@example.com\nPhone: +1 555 123 4567\n\nSUMMARY\nBackend engineer"
     incomplete = CVModel(full_name="John Doe", email="john@example.com", summary="Backend engineer")
