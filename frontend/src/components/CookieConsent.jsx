@@ -29,6 +29,9 @@ export default function CookieConsent() {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
+    // Google CMP owns consent when the AdSense account tag is present.
+    if (document.querySelector('meta[name="google-adsense-account"]')) return
+
     const consent = localStorage.getItem('cookie_consent')
     if (consent === 'accepted') {
       loadGoogleFonts()

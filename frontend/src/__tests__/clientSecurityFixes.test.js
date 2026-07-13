@@ -37,7 +37,20 @@ describe('client security fixes', () => {
     expect(headers['Permissions-Policy']).toContain('geolocation=()')
     expect(headers['Content-Security-Policy']).toContain("img-src 'self' data: blob:")
     expect(headers['Content-Security-Policy']).toContain("frame-src 'self' blob:")
-    expect(headers['Content-Security-Policy']).toContain("object-src 'self' blob:")
+    expect(headers['Content-Security-Policy']).toContain("object-src 'none'")
+    expect(headers['Content-Security-Policy']).toContain('pagead2.googlesyndication.com')
+    expect(headers['Content-Security-Policy']).toContain('fundingchoicesmessages.google.com')
+  })
+
+  it('uses per-request nonces for AdSense scripts in production nginx', () => {
+    const nginxConfig = fs.readFileSync(
+      path.join(process.cwd(), '..', 'deploy', 'nginx.production.conf'),
+      'utf8',
+    )
+
+    expect(nginxConfig).toContain("script-src 'nonce-$request_id'")
+    expect(nginxConfig).toContain("'strict-dynamic'")
+    expect(nginxConfig).toContain("sub_filter '<script' '<script nonce=\"$request_id\"'")
   })
 
   it('clears only the current user scoped local data plus legacy global keys', async () => {
