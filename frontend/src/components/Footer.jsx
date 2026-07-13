@@ -30,6 +30,14 @@ export default function Footer() {
         </div>
 
         <div className="footer-col">
+          <h4>CV Rehberleri</h4>
+          <Link to="/cv-analiz/">CV analiz</Link>
+          <Link to="/ats-cv-kontrol/">ATS CV kontrolü</Link>
+          <Link to="/ats-uyumlu-cv/">ATS uyumlu CV</Link>
+          <Link to="/rehber/cv-nasil-hazirlanir/">CV nasıl hazırlanır?</Link>
+        </div>
+
+        <div className="footer-col">
           <h4>{t('landing.footer_legal')}</h4>
           <Link to="/privacy">{t('landing.footer_privacy')}</Link>
           <Link to="/terms">{t('landing.footer_terms')}</Link>

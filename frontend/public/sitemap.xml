@@ -2,32 +2,46 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://cvanalyzer.dev/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
+    <lastmod>2026-07-14</lastmod>
   </url>
   <url>
-    <loc>https://cvanalyzer.dev/pricing</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
+    <loc>https://cvanalyzer.dev/cv-analiz/</loc>
+    <lastmod>2026-07-14</lastmod>
   </url>
   <url>
-    <loc>https://cvanalyzer.dev/login</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
+    <loc>https://cvanalyzer.dev/ats-cv-kontrol/</loc>
+    <lastmod>2026-07-14</lastmod>
   </url>
   <url>
-    <loc>https://cvanalyzer.dev/register</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
+    <loc>https://cvanalyzer.dev/ats-uyumlu-cv/</loc>
+    <lastmod>2026-07-14</lastmod>
   </url>
   <url>
-    <loc>https://cvanalyzer.dev/privacy</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
+    <loc>https://cvanalyzer.dev/rehber/cv-nasil-hazirlanir/</loc>
+    <lastmod>2026-07-14</lastmod>
   </url>
   <url>
-    <loc>https://cvanalyzer.dev/terms</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
+    <loc>https://cvanalyzer.dev/cv-ornekleri/yeni-mezun/</loc>
+    <lastmod>2026-07-14</lastmod>
+  </url>
+  <url>
+    <loc>https://cvanalyzer.dev/cv-ornekleri/yazilim-muhendisi/</loc>
+    <lastmod>2026-07-14</lastmod>
+  </url>
+  <url>
+    <loc>https://cvanalyzer.dev/pricing/</loc>
+    <lastmod>2026-07-14</lastmod>
+  </url>
+  <url>
+    <loc>https://cvanalyzer.dev/about/</loc>
+    <lastmod>2026-07-14</lastmod>
+  </url>
+  <url>
+    <loc>https://cvanalyzer.dev/privacy/</loc>
+    <lastmod>2026-07-14</lastmod>
+  </url>
+  <url>
+    <loc>https://cvanalyzer.dev/terms/</loc>
+    <lastmod>2026-07-14</lastmod>
   </url>
 </urlset>

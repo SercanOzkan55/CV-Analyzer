@@ -67,6 +67,7 @@ describe('Navbar', () => {
       expect(screen.getByText('nav.features')).toBeInTheDocument()
       expect(screen.getByText('nav.pricing')).toBeInTheDocument()
       expect(screen.getByText('nav.faq')).toBeInTheDocument()
+      expect(screen.getByText('CV Rehberi')).toBeInTheDocument()
     })
 
     it('hides the blog link while VITE_ENABLE_BLOG is off', () => {

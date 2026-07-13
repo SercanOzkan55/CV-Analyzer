@@ -83,9 +83,10 @@ export default function Navbar() {
         <div className={`navbar-links ${mobileOpen ? 'open' : ''}`}>
           {isLanding ? (
             <>
-              <a href="#features" className="nav-link">{t('nav.features')}</a>
-              <a href="#pricing" className="nav-link">{t('nav.pricing')}</a>
-              <a href="#faq" className="nav-link">{t('nav.faq')}</a>
+              <a href="/#features" className="nav-link">{t('nav.features')}</a>
+              <a href="/#pricing" className="nav-link">{t('nav.pricing')}</a>
+              <a href="/#faq" className="nav-link">{t('nav.faq')}</a>
+              <NavLink to="/cv-analiz/" active={location.pathname === '/cv-analiz/'}>CV Rehberi</NavLink>
               {BLOG_ENABLED && <NavLink to="/blog" active={location.pathname === '/blog'}>Blog</NavLink>}
             </>
           ) : (

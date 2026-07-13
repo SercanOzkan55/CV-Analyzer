@@ -45,6 +45,7 @@
 @import './styles/support-notifications.css';
 @import './styles/feedback-polish.css';
 @import './styles/worker-polish.css';
+@import './styles/seo-content.css';
 /* ATS validation center */
 .job-url-import {
   display: grid;
