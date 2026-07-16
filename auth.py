@@ -4,7 +4,7 @@ import threading
 import time
 
 from fastapi import Header, HTTPException
-from jose import jwt
+import jwt
 
 _logger = logging.getLogger("app.auth")
 
@@ -13,8 +13,7 @@ _ALLOWED_HS_ALGS = {"HS256", "HS384", "HS512"}
 _ALLOWED_ASYM_ALGS = {"RS256", "RS384", "RS512", "ES256", "ES384", "ES512"}
 _JWT_DECODE_OPTIONS = {
     "verify_exp": True,
-    "require_exp": True,
-    "require_sub": True,
+    "require": ["exp", "sub"],
 }
 _JWKS_CACHE_TTL_SECONDS = int(os.getenv("SUPABASE_JWKS_CACHE_TTL_SECONDS", "3600"))
 _JWKS_CACHE_LOCK = threading.Lock()
@@ -79,6 +78,7 @@ def validate_jwt_config():
         import logging
 
         logging.getLogger(__name__).info("✓ JWT configuration validated for production")
+
 
 def _expected_jwt_audience() -> str | None:
     value = os.getenv("SUPABASE_JWT_AUDIENCE", "authenticated").strip()
@@ -184,7 +184,7 @@ def verify_supabase_jwt(authorization: str = Header(None)):
             try:
                 scheme, token = authorization.split()
                 if scheme.lower() == "bearer":
-                    claims = jwt.get_unverified_claims(token)
+                    claims = jwt.decode(token, options={"verify_signature": False})
                     user_id = claims.get("sub") or "mock-user"
                     email = claims.get("email") or "dev@example.com"
                     return {

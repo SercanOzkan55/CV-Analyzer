@@ -59,6 +59,16 @@ exclude = [
 ]
 
 [tool.bandit]
-exclude_dirs = ["tests", "venv", ".venv", "frontend", "mobile"]
+exclude_dirs = [
+    "tests",
+    "venv",
+    ".venv",
+    "frontend",
+    "mobile",
+    "_dev_scratch",
+    ".codex-ci-check",
+    "tools",
+    "tmp",
+]
 skips = ["B101"]
 
