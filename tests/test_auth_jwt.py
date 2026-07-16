@@ -2,7 +2,7 @@ import time
 
 import pytest
 from fastapi import HTTPException
-from jose import jwt
+import jwt
 
 import auth
 

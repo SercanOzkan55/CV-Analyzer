@@ -405,9 +405,7 @@ def _delete_recruiter_rows_for_user(db, user_id: int) -> dict:
             db.query(CandidateAction).filter(CandidateAction.id.in_(action_ids)).delete(synchronize_session=False)
         )
     deleted_comments += int(
-        db.query(CandidateComment)
-        .filter(CandidateComment.author_user_id == user_id)
-        .delete(synchronize_session=False)
+        db.query(CandidateComment).filter(CandidateComment.author_user_id == user_id).delete(synchronize_session=False)
         or 0
     )
 
@@ -447,7 +445,9 @@ def _delete_personal_rows_for_user(db, user_id: int) -> dict:
         "deleted_usage_days": db.query(UsageDaily)
         .filter(UsageDaily.user_id == user_id)
         .delete(synchronize_session=False),
-        "deleted_reminders": db.query(Reminder).filter(Reminder.created_by == user_id).delete(synchronize_session=False),
+        "deleted_reminders": db.query(Reminder)
+        .filter(Reminder.created_by == user_id)
+        .delete(synchronize_session=False),
         "deleted_favorites_extra": db.query(Favorite)
         .filter(Favorite.user_id == user_id)
         .delete(synchronize_session=False),
