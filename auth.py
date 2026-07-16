@@ -51,6 +51,7 @@ def _read_secret_file(path: str | None) -> str | None:
 SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
 if not SUPABASE_JWT_SECRET:
     SUPABASE_JWT_SECRET = _read_secret_file(os.getenv("SUPABASE_JWT_SECRET_FILE"))
+SUPABASE_URL = os.getenv("SUPABASE_URL")
 
 
 # CRITICAL: Validate JWT secret exists for production
@@ -61,9 +62,12 @@ def validate_jwt_config():
     if env in ("production", "prod"):
         secret = os.getenv("SUPABASE_JWT_SECRET")
         secret_file = os.getenv("SUPABASE_JWT_SECRET_FILE")
+        supabase_url = os.getenv("SUPABASE_URL")
 
-        if not secret and not secret_file:
-            raise RuntimeError("CRITICAL: SUPABASE_JWT_SECRET or SUPABASE_JWT_SECRET_FILE required in production")
+        if not supabase_url and not secret and not secret_file:
+            raise RuntimeError(
+                "CRITICAL: SUPABASE_URL or SUPABASE_JWT_SECRET/SUPABASE_JWT_SECRET_FILE required in production"
+            )
 
         if secret_file:
             if not os.path.exists(secret_file):
@@ -75,10 +79,6 @@ def validate_jwt_config():
         import logging
 
         logging.getLogger(__name__).info("✓ JWT configuration validated for production")
-
-
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-
 
 def _expected_jwt_audience() -> str | None:
     value = os.getenv("SUPABASE_JWT_AUDIENCE", "authenticated").strip()
@@ -106,6 +106,13 @@ def _jwt_decode_kwargs() -> dict:
     if issuer:
         kwargs["issuer"] = issuer
     return kwargs
+
+
+def _allow_legacy_hs_jwt() -> bool:
+    env = os.getenv("ENV", "development").lower()
+    if env not in ("production", "prod"):
+        return True
+    return os.getenv("ALLOW_LEGACY_SUPABASE_HS_JWT", "").strip().lower() in ("1", "true", "yes", "on")
 
 
 def _fetch_jwks(supabase_url: str):
@@ -230,6 +237,9 @@ def verify_supabase_jwt(authorization: str = Header(None)):
 
     # If algorithm is HMAC (HS*), use SUPABASE_JWT_SECRET
     if alg_upper in _ALLOWED_HS_ALGS:
+        if not _allow_legacy_hs_jwt():
+            _jwt_fail()
+            raise HTTPException(status_code=401, detail="Unsupported token algorithm")
         if not SUPABASE_JWT_SECRET:
             raise HTTPException(
                 status_code=500,

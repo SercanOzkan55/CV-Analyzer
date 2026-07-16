@@ -199,8 +199,12 @@ def validate_startup_config():
             return os.getenv(name, "").strip().lower() in ("1", "true", "yes", "on")
 
         cors_lower = [origin.lower() for origin in cors_origins]
-        if not os.getenv("SUPABASE_JWT_SECRET") and not os.getenv("SUPABASE_JWT_SECRET_FILE"):
-            fatals.append("SUPABASE_JWT_SECRET (or _FILE) is required in production")
+        if (
+            not os.getenv("SUPABASE_URL")
+            and not os.getenv("SUPABASE_JWT_SECRET")
+            and not os.getenv("SUPABASE_JWT_SECRET_FILE")
+        ):
+            fatals.append("SUPABASE_URL or SUPABASE_JWT_SECRET (or _FILE) is required in production")
         if not os.getenv("DATABASE_URL"):
             fatals.append("DATABASE_URL is required in production")
         if main_value("MOCK_SERVICES_ON", False):
@@ -233,6 +237,8 @@ def validate_startup_config():
     if _jwt_secret:
         if len(_jwt_secret) < 32:
             warnings.append(f"SUPABASE_JWT_SECRET is short ({len(_jwt_secret)} chars, recommend >=32)")
+        if env_mode in ("production", "prod") and not os.getenv("ALLOW_LEGACY_SUPABASE_HS_JWT", "").strip():
+            warnings.append("SUPABASE_JWT_SECRET is set but legacy HS JWT verification is disabled")
         if _jwt_secret in (
             "super-secret-jwt-token-with-at-least-32-characters-long",
             "your-super-secret-jwt-token",
