@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from core.http_runtime import _cors_origins
 from main import app
 
 
@@ -7,7 +8,7 @@ def test_options_method():
     """OPTIONS preflight should return CORS headers."""
     client = TestClient(app)
     headers = {
-        "Origin": "https://yourdomain.com",
+        "Origin": _cors_origins[0],
         "Access-Control-Request-Method": "POST",
     }
     resp = client.options("/api/v1/analyze", headers=headers)

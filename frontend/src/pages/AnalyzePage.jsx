@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Link2, Loader2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/LanguageContext'
 import { useToast } from '../components/Toast'
-import { analyzePdf, autoFixCv, buildSkillRoadmap, exportAutoFixedCV, fetchScoreBreakdown } from '../api'
+import { analyzePdf, autoFixCv, buildSkillRoadmap, exportAutoFixedCV, fetchScoreBreakdown, importJobDescriptionUrl, saveCvVersion } from '../api'
 import { addHistoryItem } from '../utils/historyStorage'
 import Navbar from '../components/Navbar'
 import DragDropUpload from '../components/DragDropUpload'
@@ -15,6 +16,7 @@ import SkillTags from '../components/SkillTags'
 import GlobalBenchmark from '../components/GlobalBenchmark'
 import QuotaWarningBanner from '../components/QuotaWarningBanner'
 import JDTemplateSelector from '../components/JDTemplateSelector'
+import ATSValidationCenter from '../components/ATSValidationCenter'
 
 function localizedValue(value, lang) {
   if (!value) return ''
@@ -648,6 +650,9 @@ export default function AnalyzePage() {
 
   const [file, setFile] = useState(null)
   const [jobDesc, setJobDesc] = useState('')
+  const [jobUrl, setJobUrl] = useState('')
+  const [jobImportLoading, setJobImportLoading] = useState(false)
+  const [jobImportError, setJobImportError] = useState('')
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -659,6 +664,9 @@ export default function AnalyzePage() {
   const [autoFixError, setAutoFixError] = useState(null)
   const [exportLoading, setExportLoading] = useState(null)
   const [editedText, setEditedText] = useState('')
+  const [autoFixTargetLanguage, setAutoFixTargetLanguage] = useState(lang)
+  const [versionSaveLoading, setVersionSaveLoading] = useState(false)
+  const [savedAutoFixVersion, setSavedAutoFixVersion] = useState(null)
   const [scoreBreakdown, setScoreBreakdown] = useState(null)
   const [breakdownLoading, setBreakdownLoading] = useState(false)
   const [cvPreviewUrl, setCvPreviewUrl] = useState('')
@@ -776,10 +784,16 @@ export default function AnalyzePage() {
       setAutoFixLoading(true)
       setAutoFixError(null)
 
-      const data = await autoFixCv(token, file, jobDesc, { lang, useAi })
+      if (!useAi && autoFixTargetLanguage !== lang) {
+        setAutoFixError(uiCopy(lang, 'Dil dönüşümü için AI düzeltmeyi kullanın.', 'Use AI Fix for language conversion.'))
+        return
+      }
+
+      const data = await autoFixCv(token, file, jobDesc, { lang: autoFixTargetLanguage, useAi })
 
       setAutoFixResult(data)
       setEditedText(data.optimized_cv_text || '')
+      setSavedAutoFixVersion(null)
       addToast(t('toast.analysis_complete'), 'success')
     } catch (err) {
       console.error('Auto-fix error:', err)
@@ -787,6 +801,26 @@ export default function AnalyzePage() {
       setAutoFixError(msg)
     } finally {
       setAutoFixLoading(false)
+    }
+  }
+
+  async function handleJobUrlImport() {
+    const value = jobUrl.trim()
+    if (!/^https?:\/\//i.test(value)) {
+      setJobImportError(uiCopy(lang, 'Geçerli bir http(s) ilan adresi girin.', 'Enter a valid http(s) job URL.'))
+      return
+    }
+    try {
+      setJobImportLoading(true)
+      setJobImportError('')
+      const imported = await importJobDescriptionUrl(token, value)
+      const heading = [imported.title, imported.company].filter(Boolean).join(' | ')
+      setJobDesc([heading, imported.description].filter(Boolean).join('\n\n'))
+      addToast(uiCopy(lang, 'İş ilanı içe aktarıldı.', 'Job description imported.'), 'success')
+    } catch (err) {
+      setJobImportError(err.message || t('toast.error_generic'))
+    } finally {
+      setJobImportLoading(false)
     }
   }
 
@@ -834,10 +868,11 @@ export default function AnalyzePage() {
 
       const response = await exportAutoFixedCV(token, {
         optimized_cv_text: editedText,
+        original_cv_text: autoFixResult.original_cv_text || '',
         builder_payload: useStructuredPayload ? autoFixResult.builder_payload : undefined,
         job_description: jobDesc,
         output_format: format,
-        lang,
+        lang: autoFixTargetLanguage,
       })
 
       const blob = await response.blob()
@@ -860,6 +895,9 @@ export default function AnalyzePage() {
   function handleReset() {
     setFile(null)
     setJobDesc('')
+    setJobUrl('')
+    setJobImportError('')
+    setJobImportLoading(false)
     setResult(null)
     setError(null)
     setSaved(false)
@@ -868,8 +906,35 @@ export default function AnalyzePage() {
     setAutoFixError(null)
     setExportLoading(null)
     setEditedText('')
+    setAutoFixTargetLanguage(lang)
+    setVersionSaveLoading(false)
+    setSavedAutoFixVersion(null)
     setSkillRoadmap(null)
     setSkillRoadmapError(null)
+  }
+
+  async function handleSaveAutoFixVersion() {
+    if (!autoFixResult || !editedText.trim()) return
+    try {
+      setVersionSaveLoading(true)
+      setAutoFixError(null)
+      const jobLabel = jobDesc.trim().split(/\r?\n/)[0]?.slice(0, 28)
+      const savedVersion = await saveCvVersion(token, {
+        cv_text: autoFixResult.original_cv_text || editedText,
+        optimized_cv_text: editedText,
+        job_description: jobDesc,
+        version_label: jobLabel ? `${jobLabel} - ATS` : undefined,
+        source: 'ats_validation_center',
+        lang: autoFixTargetLanguage,
+        notes: autoFixResult.export_safe ? 'Safe-export checks passed' : 'Saved after manual review',
+      })
+      setSavedAutoFixVersion(savedVersion)
+      addToast(uiCopy(lang, 'CV sürümü kaydedildi.', 'CV version saved.'), 'success')
+    } catch (err) {
+      setAutoFixError(err.message || t('toast.error_generic'))
+    } finally {
+      setVersionSaveLoading(false)
+    }
   }
 
   function getInterpretation(text) {
@@ -953,6 +1018,23 @@ export default function AnalyzePage() {
                 transition={{ delay: 0.15 }}
               >
                 <h2>{t('analyze.job_desc_title')}</h2>
+                <div className="job-url-import">
+                  <div className="job-url-input-wrap">
+                    <Link2 size={16} aria-hidden="true" />
+                    <input
+                      type="url"
+                      value={jobUrl}
+                      onChange={(event) => setJobUrl(event.target.value)}
+                      placeholder={uiCopy(lang, 'İş ilanı bağlantısını yapıştır', 'Paste a job posting URL')}
+                      aria-label={uiCopy(lang, 'İş ilanı bağlantısı', 'Job posting URL')}
+                    />
+                  </div>
+                  <button type="button" className="btn-outline btn-sm" onClick={handleJobUrlImport} disabled={jobImportLoading || !jobUrl.trim()}>
+                    {jobImportLoading ? <Loader2 size={15} className="spin" /> : <Link2 size={15} />}
+                    {uiCopy(lang, 'İçe aktar', 'Import')}
+                  </button>
+                </div>
+                {jobImportError && <p className="error job-url-error">{jobImportError}</p>}
                 <JDTemplateSelector
                   onSelect={(desc) => setJobDesc(desc)}
                   currentText={jobDesc}
@@ -1729,108 +1811,59 @@ export default function AnalyzePage() {
               </>
             )}
 
-            {/* AUTOFIX TAB (kept from original) */}
+            {/* ATS validation and safe export */}
             {activeTab === 'autofix' && (
-              <div className="card">
-                <h3>{t('analyze.autofix_title')}</h3>
-                <p className="text-muted" style={{ marginBottom: '1rem' }}>
-                  {t('analyze.autofix_desc')}
-                </p>
-
-                {autoFixError && <p className="error">{autoFixError}</p>}
-
-                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-                  <button type="button" className="btn-primary" onClick={() => handleAutoFix(true)} disabled={autoFixLoading}>
-                    {autoFixLoading ? t('analyze.autofix_processing') : t('analyze.autofix_ai_fix')}
-                  </button>
-                  <button type="button" className="btn-outline" onClick={() => handleAutoFix(false)} disabled={autoFixLoading}>
-                    {autoFixLoading ? t('analyze.autofix_processing') : t('analyze.autofix_quick_fix')}
-                  </button>
-                </div>
-
-                {autoFixResult && (
-                  <>
-                    <div className="autofix-result-shell">
-                      <div className="autofix-score-strip">
-                        <div>
-                          <span>{t('analyze.autofix_before_ats')}</span>
-                          <strong>{autoFixResult.before_ats?.overall_score ?? 0}</strong>
-                        </div>
-                        <div>
-                          <span>{t('analyze.autofix_after_ats')}</span>
-                          <strong className="autofix-score-good">{autoFixResult.after_ats?.overall_score ?? 0}</strong>
-                        </div>
-                        <div>
-                          <span>{uiCopy(lang, 'Net değişim', 'Net change')}</span>
-                          <strong className={Number(autoFixResult.score_delta || 0) >= 0 ? 'autofix-score-good' : 'autofix-score-bad'}>
-                            {Number(autoFixResult.score_delta || 0) >= 0 ? '+' : ''}{Number(autoFixResult.score_delta || 0).toFixed(1)}
-                          </strong>
-                        </div>
-                      </div>
-
-                      <div className="autofix-preview-layout">
-                        <section className="autofix-preview-panel">
-                          <div className="autofix-panel-head">
-                            <span>{uiCopy(lang, 'AI sonrası önizleme', 'Post-fix preview')}</span>
-                            <strong>{uiCopy(lang, 'Düzenlenebilir CV metni', 'Editable CV text')}</strong>
-                          </div>
-                          <textarea
-                            className="job-desc-input autofix-preview-textarea"
-                            rows={18}
-                            value={editedText}
-                            onChange={(e) => setEditedText(e.target.value)}
-                          />
-                        </section>
-
-                        <aside className="autofix-changes-panel">
-                          <div className="autofix-panel-head">
-                            <span>{uiCopy(lang, 'Düzeltme özeti', 'Fix summary')}</span>
-                            <strong>{uiCopy(lang, 'Neleri düzelttik?', 'What changed?')}</strong>
-                          </div>
-                          {Array.isArray(autoFixResult.applied_changes) && autoFixResult.applied_changes.length > 0 ? (
-                            <ul className="autofix-change-list">
-                              {autoFixResult.applied_changes.map((change, idx) => (
-                                <li key={`change-${idx}`}>
-                                  <b>{idx + 1}</b>
-                                  <span>{change}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="text-muted" style={{ margin: 0 }}>{t('analyze.autofix_changes_empty')}</p>
-                          )}
-                          {Array.isArray(autoFixResult.warnings) && autoFixResult.warnings.length > 0 && (
-                            <div className="autofix-warning-box">
-                              <strong>{uiCopy(lang, 'Kontrol notu', 'Review note')}</strong>
-                              {autoFixResult.warnings.map((warning, idx) => (
-                                <p key={`autofix-warning-${idx}`}>{warning}</p>
-                              ))}
-                            </div>
-                          )}
-                        </aside>
-                      </div>
+              <div className="ats-validation-route">
+                {!autoFixResult && (
+                  <div className="card ats-validation-launcher">
+                    <div>
+                      <span className="ats-validation-launcher-kicker">{uiCopy(lang, 'Güvenli çıktı akışı', 'Safe export workflow')}</span>
+                      <h3>{uiCopy(lang, 'ATS Doğrulama Merkezini hazırla', 'Prepare ATS Validation Center')}</h3>
+                      <p className="text-muted">
+                        {uiCopy(lang, 'Orijinal metni, düzeltilmiş sürümü, ATS okumasını ve recruiter özetini tek yerde incele.', 'Review the source, optimized version, ATS-readable text and recruiter snapshot in one place.')}
+                      </p>
                     </div>
-
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
-                      <button
-                        type="button"
-                        className="btn-primary"
-                        onClick={() => handleExportAutoFix('pdf')}
-                        disabled={exportLoading === 'pdf' || (autoFixResult.export_safe === false && autoFixTextIsUnchanged())}
-                      >
-                        {exportLoading === 'pdf' ? t('analyze.autofix_exporting') : t('analyze.autofix_export_pdf')}
+                    <label className="ats-language-control">
+                      <span>{uiCopy(lang, 'Çıktı dili', 'Output language')}</span>
+                      <select value={autoFixTargetLanguage} onChange={(event) => setAutoFixTargetLanguage(event.target.value)}>
+                        <option value={lang}>{uiCopy(lang, 'CV dilini koru', 'Keep CV language')}</option>
+                        {lang !== 'en' && <option value="en">English</option>}
+                      </select>
+                    </label>
+                    <div className="ats-validation-launch-actions">
+                      <button type="button" className="btn-primary" onClick={() => handleAutoFix(true)} disabled={autoFixLoading}>
+                        {autoFixLoading ? t('analyze.autofix_processing') : t('analyze.autofix_ai_fix')}
                       </button>
                       <button
                         type="button"
                         className="btn-outline"
-                        onClick={() => handleExportAutoFix('docx')}
-                        disabled={exportLoading === 'docx' || (autoFixResult.export_safe === false && autoFixTextIsUnchanged())}
+                        onClick={() => handleAutoFix(false)}
+                        disabled={autoFixLoading || autoFixTargetLanguage !== lang}
+                        title={autoFixTargetLanguage !== lang ? uiCopy(lang, 'Çeviri AI gerektirir', 'Translation requires AI') : ''}
                       >
-                        {exportLoading === 'docx' ? t('analyze.autofix_exporting') : t('analyze.autofix_export_docx')}
+                        {autoFixLoading ? t('analyze.autofix_processing') : t('analyze.autofix_quick_fix')}
                       </button>
                     </div>
-                  </>
+                  </div>
                 )}
+
+                {autoFixResult && (
+                  <ATSValidationCenter
+                    result={autoFixResult}
+                    editedText={editedText}
+                    onEditedTextChange={setEditedText}
+                    onExport={handleExportAutoFix}
+                    exportLoading={exportLoading}
+                    onSaveVersion={handleSaveAutoFixVersion}
+                    saveLoading={versionSaveLoading}
+                    savedVersion={savedAutoFixVersion}
+                    jobDescription={jobDesc}
+                    benchmark={result.global_benchmark}
+                    lang={lang}
+                  />
+                )}
+
+                {autoFixError && <p className="error ats-validation-error">{autoFixError}</p>}
               </div>
             )}
           </motion.div>

@@ -7,5 +7,17 @@ Disallow: /settings
 Disallow: /recruiter
 Disallow: /premium
 Disallow: /cv-builder
+Disallow: /career-studio
+Disallow: /compare
+Disallow: /my-cvs
+Disallow: /cover-letter
+Disallow: /interview-simulator
+Disallow: /job-tracker
+Disallow: /agents
+Disallow: /profile
+Disallow: /data-center
+Disallow: /template-marketplace
+Disallow: /admin/
+Disallow: /shared/
 
 Sitemap: https://cvanalyzer.dev/sitemap.xml

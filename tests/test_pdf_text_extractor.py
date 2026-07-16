@@ -6,6 +6,7 @@ from services.pdf_text_extractor import (
     _detect_columns_from_heading_rows,
     _line_words_to_text,
     _looks_like_section_heading,
+    _normalize_private_use_glyphs,
     _strip_page_furniture,
 )
 
@@ -42,6 +43,7 @@ class TestStripPageFurniture:
             "Ranked 1 of 500 in the national olympiad",  # achievement, not a footer
             "Rated top 2 of 50",  # short achievement ending in "N of M"
             "Completed 8 of 10 sprints ahead of schedule",  # "N of M" content
+            "github.com/SercanOzkan55",  # profile digits are not a page number
         ],
     )
     def test_keeps_real_content(self, keep):
@@ -82,3 +84,16 @@ def test_spaced_glyph_title_is_reconstructed_from_coordinates():
         x += 9.5
 
     assert _line_words_to_text(letters) == "COMPUTER ENGINEER"
+
+
+def test_cid_bullet_is_normalized_to_real_bullet():
+    assert _normalize_private_use_glyphs("(cid:127) Built a backend service") == "• Built a backend service"
+
+
+def test_large_coordinate_gap_preserves_two_column_semantics():
+    words = [
+        _word("CV Analyzer Platform", 40, 160, 100),
+        _word("Python, FastAPI, PostgreSQL", 355, 510, 100),
+    ]
+
+    assert _line_words_to_text(words) == "CV Analyzer Platform | Python, FastAPI, PostgreSQL"

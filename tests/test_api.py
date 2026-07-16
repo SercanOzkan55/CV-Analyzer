@@ -196,6 +196,17 @@ Photography
     assert "EXPERIENCE" in data["optimized_cv_text"]
     assert "SKILLS" in data["optimized_cv_text"]
     assert data["after_ats"]["overall_score"] >= data["before_ats"]["overall_score"]
+    assert data["original_cv_text"] == sample_cv.strip()
+    validation = data["validation_center"]
+    assert validation["review_operations"]
+    assert validation["ats_readable_text"] == data["optimized_cv_text"]
+    assert validation["recruiter_snapshot"]["full_name"] == "John Doe"
+    assert {item["id"] for item in validation["checks"]} >= {
+        "export_gate",
+        "contacts",
+        "glyphs",
+        "protected_sections",
+    }
 
 
 def test_cv_auto_fix_endpoint_drops_irrelevant_sections(monkeypatch, client):
@@ -232,6 +243,49 @@ Travel, movies
     assert data["optimized_cv_text"].upper().find("REFERENCES") == -1
 
 
+def test_job_description_url_import_extracts_jobposting_json_ld(monkeypatch, client):
+    import requests
+    import routes.analysis as analysis_routes
+
+    html = b"""<!doctype html><html><head><script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"JobPosting","title":"Backend Engineer",
+     "hiringOrganization":{"name":"Acme"},
+     "description":"<p>Build reliable Python and FastAPI services for a production platform. Work with PostgreSQL, Redis, Docker, testing, monitoring, and secure API design.</p>"}
+    </script></head><body></body></html>"""
+
+    class FakeResponse:
+        status_code = 200
+        content = html
+        headers = {"content-type": "text/html; charset=utf-8"}
+
+        def iter_content(self, chunk_size=65536):
+            yield self.content
+
+    monkeypatch.setattr(analysis_routes, "_validate_job_import_url", lambda value: value)
+    monkeypatch.setattr(requests, "get", lambda *_args, **_kwargs: FakeResponse())
+
+    resp = client.post(
+        "/api/v1/job-description/import-url",
+        data={"url": "https://jobs.example.com/backend-engineer"},
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["title"] == "Backend Engineer"
+    assert data["company"] == "Acme"
+    assert "FastAPI" in data["description"]
+
+
+def test_job_description_url_import_blocks_localhost(client):
+    resp = client.post(
+        "/api/v1/job-description/import-url",
+        data={"url": "http://127.0.0.1:8001/metrics"},
+    )
+
+    assert resp.status_code == 403
+    assert "not allowed" in resp.json()["detail"]
+
+
 def test_cv_auto_fix_export_endpoint_returns_document(client):
     payload = {
         "optimized_cv_text": "John Doe\njohn@example.com\n\nPROFESSIONAL SUMMARY\nPython developer.\n\nEXPERIENCE\nBackend Developer\n- Built FastAPI services\n\nSKILLS\nPython, FastAPI, SQL",
@@ -261,6 +315,21 @@ def test_cv_auto_fix_export_html_returns_html(client):
     assert resp.status_code == 200
     assert "html" in resp.headers["content-type"]
     assert b"<" in resp.content
+
+
+def test_cv_auto_fix_export_revalidates_manually_edited_text(client):
+    payload = {
+        "original_cv_text": "John Doe\njohn@example.com\n+1 555 123 4567\n\nSUMMARY\nBackend engineer",
+        "optimized_cv_text": "John Doe\n\nSUMMARY\nBackend engineer",
+        "output_format": "pdf",
+        "template": "classic",
+        "lang": "en",
+    }
+
+    resp = client.post("/api/v1/cv/auto-fix/export", json=payload)
+
+    assert resp.status_code == 422
+    assert "safe-export validation" in resp.json()["detail"]
 
 
 def test_cv_auto_fix_export_prefers_first_parse_builder_payload(client, monkeypatch):

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useInView, useReducedMotion, useScroll, useSpring, useTransform } from 'framer-motion'
 import {
@@ -456,11 +456,6 @@ export default function LandingPage() {
   const revealGridProps = prefersReducedMotion
     ? { initial: false }
     : { initial: 'hidden', whileInView: 'visible', viewport: gridViewport, variants: scrollStagger }
-
-  useEffect(() => {
-    document.title = 'CV Analyzer — AI-Powered Resume Analysis'
-    return () => { document.title = 'CV Analyzer' }
-  }, [])
 
   const features = [
     { title: t('landing.feature_ai_title'),       desc: t('landing.feature_ai_desc') },

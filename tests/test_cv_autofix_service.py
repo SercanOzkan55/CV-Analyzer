@@ -12,6 +12,9 @@ from services.cv_autofix_service import (
     _clean_lines,
     _polish_text,
     _parse_experience_entries,
+    _parse_project_entries,
+    _extract_categorized_skills,
+    _normalize_language_lines,
     guess_name_from_lines,
     _canonical_section,
     _noise_section,
@@ -189,6 +192,90 @@ def test_safe_export_model_preserves_facts_and_rejects_project_title_summary():
     assert merged.languages == ["Turkish", "English"]
 
 
+def test_safe_export_translation_keeps_identifiers_and_uses_translated_narrative():
+    source = CVModel.from_mapping(
+        {
+            "full_name": "Jane Doe",
+            "experiences": [
+                {
+                    "title": "Yazılım Mühendisi",
+                    "company": "Acme Teknoloji",
+                    "start_date": "2022",
+                    "end_date": "Present",
+                    "bullets": ["Güvenilir API servisleri geliştirdi"],
+                }
+            ],
+            "projects": [
+                {
+                    "name": "CV Analyzer",
+                    "description": "Özgeçmiş analiz platformu",
+                    "bullets": ["ATS analiz akışı geliştirdi"],
+                }
+            ],
+            "education": [
+                {
+                    "degree": "Bilgisayar Mühendisliği Lisans",
+                    "school": "Örnek Üniversitesi",
+                    "start_date": "2018",
+                    "end_date": "2022",
+                    "gpa": "3.50 / 4.00",
+                }
+            ],
+            "skills": ["Python", "FastAPI"],
+        }
+    )
+    candidate = CVModel.from_mapping(
+        {
+            "full_name": "Jane Doe",
+            "experiences": [
+                {
+                    "title": "Software Engineer",
+                    "company": "Translated Company",
+                    "start_date": "changed",
+                    "end_date": "changed",
+                    "bullets": ["Developed reliable API services"],
+                }
+            ],
+            "projects": [
+                {
+                    "name": "Translated Project Name",
+                    "description": "Resume analysis platform",
+                    "bullets": ["Developed an ATS analysis pipeline"],
+                }
+            ],
+            "education": [
+                {
+                    "degree": "B.Sc. in Computer Engineering",
+                    "school": "Translated University",
+                    "start_date": "changed",
+                    "end_date": "changed",
+                    "gpa": "changed",
+                }
+            ],
+            "skills": ["Invented Skill"],
+        }
+    )
+
+    with patch("services.cv_autofix_service.structured_text_to_builder_payload", return_value=candidate):
+        merged = _build_safe_export_model(
+            source,
+            "translated",
+            used_ai=True,
+            allow_translated_narrative=True,
+        )
+
+    assert merged.experiences[0].title == "Software Engineer"
+    assert merged.experiences[0].company == "Acme Teknoloji"
+    assert merged.experiences[0].start_date == "2022"
+    assert merged.experiences[0].bullets == ["Developed reliable API services"]
+    assert merged.projects[0].name == "CV Analyzer"
+    assert merged.projects[0].description == "Resume analysis platform"
+    assert merged.education[0].school == "Örnek Üniversitesi"
+    assert merged.education[0].degree == "B.Sc. in Computer Engineering"
+    assert merged.education[0].gpa == "3.50 / 4.00"
+    assert merged.skills == ["Python", "FastAPI"]
+
+
 def test_export_safety_rejects_lost_source_phone():
     source_text = "John Doe\njohn@example.com\nPhone: +1 555 123 4567\n\nSUMMARY\nBackend engineer"
     incomplete = CVModel(full_name="John Doe", email="john@example.com", summary="Backend engineer")
@@ -197,6 +284,56 @@ def test_export_safety_rejects_lost_source_phone():
 
     assert export_safe is False
     assert any("phone_lost" in issue for issue in report["hard_fails"])
+
+
+def test_export_safety_rejects_unmapped_pdf_glyphs():
+    model = CVModel(full_name="John Doe", summary="(cid:127) Backend engineer")
+
+    export_safe, report = _assess_export_safety("John Doe\nBackend engineer", model)
+
+    assert export_safe is False
+    assert "unmapped_pdf_glyphs" in report["hard_fails"]
+
+
+def test_reference_style_structures_survive_pdf_text_artifacts():
+    project_lines = _clean_lines(
+        "\n".join(
+            [
+                "CV Analyzer Platform | Python, FastAPI, PostgreSQL",
+                "(cid:127) Built an ATS pipeline that parses PDF documents and",
+                "PRESERVES structured project fields.",
+                "Realtime Chat | Node.js, WebSocket, Redis",
+                "(cid:127) Implemented presence and message delivery.",
+            ]
+        )
+    )
+    projects = _parse_project_entries(project_lines)
+    education = _parse_education_entries(
+        [
+            "Istanbul Health and Technology University | 2022 - Present",
+            "B.Sc. in Computer Engineering | GPA: 3.82 / 4.00",
+            "B.Sc. in Industrial Engineering (Transferred) | GPA: 3.41 / 4.00",
+        ]
+    )
+    categorized, _ = _extract_categorized_skills(
+        [
+            "Programming Languages: Python, Java, JavaScript",
+            "Backend & APIs: FastAPI, REST, WebSocket",
+            "AI & Data: OpenAI API, prompt engineering",
+            "Cloud & DevOps: Docker, AWS, CI/CD",
+        ]
+    )
+    languages = _normalize_language_lines(["English: B1+ Speaking | B2 Writing | B2/C1 Technical Reading"])
+
+    assert [project["name"] for project in projects] == ["CV Analyzer Platform", "Realtime Chat"]
+    assert projects[0]["description"] == "Python, FastAPI, PostgreSQL"
+    assert projects[0]["bullets"] == [
+        "Built an ATS pipeline that parses PDF documents and PRESERVES structured project fields."
+    ]
+    assert len(education) == 2
+    assert [entry["gpa"] for entry in education] == ["3.82 / 4.00", "3.41 / 4.00"]
+    assert len(categorized) == 4
+    assert languages == ["English: B1+ Speaking | B2 Writing | B2/C1 Technical Reading"]
 
 
 def test_education_parser_handles_date_before_curly_apostrophe_degree():

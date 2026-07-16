@@ -497,7 +497,7 @@ def rewrite_cv_for_ats(
         "9. Rewrite weak experience and project bullets using strong, truthful action verbs such as contributed, developed, implemented, designed, optimized, analyzed, collaborated, and maintained.\n"
         "10. For each experience/project bullet, prefer action + scope/tool + result/purpose. If no measurable metric exists in the source, describe the purpose or contribution without inventing numbers.\n"
         "11. Fix grammar, awkward phrasing, broken line wraps, repeated words, and sentence flow across all sections.\n"
-        "12. Keep the CV in the same language as the input/requested language. Return only the rewritten CV text, no commentary or markdown fences.\n"
+        "12. Write the complete CV in the requested language. If the source language differs, translate narrative content faithfully. Never translate or alter personal names, company names, institution names, product names, technologies, dates, URLs, email addresses, phone numbers, grades, or factual metrics. Return only the rewritten CV text, no commentary or markdown fences.\n"
         f"Job description (optional): {job_description}\n\n"
         f"CV:\n{cv_text}\n"
     )

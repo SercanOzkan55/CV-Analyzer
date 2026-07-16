@@ -11,6 +11,7 @@ from services.rewrite_service import (
     _mock_generate,
     ai_rewrite_available,
     ai_rewrite_cv,
+    rewrite_cv_for_ats,
     rewrite_bullets,
 )
 
@@ -104,6 +105,21 @@ class TestAiRewriteCv:
     def test_mock_prefix(self):
         result = ai_rewrite_cv("Some CV text")
         assert "[mock-rewrite]" in result
+
+    def test_requested_language_translation_preserves_factual_names(self, monkeypatch):
+        captured = {}
+
+        def fake_generate(prompt, **_kwargs):
+            captured["prompt"] = prompt
+            return "Translated CV"
+
+        monkeypatch.setattr("services.rewrite_service._generate", fake_generate)
+
+        result = rewrite_cv_for_ats("Sercan Ozkan\nDasal Havacilik", lang="en")
+
+        assert result == "Translated CV"
+        assert "Write the complete CV in the requested language" in captured["prompt"]
+        assert "Never translate or alter personal names" in captured["prompt"]
 
 
 class TestRewriteBullets:

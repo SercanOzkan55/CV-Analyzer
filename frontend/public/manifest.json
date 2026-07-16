@@ -1,7 +1,7 @@
 {
   "name": "CV Analyzer",
   "short_name": "CV Analyzer",
-  "description": "AI-Powered Resume Analysis — Match your CV to job descriptions instantly",
+  "description": "CV'nizi ATS uyumu, iş ilanı eşleşmesi ve beceri boşlukları açısından analiz edin.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#050816",

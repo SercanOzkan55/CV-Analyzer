@@ -16,6 +16,8 @@ import CookieConsent from "./components/CookieConsent"
 import BackToTop from "./components/BackToTop"
 import FeedbackButton from "./components/FeedbackButton"
 import AmbientPointerField from "./components/AmbientPointerField"
+import SEOManager from "./components/SEOManager"
+import { SEO_PAGES } from "./content/seoPages"
 
 
 // ---------- LAZY PAGES ----------
@@ -53,6 +55,7 @@ const CoverLetterPage = lazy(() => import("./pages/CoverLetterPage"))
 const InterviewSimulatorPage = lazy(() => import("./pages/InterviewSimulatorPage"))
 const JobTrackerPage = lazy(() => import("./pages/JobTrackerPage"))
 const AIAgentHubPage = lazy(() => import("./pages/AIAgentHubPage"))
+const SEOContentPage = lazy(() => import("./pages/SEOContentPage"))
 
 
 
@@ -143,6 +146,13 @@ function AnimatedRoutes() {
         <Route path="/privacy" element={<PageTransition><PrivacyPage /></PageTransition>} />
         <Route path="/terms" element={<PageTransition><TermsPage /></PageTransition>} />
         <Route path="/about" element={<PageTransition><AboutPage /></PageTransition>} />
+        {SEO_PAGES.map((page) => (
+          <Route
+            key={page.path}
+            path={page.path}
+            element={<PageTransition><SEOContentPage page={page} /></PageTransition>}
+          />
+        ))}
         <Route path="/shared/:shareToken" element={<PageTransition><SharedAnalysisPage /></PageTransition>} />
         {BLOG_ENABLED && <Route path="/blog" element={PRIVATE_MODE ? <PrivateRoute><PageTransition><BlogPage /></PageTransition></PrivateRoute> : <PageTransition><BlogPage /></PageTransition>} />}
         {BLOG_ENABLED && <Route path="/blog/:slug" element={PRIVATE_MODE ? <PrivateRoute><PageTransition><BlogDetailPage /></PageTransition></PrivateRoute> : <PageTransition><BlogDetailPage /></PageTransition>} />}
@@ -166,6 +176,7 @@ export default function App() {
               <RecruiterSessionProvider>
                 <MotionConfig reducedMotion="user">
                   <BrowserRouter>
+                    <SEOManager />
                     <DevContextGuard />
                     <AmbientPointerField />
                     <a href="#main-content" className="skip-link">Skip to main content</a>

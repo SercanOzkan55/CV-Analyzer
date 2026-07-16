@@ -33,6 +33,14 @@
 | 7 | [Request Lifecycle](#-7-request-lifecycle) | 15 | [Roadmap & Tech Debt](#-15-roadmap--technical-debt) |
 | 8 | [API Surface](#-8-api-surface) | 16 | [Contributing](#-16-contributing) |
 
+## License / Usage
+
+This project is **source-available for portfolio and recruitment review only**. It is not open source.
+
+Copyright (c) 2026 Sercan Ozkan. All rights reserved. No permission is granted to copy, modify, distribute, deploy, sublicense, host, sell, or commercially use this code without explicit written permission.
+
+See [LICENSE](LICENSE) for the full terms.
+
 ---
 
 ## 🧭 1. What is CV Analyzer
