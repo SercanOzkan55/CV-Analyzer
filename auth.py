@@ -51,6 +51,7 @@ SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
 if not SUPABASE_JWT_SECRET:
     SUPABASE_JWT_SECRET = _read_secret_file(os.getenv("SUPABASE_JWT_SECRET_FILE"))
 SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_JWKS_URL = os.getenv("SUPABASE_JWKS_URL")
 
 
 # CRITICAL: Validate JWT secret exists for production
@@ -59,14 +60,13 @@ def validate_jwt_config():
     env = os.getenv("ENV", "development").lower()
 
     if env in ("production", "prod"):
-        secret = os.getenv("SUPABASE_JWT_SECRET")
-        secret_file = os.getenv("SUPABASE_JWT_SECRET_FILE")
         supabase_url = os.getenv("SUPABASE_URL")
+        jwks_url = os.getenv("SUPABASE_JWKS_URL")
 
-        if not supabase_url and not secret and not secret_file:
-            raise RuntimeError(
-                "CRITICAL: SUPABASE_URL or SUPABASE_JWT_SECRET/SUPABASE_JWT_SECRET_FILE required in production"
-            )
+        if not supabase_url and not jwks_url:
+            raise RuntimeError("CRITICAL: SUPABASE_URL or SUPABASE_JWKS_URL required in production")
+
+        secret_file = os.getenv("SUPABASE_JWT_SECRET_FILE")
 
         if secret_file:
             if not os.path.exists(secret_file):
@@ -117,7 +117,8 @@ def _allow_legacy_hs_jwt() -> bool:
 
 def _fetch_jwks(supabase_url: str):
     """Fetch JWKS from Supabase with a small in-memory TTL cache."""
-    cache_key = (supabase_url or "").rstrip("/")
+    explicit_jwks_url = (SUPABASE_JWKS_URL or "").strip()
+    cache_key = explicit_jwks_url or (supabase_url or "").rstrip("/")
     now = time.time()
     with _JWKS_CACHE_LOCK:
         cached = _JWKS_CACHE.get(cache_key)
@@ -132,6 +133,8 @@ def _fetch_jwks(supabase_url: str):
         return None
 
     candidates = []
+    if explicit_jwks_url:
+        candidates.append(explicit_jwks_url)
     if supabase_url:
         candidates.append(supabase_url.rstrip("/") + "/auth/v1/.well-known/jwks.json")
         candidates.append(supabase_url.rstrip("/") + "/.well-known/jwks.json")
@@ -262,7 +265,7 @@ def verify_supabase_jwt(authorization: str = Header(None)):
         if not jwks or "keys" not in jwks:
             raise HTTPException(
                 status_code=500,
-                detail="Unable to fetch JWKS for token verification; set SUPABASE_URL and install requests",
+                detail="Unable to fetch JWKS for token verification; set SUPABASE_URL/SUPABASE_JWKS_URL and install requests",
             )
 
         kid = header.get("kid")
