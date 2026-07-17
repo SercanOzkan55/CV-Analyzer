@@ -196,6 +196,23 @@ def _is_sqlite_url(db_url: str) -> bool:
     return str(db_url).startswith("sqlite")
 
 
+def _reset_test_data(engine) -> None:
+    """Return every model table to an empty state between tests."""
+    if _is_sqlite_url(str(engine.url)):
+        Base.metadata.drop_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
+        return
+
+    table_names = ", ".join(
+        engine.dialect.identifier_preparer.format_table(table) for table in Base.metadata.sorted_tables
+    )
+    if not table_names:
+        return
+
+    with engine.begin() as conn:
+        conn.execute(text(f"TRUNCATE TABLE {table_names} RESTART IDENTITY CASCADE"))
+
+
 # ─── Session-scoped: create DB tables ONCE for the entire test session ───
 @pytest.fixture(scope="session", autouse=True)
 def _ensure_test_db_ready():
@@ -296,30 +313,16 @@ def db_session():
     else:
         engine = create_engine(_ACTIVE_TEST_DB_URL)
     Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    from sqlalchemy import text
 
-    # Clean data for a fresh slate
-    if _is_sqlite_url(_ACTIVE_TEST_DB_URL):
-        Base.metadata.drop_all(bind=engine)
-        Base.metadata.create_all(bind=engine)
-    else:
-        try:
-            with engine.begin() as conn:
-                conn.execute(text("TRUNCATE TABLE analysis, app_users, organizations RESTART IDENTITY CASCADE"))
-        except Exception:
-            pass
+    # Clean data for a fresh slate.
+    _reset_test_data(engine)
     db = Session()
     try:
         yield db
     finally:
         db.close()
-        # Clean data but keep tables for other tests
-        if not _is_sqlite_url(_ACTIVE_TEST_DB_URL):
-            try:
-                with engine.begin() as conn:
-                    conn.execute(text("TRUNCATE TABLE analysis, app_users, organizations RESTART IDENTITY CASCADE"))
-            except Exception:
-                pass
+        # Clean data but keep tables for other tests.
+        _reset_test_data(engine)
 
 
 @pytest.fixture(scope="function")
