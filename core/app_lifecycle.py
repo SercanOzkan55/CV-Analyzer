@@ -199,10 +199,7 @@ def validate_startup_config():
             return os.getenv(name, "").strip().lower() in ("1", "true", "yes", "on")
 
         cors_lower = [origin.lower() for origin in cors_origins]
-        if (
-            not os.getenv("SUPABASE_URL")
-            and not os.getenv("SUPABASE_JWKS_URL")
-        ):
+        if not os.getenv("SUPABASE_URL") and not os.getenv("SUPABASE_JWKS_URL"):
             fatals.append("SUPABASE_URL or SUPABASE_JWKS_URL is required in production")
         if not os.getenv("DATABASE_URL"):
             fatals.append("DATABASE_URL is required in production")
