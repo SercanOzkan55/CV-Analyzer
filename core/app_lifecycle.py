@@ -201,10 +201,9 @@ def validate_startup_config():
         cors_lower = [origin.lower() for origin in cors_origins]
         if (
             not os.getenv("SUPABASE_URL")
-            and not os.getenv("SUPABASE_JWT_SECRET")
-            and not os.getenv("SUPABASE_JWT_SECRET_FILE")
+            and not os.getenv("SUPABASE_JWKS_URL")
         ):
-            fatals.append("SUPABASE_URL or SUPABASE_JWT_SECRET (or _FILE) is required in production")
+            fatals.append("SUPABASE_URL or SUPABASE_JWKS_URL is required in production")
         if not os.getenv("DATABASE_URL"):
             fatals.append("DATABASE_URL is required in production")
         if main_value("MOCK_SERVICES_ON", False):
