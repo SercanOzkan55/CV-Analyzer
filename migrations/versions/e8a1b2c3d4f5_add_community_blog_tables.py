@@ -21,7 +21,11 @@ def upgrade() -> None:
     op.create_table(
         "blog_posts",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("author_user_id", sa.Integer(), nullable=False),
+        sa.Column("author_supabase_id", sa.String(length=128), nullable=False),
+        sa.Column("author_email", sa.String(length=320), nullable=False),
+        sa.Column("author_name", sa.String(length=80), nullable=False),
+        sa.Column("author_role", sa.String(length=32), nullable=False),
+        sa.Column("author_plan", sa.String(length=32), nullable=False),
         sa.Column("title", sa.String(length=160), nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
         sa.Column("summary", sa.String(length=320), nullable=False),
@@ -33,10 +37,9 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.CheckConstraint("status IN ('published', 'hidden')", name="check_blog_post_status"),
-        sa.ForeignKeyConstraint(["author_user_id"], ["app_users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_blog_posts_author_user_id", "blog_posts", ["author_user_id"])
+    op.create_index("ix_blog_posts_author_supabase_id", "blog_posts", ["author_supabase_id"])
     op.create_index("ix_blog_posts_category", "blog_posts", ["category"])
     op.create_index("ix_blog_posts_created_at", "blog_posts", ["created_at"])
     op.create_index("ix_blog_posts_slug", "blog_posts", ["slug"], unique=True)
@@ -47,17 +50,20 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("post_id", sa.Integer(), nullable=False),
         sa.Column("parent_id", sa.Integer(), nullable=True),
-        sa.Column("author_user_id", sa.Integer(), nullable=False),
+        sa.Column("author_supabase_id", sa.String(length=128), nullable=False),
+        sa.Column("author_email", sa.String(length=320), nullable=False),
+        sa.Column("author_name", sa.String(length=80), nullable=False),
+        sa.Column("author_role", sa.String(length=32), nullable=False),
+        sa.Column("author_plan", sa.String(length=32), nullable=False),
         sa.Column("text", sa.Text(), nullable=False),
         sa.Column("status", sa.String(length=16), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.CheckConstraint("status IN ('published', 'hidden')", name="check_blog_comment_status"),
-        sa.ForeignKeyConstraint(["author_user_id"], ["app_users.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["parent_id"], ["blog_comments.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["post_id"], ["blog_posts.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_blog_comments_author_user_id", "blog_comments", ["author_user_id"])
+    op.create_index("ix_blog_comments_author_supabase_id", "blog_comments", ["author_supabase_id"])
     op.create_index("ix_blog_comments_created_at", "blog_comments", ["created_at"])
     op.create_index("ix_blog_comments_parent_id", "blog_comments", ["parent_id"])
     op.create_index("ix_blog_comments_post_id", "blog_comments", ["post_id"])
@@ -66,18 +72,17 @@ def upgrade() -> None:
     op.create_table(
         "blog_reactions",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("user_id", sa.Integer(), nullable=False),
+        sa.Column("user_supabase_id", sa.String(length=128), nullable=False),
         sa.Column("target_type", sa.String(length=16), nullable=False),
         sa.Column("target_id", sa.Integer(), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.CheckConstraint("target_type IN ('post', 'comment')", name="check_blog_reaction_target_type"),
-        sa.ForeignKeyConstraint(["user_id"], ["app_users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("user_id", "target_type", "target_id", name="uq_blog_reaction_user_target"),
+        sa.UniqueConstraint("user_supabase_id", "target_type", "target_id", name="uq_blog_reaction_user_target"),
     )
     op.create_index("ix_blog_reactions_target_id", "blog_reactions", ["target_id"])
     op.create_index("ix_blog_reactions_target_type", "blog_reactions", ["target_type"])
-    op.create_index("ix_blog_reactions_user_id", "blog_reactions", ["user_id"])
+    op.create_index("ix_blog_reactions_user_supabase_id", "blog_reactions", ["user_supabase_id"])
 
 
 def downgrade() -> None:

@@ -12,9 +12,8 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func
 
 from core.route_dependencies import Depends, HTTPException, Query, Request, get_db, rate_limit, verify_supabase_jwt
-from models import BlogComment, BlogPost, BlogReaction, User
+from models import BlogComment, BlogPost, BlogReaction
 from services.blog_moderation_service import moderate_text
-from services.user_service import get_or_create_user
 
 
 router = APIRouter(prefix="/api/v1/blog", tags=["blog"])
@@ -83,13 +82,31 @@ class BlogReactionToggle(BaseModel):
     target_id: int
 
 
-def _author_name(user: User) -> str:
-    local = (user.email or "").split("@", 1)[0].replace(".", " ").replace("_", " ").strip()
+def _author_name(email: str) -> str:
+    local = (email or "").split("@", 1)[0].replace(".", " ").replace("_", " ").strip()
     return " ".join(part.capitalize() for part in local.split())[:80] or "Member"
 
 
-def _author_payload(user: User) -> dict:
-    return {"name": _author_name(user), "role": user.role or "individual", "plan": user.plan_type or "free"}
+def _identity(auth_user: dict) -> dict:
+    payload = auth_user.get("payload") or {}
+    app_metadata = payload.get("app_metadata") if isinstance(payload, dict) else {}
+    user_metadata = payload.get("user_metadata") if isinstance(payload, dict) else {}
+    email = str(auth_user.get("email") or payload.get("email") or "").strip().lower()
+    supabase_id = str(auth_user.get("user_id") or payload.get("sub") or "").strip()
+    if not email or not supabase_id:
+        raise HTTPException(status_code=401, detail="Authenticated user identity is incomplete")
+    role = str((app_metadata or {}).get("role") or "individual")[:32]
+    plan = str((app_metadata or {}).get("plan") or "free")[:32]
+    name = str((user_metadata or {}).get("full_name") or _author_name(email)).strip()[:80]
+    return {"supabase_id": supabase_id, "email": email, "name": name, "role": role, "plan": plan}
+
+
+def _author_payload(record) -> dict:
+    return {
+        "name": record.author_name,
+        "role": record.author_role or "individual",
+        "plan": record.author_plan or "free",
+    }
 
 
 def _like_tokens(count: int) -> list[str]:
@@ -98,7 +115,6 @@ def _like_tokens(count: int) -> list[str]:
 
 
 def _post_payload(db, post: BlogPost, *, include_comments: bool = False) -> dict:
-    author = db.query(User).filter(User.id == post.author_user_id).first()
     post_likes = (
         db.query(func.count(BlogReaction.id))
         .filter(BlogReaction.target_type == "post", BlogReaction.target_id == post.id)
@@ -124,7 +140,6 @@ def _post_payload(db, post: BlogPost, *, include_comments: bool = False) -> dict
     serialized_comments = []
     if include_comments:
         for comment in top_comments:
-            comment_author = db.query(User).filter(User.id == comment.author_user_id).first()
             comment_likes = (
                 db.query(func.count(BlogReaction.id))
                 .filter(BlogReaction.target_type == "comment", BlogReaction.target_id == comment.id)
@@ -139,11 +154,10 @@ def _post_payload(db, post: BlogPost, *, include_comments: bool = False) -> dict
             )
             serialized_replies = []
             for reply in replies:
-                reply_author = db.query(User).filter(User.id == reply.author_user_id).first()
                 serialized_replies.append(
                     {
                         "id": str(reply.id),
-                        "author": _author_payload(reply_author),
+                        "author": _author_payload(reply),
                         "text": reply.text,
                         "createdAt": reply.created_at.isoformat(),
                         "likes": [],
@@ -152,7 +166,7 @@ def _post_payload(db, post: BlogPost, *, include_comments: bool = False) -> dict
             serialized_comments.append(
                 {
                     "id": str(comment.id),
-                    "author": _author_payload(comment_author),
+                    "author": _author_payload(comment),
                     "text": comment.text,
                     "createdAt": comment.created_at.isoformat(),
                     "likes": _like_tokens(comment_likes),
@@ -167,17 +181,13 @@ def _post_payload(db, post: BlogPost, *, include_comments: bool = False) -> dict
         "category": post.category,
         "slug": post.slug,
         "image": "",
-        "author": _author_payload(author),
+        "author": _author_payload(post),
         "tags": post.tags or [],
         "createdAt": post.created_at.isoformat(),
         "views": post.view_count or 0,
         "likes": _like_tokens(post_likes),
         "comments": serialized_comments if include_comments else _like_tokens(comment_count),
     }
-
-
-def _db_user(db, auth_user: dict) -> User:
-    return get_or_create_user(db, auth_user.get("user_id"), auth_user.get("email"))
 
 
 def _moderate_or_reject(text: str) -> None:
@@ -228,15 +238,21 @@ def create_blog_post(
     auth_user=Depends(verify_supabase_jwt),
     db=Depends(get_db),
 ):
-    user = _db_user(db, auth_user)
+    identity = _identity(auth_user)
     start_today = datetime.combine(datetime.now(timezone.utc).date(), time.min).replace(tzinfo=None)
     count_today = (
         db.query(func.count(BlogPost.id))
-        .filter(BlogPost.author_user_id == user.id, BlogPost.created_at >= start_today)
+        .filter(BlogPost.author_supabase_id == identity["supabase_id"], BlogPost.created_at >= start_today)
         .scalar()
         or 0
     )
-    limit = 999 if user.role == "admin" else 10 if user.role == "recruiter" or user.plan_type in ("pro", "enterprise") else 3
+    limit = (
+        999
+        if identity["role"] == "admin"
+        else 10
+        if identity["role"] == "recruiter" or identity["plan"] in ("pro", "enterprise")
+        else 3
+    )
     if count_today >= limit:
         raise HTTPException(status_code=429, detail="Daily post limit reached")
     _moderate_or_reject(f"{body.title}\n\n{body.content}")
@@ -246,7 +262,11 @@ def create_blog_post(
     if len(body.content) > 317:
         summary += "..."
     post = BlogPost(
-        author_user_id=user.id,
+        author_supabase_id=identity["supabase_id"],
+        author_email=identity["email"],
+        author_name=identity["name"],
+        author_role=identity["role"],
+        author_plan=identity["plan"],
         title=body.title,
         content=body.content,
         summary=summary,
@@ -269,7 +289,7 @@ def create_blog_comment(
     auth_user=Depends(verify_supabase_jwt),
     db=Depends(get_db),
 ):
-    user = _db_user(db, auth_user)
+    identity = _identity(auth_user)
     post = db.query(BlogPost).filter(BlogPost.id == post_id, BlogPost.status == "published").first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
@@ -291,7 +311,11 @@ def create_blog_comment(
         BlogComment(
             post_id=post.id,
             parent_id=body.parent_id,
-            author_user_id=user.id,
+            author_supabase_id=identity["supabase_id"],
+            author_email=identity["email"],
+            author_name=identity["name"],
+            author_role=identity["role"],
+            author_plan=identity["plan"],
             text=body.text,
         )
     )
@@ -307,7 +331,7 @@ def toggle_blog_reaction(
     auth_user=Depends(verify_supabase_jwt),
     db=Depends(get_db),
 ):
-    user = _db_user(db, auth_user)
+    identity = _identity(auth_user)
     target = (
         db.query(BlogPost).filter(BlogPost.id == body.target_id, BlogPost.status == "published").first()
         if body.target_type == "post"
@@ -318,7 +342,7 @@ def toggle_blog_reaction(
     existing = (
         db.query(BlogReaction)
         .filter(
-            BlogReaction.user_id == user.id,
+            BlogReaction.user_supabase_id == identity["supabase_id"],
             BlogReaction.target_type == body.target_type,
             BlogReaction.target_id == body.target_id,
         )
@@ -328,7 +352,13 @@ def toggle_blog_reaction(
     if existing:
         db.delete(existing)
     else:
-        db.add(BlogReaction(user_id=user.id, target_type=body.target_type, target_id=body.target_id))
+        db.add(
+            BlogReaction(
+                user_supabase_id=identity["supabase_id"],
+                target_type=body.target_type,
+                target_id=body.target_id,
+            )
+        )
     db.commit()
     count = (
         db.query(func.count(BlogReaction.id))

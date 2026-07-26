@@ -61,7 +61,11 @@ class BlogPost(Base):
     )
 
     id = Column(Integer, primary_key=True)
-    author_user_id = Column(Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    author_supabase_id = Column(String(128), nullable=False, index=True)
+    author_email = Column(String(320), nullable=False)
+    author_name = Column(String(80), nullable=False)
+    author_role = Column(String(32), nullable=False, default="individual")
+    author_plan = Column(String(32), nullable=False, default="free")
     title = Column(String(160), nullable=False)
     content = Column(Text, nullable=False)
     summary = Column(String(320), nullable=False)
@@ -85,7 +89,11 @@ class BlogComment(Base):
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey("blog_posts.id", ondelete="CASCADE"), nullable=False, index=True)
     parent_id = Column(Integer, ForeignKey("blog_comments.id", ondelete="CASCADE"), nullable=True, index=True)
-    author_user_id = Column(Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    author_supabase_id = Column(String(128), nullable=False, index=True)
+    author_email = Column(String(320), nullable=False)
+    author_name = Column(String(80), nullable=False)
+    author_role = Column(String(32), nullable=False, default="individual")
+    author_plan = Column(String(32), nullable=False, default="free")
     text = Column(Text, nullable=False)
     status = Column(String(16), nullable=False, default="published", index=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
@@ -97,11 +105,11 @@ class BlogReaction(Base):
     __tablename__ = "blog_reactions"
     __table_args__ = (
         CheckConstraint("target_type IN ('post', 'comment')", name="check_blog_reaction_target_type"),
-        UniqueConstraint("user_id", "target_type", "target_id", name="uq_blog_reaction_user_target"),
+        UniqueConstraint("user_supabase_id", "target_type", "target_id", name="uq_blog_reaction_user_target"),
     )
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_supabase_id = Column(String(128), nullable=False, index=True)
     target_type = Column(String(16), nullable=False, index=True)
     target_id = Column(Integer, nullable=False, index=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
