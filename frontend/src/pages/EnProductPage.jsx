@@ -171,12 +171,12 @@ export default function EnProductPage({ page }) {
         <section className="seo-final-cta">
           <div className="seo-container">
             <div>
-              <p className="seo-eyebrow">Check your own document</p>
-              <h2>See how your CV is read</h2>
-              <p>Review ATS readability, job matching, and practical improvement suggestions in one analysis.</p>
+              <p className="seo-eyebrow">{page.finalCtaEyebrow || 'Check your own document'}</p>
+              <h2>{page.finalCtaTitle || 'See how your CV is read'}</h2>
+              <p>{page.finalCtaDescription || 'Review ATS readability, job matching, and practical improvement suggestions in one analysis.'}</p>
             </div>
             <Link to={page.ctaHref} className="btn-primary">
-              Create a free account <ArrowRight size={17} aria-hidden="true" />
+              {page.finalCtaLabel || 'Create a free account'} <ArrowRight size={17} aria-hidden="true" />
             </Link>
           </div>
         </section>

@@ -361,6 +361,299 @@ export const EN_SEO_PAGES = [
     ctaLabel: 'Track My Applications Free',
     ctaHref: '/register',
   },
+  {
+    slug: 'ai-career-studio',
+    path: '/en/ai-career-studio/',
+    eyebrow: 'LinkedIn optimization and job-match scoring',
+    title: 'AI Career Studio: Optimize Your LinkedIn Profile and Job Match Score',
+    seoTitle: 'AI Career Studio | LinkedIn Optimization & Job Match | CV Analyzer',
+    description: 'Turn your CV into a stronger LinkedIn profile and see a detailed job-match score — keyword coverage, experience fit, and concrete recommendations — for a specific role.',
+    intro: 'Career Studio takes one CV and a target role and runs two things side by side: a LinkedIn-ready rewrite of your headline, About section, and experience bullets, and a detailed match score against the role you are targeting.',
+    updatedAt: '2026-07-27',
+    readingTime: '5 min read',
+    highlights: [
+      'A LinkedIn headline, About section, and rewritten experience bullets generated from your CV',
+      'A list of your top skills worth featuring on your profile',
+      'A job match score with keyword coverage, experience, title, and seniority sub-scores',
+      'Strong and missing keywords called out explicitly, with text recommendations',
+      'Choose a tone from 5 modes: junior, senior, manager, technical, academic',
+    ],
+    sections: [
+      {
+        heading: 'How it works',
+        paragraphs: [
+          'One CV and one target role run through two views at once.',
+        ],
+        bullets: [
+          'Paste or upload the CV you want to optimize.',
+          'Add the target role or job description and pick a mode.',
+          'Get a LinkedIn rewrite (headline, About, bullets, top skills) and a job match score side by side.',
+          'Use the strong/missing keyword list and recommendations to decide what to adjust in your CV or profile.',
+        ],
+      },
+      {
+        heading: 'Who it is for',
+        paragraphs: [
+          'For candidates who want their CV and LinkedIn presence pointed at the same target role.',
+        ],
+        bullets: [
+          'Job hunters who also want their LinkedIn profile aligned with a specific role.',
+          'Anyone unsure how to turn CV bullet points into a LinkedIn "About" narrative.',
+          'Candidates who want to see precisely which keywords a role expects that their CV is missing.',
+        ],
+      },
+      {
+        heading: 'What it does — and does not — replace',
+        paragraphs: [
+          'It works on one CV and one role at a time — it is not a multi-CV career-path planner or long-term goal tracker. The match score is a comparison signal, not a hiring or ATS-pass guarantee, the same caveat that applies to the CV Analyzer’s scoring.',
+          'It does not post anything to LinkedIn for you; you copy the generated text into your own profile after reviewing it.',
+        ],
+      },
+    ],
+    faq: [
+      { question: 'Is Career Studio free?', answer: 'It is available after creating a free account. Current usage limits are shown in the product.' },
+      { question: 'Does it post to LinkedIn for me?', answer: 'No. It generates text you review and copy into your own LinkedIn profile.' },
+      { question: 'Do I need a job description?', answer: 'Yes, for job match scoring. The LinkedIn rewrite also works better with a target role or mode selected.' },
+      { question: 'Is this the same as the CV Analyzer?', answer: 'No. The CV Analyzer scores CV readability and job fit; Career Studio focuses on LinkedIn rewriting plus job match scoring for one CV and role pair.' },
+    ],
+    ctaLabel: 'Optimize My Profile Free',
+    ctaHref: '/register',
+  },
+  {
+    slug: 'ai-career-agents',
+    path: '/en/ai-career-agents/',
+    eyebrow: 'Chat with specialized AI career personas',
+    title: 'AI Career Agents: Practice With Recruiter, Tech Lead, and Coach Personas',
+    seoTitle: 'AI Career Agents | Recruiter, Tech Lead & Coach Chat | CV Analyzer',
+    description: 'Chat with three specialized AI personas — an HR recruiter, a tech lead, and a career coach — using your own saved CV as context.',
+    intro: 'Instead of one generic assistant, the Agent Hub gives you three focused personas to talk to, each suited to a different kind of question, with your saved CV loaded in as context so the conversation is specific to you.',
+    updatedAt: '2026-07-27',
+    readingTime: '5 min read',
+    highlights: [
+      '"Selin", an HR Recruiter Agent, for resume screening feedback and behavioral interview questions',
+      '"Devrim", a Tech Lead Agent, for system design questions and tech-stack/skill review',
+      '"Canan", a Career Coach Agent, for CV summary rewrites, career roadmaps, and ATS keyword advice',
+      'Pick which saved CV version the conversation uses as context',
+      'A toggleable raw CV text panel alongside the chat',
+    ],
+    sections: [
+      {
+        heading: 'How it works',
+        paragraphs: [
+          'Each conversation is grounded in a CV you already have saved.',
+        ],
+        bullets: [
+          'Choose a saved CV version from your account.',
+          'Pick the agent that matches your question — recruiter, tech lead, or coach.',
+          'Ask your question in plain language.',
+          'Continue the conversation, referring back to your CV as needed.',
+        ],
+      },
+      {
+        heading: 'Who it is for',
+        paragraphs: [
+          'For candidates who want a focused conversation rather than one generic chatbot.',
+        ],
+        bullets: [
+          'Anyone preparing for a specific type of conversation — recruiter screen, technical interview, or career planning.',
+          'People who want quick, CV-specific answers rather than generic advice.',
+          'Candidates deciding between coaching-style questions and a more technical deep-dive.',
+        ],
+      },
+      {
+        heading: 'What the agents can — and cannot — do',
+        paragraphs: [
+          'Each turn is a single conversational response, not an autonomous multi-step task runner — the agents answer and discuss, they do not take actions elsewhere in your account for you.',
+          'Responses are AI-generated and should be treated as a starting point for your own judgment, not a substitute for a real recruiter or hiring manager’s decision.',
+        ],
+      },
+    ],
+    faq: [
+      { question: 'Is this free?', answer: 'It is available after creating a free account. Current usage limits are shown in the product.' },
+      { question: 'Which agent should I use for interview prep?', answer: 'The HR Recruiter Agent for behavioral and screening questions, the Tech Lead Agent for technical and system-design questions.' },
+      { question: 'Does it use my real CV?', answer: 'Yes, you select one of your saved CV versions to use as context for the conversation.' },
+      { question: 'Can I switch agents mid-conversation?', answer: 'Yes, you can pick a different agent for a different kind of question at any time.' },
+    ],
+    ctaLabel: 'Chat With an Agent Free',
+    ctaHref: '/register',
+  },
+  {
+    slug: 'career-data-center',
+    path: '/en/career-data-center/',
+    eyebrow: 'Your data, in your control',
+    title: 'Career Data Center: See and Control Everything Stored in Your Account',
+    seoTitle: 'Career Data Center | Export & Delete Your Data | CV Analyzer',
+    description: 'See exactly what is stored in your account — CV versions, files, analyses, reminders — and export or delete it, in full or by category, whenever you want.',
+    intro: 'The Data Center is not an analytics dashboard — it is a straightforward privacy control center. It shows what is actually stored under your account and gives you a direct way to export or delete it, without contacting support.',
+    updatedAt: '2026-07-27',
+    readingTime: '4 min read',
+    highlights: [
+      'Six count tiles: CV versions, stored files, analyses, reminders, candidate actions, and usage days',
+      'Export your data as redacted JSON (safe to share) or full JSON (everything)',
+      'Delete data by scope — stored CVs, analyses, workspace data, or everything — with a confirmation step',
+      'A preview of your most recent export before you download it',
+    ],
+    sections: [
+      {
+        heading: 'How it works',
+        paragraphs: [
+          'Every action here is direct, scoped, and confirmed before it runs.',
+        ],
+        bullets: [
+          'Open the Data Center to see your current counts across all data categories.',
+          'Choose "Export Redacted" for a safe-to-share summary, or "Export Full" for everything.',
+          'Preview the JSON before downloading it.',
+          'Use the scoped delete selector if you want to remove specific categories or everything, with a confirmation step before anything is deleted.',
+        ],
+      },
+      {
+        heading: 'Who it is for',
+        paragraphs: [
+          'For anyone who wants direct control over their own account data.',
+        ],
+        bullets: [
+          'Anyone who wants to know exactly what a service has stored about them.',
+          'Candidates who want to clean out old CV versions or analyses without deleting their whole account.',
+          'Anyone exercising a data access or deletion request themselves rather than emailing support.',
+        ],
+      },
+      {
+        heading: 'What this is — and is not',
+        paragraphs: [
+          'This is account-data management, not usage analytics or trend charts — there are no graphs of your scores over time here.',
+          'Deletion is permanent once confirmed, so review the scope carefully before proceeding.',
+        ],
+      },
+    ],
+    faq: [
+      { question: 'Is this free?', answer: 'Yes, it is available to every account regardless of plan.' },
+      { question: 'What is the difference between redacted and full export?', answer: 'Redacted removes sensitive identifying details so it is safer to share; full export includes everything stored under your account.' },
+      { question: 'Can I undo a deletion?', answer: 'No. Deletions are permanent once confirmed, which is why there is a confirmation step first.' },
+      { question: 'Does this replace contacting support?', answer: 'For most access, export, and delete needs, yes — you can act directly here instead of waiting on a support request.' },
+    ],
+    ctaLabel: 'View My Data',
+    ctaHref: '/register',
+  },
+  {
+    slug: 'resume-templates',
+    path: '/en/resume-templates/',
+    eyebrow: 'Ready-made, ATS-friendly resume templates',
+    title: 'ATS-Friendly Resume Templates You Can Build On Directly',
+    seoTitle: 'ATS-Friendly Resume Templates | CV Analyzer',
+    description: 'Browse resume templates by category, then open one directly in the resume builder — no separate download or file wrangling.',
+    intro: 'Rather than downloading a template file and reformatting it yourself, each template in the marketplace opens directly in the resume builder, pre-selected, so you go straight from picking a look to filling in your details.',
+    updatedAt: '2026-07-27',
+    readingTime: '4 min read',
+    highlights: [
+      'Templates organized by category, each with a description and "best for" tags to help you pick',
+      'Some templates are available on the free plan; others unlock with a paid plan',
+      '"Use Template" opens the template pre-selected inside the resume builder',
+      'Locked templates are shown clearly and link to plans that include them',
+    ],
+    sections: [
+      {
+        heading: 'How it works',
+        paragraphs: [
+          'Picking a template and starting to build are the same step, not two.',
+        ],
+        bullets: [
+          'Browse templates by category and "best for" tags.',
+          'Pick one that fits the role or industry you are targeting.',
+          'Select "Use Template" to open it directly in the resume builder with that template pre-applied.',
+          'Fill in your details and export as usual.',
+        ],
+      },
+      {
+        heading: 'Who it is for',
+        paragraphs: [
+          'For anyone who wants a professional starting point instead of a blank builder session.',
+        ],
+        bullets: [
+          'Candidates targeting a specific industry or seniority level where a particular style tends to fit better.',
+          'Anyone who wants a professional starting point rather than a blank resume-builder session.',
+          'People who have used the builder before and want to switch templates without starting over.',
+        ],
+      },
+      {
+        heading: 'What to expect',
+        paragraphs: [
+          'Template previews are illustrative category cards, not full live thumbnails of every design — you will see the actual look once you open a template in the builder.',
+          'Some templates require a paid plan; free-plan availability is limited to the classic template set covered by the resume builder.',
+        ],
+      },
+    ],
+    faq: [
+      { question: 'Are all templates free?', answer: 'No. Some are available on the free plan, others require a paid plan, shown clearly on each card.' },
+      { question: 'Do templates affect ATS readability?', answer: 'They are designed with clean, text-based layouts in mind. For a full readability check on your finished resume, run it through the ATS Resume Checker.' },
+      { question: 'Can I change templates after I have started building?', answer: 'Yes. Open a different template from the marketplace to apply it to the builder.' },
+      { question: 'Do I need to download anything to use a template?', answer: 'No. Selecting a template opens it directly inside the resume builder.' },
+    ],
+    ctaLabel: 'Browse Templates Free',
+    ctaHref: '/register',
+  },
+  {
+    slug: 'recruiter-cv-screening',
+    path: '/en/recruiter-cv-screening/',
+    eyebrow: 'Bulk candidate screening for recruiters',
+    title: 'Recruiter CV Screening: Rank and Compare Candidates in Bulk',
+    seoTitle: 'Recruiter CV Screening & Candidate Ranking | CV Analyzer',
+    description: 'Upload a batch of candidate resumes against a job description and get sortable, filterable rankings, bulk actions, and exportable shortlists.',
+    intro: 'Built for the recruiter side of hiring, not the candidate side: paste a job description, upload a batch of resumes, and get every candidate ranked and scored against that role in one table.',
+    updatedAt: '2026-07-27',
+    readingTime: '5 min read',
+    highlights: [
+      'Bulk resume upload (PDF) ranked against a pasted or uploaded job description',
+      'Per-candidate score circles and breakdown bars, with a sortable, filterable results table (High/Medium/Low match chips)',
+      'Bulk select, accept/reject, and templated bulk email to candidates',
+      'CSV, HTML, or JSON export of batch results, plus candidate/keyword search',
+      'A persisted decision log and reusable email templates across sessions',
+    ],
+    sections: [
+      {
+        heading: 'How it works',
+        paragraphs: [
+          'A full screening pass moves from upload to shortlist in a few steps.',
+        ],
+        bullets: [
+          'Paste or upload the job description.',
+          'Bulk-upload candidate resumes.',
+          'Review the ranked, sortable, filterable results table with per-candidate score breakdowns.',
+          'Select candidates in bulk to accept, reject, or email using a saved template.',
+          'Export the results or search by keyword/name as your shortlist narrows.',
+        ],
+      },
+      {
+        heading: 'Who it is for',
+        paragraphs: [
+          'For recruiters and hiring teams, not individual job seekers.',
+        ],
+        bullets: [
+          'Recruiters and hiring teams screening more candidates than they can manually review one by one.',
+          'Teams that need a defensible, consistent first-pass ranking before deeper manual review.',
+          'Teams that want a shared decision log and reusable outreach templates.',
+        ],
+      },
+      {
+        heading: 'Access and limitations',
+        paragraphs: [
+          'This requires recruiter access — it is not available on a standard individual account. Contact your organization’s administrator or upgrade your plan to get access.',
+          'Rankings are a first-pass screening signal to help prioritize manual review, not an automated hiring decision.',
+        ],
+      },
+    ],
+    faq: [
+      { question: 'Who can access this?', answer: 'Accounts with recruiter role access, or billing admins on an organization plan. There is no separate self-serve recruiter signup.' },
+      { question: 'How many resumes can I upload at once?', answer: 'It supports bulk/batch upload — check your plan’s current limits in the product.' },
+      { question: 'Can I export the results?', answer: 'Yes, as CSV, HTML, or JSON.' },
+      { question: 'Does it replace reviewing candidates manually?', answer: 'No. It is a first-pass ranking and organization tool to help you prioritize who to review more closely.' },
+    ],
+    ctaLabel: 'See Recruiter Plans',
+    ctaHref: '/pricing',
+    finalCtaEyebrow: 'Screening for hiring teams',
+    finalCtaTitle: 'Get recruiter access for your team',
+    finalCtaDescription: 'Recruiter screening requires recruiter-role or admin access — see plans or contact your administrator.',
+    finalCtaLabel: 'See Recruiter Plans',
+  },
 ]
 
 export const EN_SEO_PAGE_BY_PATH = Object.fromEntries(EN_SEO_PAGES.map((page) => [page.path, page]))
