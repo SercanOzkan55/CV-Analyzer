@@ -32,7 +32,7 @@ jobs:
         run: ruff check . --select E9,F63,F7,F82 --exclude FEATURE_IMPLEMENTATIONS.py --output-format=github
 
       - name: Ruff format check
-        run: ruff format --check .
+        run: ruff format --check --exclude "*.md,**/*.md,migrations/**" .
 
       - name: Bandit security scan
         run: bandit -c pyproject.toml -r . --severity-level medium -f json -o bandit-report.json

@@ -30,6 +30,59 @@ _SUPPORTED_CV_UPLOAD_TYPES = {
 }
 
 
+def _increment_persistent_analysis_usage(db, db_user) -> None:
+    if db_user.role == "recruiter" and db_user.organization_id:
+        organization = (
+            db.query(Organization).filter(Organization.id == db_user.organization_id).with_for_update().first()
+        )
+        if organization:
+            _reset_organization_usage_if_needed(organization)
+            organization.daily_usage = int(organization.daily_usage or 0) + 1
+            organization.monthly_usage = int(organization.monthly_usage or 0) + 1
+            db.add(organization)
+    elif not _is_admin_user(db_user):
+        db_user.daily_usage = int(db_user.daily_usage or 0) + 1
+        db_user.monthly_usage = int(db_user.monthly_usage or 0) + 1
+        db.add(db_user)
+    db.commit()
+
+
+def _refund_persistent_analysis_usage(db, db_user) -> None:
+    if db_user.role == "recruiter" and db_user.organization_id:
+        organization = (
+            db.query(Organization).filter(Organization.id == db_user.organization_id).with_for_update().first()
+        )
+        if organization:
+            organization.daily_usage = max(0, int(organization.daily_usage or 0) - 1)
+            organization.monthly_usage = max(0, int(organization.monthly_usage or 0) - 1)
+            db.add(organization)
+    elif not _is_admin_user(db_user):
+        db_user.daily_usage = max(0, int(db_user.daily_usage or 0) - 1)
+        db_user.monthly_usage = max(0, int(db_user.monthly_usage or 0) - 1)
+        db.add(db_user)
+    db.commit()
+
+
+def _analysis_recommendations(score: float) -> list[str]:
+    if float(score or 0) >= 80:
+        return [
+            "Strong match! Prepare for behavioral and technical interviews.",
+            "Highlight relevant projects and achievements in your CV.",
+            "Practice common interview questions for this role.",
+        ]
+    if float(score or 0) >= 60:
+        return [
+            "Good potential. Tailor your CV to emphasize matching skills.",
+            "Consider gaining more experience in key areas.",
+            "Network with professionals in this field.",
+        ]
+    return [
+        "Consider upskilling in required technologies.",
+        "Seek entry-level positions or internships to build experience.",
+        "Get feedback on your CV from mentors.",
+    ]
+
+
 def _upload_extension(filename: str | None) -> str:
     _, ext = os.path.splitext(str(filename or "").lower())
     return ext.lstrip(".")
@@ -238,6 +291,7 @@ def analyze(
             org = db.query(Organization).filter(Organization.id == db_user.organization_id).first()
         # organization daily/monthly quota based on org.plan_type
         if org:
+            _reset_organization_usage_if_needed(org)
             org_daily_limit = ORG_PLAN_LIMITS_DAILY.get(_normalize_plan(org.plan_type), ORG_PLAN_LIMITS_DAILY["free"])
             org_monthly_limit = ORG_PLAN_LIMITS_MONTHLY.get(
                 _normalize_plan(org.plan_type), ORG_PLAN_LIMITS_MONTHLY["free"]
@@ -296,24 +350,7 @@ def analyze(
         result = _main_module().run_pipeline(body.cv_text, body.job_description, body.lang)
         # Add AI recommendations
         score = result.get("final_score", 0)
-        if score > 0.8:
-            result["recommendations"] = [
-                "Strong match! Prepare for behavioral and technical interviews.",
-                "Highlight relevant projects and achievements in your CV.",
-                "Practice common interview questions for this role.",
-            ]
-        elif score > 0.6:
-            result["recommendations"] = [
-                "Good potential. Tailor your CV to emphasize matching skills.",
-                "Consider gaining more experience in key areas.",
-                "Network with professionals in this field.",
-            ]
-        else:
-            result["recommendations"] = [
-                "Consider upskilling in required technologies.",
-                "Seek entry-level positions or internships to build experience.",
-                "Get feedback on your CV from mentors.",
-            ]
+        result["recommendations"] = _analysis_recommendations(score)
     except Exception:
         _metric_error("analyze", "pipeline")
         raise
@@ -673,6 +710,7 @@ def analyze_async(
         if db_user.organization_id:
             org = db.query(Organization).filter(Organization.id == db_user.organization_id).first()
         if org:
+            _reset_organization_usage_if_needed(org)
             org_daily_limit = ORG_PLAN_LIMITS_DAILY.get(_normalize_plan(org.plan_type), ORG_PLAN_LIMITS_DAILY["free"])
             org_monthly_limit = ORG_PLAN_LIMITS_MONTHLY.get(
                 _normalize_plan(org.plan_type), ORG_PLAN_LIMITS_MONTHLY["free"]
@@ -719,9 +757,32 @@ def analyze_async(
         # If Celery is not configured, fall back to synchronous pipeline
         # but still wrap response in a completed job shape for API
         result = _main_module().run_pipeline(body.cv_text, body.job_description, body.lang)
+        _increment_persistent_analysis_usage(db, db_user)
+        from services.tasks import persist_analysis_result
+
+        result = persist_analysis_result(
+            result,
+            user_id=db_user.id,
+            organization_id=db_user.organization_id,
+            cv_text=body.cv_text,
+            job_description=body.job_description,
+            lang=body.lang,
+            db=db,
+        )
         return {"job_id": "local-sync", "status": "completed", "result": result}
 
-    task = analyze_text_task.delay(body.cv_text, body.job_description, body.lang)
+    _increment_persistent_analysis_usage(db, db_user)
+    try:
+        task = analyze_text_task.delay(
+            body.cv_text,
+            body.job_description,
+            body.lang,
+            db_user.id,
+            db_user.organization_id,
+        )
+    except Exception:
+        _refund_persistent_analysis_usage(db, db_user)
+        raise HTTPException(status_code=503, detail="Failed to queue analysis")
     _record_analysis_task_owner(str(task.id), db_user, db)
     return {"job_id": task.id, "status": "queued"}
 
@@ -880,16 +941,25 @@ async def analyze_pdf(
                 detail=(f"User rate limit exceeded ({user_throttle['limit']}/minute)"),
             )
 
-    # reset daily counter if a new day has started
+    # Reset personal counters before checking quota.
     if db_user.last_reset is None or db_user.last_reset.date() < _quota_today_date():
         db_user.daily_usage = 0
         db_user.last_reset = utcnow()
+    quota_today = _quota_today_date()
+    if db_user.updated_at is None or (db_user.updated_at.year, db_user.updated_at.month) != (
+        quota_today.year,
+        quota_today.month,
+    ):
+        db_user.monthly_usage = 0
+        db_user.updated_at = utcnow()
 
     # enforce limits: individual users use personal quota; recruiters use org monthly quota
     if db_user.role == "recruiter":
         org = None
         if db_user.organization_id:
             org = db.query(Organization).filter(Organization.id == db_user.organization_id).first()
+        if org:
+            _reset_organization_usage_if_needed(org)
         if org and org.plan_type == "free" and org.monthly_usage >= ORG_PLAN_LIMITS_MONTHLY["free"]:
             _metric_quota_hit("analyze-pdf", "org_monthly")
             raise HTTPException(status_code=429, detail="Organization monthly limit reached")
@@ -904,12 +974,6 @@ async def analyze_pdf(
                 status_code=403,
                 detail=f"Daily limit reached ({redis_quota['limit']}/day)",
             )
-        # usage increment BEFORE parse
-        if org:
-            org.daily_usage = (org.daily_usage or 0) + 1
-            org.monthly_usage = (org.monthly_usage or 0) + 1
-            db.add(org)
-            db.commit()
     elif not _is_admin_user(db_user):
         user_daily_limit = USER_PLAN_LIMITS_DAILY.get(
             _normalize_plan(db_user.plan_type), USER_PLAN_LIMITS_DAILY["free"]
@@ -941,13 +1005,7 @@ async def analyze_pdf(
             _metric_quota_hit("analyze-pdf", "user_monthly")
             raise HTTPException(status_code=403, detail="Monthly limit reached")
 
-        # usage increment BEFORE parse
-        db_user.daily_usage = (db_user.daily_usage or 0) + 1
-        db_user.monthly_usage = (db_user.monthly_usage or 0) + 1
-        db.add(db_user)
-        db.commit()
-
-    # Only after quota check and increment, read and parse file
+    # Validate and extract before consuming a billable usage unit.
     contents = await _read_upload_or_400(file)
     text, _pdf_truncated, _cv_file_type = _extract_uploaded_cv_text(contents, file)
     from security.validators import is_probably_cv
@@ -957,6 +1015,8 @@ async def analyze_pdf(
             status_code=400,
             detail="The uploaded file does not appear to be a CV/resume. Please upload a valid CV.",
         )
+
+    _increment_persistent_analysis_usage(db, db_user)
 
     # Disable Zero Data Retention: Upload CV to storage
     from services.storage_service import upload_original_cv
@@ -978,17 +1038,32 @@ async def analyze_pdf(
     # Queue the analysis job (or run synchronously in LocalTask fallback)
     # Keep scoring faithful to the uploaded CV. Auto-fix remains available
     # from /api/v1/cv/auto-fix when the user explicitly requests it.
-    task = analyze_pdf_task.delay(text, job_description, lang)
+    try:
+        task = analyze_pdf_task.delay(
+            text,
+            job_description,
+            lang,
+            db_user.id,
+            db_user.organization_id,
+            s3_key,
+        )
+    except Exception:
+        _refund_persistent_analysis_usage(db, db_user)
+        raise HTTPException(status_code=503, detail="Failed to queue PDF analysis")
     _record_analysis_task_owner(str(task.id), db_user, db)
 
     # If the task ran synchronously (LocalTask), the wrapper returns a
     # DummyResult with `.status` and `.result` attributes — return the
     # actual analysis result immediately in that case for a better UX.
     try:
+        if getattr(task, "status", None) == "FAILURE":
+            _refund_persistent_analysis_usage(db, db_user)
+            raise HTTPException(status_code=500, detail="PDF analysis failed")
         if getattr(task, "status", None) == "SUCCESS" and hasattr(task, "result"):
             result = dict(task.result) if task.result else {}
             result["cv_text"] = text
             result["cv_file_type"] = _cv_file_type
+            return result
             # Save Analysis + Candidate records and compute benchmark
             try:
                 analysis_record = Analysis(
@@ -1102,6 +1177,8 @@ async def analyze_pdf(
                     pass
                 result.setdefault("benchmark", {"available": False, "reason": "benchmark_error"})
             return result
+    except HTTPException:
+        raise
     except Exception:
         pass
 
@@ -1155,8 +1232,8 @@ def get_history(
     job_title: str = Query(None, description="Filter by job title"),
     from_date: str = Query(None, description="Filter from date (ISO format)"),
     to_date: str = Query(None, description="Filter to date (ISO format)"),
-    min_score: float = Query(None, ge=0, le=1, description="Minimum similarity score"),
-    max_score: float = Query(None, ge=0, le=1, description="Maximum similarity score"),
+    min_score: float = Query(None, ge=0, le=100, description="Minimum similarity score"),
+    max_score: float = Query(None, ge=0, le=100, description="Maximum similarity score"),
 ):
     """
     Get analysis history for authenticated user with JWT.
@@ -1405,6 +1482,19 @@ def import_job_description_url(
     return extracted
 
 
+def _normalize_imported_jobs(jobs_data) -> list[dict]:
+    """Return valid job objects from either supported external API shape."""
+    if isinstance(jobs_data, dict):
+        job_list = jobs_data.get("jobs", [])
+    elif isinstance(jobs_data, list):
+        job_list = jobs_data
+    else:
+        return []
+    if not isinstance(job_list, list):
+        return []
+    return [job for job in job_list if isinstance(job, dict)]
+
+
 @router.post("/api/v1/integrations/import-jobs")
 def import_jobs(
     url: str = Form(...),  # Mock URL for job board
@@ -1427,12 +1517,12 @@ def import_jobs(
         if 300 <= response.status_code < 400:
             raise HTTPException(status_code=400, detail="Import URL redirects are not allowed")
         response.raise_for_status()
-        jobs_data = response.json()  # Assume list of {"title": str, "description": str}
+        jobs_data = response.json()
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to fetch jobs: {str(e)}")
 
     imported = 0
-    for job in jobs_data.get("jobs", []):
+    for job in _normalize_imported_jobs(jobs_data):
         new_job = Job(
             organization_id=db_user.organization_id,
             raw_text=job.get("description", ""),

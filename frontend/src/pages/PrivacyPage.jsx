@@ -13,7 +13,7 @@ export default function PrivacyPage() {
       <main className="legal-page" id="main-content">
         <div className="legal-container">
           <h1>{t('privacy.title')}</h1>
-          <p className="legal-updated">{t('privacy.last_updated')}: 2026-03-01</p>
+          <p className="legal-updated">{t('privacy.last_updated')}: 2026-07-26</p>
 
           <section>
             <h2>{t('privacy.section1_title')}</h2>
@@ -33,6 +33,11 @@ export default function PrivacyPage() {
           <section>
             <h2>{t('privacy.section4_title')}</h2>
             <p>{t('privacy.section4_text')}</p>
+            <p>
+              <a href="https://policies.google.com/technologies/ads" target="_blank" rel="noopener noreferrer">
+                {t('privacy.ads_policy_link')}
+              </a>
+            </p>
           </section>
 
           <section>

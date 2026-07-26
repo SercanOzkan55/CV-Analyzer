@@ -52,6 +52,46 @@ def _text_to_cvmodel(cv_text: str, lang: str = "en"):
     return CVModel.from_mapping(data)
 
 
+def _extract_stored_cv_text(contents: bytes, filename: str | None, content_type: str | None) -> str:
+    extension = os.path.splitext(str(filename or "").lower())[1]
+    if extension == ".docx" or content_type == (
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ):
+        from utils.cv_processor import extract_docx_text_fast
+
+        return str(extract_docx_text_fast(contents) or "").strip()
+
+    from services.pdf_text_extractor import extract_pdf_text
+
+    text, _ = extract_pdf_text(contents, max_pages=20, max_chars=300000, ocr_extract_text=None)
+    return str(text or "").strip()
+
+
+def _record_uploaded_cv(
+    db,
+    db_user,
+    *,
+    text: str,
+    key: str,
+    optimized: bool,
+) -> None:
+    from models import CVVersion
+
+    row = CVVersion(
+        user_id=db_user.id,
+        organization_id=db_user.organization_id,
+        version_label="Uploaded optimized CV" if optimized else "Uploaded CV",
+        source="upload-optimized" if optimized else "upload-original",
+        lang="en",
+        cv_text=text or "[Stored file]",
+        optimized_cv_text=text or None if optimized else None,
+        original_s3_key=None if optimized else key,
+        optimized_s3_key=key if optimized else None,
+    )
+    db.add(row)
+    db.commit()
+
+
 @router.post("/api/v1/score/breakdown")
 @rate_limit(f"{RATE_LIMIT_IP_ANALYZE_PER_MIN}/minute")
 def score_breakdown_endpoint(
@@ -169,15 +209,19 @@ async def upload_cv(
     except HTTPException:
         raise
 
+    raw_text = ""
+    try:
+        raw_text = _extract_stored_cv_text(contents, file.filename, content_type)
+    except Exception:
+        logger.warning("upload_text_extraction_failed user=%s filename=%s", supabase_id, file.filename)
+
     # ── Duplicate prevention: compute normalized-text fingerprint and check user's existing CVs
     try:
         try:
-            from services.pdf_text_extractor import extract_pdf_text
             import hashlib
             from models import CVVersion
 
-            raw_text, _ = extract_pdf_text(contents, max_pages=20, max_chars=300000, ocr_extract_text=None)
-            fp = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
+            fp = hashlib.sha256(raw_text.encode("utf-8")).hexdigest() if raw_text else None
 
             existing = db.query(CVVersion).filter(CVVersion.user_id == db_user.id).all()
             for row in existing:
@@ -185,7 +229,7 @@ async def upload_cv(
                 if not txt:
                     continue
                 existing_fp = hashlib.sha256(txt.encode("utf-8")).hexdigest()
-                if existing_fp == fp:
+                if fp and existing_fp == fp:
                     raise HTTPException(status_code=409, detail=f"duplicate_cv: existing_cv_version_id={row.id}")
         except HTTPException:
             raise
@@ -194,6 +238,14 @@ async def upload_cv(
             # fall back to upload if duplicate check fails unexpectedly
 
         key = upload_original_cv(contents, supabase_id, content_type, file.filename)
+        try:
+            _record_uploaded_cv(db, db_user, text=raw_text, key=key, optimized=False)
+        except Exception:
+            db.rollback()
+            from services.storage_service import delete_cv
+
+            delete_cv(key, supabase_id)
+            raise
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except PermissionError:
@@ -250,7 +302,20 @@ async def upload_optimized_cv_route(
         raise
 
     try:
+        optimized_text = _extract_stored_cv_text(contents, file.filename, content_type)
+    except Exception:
+        optimized_text = ""
+
+    try:
         key = upload_optimized_cv(contents, supabase_id, content_type, file.filename)
+        try:
+            _record_uploaded_cv(db, db_user, text=optimized_text, key=key, optimized=True)
+        except Exception:
+            db.rollback()
+            from services.storage_service import delete_cv
+
+            delete_cv(key, supabase_id)
+            raise
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except PermissionError:
@@ -332,6 +397,7 @@ def delete_cv_file(
 
     _ensure_not_expired(user)
     supabase_id = user.get("user_id")
+    db_user = get_or_create_user(db, supabase_id, user.get("email"))
 
     try:
         validate_s3_key(key)
@@ -341,6 +407,26 @@ def delete_cv_file(
 
     try:
         delete_cv(key, supabase_id)
+        from models import CVVersion
+
+        rows = (
+            db.query(CVVersion)
+            .filter(
+                CVVersion.user_id == db_user.id,
+                (CVVersion.original_s3_key == key) | (CVVersion.optimized_s3_key == key),
+            )
+            .all()
+        )
+        for row in rows:
+            if row.original_s3_key == key:
+                row.original_s3_key = None
+            if row.optimized_s3_key == key:
+                row.optimized_s3_key = None
+            if not row.original_s3_key and not row.optimized_s3_key and str(row.source or "").startswith("upload-"):
+                db.delete(row)
+            else:
+                db.add(row)
+        db.commit()
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid key format")
     except Exception:

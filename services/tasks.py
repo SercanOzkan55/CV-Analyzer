@@ -16,6 +16,98 @@ def _run_pipeline(cv_text, job_description, lang="en"):
     return pipeline(cv_text, job_description, lang)
 
 
+def persist_analysis_result(
+    result: dict,
+    *,
+    user_id: int,
+    organization_id: int | None,
+    cv_text: str,
+    job_description: str = "",
+    lang: str = "en",
+    source: str = "analyze-async",
+    original_s3_key: str | None = None,
+    db=None,
+) -> dict:
+    """Persist a completed worker result so async and sync flows stay aligned."""
+    from database import SessionLocal
+    from models import Analysis, Candidate, CVVersion, User
+    from services.pipeline_runtime import _extract_job_title_from_jd
+    from services.user_service import _apply_plan_based_result_features
+    from core.quota import _record_usage_daily, _resolve_effective_plan
+
+    owns_session = db is None
+    session = db or SessionLocal()
+    try:
+        db_user = session.query(User).filter(User.id == int(user_id)).first()
+        if db_user is None:
+            raise RuntimeError("Analysis owner no longer exists")
+
+        effective_plan = _resolve_effective_plan(session, db_user)
+        result = _apply_plan_based_result_features(dict(result or {}), effective_plan)
+        analysis_record = Analysis(
+            user_id=db_user.id,
+            organization_id=organization_id,
+            similarity_score=float(result.get("final_score") or 0),
+            interpretation=str(result.get("interpretation") or ""),
+            confidence=float(result.get("confidence") or 0),
+            risk_level=str(result.get("risk_level") or ""),
+            domain_id=int((result.get("domain") or {}).get("domain_id") or 0),
+            industry_id=int((result.get("industry") or {}).get("industry_id") or 0),
+            specialization_id=int((result.get("specialization") or {}).get("id") or 0),
+            job_title=_extract_job_title_from_jd(job_description),
+            result={
+                "final_score": result.get("final_score"),
+                "semantic_score": result.get("semantic_score"),
+                "keyword_score": result.get("keyword_score"),
+                "skill_score": result.get("skill_score"),
+                "experience_score": result.get("experience_score"),
+                "ats_score": result.get("ats_score"),
+                "job_description_quality": result.get("job_description_quality"),
+                "warnings": result.get("warnings", []),
+                "score_version": result.get("score_version"),
+                "missing_skills": result.get("missing_skills", []),
+                "recommendations": result.get("recommendations", []),
+            },
+        )
+        session.add(analysis_record)
+        _record_usage_daily(session, db_user.id)
+
+        if organization_id is not None:
+            session.add(
+                Candidate(
+                    organization_id=organization_id,
+                    cv_text=cv_text,
+                )
+            )
+
+        if source == "analyze-pdf" and original_s3_key:
+            session.add(
+                CVVersion(
+                    user_id=db_user.id,
+                    organization_id=organization_id,
+                    version_label="Analyzed CV",
+                    source=source,
+                    lang=lang,
+                    cv_text=cv_text,
+                    job_description=job_description,
+                    match_score=float(result.get("final_score") or 0),
+                    original_s3_key=original_s3_key,
+                )
+            )
+
+        session.commit()
+        session.refresh(analysis_record)
+        result["analysis_id"] = analysis_record.id
+        result["effective_plan"] = effective_plan
+        return result
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        if owns_session:
+            session.close()
+
+
 try:
     from celery import Celery, Task
 
@@ -133,14 +225,44 @@ try:
         )
 
         @celery_app.task(bind=True, name="analyze_pdf_task", queue="pdf_processing")
-        def analyze_pdf_task(self, cv_text, job_description, lang="en"):
+        def analyze_pdf_task(
+            self,
+            cv_text,
+            job_description,
+            lang="en",
+            user_id=None,
+            organization_id=None,
+            original_s3_key=None,
+        ):
             # Analyze the uploaded/extracted CV faithfully. Field rewriting is
             # reserved for the explicit auto-fix endpoint.
-            return _run_pipeline(cv_text, job_description, lang)
+            result = _run_pipeline(cv_text, job_description, lang)
+            if user_id is not None:
+                result = persist_analysis_result(
+                    result,
+                    user_id=user_id,
+                    organization_id=organization_id,
+                    cv_text=cv_text,
+                    job_description=job_description,
+                    lang=lang,
+                    source="analyze-pdf",
+                    original_s3_key=original_s3_key,
+                )
+            return result
 
         @celery_app.task(bind=True, name="analyze_text_task", queue="ai_tasks")
-        def analyze_text_task(self, cv_text, job_description, lang="en"):
-            return _run_pipeline(cv_text, job_description, lang)
+        def analyze_text_task(self, cv_text, job_description, lang="en", user_id=None, organization_id=None):
+            result = _run_pipeline(cv_text, job_description, lang)
+            if user_id is not None:
+                result = persist_analysis_result(
+                    result,
+                    user_id=user_id,
+                    organization_id=organization_id,
+                    cv_text=cv_text,
+                    job_description=job_description,
+                    lang=lang,
+                )
+            return result
 
         @celery_app.task(bind=True, name="batch_recruiter_task", queue="pdf_processing")
         def batch_recruiter_task(self, cv_list, job_id, job_description, org_id, recruiter_id):
@@ -251,26 +373,55 @@ except Exception:
 
         def delay(self, *args, **kwargs):
             class DummyResult:
-                def __init__(self, res):
+                def __init__(self, res, status="SUCCESS"):
                     self.id = f"local-{int(time.time() * 1000)}"
-                    self.status = "SUCCESS"
+                    self.status = status
                     self.result = res
 
             try:
                 res = self.fn(*args, **kwargs)
+                return DummyResult(res)
             except Exception as e:
-                res = e
-            return DummyResult(res)
+                return DummyResult(e, status="FAILURE")
 
-    def _analyze_pdf(cv_text, job_description, lang="en"):
+    def _analyze_pdf(
+        cv_text,
+        job_description,
+        lang="en",
+        user_id=None,
+        organization_id=None,
+        original_s3_key=None,
+    ):
         # Analyze the uploaded/extracted CV faithfully. Field rewriting is
         # reserved for the explicit auto-fix endpoint.
-        return _run_pipeline(cv_text, job_description, lang)
+        result = _run_pipeline(cv_text, job_description, lang)
+        if user_id is not None:
+            result = persist_analysis_result(
+                result,
+                user_id=user_id,
+                organization_id=organization_id,
+                cv_text=cv_text,
+                job_description=job_description,
+                lang=lang,
+                source="analyze-pdf",
+                original_s3_key=original_s3_key,
+            )
+        return result
 
     analyze_pdf_task = LocalTask(_analyze_pdf)
 
-    def _analyze_text(cv_text, job_description, lang="en"):
-        return _run_pipeline(cv_text, job_description, lang)
+    def _analyze_text(cv_text, job_description, lang="en", user_id=None, organization_id=None):
+        result = _run_pipeline(cv_text, job_description, lang)
+        if user_id is not None:
+            result = persist_analysis_result(
+                result,
+                user_id=user_id,
+                organization_id=organization_id,
+                cv_text=cv_text,
+                job_description=job_description,
+                lang=lang,
+            )
+        return result
 
     analyze_text_task = LocalTask(_analyze_text)
 

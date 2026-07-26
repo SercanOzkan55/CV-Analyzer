@@ -1,64 +1,149 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, CheckCircle2, Clock3, FileSearch, ShieldCheck } from 'lucide-react'
+import { motion, useReducedMotion } from 'framer-motion'
+import { ArrowRight, CheckCircle2, Clock3, FileSearch, Languages, ShieldCheck } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { SEO_PAGES } from '../content/seoPages'
+import { getGuideUi, getLocalizedSeoPage, getLocalizedSeoPages } from '../content/guideI18n'
+import { useLanguage } from '../i18n/LanguageContext'
 
-export default function SEOContentPage({ page }) {
+function sectionId(pageSlug, index) {
+  return `${pageSlug}-section-${index + 1}`
+}
+
+function formatUpdatedAt(value, locale) {
+  const date = new Date(`${value}T00:00:00Z`)
+  if (Number.isNaN(date.getTime())) return value
+
+  return new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(date)
+}
+
+export default function SEOContentPage({ page: sourcePage }) {
+  const { lang } = useLanguage()
+  const reduceMotion = useReducedMotion()
+  const ui = getGuideUi(lang)
+  const page = getLocalizedSeoPage(sourcePage, lang)
+  const canObserve = typeof window !== 'undefined' && 'IntersectionObserver' in window
+  const relatedPages = getLocalizedSeoPages(
+    SEO_PAGES.filter((candidate) => candidate.path !== sourcePage.path).slice(0, 4),
+    lang,
+  )
+  const reveal = reduceMotion
+    ? {}
+    : { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } }
+  const inViewReveal = reduceMotion || !canObserve
+    ? {}
+    : {
+        initial: { opacity: 0, y: 10 },
+        whileInView: { opacity: 1, y: 0 },
+        viewport: { once: true, amount: 0.08 },
+      }
+
   return (
     <div className="seo-page">
       <Navbar />
       <main id="main-content">
         <header className="seo-hero">
           <div className="seo-container seo-hero-grid">
-            <div className="seo-hero-copy">
-              <p className="seo-eyebrow">{page.eyebrow}</p>
-              <h1>{page.title}</h1>
-              <p className="seo-lead">{page.intro}</p>
+            <motion.div
+              className="seo-hero-copy"
+              key={`${lang}-${page.slug}-copy`}
+              {...reveal}
+              transition={{ duration: 0.28, ease: 'easeOut' }}
+            >
+              <div
+                className="seo-guide-localized-copy"
+                lang={page.contentLanguage}
+                dir={lang === 'ar' && page.contentLanguage === 'en' ? 'ltr' : undefined}
+              >
+                <p className="seo-eyebrow">{page.eyebrow}</p>
+                <h1>{page.title}</h1>
+                <p className="seo-lead">{page.intro}</p>
+              </div>
+              {page.isFallback && (
+                <p className="seo-language-note" role="note">
+                  <Languages size={17} aria-hidden="true" /> {ui.fallbackNotice}
+                </p>
+              )}
               <div className="seo-hero-actions">
                 <Link to="/register" className="btn-primary">
-                  CV’mi ücretsiz analiz et <ArrowRight size={17} aria-hidden="true" />
+                  {ui.analyzeCta} <ArrowRight size={17} aria-hidden="true" />
                 </Link>
                 <Link to="/ats-cv-kontrol/" className="btn-outline">
-                  ATS rehberini incele
+                  {ui.atsCta}
                 </Link>
               </div>
-              <div className="seo-meta" aria-label="İçerik bilgileri">
+              <div className="seo-meta" aria-label={ui.contentInfo}>
                 <span><Clock3 size={15} aria-hidden="true" /> {page.readingTime}</span>
-                <span>Güncellendi: 14 Temmuz 2026</span>
+                <span>{ui.updated}: {formatUpdatedAt(page.updatedAt, ui.locale)}</span>
               </div>
-            </div>
+              <div className="seo-trust-note">
+                <ShieldCheck size={18} aria-hidden="true" />
+                <p>
+                  <strong>{ui.editorialTeam}</strong>
+                  {ui.editorialNote}
+                </p>
+              </div>
+            </motion.div>
 
-            <div className="seo-product-visual" aria-label="CV Analyzer değerlendirme özeti">
+            <motion.div
+              className="seo-product-visual"
+              aria-label={ui.sampleAria}
+              key={`${lang}-${page.slug}-sample`}
+              initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: reduceMotion ? 0 : 0.06, ease: 'easeOut' }}
+            >
               <div className="seo-product-head">
-                <span><FileSearch size={18} aria-hidden="true" /> Analiz özeti</span>
+                <span><FileSearch size={18} aria-hidden="true" /> {ui.sampleSummary}</span>
                 <strong>84/100</strong>
               </div>
               <div className="seo-score-track" aria-hidden="true"><span /></div>
               <div className="seo-product-checks">
-                <p><CheckCircle2 size={17} /> İletişim bilgileri okunabilir</p>
-                <p><CheckCircle2 size={17} /> Standart bölüm başlıkları</p>
-                <p><ShieldCheck size={17} /> Güvenli ATS metin çıktısı</p>
+                <p><CheckCircle2 size={17} /> {ui.sampleChecks[0]}</p>
+                <p><CheckCircle2 size={17} /> {ui.sampleChecks[1]}</p>
+                <p><ShieldCheck size={17} /> {ui.sampleChecks[2]}</p>
               </div>
-              <div className="seo-product-note">
-                Öneriler, CV’de bulunan kanıtlara ve hedef ilanın gereksinimlerine göre açıklanır.
-              </div>
-            </div>
+              <div className="seo-product-note">{ui.sampleNote}</div>
+            </motion.div>
           </div>
         </header>
 
-        <nav className="seo-jump-band" aria-label="Sayfa özeti">
-          <div className="seo-container seo-highlight-grid">
-            {page.highlights.map((item) => (
-              <span key={item}><CheckCircle2 size={16} aria-hidden="true" /> {item}</span>
-            ))}
+        <nav className="seo-jump-band" aria-label={ui.contents}>
+          <div className="seo-container">
+            <p className="seo-jump-title">{ui.inThisGuide}</p>
+            <div className="seo-highlight-grid">
+              {page.sections.map((section, index) => (
+                <a href={`#${sectionId(page.slug, index)}`} key={section.heading}>
+                  <CheckCircle2 size={16} aria-hidden="true" /> {section.heading}
+                </a>
+              ))}
+              <a href={`#${page.slug}-faq-title`}>
+                <CheckCircle2 size={16} aria-hidden="true" /> {ui.faq}
+              </a>
+            </div>
           </div>
         </nav>
 
         <article className="seo-container seo-article">
-          <div className="seo-article-main">
-            {page.sections.map((section) => (
-              <section key={section.heading}>
+          <div
+            className="seo-article-main"
+            lang={page.contentLanguage}
+            dir={lang === 'ar' && page.contentLanguage === 'en' ? 'ltr' : undefined}
+          >
+            {page.sections.map((section, index) => (
+              <motion.section
+                id={sectionId(page.slug, index)}
+                key={section.heading}
+                {...inViewReveal}
+                transition={{ duration: 0.24, ease: 'easeOut' }}
+              >
                 <h2>{section.heading}</h2>
                 {section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
                 {section.bullets && (
@@ -66,40 +151,49 @@ export default function SEOContentPage({ page }) {
                     {section.bullets.map((item) => <li key={item}>{item}</li>)}
                   </ul>
                 )}
-              </section>
+              </motion.section>
             ))}
 
-            <section className="seo-faq" aria-labelledby={`${page.slug}-faq-title`}>
-              <p className="seo-eyebrow">Sık sorulan sorular</p>
-              <h2 id={`${page.slug}-faq-title`}>{page.title} hakkında sorular</h2>
+            <motion.section
+              className="seo-faq"
+              aria-labelledby={`${page.slug}-faq-title`}
+              {...inViewReveal}
+              transition={{ duration: 0.24, ease: 'easeOut' }}
+            >
+              <p className="seo-eyebrow">{ui.faq}</p>
+              <h2 id={`${page.slug}-faq-title`}>{ui.questionsAbout(page.title)}</h2>
               {page.faq.map((item) => (
                 <details key={item.question}>
                   <summary>{item.question}</summary>
                   <p>{item.answer}</p>
                 </details>
               ))}
-            </section>
+            </motion.section>
           </div>
 
-          <aside className="seo-related" aria-label="İlgili CV rehberleri">
-            <h2>Sonraki adım</h2>
-            <p>CV’nizi hazırladıktan sonra metin akışını ve ATS sinyallerini gerçek dosyanız üzerinden kontrol edin.</p>
-            <Link to="/cv-analiz/">CV analiz rehberi <ArrowRight size={15} /></Link>
-            <Link to="/ats-uyumlu-cv/">ATS uyumlu CV hazırlama <ArrowRight size={15} /></Link>
-            <Link to="/rehber/cv-nasil-hazirlanir/">CV hazırlama rehberi <ArrowRight size={15} /></Link>
-            <Link to="/cv-ornekleri/yeni-mezun/">Yeni mezun CV örneği <ArrowRight size={15} /></Link>
+          <aside className="seo-related" aria-label={ui.relatedGuides}>
+            <h2>{ui.relatedGuides}</h2>
+            <p>{ui.relatedDescription}</p>
+            {relatedPages.map((relatedPage) => (
+              <Link to={relatedPage.path} key={relatedPage.path}>
+                {relatedPage.eyebrow} <ArrowRight size={15} aria-hidden="true" />
+              </Link>
+            ))}
+            <Link to="/rehber/" className="seo-related-all">
+              {ui.allGuides} <ArrowRight size={15} aria-hidden="true" />
+            </Link>
           </aside>
         </article>
 
         <section className="seo-final-cta">
           <div className="seo-container">
             <div>
-              <p className="seo-eyebrow">Dosyanız üzerinden kontrol edin</p>
-              <h2>CV’nizin nasıl okunduğunu görün</h2>
-              <p>ATS görünümü, iş ilanı eşleşmesi ve uygulanabilir geliştirme önerileri tek analizde.</p>
+              <p className="seo-eyebrow">{ui.finalEyebrow}</p>
+              <h2>{ui.finalTitle}</h2>
+              <p>{ui.finalDescription}</p>
             </div>
             <Link to="/register" className="btn-primary">
-              Ücretsiz hesap oluştur <ArrowRight size={17} aria-hidden="true" />
+              {ui.createAccount} <ArrowRight size={17} aria-hidden="true" />
             </Link>
           </div>
         </section>

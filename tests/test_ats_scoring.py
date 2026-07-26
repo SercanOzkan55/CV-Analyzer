@@ -156,3 +156,13 @@ class TestScoreCV:
         )
         result = score_cv(model)
         assert result.soft_skills <= 25
+
+    def test_runtime_weight_changes_are_applied(self, monkeypatch):
+        model = _make_model()
+        monkeypatch.setenv("ATS_WEIGHT_STRUCTURE", "1")
+        for key in ("KEYWORDS", "EXPERIENCE", "EDUCATION", "LANGUAGES", "ATS", "LENGTH", "SOFT_SKILLS"):
+            monkeypatch.setenv(f"ATS_WEIGHT_{key}", "0")
+
+        result = score_cv(model)
+
+        assert result.overall == result.structure

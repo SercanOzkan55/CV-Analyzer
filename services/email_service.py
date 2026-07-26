@@ -343,37 +343,68 @@ def _process_due_reminders(db):
     now = utcnow()
     today = now.date()
     window_end = datetime.combine(today + timedelta(days=3), datetime.max.time())
-    reminders = (
-        db.query(Reminder)
-        .filter(
-            Reminder.is_active == True,
-            Reminder.event_date > now,
-            Reminder.event_date <= window_end,
-            or_(Reminder.notified_3d_at.is_(None), Reminder.notified_1d_at.is_(None)),
+    reminder_ids = [
+        row[0]
+        for row in (
+            db.query(Reminder.id)
+            .filter(
+                Reminder.is_active == True,
+                Reminder.event_date > now,
+                Reminder.event_date <= window_end,
+                or_(Reminder.notified_3d_at.is_(None), Reminder.notified_1d_at.is_(None)),
+            )
+            .all()
         )
-        .all()
-    )
-    for reminder in reminders:
+    ]
+    for reminder_id in reminder_ids:
+        reminder = (
+            db.query(Reminder)
+            .filter(
+                Reminder.id == reminder_id,
+                Reminder.is_active == True,
+                Reminder.event_date > now,
+            )
+            .with_for_update(skip_locked=True)
+            .first()
+        )
+        if reminder is None:
+            db.rollback()
+            continue
         if reminder.event_date <= now:
+            db.rollback()
             continue
         days_left = (reminder.event_date.date() - today).days
         recipient = reminder.target_email or ""
         if not recipient:
+            db.rollback()
             continue
         if reminder.notified_1d_at is None and days_left <= 1:
             if _send_reminder_email(reminder, 1, recipient):
                 reminder.notified_1d_at = now
                 db.add(reminder)
                 db.commit()
+            else:
+                db.rollback()
             continue
         if reminder.notified_3d_at is None and reminder.notified_1d_at is None and days_left == 3:
             if _send_reminder_email(reminder, 3, recipient):
                 reminder.notified_3d_at = now
                 db.add(reminder)
                 db.commit()
+            else:
+                db.rollback()
+            continue
+        db.rollback()
+
+
+_REMINDER_WORKER_STARTED = False
 
 
 def _start_reminder_worker():
+    global _REMINDER_WORKER_STARTED
+    if _REMINDER_WORKER_STARTED:
+        return
+    _REMINDER_WORKER_STARTED = True
     interval = int(os.getenv("REMINDER_CHECK_INTERVAL_SECONDS", "3600"))
 
     def _loop():

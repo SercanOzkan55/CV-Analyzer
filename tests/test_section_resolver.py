@@ -76,6 +76,23 @@ class TestResolveRawSections:
         # May stay in misc depending on implementation
         assert isinstance(result.get("languages"), list)
 
+    def test_empty_language_objects_are_removed(self):
+        from services.section_resolver import _validate_languages
+
+        data = {
+            "languages": [
+                {},
+                {"name": ""},
+                {"language": "  "},
+                {"name": "English"},
+                {"language": "Turkish"},
+            ]
+        }
+
+        _validate_languages(data)
+
+        assert data["languages"] == [{"name": "English"}, {"language": "Turkish"}]
+
     def test_certifications_rescued_from_experience(self):
         """Standalone credentials inside experience should move to certifications."""
         sections = self._make_sections(

@@ -42,7 +42,7 @@ const PRICING_CONFIG = {
  * @property {string} lang
  * @property {(newLang: string) => void} setLang
  * @property {(path: string) => any} t
- * @property {string[]} availableLanguages
+ * @property {string[]} availableLanguages Languages exposed for manual selection.
  */
 
 const LANGUAGE_CONTEXT_KEY = '__CV_ANALYZER_LANGUAGE_CONTEXT__'
@@ -217,6 +217,8 @@ export function LanguageProvider({ children }) {
     return fallback || path
   }
 
+  // Automatic IP/browser detection may still select any language in `translations`.
+  // Only English and Turkish are intentionally exposed as manual controls.
   return (
     <LanguageContext.Provider value={{ lang, setLang, t, countryCode, pricing, availableLanguages: ['en', 'tr'] }}>
       {children}

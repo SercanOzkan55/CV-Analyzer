@@ -1,7 +1,11 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import SEOManager from '../components/SEOManager'
+
+vi.mock('../i18n/LanguageContext', () => ({
+  useLanguage: () => ({ lang: 'tr' }),
+}))
 
 function renderManager(pathname) {
   return render(

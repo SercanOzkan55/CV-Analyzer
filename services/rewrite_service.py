@@ -1042,7 +1042,21 @@ def generate_interview_questions(
                         }
                     )
             if result:
-                return result
+                fallback = _mock_interview_questions(
+                    cv_text,
+                    job_description,
+                    lang,
+                    normalized_mode,
+                    count,
+                )
+                seen = {item["question"].casefold() for item in result}
+                for item in fallback:
+                    if item["question"].casefold() not in seen:
+                        result.append(item)
+                        seen.add(item["question"].casefold())
+                    if len(result) >= count:
+                        break
+                return result[:count]
     except Exception:
         pass
 
@@ -1327,7 +1341,80 @@ def _mock_interview_questions(
         ],
     }
 
-    questions = mode_questions.get(mode, mode_questions["senior"])
+    questions = list(mode_questions.get(mode, mode_questions["senior"]))
+    supplemental = [
+        {
+            "question": (
+                f"How would you measure success in a role centered on {kw1}?"
+                if not is_tr
+                else f"{kw1} odaklı bir rolde başarıyı nasıl ölçerdiniz?"
+            ),
+            "category": "competency",
+            "difficulty": "medium",
+            "tip": (
+                "Define concrete outcomes, leading indicators, and a review cadence."
+                if not is_tr
+                else "Somut sonuçları, öncü göstergeleri ve değerlendirme sıklığını tanımlayın."
+            ),
+        },
+        {
+            "question": (
+                f"Tell me about a decision involving {kw2} that you would handle differently today."
+                if not is_tr
+                else f"{kw2} ile ilgili bugün farklı ele alacağınız bir kararı anlatın."
+            ),
+            "category": "behavioral",
+            "difficulty": "medium",
+            "tip": (
+                "Show reflection, ownership, and what changed in your approach."
+                if not is_tr
+                else "Öz değerlendirme, sorumluluk ve yaklaşımınızdaki değişimi gösterin."
+            ),
+        },
+        {
+            "question": (
+                "How do you prioritize when several important deadlines conflict?"
+                if not is_tr
+                else "Birden fazla önemli teslim tarihi çakıştığında nasıl önceliklendirirsiniz?"
+            ),
+            "category": "situational",
+            "difficulty": "medium",
+            "tip": (
+                "Explain impact assessment, communication, and explicit trade-offs."
+                if not is_tr
+                else "Etki değerlendirmesi, iletişim ve açık ödünleşimleri anlatın."
+            ),
+        },
+        {
+            "question": (
+                f"Describe how you validated the quality of work involving {kw3}."
+                if not is_tr
+                else f"{kw3} içeren bir çalışmanın kalitesini nasıl doğruladığınızı anlatın."
+            ),
+            "category": "technical",
+            "difficulty": "hard",
+            "tip": (
+                "Discuss criteria, evidence, monitoring, and failure cases."
+                if not is_tr
+                else "Kriterleri, kanıtları, izlemeyi ve hata senaryolarını ele alın."
+            ),
+        },
+        {
+            "question": (
+                "What would your first 30 days in this role look like?"
+                if not is_tr
+                else "Bu roldeki ilk 30 gününüz nasıl görünürdü?"
+            ),
+            "category": "situational",
+            "difficulty": "easy",
+            "tip": (
+                "Balance learning, stakeholder alignment, and early measurable progress."
+                if not is_tr
+                else "Öğrenme, paydaş uyumu ve erken ölçülebilir ilerlemeyi dengeleyin."
+            ),
+        },
+    ]
+    questions.extend(supplemental)
     return questions[:count]
 
 

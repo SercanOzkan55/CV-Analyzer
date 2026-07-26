@@ -48,6 +48,19 @@ class TestKeywordMatchScore:
         score = keyword_match_score(cv, jd)
         assert score <= 100
 
+    def test_phrase_cap_prioritizes_long_specific_phrases(self, monkeypatch):
+        monkeypatch.setenv("MAX_JD_PHRASES", "1")
+        monkeypatch.setattr(
+            "services.keyword_service._extract_phrases",
+            lambda text: (
+                {"ai", "distributed microservices architecture"}
+                if text == "job"
+                else {"distributed microservices architecture"}
+            ),
+        )
+
+        assert keyword_match_score("cv", "job") > 0
+
 
 # ── compute_keyword_gap ──────────────────────────────────────
 

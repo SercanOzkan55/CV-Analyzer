@@ -80,6 +80,7 @@ class APISubscription(Base):
 
     # Reset monthly usage on the 1st of each month
     monthly_reset_day = Column(Integer, default=1, nullable=False)
+    usage_reset_at = Column(DateTime, nullable=True)
 
     def set_api_key(self, plain_key: str):
         """Hash and store API key securely."""
@@ -149,6 +150,7 @@ class Organization(Base):
     stripe_customer_id = Column(String, nullable=True, index=True)
     daily_usage = Column(Integer, default=0)
     monthly_usage = Column(Integer, default=0)
+    usage_reset_at = Column(DateTime, nullable=True)
     cv_credit_limit = Column(Integer, default=100)  # Varsayılan aylık 100 CV kotası
     created_at = Column(DateTime, default=datetime.utcnow)
 

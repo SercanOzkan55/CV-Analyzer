@@ -43,6 +43,59 @@ def _quota_now() -> datetime:
         return utcnow()
 
 
+def _previous_month(value: datetime) -> tuple[int, int]:
+    if value.month == 1:
+        return value.year - 1, 12
+    return value.year, value.month - 1
+
+
+def _reset_organization_usage_if_needed(organization, now: datetime | None = None) -> bool:
+    """Reset persistent organization counters at day/month boundaries."""
+    if organization is None:
+        return False
+    current = now or utcnow()
+    previous = getattr(organization, "usage_reset_at", None)
+    if previous is None:
+        organization.usage_reset_at = current
+        return True
+    changed = False
+    if previous.date() != current.date():
+        organization.daily_usage = 0
+        changed = True
+    if (previous.year, previous.month) != (current.year, current.month):
+        organization.monthly_usage = 0
+        changed = True
+    if changed:
+        organization.usage_reset_at = current
+    return changed
+
+
+def _reset_api_subscription_usage_if_needed(subscription, now: datetime | None = None) -> bool:
+    """Reset local-processing subscription usage when its billing month changes."""
+    if subscription is None:
+        return False
+    current = now or utcnow()
+    previous = getattr(subscription, "usage_reset_at", None)
+    reset_day = max(1, min(28, int(getattr(subscription, "monthly_reset_day", 1) or 1)))
+    current_period = (current.year, current.month) if current.day >= reset_day else _previous_month(current)
+    if previous is None:
+        reference = getattr(subscription, "last_used_at", None) or getattr(subscription, "created_at", None)
+        if reference is not None:
+            reference_period = (
+                (reference.year, reference.month) if reference.day >= reset_day else _previous_month(reference)
+            )
+            if reference_period != current_period:
+                subscription.monthly_usage = 0
+        subscription.usage_reset_at = current
+        return True
+    previous_period = (previous.year, previous.month) if previous.day >= reset_day else _previous_month(previous)
+    if previous_period == current_period:
+        return False
+    subscription.monthly_usage = 0
+    subscription.usage_reset_at = current
+    return True
+
+
 def _quota_today_date():
     return _quota_now().date()
 

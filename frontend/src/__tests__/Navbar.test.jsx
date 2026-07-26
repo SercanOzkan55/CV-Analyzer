@@ -7,6 +7,7 @@ const mockSignOut = vi.fn()
 let mockUser = null
 let mockPlan = 'free'
 let mockPlanLoading = false
+const mockSetLang = vi.fn()
 
 vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({
@@ -21,7 +22,7 @@ vi.mock('../i18n/LanguageContext', () => ({
   useLanguage: () => ({
     t: (key) => key,
     lang: 'en',
-    setLang: vi.fn(),
+    setLang: mockSetLang,
     availableLanguages: ['en', 'tr'],
   }),
 }))
@@ -67,7 +68,7 @@ describe('Navbar', () => {
       expect(screen.getByText('nav.features')).toBeInTheDocument()
       expect(screen.getByText('nav.pricing')).toBeInTheDocument()
       expect(screen.getByText('nav.faq')).toBeInTheDocument()
-      expect(screen.getByText('CV Rehberi')).toBeInTheDocument()
+      expect(screen.getByText('CV writing and ATS guides')).toBeInTheDocument()
     })
 
     it('hides the blog link while VITE_ENABLE_BLOG is off', () => {
@@ -165,11 +166,17 @@ describe('Navbar', () => {
       expect(screen.getByLabelText('Toggle theme')).toBeInTheDocument()
     })
 
-    it('has language switcher buttons', () => {
+    it('shows only the manual English and Turkish language controls', () => {
       renderNavbar()
 
-      expect(screen.getByText('EN')).toBeInTheDocument()
-      expect(screen.getByText('TR')).toBeInTheDocument()
+      const languageGroup = screen.getByRole('group', { name: 'settings.language' })
+      expect(languageGroup).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'EN' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByRole('button', { name: 'TR' })).toHaveAttribute('aria-pressed', 'false')
+      expect(screen.queryByRole('combobox', { name: 'settings.language' })).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'TR' }))
+      expect(mockSetLang).toHaveBeenCalledWith('tr')
     })
   })
 })

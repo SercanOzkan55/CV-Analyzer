@@ -484,9 +484,10 @@ export default function LandingPage() {
     <div className="landing">
       <AnimatedBackground />
       <Navbar />
+      <main id="main-content">
 
       {/* ── Hero ─────────────────────────────────────────── */}
-      <section className="hero hero-kinetic-section" id="main-content">
+      <section className="hero hero-kinetic-section">
         <div className="hero-grid">
           {/* Left: Content */}
           <motion.div
@@ -496,7 +497,7 @@ export default function LandingPage() {
             variants={stagger}
           >
             <motion.div className="hero-badge" variants={fadeUp}>
-              <FileCheck size={14} /> Resume intelligence workspace
+              <FileCheck size={14} /> {t('landing.workspace_badge')}
             </motion.div>
 
             <motion.h1 variants={fadeUp}>{t('landing.hero_title')}</motion.h1>
@@ -515,23 +516,23 @@ export default function LandingPage() {
               <a href="#pricing" className="btn-ghost btn-lg">{t('landing.view_pricing')}</a>
             </motion.div>
 
-            <motion.p className="hero-note" variants={fadeUp}>{t('landing.trusted_by')}</motion.p>
+            <motion.p className="hero-note" variants={fadeUp}>{t('landing.trust_note')}</motion.p>
 
             {/* Stats Row */}
             <motion.div className="hero-stats" variants={fadeUp}>
               <div className="hero-stat">
-                <span className="hero-stat-num">10K+</span>
-                <span className="hero-stat-label">{t('landing.stat_cvs') || 'CVs Analyzed'}</span>
+                <span className="hero-stat-num">ATS</span>
+                <span className="hero-stat-label">{t('landing.stat_readability')}</span>
               </div>
               <div className="hero-stat-divider" />
               <div className="hero-stat">
-                <span className="hero-stat-num">95%</span>
-                <span className="hero-stat-label">{t('landing.stat_accuracy') || 'Accuracy Rate'}</span>
+                <span className="hero-stat-num">{t('landing.stat_evidence_value')}</span>
+                <span className="hero-stat-label">{t('landing.stat_evidence')}</span>
               </div>
               <div className="hero-stat-divider" />
               <div className="hero-stat">
-                <span className="hero-stat-num">50+</span>
-                <span className="hero-stat-label">{t('landing.stat_skills') || 'Skills Tracked'}</span>
+                <span className="hero-stat-num">{t('landing.stat_control_value')}</span>
+                <span className="hero-stat-label">{t('landing.stat_control')}</span>
               </div>
             </motion.div>
           </motion.div>
@@ -556,28 +557,24 @@ export default function LandingPage() {
         viewport={scrollViewport}
         variants={scrollScaleItem}
       >
-        <ProofStat value={10000} suffix="+" label={t('landing.stat_cvs') || 'CVs Analyzed'} />
-        <div className="lp-proof-divider" />
-        <ProofStat value={95} suffix="%" label={t('landing.stat_accuracy') || 'Accuracy Rate'} />
-        <div className="lp-proof-divider" />
-        <ProofStat value={50} suffix="+" label={t('landing.stat_skills') || 'Skills Tracked'} />
+        <div className="lp-proof-stat">
+          <span className="lp-proof-num">ATS</span>
+          <span className="lp-proof-label">{t('landing.proof_ats')}</span>
+        </div>
         <div className="lp-proof-divider" />
         <div className="lp-proof-stat">
-          <span className="lp-proof-num" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            {[...Array(5)].map((_, i) => (
-              <motion.span
-                key={i}
-                initial={{ opacity: 0, scale: 0 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.06 + 0.2, type: 'spring', stiffness: 400 }}
-                style={{ color: '#fbbf24', fontSize: '1.1rem' }}
-              >
-                ★
-              </motion.span>
-            ))}
-          </span>
-          <span className="lp-proof-label">4.9 / 5 Rating</span>
+          <span className="lp-proof-num">{t('landing.proof_content_value')}</span>
+          <span className="lp-proof-label">{t('landing.proof_content')}</span>
+        </div>
+        <div className="lp-proof-divider" />
+        <div className="lp-proof-stat">
+          <span className="lp-proof-num">{t('landing.proof_match_value')}</span>
+          <span className="lp-proof-label">{t('landing.proof_match')}</span>
+        </div>
+        <div className="lp-proof-divider" />
+        <div className="lp-proof-stat">
+          <span className="lp-proof-num">{t('landing.proof_privacy_value')}</span>
+          <span className="lp-proof-label">{t('landing.proof_privacy')}</span>
         </div>
       </motion.div>
 
@@ -620,6 +617,10 @@ export default function LandingPage() {
                     <span className="lp-flip-kicker">{t('landing.feature_kicker')} {String(i + 1).padStart(2, '0')}</span>
                     <h3>{f.title}</h3>
                     <p>{f.desc}</p>
+                    <div className="lp-flip-meta">
+                      <span>{t('landing.inspect_depth')}</span>
+                      <ArrowRight size={15} />
+                    </div>
                   </div>
                 </div>
               </motion.article>
@@ -778,11 +779,12 @@ export default function LandingPage() {
             </motion.div>
           </motion.div>
           <p className="lp-cta-note">
-            Free to start | No credit card | Instant results
+            {t('landing.cta_note')}
           </p>
         </div>
       </motion.section>
 
+      </main>
       <Footer />
     </div>
   )

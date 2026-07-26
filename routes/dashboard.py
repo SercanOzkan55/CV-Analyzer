@@ -568,7 +568,7 @@ def get_dashboard_insights(
     if not records:
         return {"insights": [], "stats": {}}
 
-    scores = [r.similarity_score for r in records if r.similarity_score]
+    scores = [float(r.similarity_score) for r in records if r.similarity_score is not None]
     avg_score = sum(scores) / len(scores) if scores else 0
     best_score = max(scores) if scores else 0
     worst_score = min(scores) if scores else 0
@@ -590,7 +590,7 @@ def get_dashboard_insights(
             if val is not None:
                 dim_totals[dim].append(val)
 
-    dim_avgs = {k: sum(v) / len(v) if v else 0 for k, v in dim_totals.items()}
+    dim_avgs = {k: sum(v) / len(v) for k, v in dim_totals.items() if v}
     weakest = sorted(dim_avgs.items(), key=lambda x: x[1])[:2]
 
     insights = []
@@ -873,6 +873,16 @@ def get_usage(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
 
     monthly_used = int(db_user.monthly_usage or 0)
     monthly_limit = (10**12) if is_admin else int(user_monthly_limit)
+    if db_user.role == "recruiter" and db_user.organization_id:
+        from models import Organization
+        from core.quota import _reset_organization_usage_if_needed
+
+        organization = db.query(Organization).filter(Organization.id == db_user.organization_id).first()
+        if organization:
+            if _reset_organization_usage_if_needed(organization):
+                db.add(organization)
+                db.commit()
+            monthly_used = int(organization.monthly_usage or 0)
 
     return {
         "plan_type": plan_type,
@@ -905,7 +915,7 @@ def get_me(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
         db_user = get_or_create_user(db, supabase_id, email)
     return {
         "role": db_user.role or "individual",
-        "plan_type": _normalize_plan(db_user.plan_type),
+        "plan_type": _resolve_effective_plan(db, db_user),
         "email": db_user.email,
         "organization_id": db_user.organization_id,
     }

@@ -8,18 +8,21 @@ import secrets
 import os
 import logging
 import hashlib
+import io
+import uuid
 
 logger = logging.getLogger(__name__)
 from datetime import timedelta
 from typing import List
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Header, UploadFile, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Header, UploadFile, Request
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from config.aws import MAX_UPLOAD_BYTES
-from database import get_db
+from database import SessionLocal, get_db
 from models import APISubscription, RecruiterJob
+from core.quota import _reset_api_subscription_usage_if_needed
 from routes.recruiter import recruiter_required
 from security.file_guard import read_upload_limited
 from utils.csv_exporter import generate_csv_download
@@ -28,6 +31,10 @@ from utils.json_exporter import generate_json_download
 router = APIRouter(prefix="/api/v1/recruiter", tags=["recruiter-local"])
 
 _MAX_LOCAL_BATCH_FILES = int(os.getenv("RECRUITER_LOCAL_MAX_BATCH_FILES", "100"))
+_MAX_LINKEDIN_ZIP_BYTES = min(
+    50_000_000,
+    max(1_000_000, int(os.getenv("RECRUITER_LINKEDIN_ZIP_MAX_BYTES", "50000000"))),
+)
 
 
 def _format_bytes(value: int) -> str:
@@ -81,6 +88,11 @@ def validate_api_key(api_key: str, db: Session, lock: bool = False) -> APISubscr
     if subscription.expires_at and subscription.expires_at < utcnow():
         raise HTTPException(status_code=401, detail="API key expired")
 
+    if _reset_api_subscription_usage_if_needed(subscription):
+        db.add(subscription)
+        db.commit()
+        db.refresh(subscription)
+
     return subscription
 
 
@@ -130,6 +142,7 @@ async def generate_subscription_key(
         organization_id=org_id,
         monthly_limit=1000,  # Default 1000 CVs/month
         expires_at=utcnow() + timedelta(days=365),  # 1 year
+        usage_reset_at=utcnow(),
     )
     subscription.set_api_key(raw_key)
 
@@ -171,6 +184,7 @@ async def rotate_subscription_key(
         organization_id=org_id,
         monthly_limit=1000,
         expires_at=utcnow() + timedelta(days=365),
+        usage_reset_at=utcnow(),
     )
     subscription.set_api_key(raw_key)
     db.add(subscription)
@@ -385,11 +399,6 @@ async def process_linkedin_export_zip(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    # Check quota (we'll estimate based on typical LinkedIn exports)
-    # LinkedIn exports usually contain 50-500 CVs
-    estimated_cvs = 250  # Conservative estimate
-    check_monthly_quota(subscription, estimated_cvs)
-
     # Process LinkedIn export
     try:
         from utils.cv_processor import process_cv_batch_chunked
@@ -448,8 +457,113 @@ async def process_linkedin_export_zip(
     }
 
 
+async def _process_linkedin_export_background(
+    *,
+    session_id: str,
+    zip_contents: bytes,
+    filename: str,
+    subscription_id: int,
+    job_id: int,
+    chunk_size: int,
+) -> None:
+    from utils.cv_processor import process_cv_batch_chunked, set_processing_status
+
+    db = SessionLocal()
+    try:
+        subscription = db.query(APISubscription).filter(APISubscription.id == subscription_id).first()
+        job = db.query(RecruiterJob).filter(RecruiterJob.id == job_id).first()
+        if not subscription or not job or job.organization_id != subscription.organization_id:
+            await set_processing_status(
+                session_id,
+                {"status": "failed", "error": "Subscription or job is no longer available"},
+            )
+            return
+
+        async def progress(payload):
+            await set_processing_status(
+                session_id,
+                {
+                    **dict(payload or {}),
+                    "subscription_id": subscription_id,
+                    "job_id": job_id,
+                },
+            )
+
+        upload = UploadFile(file=io.BytesIO(zip_contents), filename=filename)
+        results, summary = await process_cv_batch_chunked(
+            zip_file=upload,
+            job_description=job.description,
+            job_id=job_id,
+            chunk_size=chunk_size,
+            progress_callback=progress,
+            session_id=session_id,
+        )
+
+        subscription = (
+            db.query(APISubscription)
+            .filter(APISubscription.id == subscription_id, APISubscription.is_active == True)
+            .with_for_update()
+            .first()
+        )
+        if not subscription:
+            raise ValueError("Subscription is no longer active")
+        _reset_api_subscription_usage_if_needed(subscription)
+        actual_cvs = len(results)
+        check_monthly_quota(subscription, actual_cvs)
+        subscription.monthly_usage += actual_cvs
+        subscription.last_used_at = utcnow()
+        db.add(subscription)
+        db.commit()
+
+        json_url = generate_json_download(
+            results,
+            job_id,
+            owner_organization_id=subscription.organization_id,
+            owner_subscription_id=subscription.id,
+        )
+        csv_url = generate_csv_download(
+            results,
+            job_id,
+            owner_organization_id=subscription.organization_id,
+            owner_subscription_id=subscription.id,
+        )
+        await set_processing_status(
+            session_id,
+            {
+                **summary,
+                "status": "completed",
+                "subscription_id": subscription_id,
+                "job_id": job_id,
+                "job_title": job.title,
+                "total_results": len(results),
+                "results": results[:100],
+                "downloads": {"json": json_url, "csv": csv_url},
+                "usage": {
+                    "monthly_limit": subscription.monthly_limit,
+                    "monthly_usage": subscription.monthly_usage,
+                    "remaining": subscription.monthly_limit - subscription.monthly_usage,
+                },
+            },
+        )
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Background LinkedIn processing failed: %s", exc)
+        await set_processing_status(
+            session_id,
+            {
+                "status": "failed",
+                "subscription_id": subscription_id,
+                "job_id": job_id,
+                "error": str(exc)[:300],
+            },
+        )
+    finally:
+        db.close()
+
+
 @router.post("/process-linkedin-export-large")
 async def process_linkedin_export_large(
+    background_tasks: BackgroundTasks,
     job_id: int = Form(..., gt=0),
     zip_file: UploadFile = File(...),
     api_key: str = Header(..., alias="X-API-Key"),
@@ -493,68 +607,43 @@ async def process_linkedin_export_large(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    # For large batches, check quota more generously
-    max_csv_estimate = 2000  # Conservative estimate for 1000-5000 CVs
-    if subscription.monthly_limit - subscription.monthly_usage < max_csv_estimate:
+    remaining = subscription.monthly_limit - subscription.monthly_usage
+    if remaining <= 0:
         raise HTTPException(
             status_code=429,
-            detail=f"Insufficient quota for large batch processing. Remaining: {subscription.monthly_limit - subscription.monthly_usage}",
+            detail="Monthly quota exceeded",
         )
-
-    # Process in chunks
-    from utils.cv_processor import process_cv_batch_chunked
-
-    session_id = str(utcnow().timestamp())
 
     try:
-        results, summary = await process_cv_batch_chunked(
-            zip_file=zip_file,
-            job_description=job.description,
+        zip_contents = await read_upload_limited(zip_file, max_bytes=_MAX_LINKEDIN_ZIP_BYTES)
+        session_id = str(uuid.uuid4())
+        from utils.cv_processor import set_processing_status
+
+        await set_processing_status(
+            session_id,
+            {
+                "status": "queued",
+                "subscription_id": subscription.id,
+                "job_id": job_id,
+                "processed": 0,
+                "errors": 0,
+            },
+        )
+        background_tasks.add_task(
+            _process_linkedin_export_background,
+            session_id=session_id,
+            zip_contents=zip_contents,
+            filename=zip_file.filename or "linkedin-export.zip",
+            subscription_id=subscription.id,
             job_id=job_id,
             chunk_size=chunk_size,
-            progress_callback=None,  # Could integrate with WebSocket
         )
-
-        # Update usage with actual count
-        actual_cvs = len(results)
-        check_monthly_quota(subscription, actual_cvs)
-
-        subscription.monthly_usage += actual_cvs
-        subscription.last_used_at = utcnow()
-        db.add(subscription)
-        db.commit()
-
-        # Generate download links
-        json_url = generate_json_download(
-            results,
-            job_id,
-            owner_organization_id=subscription.organization_id,
-            owner_subscription_id=subscription.id,
-        )
-        csv_url = generate_csv_download(
-            results,
-            job_id,
-            owner_organization_id=subscription.organization_id,
-            owner_subscription_id=subscription.id,
-        )
-
         return {
-            "status": "success",
+            "status": "queued",
             "session_id": session_id,
-            "summary": {
-                **summary,
-                "job_id": job_id,
-                "job_title": job.title,
-                "processed_at": utcnow().isoformat(),
-            },
-            "results": results[:100],  # Return top 100 for preview
-            "total_results": len(results),
-            "downloads": {"json": json_url, "csv": csv_url, "note": "Full results available in JSON/CSV downloads"},
-            "usage": {
-                "monthly_limit": subscription.monthly_limit,
-                "monthly_usage": subscription.monthly_usage,
-                "remaining": subscription.monthly_limit - subscription.monthly_usage,
-            },
+            "job_id": job_id,
+            "job_title": job.title,
+            "message": "Background processing started",
         }
 
     except ValueError as e:
@@ -579,11 +668,14 @@ async def get_processing_status(
     - `eta`: Estimated time remaining
     """
     # Validate API key
-    validate_api_key(api_key, db)
+    subscription = validate_api_key(api_key, db)
 
     from utils.cv_processor import get_processing_status
 
     status = await get_processing_status(session_id)
+    status_subscription_id = status.get("subscription_id")
+    if status_subscription_id is not None and int(status_subscription_id) != int(subscription.id):
+        raise HTTPException(status_code=404, detail="Processing session not found")
 
     return {
         "session_id": session_id,
