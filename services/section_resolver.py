@@ -952,9 +952,13 @@ def _validate_languages(data: Dict) -> None:
             for lang in languages
             if isinstance(lang, (str, dict))
             and (
-                isinstance(lang, dict)
+                (
+                    isinstance(lang, dict)
+                    and bool(str(lang.get("name") or lang.get("language") or "").strip())
+                )
                 or (
-                    lang.strip()
+                    isinstance(lang, str)
+                    and lang.strip()
                     and len(lang.strip()) > 1
                     and not re.match(r"^[\d\W]+$", lang.strip())
                     and "@" not in lang

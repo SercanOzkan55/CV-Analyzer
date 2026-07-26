@@ -710,7 +710,12 @@ async def extract_linkedin_zip_streaming(
 
 
 async def process_cv_batch_chunked(
-    zip_file: UploadFile, job_description: str, job_id: int, chunk_size: int = 200, progress_callback=None
+    zip_file: UploadFile,
+    job_description: str,
+    job_id: int,
+    chunk_size: int = 200,
+    progress_callback=None,
+    session_id: str | None = None,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
     Process large CV batches in chunks (handles 5000+ CVs).
@@ -731,7 +736,7 @@ async def process_cv_batch_chunked(
     all_results = []
     total_processed = 0
     total_errors = 0
-    session_id = str(uuid.uuid4())
+    session_id = session_id or str(uuid.uuid4())
 
     try:
         # Stream extract ZIP in chunks
@@ -792,6 +797,14 @@ async def process_cv_batch_chunked(
 
     except Exception as e:
         logger.error(f"Batch processing failed: {str(e)}")
+        if progress_callback:
+            await progress_callback(
+                {
+                    "session_id": session_id,
+                    "status": "failed",
+                    "error": "Batch processing failed",
+                }
+            )
         raise
 
 
@@ -826,6 +839,27 @@ def create_celery_task(batch_id: str, cv_count: int, job_id: int) -> Dict[str, A
         return None
 
 
+_PROCESSING_STATUS: Dict[str, Dict[str, Any]] = {}
+
+
+async def set_processing_status(session_id: str, status: Dict[str, Any]) -> None:
+    payload = {"session_id": session_id, **dict(status or {})}
+    _PROCESSING_STATUS[session_id] = payload
+    try:
+        import redis
+
+        redis_url = os.getenv("REDIS_URL")
+        r = (
+            redis.Redis.from_url(redis_url, decode_responses=True)
+            if redis_url
+            else redis.Redis(host="localhost", port=6379, decode_responses=True)
+        )
+        r.setex(f"processing:{session_id}", 86400, json.dumps(payload, default=str))
+        r.close()
+    except Exception:
+        pass
+
+
 async def get_processing_status(session_id: str) -> Dict[str, Any]:
     """
     Get real-time processing status from Redis cache.
@@ -833,13 +867,19 @@ async def get_processing_status(session_id: str) -> Dict[str, Any]:
     try:
         import redis
 
-        r = redis.Redis(host="localhost", port=6379, decode_responses=True)
+        redis_url = os.getenv("REDIS_URL")
+        r = (
+            redis.Redis.from_url(redis_url, decode_responses=True)
+            if redis_url
+            else redis.Redis(host="localhost", port=6379, decode_responses=True)
+        )
 
         status = r.get(f"processing:{session_id}")
+        r.close()
         if status:
             return json.loads(status)
 
-        return {"status": "not_found", "session_id": session_id}
+        return _PROCESSING_STATUS.get(session_id, {"status": "not_found", "session_id": session_id})
     except Exception as e:
         logger.warning(f"Redis status check failed: {str(e)}")
-        return {"status": "unknown", "error": str(e)}
+        return _PROCESSING_STATUS.get(session_id, {"status": "unknown"})

@@ -9,6 +9,8 @@ const distDir = path.join(rootDir, 'dist')
 const baseHtml = await readFile(path.join(distDir, 'index.html'), 'utf8')
 
 const PUBLIC_ROUTES = [
+  { path: '/', title: 'Ücretsiz CV Analiz ve ATS Kontrolü | CV Analyzer', description: 'CV’nizi ücretsiz analiz edin; ATS uyumunu, iş ilanı eşleşmesini, beceri boşluklarını ve geliştirme önerilerini tek ekranda görün.' },
+  { path: '/rehber/', title: 'CV Hazırlama ve ATS Rehberleri | CV Analyzer', description: 'CV hazırlama, ATS okunabilirliği, mülakat, ön yazı ve role özel CV örnekleri için özgün ve uygulanabilir rehberleri inceleyin.' },
   { path: '/pricing/', title: 'CV Analyzer Planları ve Özellikleri', description: 'CV analizi, ATS kontrolü, iş eşleşmesi ve CV geliştirme özelliklerini karşılaştırın.' },
   { path: '/about/', title: 'CV Analyzer Hakkında', description: 'CV Analyzer’ın özgeçmiş değerlendirmesini daha açık, erişilebilir ve uygulanabilir hale getirme yaklaşımını öğrenin.' },
   { path: '/privacy/', title: 'Gizlilik Politikası | CV Analyzer', description: 'CV Analyzer’ın CV dosyalarını, analiz sonuçlarını ve hesap verilerini nasıl işlediğini inceleyin.' },
@@ -93,6 +95,94 @@ function staticPageContent(page) {
   return `<main id="main-content" class="seo-container seo-article" data-prerendered="true"><article class="seo-article-main"><header><p class="seo-eyebrow">${escapeHtml(page.eyebrow)}</p><h1>${escapeHtml(page.title)}</h1><p>${escapeHtml(page.intro)}</p></header>${sections}<section class="seo-faq"><h2>Sık sorulan sorular</h2>${faq}</section><p><a href="/register">CV’nizi ücretsiz analiz edin</a></p></article></main>`
 }
 
+function staticPublicChrome(content) {
+  return `
+    <header data-prerendered="true">
+      <nav aria-label="Ana navigasyon">
+        <a href="/">CV Analyzer</a>
+        <a href="/rehber/">CV rehberleri</a>
+        <a href="/pricing/">Fiyatlandırma</a>
+        <a href="/about/">Hakkımızda</a>
+      </nav>
+    </header>
+    ${content}
+    <footer data-prerendered="true">
+      <nav aria-label="Alt bilgi">
+        <a href="/privacy/">Gizlilik Politikası</a>
+        <a href="/terms/">Kullanım Koşulları</a>
+        <a href="mailto:support@cvanalyzer.dev">İletişim</a>
+      </nav>
+      <p>© 2026 CV Analyzer</p>
+    </footer>`
+}
+
+function staticPublicPage(routePath) {
+  if (routePath === '/rehber/') {
+    const guides = SEO_PAGES.map(
+      (page) => `<article><h2><a href="${escapeHtml(page.path)}">${escapeHtml(page.title)}</a></h2><p>${escapeHtml(page.description)}</p></article>`,
+    ).join('')
+    return staticPublicChrome(
+      `<main id="main-content" class="seo-container seo-article" data-prerendered="true"><article class="seo-article-main"><h1>CV hazırlama ve ATS rehberleri</h1><p>CV’nizi ilk kez hazırlamadan hedef ilana uyarlamaya, mülakat planından ön yazıya kadar ihtiyaç duyacağınız kaynakları tek yerde inceleyin.</p>${guides}</article></main>`,
+    )
+  }
+
+  const pages = {
+    '/': {
+      title: 'CV’nizi ATS ve hedef iş ilanına göre değerlendirin',
+      intro: 'CV Analyzer; özgeçmişinizin okunabilirliğini, bölüm yapısını, deneyim ve beceri anlatımını ve hedef rolle ilişkisini ayrı başlıklarda incelemenize yardımcı olur.',
+      sections: [
+        ['Tek puandan daha açıklayıcı sonuçlar', 'Analiz; iletişim bilgileri, standart bölüm başlıkları, metin çıkarma kalitesi, deneyim anlatımı, beceriler ve iş ilanı eşleşmesi gibi sinyalleri ayrı ayrı gösterir. Böylece hangi değişikliğin neden gerekli olduğunu görebilirsiniz.'],
+        ['Gerçekleri koruyan öneriler', 'CV’nizde bulunmayan deneyim, sonuç veya becerileri eklemenizi önermeyiz. Amaç, sahip olduğunuz bilgileri daha açık ve hedef rolle ilişkili biçimde sunmanıza yardımcı olmaktır.'],
+        ['Ücretsiz başlayın', 'Hesap oluşturarak CV dosyanızı analiz edebilir, ATS görünümünü inceleyebilir ve geliştirme adımlarını kendi belgeniz üzerinde uygulayabilirsiniz.'],
+        ['Kariyer rehberleri', 'CV hazırlama, ATS okunabilirliği, yeni mezun ve yazılım mühendisi CV örnekleri için herkese açık rehber merkezini ziyaret edin.'],
+      ],
+    },
+    '/pricing/': {
+      title: 'CV Analyzer planları',
+      intro: 'CV analizi, ATS okunabilirlik kontrolü ve iş ilanı karşılaştırması için sunulan planları karşılaştırın.',
+      sections: [
+        ['Ücretsiz başlangıç', 'Temel CV analizi ve açıklanabilir geliştirme önerileriyle ürünü deneyebilirsiniz. Güncel kullanım sınırları hesap ekranında gösterilir.'],
+        ['Bireysel ve ekip kullanımı', 'Daha yüksek analiz ihtiyacı olan kullanıcılar ile aday havuzu yöneten ekipler için farklı kullanım seçenekleri sunulur. Satın alma öncesinde özellik ve limitleri fiyatlandırma ekranından doğrulayın.'],
+      ],
+    },
+    '/about/': {
+      title: 'CV Analyzer hakkında',
+      intro: 'CV Analyzer, özgeçmiş değerlendirmesini tek bir puan yerine anlaşılır bulgulara ve uygulanabilir adımlara dönüştürmek amacıyla geliştirilen bağımsız bir üründür.',
+      sections: [
+        ['Yaklaşımımız', 'CV’nin bölüm yapısını, metin okunabilirliğini, deneyim ve beceri anlatımını ve hedef iş ilanıyla ilişkisini ayrı sinyaller olarak değerlendiririz. Sonuçlar işe alınma garantisi değil, adayın kendi belgesini gözden geçirmesine yardımcı olan rehberliktir.'],
+        ['Şeffaflık ve kontrol', 'Önerilerin gerçekte CV’de bulunan bilgilere dayanmasını, uydurma deneyim veya beceri eklememesini hedefleriz. Kullanıcılar kayıtlı analizlerini ve CV sürümlerini hesaplarından yönetebilir ve silebilir.'],
+        ['İletişim', 'Ürün, gizlilik veya içeriklerle ilgili sorularınızı support@cvanalyzer.dev adresine iletebilirsiniz.'],
+      ],
+    },
+    '/privacy/': {
+      title: 'Gizlilik Politikası',
+      intro: 'Bu politika; hesap, CV dosyası, analiz sonucu, çerez ve reklam teknolojileriyle ilişkili verilerin nasıl işlendiğini açıklar.',
+      sections: [
+        ['Saklanan veriler', 'Hesap bilgileri, analiz sonuçları ve kaydetmeyi seçtiğiniz CV sürümleri, geçmişinize erişebilmeniz için siz silene kadar saklanabilir. Kayıtları Veri Merkezi üzerinden veya hesabınızı silerek kaldırabilirsiniz.'],
+        ['Çerezler ve reklamlar', 'Kimlik doğrulama ve tercih çerezleri hizmetin çalışması için kullanılır. Reklamlar etkinleştirildiğinde Google AdSense çerezleri ve benzer tanımlayıcılar, geçerli onay tercihleri doğrultusunda kullanılabilir.'],
+        ['Haklar ve iletişim', 'Verilerinize erişme veya silme talepleri için uygulamadaki veri kontrollerini ya da support@cvanalyzer.dev adresini kullanabilirsiniz.'],
+      ],
+    },
+    '/terms/': {
+      title: 'Kullanım Koşulları',
+      intro: 'CV Analyzer sonuçları kariyer kararlarını destekleyen otomatik değerlendirmelerdir; işe alınma sonucu veya kesin profesyonel görüş garantisi vermez.',
+      sections: [
+        ['Kullanıcı sorumluluğu', 'Yüklediğiniz içeriğin doğruluğundan, paylaşma yetkinizden ve üretilen önerileri kullanmadan önce gözden geçirmekten siz sorumlusunuz.'],
+        ['Hizmet sınırları', 'Puanlar ve öneriler farklı ATS ürünlerinin kesin davranışını temsil etmez. İşverenlerin değerlendirme yöntemleri değişebilir.'],
+        ['İçerik sahipliği', 'Yüklediğiniz içeriğin hakları sizde kalır. Hizmetin marka, tasarım ve yazılım bileşenleri sağlayıcıya aittir.'],
+      ],
+    },
+  }
+  const page = pages[routePath]
+  if (!page) return ''
+  const sections = page.sections
+    .map(([heading, body]) => `<section><h2>${escapeHtml(heading)}</h2><p>${escapeHtml(body)}</p></section>`)
+    .join('')
+  return staticPublicChrome(
+    `<main id="main-content" class="seo-container seo-article" data-prerendered="true"><article class="seo-article-main"><h1>${escapeHtml(page.title)}</h1><p>${escapeHtml(page.intro)}</p>${sections}</article></main>`,
+  )
+}
+
 async function writeRoute(route, html) {
   const routeDir = path.join(distDir, route.replace(/^\//, '').replace(/\/$/, ''))
   await mkdir(routeDir, { recursive: true })
@@ -107,13 +197,15 @@ for (const page of SEO_PAGES) {
     canonical,
     schema: pageSchema(page),
   })
-  html = html.replace('<div id="root"></div>', `<div id="root">${staticPageContent(page)}</div>`)
+  html = html.replace('<div id="root"></div>', `<div id="root">${staticPublicChrome(staticPageContent(page))}</div>`)
   await writeRoute(page.path, html)
 }
 
 for (const route of PUBLIC_ROUTES) {
   const canonical = `${SITE_URL}${route.path}`
-  await writeRoute(route.path, applyMeta(baseHtml, { ...route, canonical }))
+  let html = applyMeta(baseHtml, { ...route, canonical })
+  html = html.replace('<div id="root"></div>', `<div id="root">${staticPublicPage(route.path)}</div>`)
+  await writeRoute(route.path, html)
 }
 
 for (const route of NOINDEX_ROUTES) {

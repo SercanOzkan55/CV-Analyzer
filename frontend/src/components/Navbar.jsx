@@ -14,6 +14,8 @@ import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/LanguageContext'
 import { useTheme } from '../context/ThemeContext'
 import { BLOG_ENABLED } from '../config/features'
+import { getGuideUi } from '../content/guideI18n'
+import { findSeoPage } from '../content/seoPages'
 import NotificationCenter from './NotificationCenter'
 
 const langLabels = { en: 'EN', tr: 'TR' }
@@ -23,6 +25,8 @@ export default function Navbar() {
   const { t, lang, setLang, availableLanguages } = useLanguage()
   const { theme, toggleTheme } = useTheme()
   const location = useLocation()
+  const guideUi = getGuideUi(lang)
+  const isGuideRoute = location.pathname.startsWith('/rehber/') || Boolean(findSeoPage(location.pathname))
   const [mobileOpen, setMobileOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
@@ -86,7 +90,7 @@ export default function Navbar() {
               <a href="/#features" className="nav-link">{t('nav.features')}</a>
               <a href="/#pricing" className="nav-link">{t('nav.pricing')}</a>
               <a href="/#faq" className="nav-link">{t('nav.faq')}</a>
-              <NavLink to="/cv-analiz/" active={location.pathname === '/cv-analiz/'}>CV Rehberi</NavLink>
+              <NavLink to="/rehber/" active={isGuideRoute}>{guideUi.hubTitle}</NavLink>
               {BLOG_ENABLED && <NavLink to="/blog" active={location.pathname === '/blog'}>Blog</NavLink>}
             </>
           ) : (
@@ -143,14 +147,16 @@ export default function Navbar() {
         </div>
 
         <div className="navbar-actions">
-          <div className="lang-switcher">
-            {availableLanguages.map((l) => (
+          <div className="lang-switcher" role="group" aria-label={t('settings.language')}>
+            {availableLanguages.map((languageCode) => (
               <button
-                key={l}
-                className={`lang-btn ${lang === l ? 'active' : ''}`}
-                onClick={() => setLang(l)}
+                key={languageCode}
+                type="button"
+                className={`lang-btn ${lang === languageCode ? 'active' : ''}`}
+                onClick={() => setLang(languageCode)}
+                aria-pressed={lang === languageCode}
               >
-                {langLabels[l] || l.toUpperCase()}
+                {langLabels[languageCode] || languageCode.toUpperCase()}
               </button>
             ))}
           </div>

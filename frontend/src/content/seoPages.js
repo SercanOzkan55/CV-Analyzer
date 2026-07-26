@@ -297,7 +297,305 @@ export const SEO_PAGES = [
       { question: 'Teknik CV iki sayfa olabilir mi?', answer: 'Deneyimli adaylarda iki sayfa olabilir. Tekrarlanan görevleri ve eski, ilgisiz teknolojileri çıkararak her bölümün hedef role katkısını koruyun.' },
     ],
   },
+  {
+    slug: 'mulakat-hazirligi',
+    path: '/rehber/mulakat-hazirligi/',
+    eyebrow: 'Uygulanabilir mülakat rehberi',
+    title: 'İş Mülakatına Nasıl Hazırlanılır? Araştırmadan Takip Mesajına',
+    seoTitle: 'İş Mülakatına Hazırlık Rehberi | CV Analyzer',
+    description: 'İş mülakatına hazırlanırken şirket ve rol araştırmasını, deneyim örneklerini, teknik soruları, görüşme gününü ve takip mesajını adım adım planlayın.',
+    intro: 'Mülakat hazırlığı, olası sorulara ezber cevap yazmaktan ibaret değildir. Amaç; rolün beklentilerini anlamak, geçmiş deneyiminizden ilgili kanıtları seçmek ve bilmediğiniz konularda da düşünme biçiminizi açıkça gösterebilmektir. Bu rehber, görüşme öncesinden sonrasına kadar uygulanabilir bir çalışma planı sunar.',
+    updatedAt: '2026-07-26',
+    readingTime: '10 dk',
+    highlights: [
+      'Rol ve şirket araştırması',
+      'Kanıta dayalı deneyim örnekleri',
+      'Teknik ve davranışsal soru hazırlığı',
+      'Görüşme sonrası takip',
+    ],
+    sections: [
+      {
+        heading: 'İlanı bir değerlendirme planına dönüştürün',
+        paragraphs: [
+          'İlan metnini sorumluluklar, zorunlu beceriler, tercih edilen beceriler ve çalışma biçimi olarak dört gruba ayırın. Her zorunlu beklentinin yanına kendi deneyiminizden bir örnek veya henüz deneyiminiz yoksa öğrenme yaklaşımınızı yazın. Böylece görüşmede yalnızca CV’nizi tekrar etmek yerine rolün ihtiyaçlarına cevap verebilirsiniz.',
+          'Şirketin ürününü, müşterisini, gelir modelini ve yakın dönemde duyurduğu gelişmeleri inceleyin. Araştırmanın amacı şirketi övmek değil; rolün hangi probleme hizmet ettiğini anlamaktır. Kaynağı belirsiz yorumları gerçek gibi kullanmayın ve güncel bilgiyi şirketin kendi sitesiyle doğrulayın.',
+        ],
+        bullets: [
+          'İlandaki üç temel sorumluluğu kendi cümlelerinizle özetleyin.',
+          'Her sorumluluk için geçmişten bir kanıt veya öğrenme planı hazırlayın.',
+          'Görüşmeciye soracağınız ürün, ekip ve başarı ölçütü sorularını not edin.',
+        ],
+      },
+      {
+        heading: 'Deneyim örneklerini STAR yapısıyla hazırlayın',
+        paragraphs: [
+          'Davranışsal sorularda durum, görev, eylem ve sonuç sırası anlatımı toparlar. Ancak cevabın çoğu eylem bölümünde olmalıdır: sizin hangi kararı verdiğiniz, kimlerle çalıştığınız ve engeli nasıl aştığınız açık olmalıdır. Ekip başarısını sahiplenmeden kendi katkınızı ayırın.',
+          'Her örnekte ölçülebilir sonuç bulunmayabilir. Uydurma yüzde yerine teslim süresinin kısalması, hata tekrarının azalması, kararın netleşmesi veya paydaş beklentisinin karşılanması gibi doğrulanabilir etkileri anlatın. Olumsuz sonuçlanan bir örnekte ne öğrendiğinizi ve sonraki yaklaşımınızı belirtin.',
+        ],
+      },
+      {
+        heading: 'Teknik sorularda düşünme sürecini görünür yapın',
+        paragraphs: [
+          'Teknik görüşmede soruyu hemen çözmeye çalışmadan önce girdileri, kısıtları ve beklenen çıktıyı netleştirin. Varsayımlarınızı söyleyin, basit çözümle başlayın ve iyileştirme seçeneklerini tartışın. Bilmediğiniz bir ayrıntıyı saklamak yerine hangi bilgiye ihtiyaç duyduğunuzu açıklayın.',
+          'Kodlama görüşmesinde yalnızca çalışan sonuç değil; isimlendirme, hata durumları, test edilebilirlik ve karmaşıklık da değerlendirilebilir. Sistem tasarımında trafik, veri tutarlılığı, güvenlik ve gözlemlenebilirlik gibi başlıkları gereksinime göre ele alın. Her konuyu ezbere sıralamak yerine kararla ilişkisini kurun.',
+        ],
+        bullets: [
+          'Soruyu ve başarı ölçütünü tekrar ederek doğrulayın.',
+          'Önce basit yaklaşımı, sonra olası darboğazları açıklayın.',
+          'En az bir normal durum ve bir kenar durum testi düşünün.',
+          'Zaman dolarken eksik kalan adımları ve nasıl tamamlayacağınızı özetleyin.',
+        ],
+      },
+      {
+        heading: 'Görüşme gününü önceden prova edin',
+        paragraphs: [
+          'Çevrim içi görüşmede kamera, mikrofon, bağlantı, görüşme linki ve ekran paylaşımını önceden test edin. Yüz yüze görüşmede adresi, ulaşım süresini ve gerekli belgeleri kontrol edin. CV’nizin görüşmeciye gönderdiğiniz son sürümünü ve ilan metnini erişilebilir bir yerde tutun.',
+          'Cevapları kelimesi kelimesine ezberlemeyin. Üç ila beş ana örneği yüksek sesle anlatmak, süreyi ve gereksiz ayrıntıları fark etmenizi sağlar. Kısa bir duraklama yapmak, acele ve dağınık bir cevaptan daha profesyoneldir.',
+        ],
+      },
+      {
+        heading: 'Takip mesajını kısa ve özgün tutun',
+        paragraphs: [
+          'Görüşmeden sonraki bir iş günü içinde teşekkür mesajı gönderebilirsiniz. Mesajda görüşmede konuşulan belirli bir konuya değinin, role ilginizi kısaca yineleyin ve talep edilen ek bilgi varsa paylaşın. Uzun bir satış metni veya tekrar tekrar durum sorma baskısı oluşturmayın.',
+          'Size belirtilen karar tarihi geçtiyse nazik bir durum sorusu uygundur. Bu sırada diğer başvurularınızı durdurmayın; görüşme notlarınızı kaydedip güçlü ve geliştirilmesi gereken cevapları bir sonraki süreç için değerlendirin.',
+        ],
+      },
+    ],
+    faq: [
+      { question: 'Mülakat cevapları ezberlenmeli mi?', answer: 'Hayır. Ana örnekleri ve sonuçları hatırlayın; cümleleri ezberlemek doğal olmayan ve soruya uyum sağlamayan cevaplara yol açabilir.' },
+      { question: 'Bilmediğim teknik soruda ne yapmalıyım?', answer: 'Bilmediğinizi açıkça söyleyin, soruyu parçalara ayırın ve çözmek için hangi bilgiyi veya deneyi kullanacağınızı anlatın. Yanlış bilgiyi kesinmiş gibi sunmayın.' },
+      { question: 'Görüşmede kaç soru sormalıyım?', answer: 'Süreye göre iki veya üç anlamlı soru genellikle yeterlidir. Ekibin öncelikleri, rolün ilk aylardaki başarı ölçütü ve çalışma biçimi gibi kararınızı da destekleyen sorular seçin.' },
+    ],
+  },
+  {
+    slug: 'on-yazi-nasil-yazilir',
+    path: '/rehber/on-yazi-nasil-yazilir/',
+    eyebrow: 'Ön yazı hazırlama rehberi',
+    title: 'Ön Yazı Nasıl Yazılır? İlanla İlişki Kuran Kısa Bir Yapı',
+    seoTitle: 'Ön Yazı Nasıl Yazılır? Örnek Yapı ve Kontrol Listesi',
+    description: 'İş ilanını tekrar etmeyen, CV’deki kanıtları hedef rolle ilişkilendiren ve gereksiz genel ifadelerden kaçınan etkili bir ön yazı hazırlayın.',
+    intro: 'İyi bir ön yazı CV’nin uzun özeti değildir. İşverenin belirli ihtiyacıyla sizin ilgili deneyiminiz arasında kısa ve anlaşılır bir bağ kurar. Her başvuru için sıfırdan uzun bir metin yazmak yerine, doğrulanabilir örnekleri koruyan ve role göre uyarlanan bir yapı kullanabilirsiniz.',
+    updatedAt: '2026-07-26',
+    readingTime: '9 dk',
+    highlights: [
+      'İlanla açık ilişki',
+      'CV’den seçilmiş kanıtlar',
+      'Kısa ve profesyonel anlatım',
+      'Göndermeden önce doğruluk kontrolü',
+    ],
+    sections: [
+      {
+        heading: 'Ön yazının amacını doğru belirleyin',
+        paragraphs: [
+          'Ön yazı, CV’de zaten bulunan her rolü ve eğitimi tekrar etmemelidir. Bunun yerine neden bu pozisyona başvurduğunuzu, hangi iki veya üç deneyimin en ilgili olduğunu ve bu deneyimlerin ekibin ihtiyacına nasıl katkı sağlayabileceğini açıklamalıdır.',
+          'İlan ön yazı istemiyorsa her zaman eklemek zorunda değilsiniz. Kariyer değişimi, çalışma arası, konum değişikliği veya ilanda özellikle sorulan motivasyon gibi CV’den kolay anlaşılmayan bir bağlam varsa ön yazı daha değerlidir.',
+        ],
+      },
+      {
+        heading: 'Dört parçalı kısa yapı kullanın',
+        paragraphs: [
+          'İlk paragrafta rolü ve başvuru nedeninizi belirtin. İkinci paragrafta ilandaki temel sorumlulukla ilişkili bir deneyim örneği verin. Üçüncü paragrafta ikinci bir yetkinliği veya çalışma yaklaşımını kanıtlayın. Son paragrafta görüşme isteğinizi ve teşekkürünüzü kısa biçimde ifade edin.',
+          'Metni genellikle 250–400 kelime arasında tutmak, tek ekranda okunmasını kolaylaştırır. Ancak kesin bir kelime sayısı uğruna anlamlı ayrıntıları kesmek veya yapay cümleler eklemek yerine her paragrafın yeni bir bilgi taşımasına odaklanın.',
+        ],
+        bullets: [
+          'Açılış: Rol, kaynak ve başvurunun kısa nedeni.',
+          'Kanıt 1: İlandaki öncelikli sorumlulukla ilişkili deneyim.',
+          'Kanıt 2: Ekip, teknik beceri veya sektör bağlamı.',
+          'Kapanış: İlgi, uygunluk ve iletişime açık olduğunuzu belirten kısa ifade.',
+        ],
+      },
+      {
+        heading: 'Genel sıfat yerine somut bağ kurun',
+        paragraphs: [
+          '“Çalışkan, dinamik ve sonuç odaklıyım” gibi ifadeler tek başına kanıt sunmaz. Bunun yerine hangi problemi çözdüğünüzü, hangi araç veya yöntemle ilerlediğinizi ve ortaya çıkan sonucu anlatın. CV’de bulunan sayıları ve sonuçları kullanabilirsiniz; yeni veya doğrulanamayacak bilgi üretmeyin.',
+          'Şirket hakkında yalnızca internet sitesindeki sloganı tekrar etmeyin. Ürün, ekip yapısı veya ilandaki sorumluluklardan gerçekten ilginizi çeken bir noktayı seçin ve deneyiminizle ilişkisini kurun. Samimi ilgi, aşırı övgüden daha güven vericidir.',
+        ],
+      },
+      {
+        heading: 'Yapay zekâ çıktısını mutlaka düzenleyin',
+        paragraphs: [
+          'Bir araç taslak oluşturduysa şirket adı, pozisyon, beceri, proje, tarih ve sonuçların CV’nizle birebir uyumlu olduğunu kontrol edin. Yapay zekâ akıcı görünen fakat gerçekte olmayan deneyim veya teknoloji ekleyebilir. Bu nedenle son metnin sorumluluğu başvuru sahibindedir.',
+          'Kendi sesinizde kullanmayacağınız aşırı resmi kalıpları, tekrarları ve uzun cümleleri sadeleştirin. Aynı taslağı yalnızca şirket adını değiştirerek göndermek, ilandaki gerçek öncelikleri kaçırır ve düşük değerli genel bir metin oluşturur.',
+        ],
+      },
+      {
+        heading: 'Göndermeden önce son kontrol',
+        paragraphs: [
+          'Alıcı adı biliniyorsa doğru yazıldığını, şirket ve pozisyon adının tüm metinde tutarlı olduğunu kontrol edin. CV ile ön yazıdaki tarihler, rol adları ve ölçülebilir sonuçlar çelişmemelidir. Dosyayı PDF olarak gönderiyorsanız açılıp okunabildiğini ve dosya adının anlaşılır olduğunu doğrulayın.',
+        ],
+        bullets: [
+          'İlandaki en önemli gereksinimlerden en az biri kanıtla karşılanıyor mu?',
+          'Metinde başka şirketten kalmış isim veya paragraf var mı?',
+          'Her iddia CV, portfolyo veya gerçek deneyimle doğrulanabilir mi?',
+          'Kapanışta gereksiz baskı veya aşırı iddialı garanti bulunuyor mu?',
+        ],
+      },
+    ],
+    faq: [
+      { question: 'Her başvuruya ön yazı göndermek gerekir mi?', answer: 'Hayır. İlan istemiyorsa ve ek bağlam sunmuyorsa zorunlu değildir. Gönderiyorsanız role özel ve yeni bilgi taşıyan bir metin olmalıdır.' },
+      { question: 'Ön yazıda maaş beklentisi yazılır mı?', answer: 'İlan veya başvuru formu özellikle istemiyorsa genellikle ön yazıya eklenmez. İsteniyorsa para birimi, dönem ve varsa esneklik açıkça belirtilmelidir.' },
+      { question: 'Ön yazı e-posta gövdesine mi, dosyaya mı yazılmalı?', answer: 'İşverenin talimatını izleyin. Talimat yoksa kısa e-posta metni ve ayrı PDF kullanılabilir; aynı uzun metni iki yerde tekrar etmeyin.' },
+    ],
+  },
+  {
+    slug: 'cv-analizi-metodolojisi',
+    path: '/metodoloji/cv-analizi/',
+    eyebrow: 'Şeffaf değerlendirme yaklaşımı',
+    title: 'CV Analyzer Değerlendirme Metodolojisi ve Sonuçların Sınırları',
+    seoTitle: 'CV Analizi Metodolojisi ve Puanların Yorumu | CV Analyzer',
+    description: 'CV Analyzer’ın belge okunabilirliği, içerik, beceri, deneyim ve iş ilanı eşleşmesini nasıl ele aldığını; puanların neyi ifade etmediğini öğrenin.',
+    intro: 'CV Analyzer bir işe alım kararı vermez. Belgeden çıkarılabilen sinyalleri düzenleyerek adayın CV’sini gözden geçirmesine yardımcı olur. Bu sayfa değerlendirme alanlarını, sonuçların nasıl yorumlanması gerektiğini ve otomatik analizin önemli sınırlarını açıklar.',
+    updatedAt: '2026-07-26',
+    readingTime: '11 dk',
+    highlights: [
+      'Ayrı değerlendirme boyutları',
+      'Açıklanabilir puan yaklaşımı',
+      'Yanlış kesinlikten kaçınma',
+      'Kullanıcı kontrolü ve doğrulama',
+    ],
+    sections: [
+      {
+        heading: 'Analiz hangi bilgileri kullanır?',
+        paragraphs: [
+          'Analiz, kullanıcının sağladığı CV metnini veya dosyadan çıkarılan metni ve isteğe bağlı iş ilanı açıklamasını kullanır. Belgenin görsel görünümü ile çıkarılan metin aynı olmayabilir; bu nedenle okunabilirlik kontrolü, başlıkların ve kritik bilgilerin metin akışında bulunup bulunmadığına odaklanır.',
+          'İş ilanı verilmediğinde genel CV kalite sinyalleri değerlendirilebilir ancak role özel eşleşme sınırlı kalır. İlan verildiğinde görevler, beceriler ve deneyim beklentileri CV’de bulunan kanıtlarla karşılaştırılır. Sistem, adayın gerçekte sahip olmadığı bilgiyi doğrulayamaz.',
+        ],
+      },
+      {
+        heading: 'Değerlendirme boyutları neden ayrıdır?',
+        paragraphs: [
+          'Tek bir toplam puan, sorunun kaynağını gizleyebilir. Bu nedenle ATS okunabilirliği, anahtar kelime ve kavram eşleşmesi, beceri kapsamı, deneyim anlatımı ve genel içerik kalitesi ayrı sinyaller olarak ele alınır. Kullanıcı, toplam sonucu değiştirmeden önce hangi boyutun zayıf olduğunu görebilir.',
+          'Örneğin okunabilirliği yüksek bir CV hedef ilandaki deneyimi karşılamayabilir. Tersine güçlü deneyime sahip bir adayın CV’si, iletişim bilgileri üstbilgide kaldığı veya bölüm başlıkları belirsiz olduğu için yanlış ayrıştırılabilir. Bu iki durum aynı önerilerle düzeltilmemelidir.',
+        ],
+      },
+      {
+        heading: 'Puanlar nasıl yorumlanmalıdır?',
+        paragraphs: [
+          'Puanlar farklı CV sürümlerini aynı hedef ilan bağlamında karşılaştırmak için yardımcı göstergelerdir. Evrensel bir “geçti” eşiği veya işe alınma olasılığı değildir. ATS ürünleri, işveren kuralları ve işe alım ekiplerinin değerlendirmeleri birbirinden farklıdır.',
+          'Küçük puan farklarını kesin performans farkı olarak yorumlamayın. Önce engelleyici belge sorunlarını, sonra gerçek deneyimin CV’de görünmediği alanları inceleyin. Yalnızca puanı yükseltmek amacıyla anahtar kelime tekrar etmek hem okunabilirliği düşürebilir hem de görüşmede güven sorunu yaratabilir.',
+        ],
+        bullets: [
+          'Sonucu aynı CV ve aynı ilan bağlamında karşılaştırın.',
+          'Her önerinin CV’deki hangi kanıta dayandığını kontrol edin.',
+          'Sahip olmadığınız beceri veya sonucu eklemeyin.',
+          'Nihai belgeyi insan gözüyle ve çıkarılmış düz metin olarak yeniden okuyun.',
+        ],
+      },
+      {
+        heading: 'Otomatik analizin bilinen sınırları',
+        paragraphs: [
+          'PDF metin çıkarma; font gömme, taranmış görüntü, sütun düzeni ve metin kutuları nedeniyle eksik veya yanlış sıra üretebilir. Dil, sektör terminolojisi ve çok anlamlı beceri adları da yanlış eşleşmelere yol açabilir. Bu nedenle sonuç ekranındaki çıkarılmış metin ve uyarılar birlikte değerlendirilmelidir.',
+          'Sistem çalışma kalitesini, kültürel uyumu, iletişim becerisini, referansları veya görüşme performansını CV metninden güvenilir biçimde belirleyemez. Ayrıca geçmiş deneyimin doğruluğunu bağımsız olarak doğrulamaz. İnsan değerlendirmesinin yerine kullanılmamalıdır.',
+        ],
+      },
+      {
+        heading: 'Önerilerde gerçekleri koruma ilkesi',
+        paragraphs: [
+          'Otomatik iyileştirme, mevcut bilgiyi daha açık yapılandırmayı hedefler. Olmayan şirket, görev, ölçüm, sertifika veya teknoloji eklenmemelidir. Kaynak metinde belirsiz bir bilgi varsa kullanıcıdan doğrulama beklenmeli veya ifade belirsiz bırakılmalıdır.',
+          'Kullanıcı, önerilen her değişikliği kabul etmeden önce karşılaştırmalıdır. Özellikle sayılar, tarih aralıkları, iş unvanları, eğitim bilgileri ve iletişim bilgileri son dosyada manuel olarak doğrulanmalıdır.',
+        ],
+      },
+      {
+        heading: 'İçerik ve metodoloji güncellemeleri',
+        paragraphs: [
+          'Ürün davranışı ve desteklenen dosya biçimleri değiştikçe bu metodoloji sayfası güncellenir. Rehber içerikleri, ürünün garanti etmediği sonuçları vaat etmemek ve adaylara uygulanabilir, doğrulanabilir öneriler sunmak amacıyla editoryal kontrolden geçirilir.',
+          'Bir sonuçta hata veya açıklama eksikliği görürseniz analiz kimliğini ve kişisel veri içermeyen kısa örneği support@cvanalyzer.dev adresine iletebilirsiniz. CV’nin tamamını e-postayla göndermeniz gerekmez.',
+        ],
+      },
+    ],
+    faq: [
+      { question: 'Yüksek puan işe alınmayı garanti eder mi?', answer: 'Hayır. Puan yalnızca belgeden ve sağlanan iş ilanından çıkarılan belirli sinyalleri özetler; işe alım kararını veya görüşme sonucunu tahmin etmez.' },
+      { question: 'CV Analyzer belirli bir ATS ürününü taklit eder mi?', answer: 'Hayır. Genel metin çıkarma ve içerik sinyallerini kontrol eder. Her ATS ürününün özel sıralama ve ayrıştırma davranışı farklı olabilir.' },
+      { question: 'Yanlış bir öneri görürsem ne yapmalıyım?', answer: 'Öneriyi uygulamayın; çıkarılmış CV metnini ve ilan bağlamını kontrol edin. Kişisel veri paylaşmadan geri bildirim gönderebilir veya öneriyi yok sayabilirsiniz.' },
+    ],
+  },
 ]
+
+const SEO_PAGE_ENRICHMENTS = {
+  'cv-analiz': {
+    heading: 'Analiz sonucunu eylem planına dönüştürme',
+    paragraphs: [
+      'Bütün önerileri aynı anda uygulamak yerine önce belgenin okunmasını engelleyen sorunları düzeltin. İletişim bilgisinin çıkarılamaması, deneyim tarihlerinin karışması veya bölüm başlıklarının tanınmaması içerik iyileştirmesinden önce ele alınmalıdır. İkinci aşamada hedef ilanda önemli olan fakat gerçek deneyiminizde bulunduğu halde CV’de görünmeyen kanıtları ekleyin.',
+      'Her değişiklikten sonra CV’yi yeniden okuyun ve önceki sürümle karşılaştırın. Puan yükselirken anlatımın doğallığı bozuluyorsa değişiklik yararlı değildir. Son sürümü farklı dosya adıyla saklamak; hangi başvuruya hangi içeriği gönderdiğinizi takip etmenizi ve etkili düzenlemeleri sonraki başvurularda yeniden kullanmanızı kolaylaştırır.',
+    ],
+    bullets: [
+      'Önce metin çıkarma ve bölüm sorunlarını düzeltin.',
+      'Sonra yalnızca gerçek deneyiminizle desteklenen eksikleri tamamlayın.',
+      'Tekrarlanan anahtar kelimeleri doğal deneyim cümlelerine dönüştürün.',
+      'Son dosyayı hem görsel hem düz metin olarak kontrol edin.',
+    ],
+  },
+  'ats-cv-kontrol': {
+    heading: 'Kendi düz metin kontrolünüzü yapın',
+    paragraphs: [
+      'CV’nizi bir PDF okuyucuda açıp tüm metni seçerek düz metin düzenleyiciye yapıştırın. Ad, e-posta, telefon, şirket, pozisyon ve tarihlerin doğru sırada gelip gelmediğine bakın. Yan sütundaki beceriler deneyim cümlelerinin ortasına karışıyorsa veya iletişim bilgileri hiç görünmüyorsa belge düzeni risklidir.',
+      'Bu yöntem belirli bir ATS ürününün sonucunu garanti etmez; ancak makinenin erişebildiği metin hakkında güçlü bir ön kontrol sağlar. Sorun varsa önce dışa aktarma ayarını, fontları ve sütun yapısını sadeleştirin. Metni görüntü olarak içeren taranmış PDF’lerde OCR gerekebilir ve özel karakterler ayrıca doğrulanmalıdır.',
+    ],
+    bullets: [
+      'Başlıkların ayrı satırlarda ve doğru sırada olduğuna bakın.',
+      'Madde işaretlerinin anlamsız karaktere dönüşmediğini kontrol edin.',
+      'Bağlantıların görünen metninin de anlamlı olmasını sağlayın.',
+      'Türkçe karakterlerin bozulmadığını doğrulayın.',
+    ],
+  },
+  'ats-uyumlu-cv': {
+    heading: 'Zayıf ve güçlü ifade arasındaki fark',
+    paragraphs: [
+      '“Satış ekibine destek oldum” ifadesi rolü, yöntemi ve sonucu açıklamaz. “Haftalık müşteri talep raporlarını CRM verilerinden hazırlayıp satış ekibinin takip önceliklerini güncellemesine destek oldum” cümlesi ise kullanılan bağlamı ve katkıyı görünür kılar. Ölçülebilir sonuç varsa eklenebilir; yoksa uydurma yüzde kullanmayın.',
+      'ATS uyumluluğu yalnızca anahtar kelime eklemek değildir. İlandaki “paydaş iletişimi” beklentisini beceri listesine yazmak yerine gerçekten yürüttüğünüz toplantı, raporlama veya koordinasyon çalışmasıyla açıklayın. Bu yaklaşım hem eşleşme sinyalini güçlendirir hem de görüşmecinin deneyimi doğrulamak için sorabileceği somut bir örnek oluşturur.',
+    ],
+    bullets: [
+      'Eylemi kimin yaptığını açıkça belirtin.',
+      'Araç veya yöntemi yalnızca gerçekten kullandıysanız yazın.',
+      'Sonucu sayı yoksa gözlemlenebilir etkiyle anlatın.',
+      'Aynı genel görevi farklı işlerde tekrar etmeyin.',
+    ],
+  },
+  'cv-nasil-hazirlanir': {
+    heading: 'Her başvuru için kontrollü bir CV sürümü oluşturun',
+    paragraphs: [
+      'Ana CV’nizde tüm doğrulanmış deneyim, proje ve başarılarınızı saklayın. Başvuru yaparken bu ana belgeden hedef rolle ilgili maddeleri seçerek kısa bir sürüm üretin. Böylece her defasında sıfırdan yazmak yerine bilgiyi tutarlı biçimde uyarlarsınız ve tarih ya da unvan çelişkisi oluşturma riskini azaltırsınız.',
+      'Dosya adında ad-soyad, hedef rol ve sürüm tarihini kullanabilirsiniz. Gönderilen ilan bağlantısını ve dosya adını başvuru takip listenizde tutun. Görüşme daveti geldiğinde görüşmecinin elindeki CV sürümünü açmak, güncel olmayan veya farklı bir örneği anlatma karışıklığını önler.',
+    ],
+    bullets: [
+      'Ana CV’de doğrulanmış tüm kanıtları koruyun.',
+      'İlana göre yalnızca öncelik ve sıralamayı değiştirin.',
+      'Gönderilen sürümü sonradan değiştirmeyin; yeni sürüm oluşturun.',
+      'İlan metni ve CV dosya adını birlikte kaydedin.',
+    ],
+  },
+  'yeni-mezun-cv-ornegi': {
+    heading: 'Deneyim envanteri çıkararak başlayın',
+    paragraphs: [
+      'Boş bir CV şablonuna bakmak yeni mezunlarda “yazacak deneyimim yok” düşüncesini güçlendirebilir. Önce ders projesi, bitirme çalışması, staj, gönüllülük, kulüp görevi, yarışma, açık kaynak katkısı ve kişisel proje gibi deneyimleri ayrı bir listede toplayın. Her çalışma için problem, sizin katkınız, kullanılan yöntem ve ortaya çıkan sonucu not edin.',
+      'Sonra hedef ilandaki beklentilerle en güçlü bağlantıyı kuran üç veya dört çalışmayı seçin. İlgisiz etkinlikleri sırf sayfayı doldurmak için eklemeyin. Küçük bir projede aldığınız net sorumluluk, adı bilinen fakat katkınızın açıklanmadığı büyük bir etkinlikten daha ikna edici olabilir.',
+    ],
+    bullets: [
+      'Ekip projesinde kişisel katkınızı ayırın.',
+      'Ders adından çok üretilen çıktıyı anlatın.',
+      'Not ortalamasını yalnızca avantaj sağlıyorsa ekleyin.',
+      'Çalışan proje bağlantılarını göndermeden önce test edin.',
+    ],
+  },
+  'yazilim-muhendisi-cv-ornegi': {
+    heading: 'Kıdem seviyesine göre teknik odağı değiştirin',
+    paragraphs: [
+      'Erken kariyer CV’sinde uygulanan teknolojiler, tamamlanan özellikler, test yaklaşımı ve öğrenme hızı daha görünür olabilir. Orta ve ileri seviyede ise mimari kararlar, performans, güvenilirlik, güvenlik, teknik borç yönetimi ve ekip üzerindeki etki önem kazanır. Aynı proje, kıdem seviyesine göre farklı kanıtlarla anlatılmalıdır.',
+      '“Mikroservis geliştirdim” ifadesi tek başına yeterli değildir. Servisin sorumluluğunu, veri ve hata sınırlarını, gözlemlenebilirliği ve kararın nedenini açıklayın. Ancak şirketin gizli mimarisini veya müşteri verisini paylaşmayın. Teknik derinliği gösterirken güvenlik ve gizlilik sorumluluğunu korumak profesyonel değerlendirmenin bir parçasıdır.',
+    ],
+    bullets: [
+      'Junior: katkı, kullanılan araç ve öğrenilen yaklaşım.',
+      'Mid-level: sahiplik, kalite, performans ve teslim etkisi.',
+      'Senior: teknik karar, risk, ölçek ve ekip etkisi.',
+      'Her seviyede sonucu doğrulanabilir bağlamla destekleyin.',
+    ],
+  },
+}
+
+SEO_PAGES.forEach((page) => {
+  const enrichment = SEO_PAGE_ENRICHMENTS[page.slug]
+  if (enrichment) page.sections.push(enrichment)
+})
 
 export const SEO_PAGE_BY_PATH = Object.fromEntries(SEO_PAGES.map((page) => [page.path, page]))
 

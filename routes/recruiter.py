@@ -3,7 +3,7 @@ import json
 import logging
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
@@ -15,6 +15,7 @@ from config.aws import MAX_UPLOAD_BYTES
 import time
 from typing import Any
 from core.runtime_bridge import main_module, redis_rate_client
+from core.quota import _reset_organization_usage_if_needed
 from database import get_db
 from models import (
     Analysis,
@@ -52,14 +53,13 @@ from services.owner_workflow_service import (
 )
 from services.recruiter_helpers import (
     _MAX_SEARCH_QUERY_LEN,
-    _do_send_email,
     _extract_pdf_text,
-    _process_due_reminders,
     _resolve_job_description_text,
     _validate_pdf_upload,
     _validate_reminder_email,
     _ensure_not_expired,
 )
+from services.email_service import _do_send_email, _process_due_reminders
 from security.file_guard import read_upload_limited
 from services.tasks import batch_recruiter_task
 from utils.sql import LIKE_ESCAPE_CHAR, contains_like_pattern
@@ -75,6 +75,20 @@ def _format_bytes(value: int) -> str:
     if value >= 1024:
         return f"{value / 1024:.0f} KB"
     return f"{value} bytes"
+
+
+def _normalize_recruiter_event_date(value) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00")) if isinstance(value, str) else value
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid event_date format; use ISO 8601") from exc
+    if not isinstance(parsed, datetime):
+        raise HTTPException(status_code=400, detail="Invalid event_date format; use ISO 8601")
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    if parsed <= utcnow():
+        raise HTTPException(status_code=400, detail="Event date must be in the future")
+    return parsed
 
 
 def _main():
@@ -1085,6 +1099,7 @@ async def recruiter_batch_upload(
     org = db.query(Organization).filter(Organization.id == org_id).with_for_update().first()
     if not org:
         raise HTTPException(status_code=500, detail="Organization not found (internal error)")
+    _reset_organization_usage_if_needed(org)
 
     requested_cv_count = len(cv_list)
     available_credits = org.cv_credit_limit - org.monthly_usage
@@ -1935,19 +1950,7 @@ def recruiter_create_reminder(
         raise HTTPException(status_code=400, detail="Title too long (max 500 characters)")
 
     # Validate event date
-    try:
-        if isinstance(body.event_date, str):
-            event_date = datetime.fromisoformat(body.event_date.replace("Z", "+00:00"))
-        else:
-            event_date = body.event_date
-    except Exception as e:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid event_date format: {e}. Use ISO format (e.g., 2026-05-15T10:00:00)"
-        )
-
-    now = utcnow()
-    if event_date <= now:
-        raise HTTPException(status_code=400, detail="Event date must be in the future")
+    event_date = _normalize_recruiter_event_date(body.event_date)
 
     # Validate target email
     target_email = body.target_email or recruiter.email or ""
@@ -2000,17 +2003,25 @@ def recruiter_update_reminder(
         raise HTTPException(status_code=404, detail="Reminder not found")
 
     if body.title is not None:
-        reminder.title = body.title.strip()
+        title = body.title.strip()
+        if not title:
+            raise HTTPException(status_code=400, detail="Title is required")
+        reminder.title = title[:500]
     if body.description is not None:
         reminder.description = body.description.strip()
     if body.reminder_type is not None:
         reminder.reminder_type = body.reminder_type.strip()
     if body.event_date is not None:
-        reminder.event_date = body.event_date
+        reminder.event_date = _normalize_recruiter_event_date(body.event_date)
+        reminder.notified_3d_at = None
+        reminder.notified_1d_at = None
     if body.target_email is not None:
         reminder.target_email = _validate_reminder_email(body.target_email)
     if body.is_active is not None:
         reminder.is_active = body.is_active
+        if body.is_active:
+            reminder.notified_3d_at = None
+            reminder.notified_1d_at = None
 
     db.add(reminder)
     db.commit()

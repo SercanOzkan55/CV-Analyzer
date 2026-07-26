@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { findSeoPage } from '../content/seoPages'
+import { getGuideUi, getLocalizedSeoPage } from '../content/guideI18n'
+import { useLanguage } from '../i18n/LanguageContext'
 
 const SITE_URL = 'https://cvanalyzer.dev'
 
@@ -16,6 +18,10 @@ const PUBLIC_META = {
   '/about': {
     title: 'CV Analyzer Hakkında',
     description: 'CV Analyzer’ın özgeçmiş değerlendirmesini daha açık, erişilebilir ve uygulanabilir hale getirme yaklaşımını öğrenin.',
+  },
+  '/rehber': {
+    title: 'CV Hazırlama ve ATS Rehberleri | CV Analyzer',
+    description: 'CV hazırlama, ATS okunabilirliği, mülakat, ön yazı ve role özel CV örnekleri için özgün ve uygulanabilir rehberleri inceleyin.',
   },
   '/privacy': {
     title: 'Gizlilik Politikası | CV Analyzer',
@@ -70,7 +76,7 @@ function buildPageSchema(page) {
         description: page.description,
         dateModified: page.updatedAt,
         datePublished: page.updatedAt,
-        inLanguage: 'tr-TR',
+        inLanguage: page.contentLanguage === 'tr' ? 'tr-TR' : 'en-US',
         mainEntityOfPage: canonical,
         author: { '@type': 'Organization', name: 'CV Analyzer', url: SITE_URL },
         publisher: { '@type': 'Organization', name: 'CV Analyzer', url: SITE_URL },
@@ -96,11 +102,19 @@ function buildPageSchema(page) {
 
 export default function SEOManager() {
   const { pathname } = useLocation()
+  const { lang } = useLanguage()
 
   useEffect(() => {
-    const page = findSeoPage(pathname)
+    const sourcePage = findSeoPage(pathname)
+    const page = sourcePage ? getLocalizedSeoPage(sourcePage, lang) : null
+    const guideUi = getGuideUi(lang)
     const normalizedPath = pathname !== '/' ? pathname.replace(/\/$/, '') : '/'
-    const publicMeta = PUBLIC_META[normalizedPath]
+    const publicMeta = normalizedPath === '/rehber'
+      ? {
+          title: `${guideUi.hubTitle} | CV Analyzer`,
+          description: guideUi.hubDescription,
+        }
+      : PUBLIC_META[normalizedPath]
     const indexable = Boolean(page || publicMeta)
     const title = page?.seoTitle || publicMeta?.title || 'CV Analyzer'
     const description = page?.description || publicMeta?.description || 'CV Analyzer kullanıcı alanı.'
@@ -108,7 +122,6 @@ export default function SEOManager() {
     const canonical = `${SITE_URL}${canonicalPath === '/' ? '/' : canonicalPath}`
 
     document.title = title
-    document.documentElement.lang = 'tr'
     upsertMeta('meta[name="description"]', { name: 'description', content: description })
     upsertMeta('meta[name="robots"]', {
       name: 'robots',
@@ -117,12 +130,15 @@ export default function SEOManager() {
     upsertMeta('meta[property="og:title"]', { property: 'og:title', content: title })
     upsertMeta('meta[property="og:description"]', { property: 'og:description', content: description })
     upsertMeta('meta[property="og:url"]', { property: 'og:url', content: canonical })
-    upsertMeta('meta[property="og:locale"]', { property: 'og:locale', content: 'tr_TR' })
+    upsertMeta('meta[property="og:locale"]', {
+      property: 'og:locale',
+      content: guideUi.locale.replace('-', '_'),
+    })
     upsertMeta('meta[name="twitter:title"]', { name: 'twitter:title', content: title })
     upsertMeta('meta[name="twitter:description"]', { name: 'twitter:description', content: description })
     upsertCanonical(canonical)
     setStructuredData(page ? buildPageSchema(page) : null)
-  }, [pathname])
+  }, [lang, pathname])
 
   return null
 }

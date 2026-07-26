@@ -1642,12 +1642,17 @@ def _find_section_position(canonical_sec: str, clean_cv_text: str) -> int:
                     best_pos = m.start()
         if best_pos != -1:
             return best_pos
-        # Fallback: email/phone presence
-        if re.search(r"[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,}", clean_cv_text) or re.search(
-            r"(\+?\d[\d\s\-()]{6,}\d)", clean_cv_text
-        ):
-            return 0
-        return -1
+        # Fallback: use the actual email/phone position. Treating any contact
+        # detail as position zero can hide a genuinely misplaced contact block.
+        contact_matches = [
+            match
+            for match in (
+                re.search(r"[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,}", clean_cv_text),
+                re.search(r"(\+?\d[\d\s\-()]{6,}\d)", clean_cv_text),
+            )
+            if match is not None
+        ]
+        return min((match.start() for match in contact_matches), default=-1)
 
     aliases = SECTION_ALIASES.get(canonical_sec, set())
     best_pos = -1

@@ -2,7 +2,9 @@ import React from 'react'
 import { motion } from 'framer-motion'
 import { useLanguage } from '../i18n/LanguageContext'
 import PageTransition from '../components/PageTransition'
-import { Target, Eye, History, Award, Shield, Zap, Mail, Github, Linkedin } from 'lucide-react'
+import { Target, Eye, Shield, Zap, Mail, Github, Linkedin } from 'lucide-react'
+import Navbar from '../components/Navbar'
+import Footer from '../components/Footer'
 
 export default function AboutPage() {
   const { t } = useLanguage()
@@ -15,7 +17,9 @@ export default function AboutPage() {
 
   return (
     <PageTransition>
-      <div className="main-content about-page">
+      <div className="about-public-page">
+        <Navbar />
+        <main id="main-content" className="main-content about-page">
         {/* Hero Section */}
         <motion.div 
           className="about-hero"
@@ -144,6 +148,8 @@ export default function AboutPage() {
             ))}
           </div>
         </section>
+        </main>
+        <Footer />
       </div>
 
       <style jsx>{`

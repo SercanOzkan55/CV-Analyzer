@@ -893,8 +893,9 @@ def keyword_match_score(cv_text: str, job_description: str) -> float:
     # Cap JD phrases to prevent denominator inflation on long JDs
     max_phrases = int(os.getenv("MAX_JD_PHRASES", 30))
     if len(job_phrases) > max_phrases:
-        # Keep the most distinctive phrases (shortest = most specific)
-        job_phrases = set(sorted(job_phrases, key=len)[:max_phrases])
+        # Longer multi-word phrases generally carry more context than short,
+        # generic phrases. Use lexical order as a deterministic tie-breaker.
+        job_phrases = set(sorted(job_phrases, key=lambda phrase: (-len(phrase), phrase))[:max_phrases])
 
     phrase_matches = set()
     phrase_cutoff = float(os.getenv("PHRASE_FUZZY_THRESHOLD", 0.75))

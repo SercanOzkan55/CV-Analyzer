@@ -75,9 +75,6 @@ def _load_weights() -> dict[str, float]:
     return {k: v / total for k, v in weights.items()}
 
 
-_WEIGHTS: dict[str, float] = _load_weights()
-
-
 # ── Helpers ───────────────────────────────────────────────────────────────
 
 
@@ -378,8 +375,10 @@ def score_cv(model: CVModel) -> ScoreResult:
         "soft_skills": _score_soft_skills(model),
     }
 
-    # Weighted average
-    weighted = sum(scores[k] * _WEIGHTS.get(k, 0) for k in scores)
+    # Resolve on each scoring request so runtime configuration changes are
+    # reflected without requiring a process restart.
+    weights = _load_weights()
+    weighted = sum(scores[k] * weights.get(k, 0) for k in scores)
     overall = _clamp(round(weighted))
 
     return ScoreResult(overall=overall, **scores)

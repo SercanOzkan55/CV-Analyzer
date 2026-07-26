@@ -1073,7 +1073,6 @@ def interview_questions_endpoint(
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
     plan = ensure_ai_rewrite_allowed(db, db_user)
-    _consume_billable_usage(db, db_user, "interview-questions", response=response)
 
     try:
         questions = rewrite_service.generate_interview_questions(
@@ -1087,6 +1086,8 @@ def interview_questions_endpoint(
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
+
+    _consume_billable_usage(db, db_user, "interview-questions", response=response)
 
     try:
         audit_log(
@@ -1116,7 +1117,6 @@ def interview_evaluate_endpoint(
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
     plan = ensure_ai_rewrite_allowed(db, db_user)
-    _consume_billable_usage(db, db_user, "interview-evaluate", response=response)
 
     try:
         evaluation = rewrite_service.evaluate_interview_answer(
@@ -1130,6 +1130,8 @@ def interview_evaluate_endpoint(
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
+
+    _consume_billable_usage(db, db_user, "interview-evaluate", response=response)
 
     try:
         audit_log(
