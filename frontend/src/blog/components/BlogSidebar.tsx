@@ -1,128 +1,116 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Hash, Search, Tag, TrendingUp } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useLanguage } from "../../i18n/LanguageContext";
+import type { BlogPost } from "../blogStore";
 
-export default function BlogSidebar({ onSearch }: { onSearch?: (q: string) => void }) {
+const CATEGORY_KEYS: Record<string, string> = {
+  Technology: "technology",
+  "Artificial Intelligence": "ai",
+  Design: "design",
+  "Data Science": "data_science",
+  Security: "security",
+  Cloud: "cloud",
+  Career: "career",
+};
+
+export default function BlogSidebar({
+  onSearch,
+  posts = [],
+}: {
+  onSearch?: (q: string) => void;
+  posts?: BlogPost[];
+}) {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
-  const [email, setEmail] = useState("");
-  const [subscribed, setSubscribed] = useState(false);
 
-  const POPULAR_POSTS = [
-    { title: t("blog.sidebar_popular_1"), views: `12.5K ${t("blog.views_suffix")}` },
-    { title: t("blog.sidebar_popular_2"), views: `10.2K ${t("blog.views_suffix")}` },
-    { title: t("blog.sidebar_popular_3"), views: `8.7K ${t("blog.views_suffix")}` },
-    { title: t("blog.sidebar_popular_4"), views: `7.3K ${t("blog.views_suffix")}` },
-  ];
-
-  const CATEGORIES_SIDEBAR = [
-    { name: t("blog.sidebar_cat_career"), count: 24 },
-    { name: t("blog.sidebar_cat_technology"), count: 18 },
-    { name: t("blog.sidebar_cat_hr"), count: 15 },
-    { name: t("blog.sidebar_cat_education"), count: 12 },
-    { name: t("blog.sidebar_cat_entrepreneurship"), count: 9 },
-  ];
-
-  const tags: string[] = t("blog.sidebar_tags") || [];
+  const popularPosts = useMemo(
+    () => [...posts].sort((a, b) => b.views - a.views).slice(0, 4),
+    [posts],
+  );
+  const categories = useMemo(() => {
+    const counts = new Map<string, number>();
+    posts.forEach(post => counts.set(post.category, (counts.get(post.category) || 0) + 1));
+    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  }, [posts]);
+  const tags = useMemo(
+    () => Array.from(new Set(posts.flatMap(post => post.tags))).slice(0, 12),
+    [posts],
+  );
 
   return (
     <aside className="blog-sidebar">
-      {/* Search */}
-      <div className="blog-sidebar-card">
-        <div className="blog-search-wrap">
-          <input
-            value={search}
-            onChange={e => { setSearch(e.target.value); onSearch?.(e.target.value); }}
-            placeholder={t("blog.search_placeholder")}
-            className="blog-search-input"
-          />
-          <Search size={16} className="blog-search-icon" />
-        </div>
-      </div>
-
-      {/* Popular Posts */}
-      <div className="blog-sidebar-card">
-        <div className="blog-sidebar-heading">
-          <TrendingUp size={17} style={{ color: "var(--color-accent)" }} />
-          {t("blog.popular_posts")}
-        </div>
-        <div>
-          {POPULAR_POSTS.map((p, i) => (
-            <div key={i} className="blog-popular-item">
-              <div className="blog-popular-title">{p.title}</div>
-              <div className="blog-popular-views">{p.views}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Categories */}
-      <div className="blog-sidebar-card">
-        <div className="blog-sidebar-heading">
-          <Hash size={17} style={{ color: "var(--color-accent)" }} />
-          {t("blog.categories")}
-        </div>
-        <div>
-          {CATEGORIES_SIDEBAR.map((c, i) => (
-            <div key={i} className="blog-cat-item">
-              <span className="blog-cat-name">{c.name}</span>
-              <span className="blog-cat-count">{c.count}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Tags */}
-      <div className="blog-sidebar-card">
-        <div className="blog-sidebar-heading">
-          <Tag size={17} style={{ color: "var(--color-accent)" }} />
-          {t("blog.tags")}
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-          {tags.map((tag, i) => (
-            <span
-              key={i}
-              className="blog-tag-chip"
-              style={{ cursor: "pointer", transition: "all 0.2s" }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLElement).style.background = "var(--color-accent)";
-                (e.currentTarget as HTMLElement).style.color = "#fff";
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLElement).style.background = "var(--color-accent-glow)";
-                (e.currentTarget as HTMLElement).style.color = "var(--color-accent)";
-              }}
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Newsletter */}
-      <div className="blog-sidebar-card blog-newsletter">
-        <div className="blog-newsletter-title">{t("blog.newsletter")}</div>
-        <p className="blog-newsletter-desc">{t("blog.newsletter_desc")}</p>
-        {subscribed ? (
-          <div className="blog-subscribed-msg">✓ {t("blog.subscribed")}</div>
-        ) : (
-          <>
+      {onSearch && (
+        <div className="blog-sidebar-card">
+          <div className="blog-search-wrap">
             <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder={t("blog.email_placeholder")}
-              className="blog-newsletter-input"
+              value={search}
+              onChange={event => {
+                setSearch(event.target.value);
+                onSearch(event.target.value);
+              }}
+              placeholder={t("blog.search_placeholder")}
+              className="blog-search-input"
             />
-            <button
-              onClick={() => { if (email.includes("@")) setSubscribed(true); }}
-              className="blog-newsletter-btn"
-            >
-              {t("blog.subscribe")}
-            </button>
-          </>
-        )}
-      </div>
+            <Search size={16} className="blog-search-icon" />
+          </div>
+        </div>
+      )}
+
+      {popularPosts.length > 0 && (
+        <div className="blog-sidebar-card">
+          <div className="blog-sidebar-heading">
+            <TrendingUp size={17} style={{ color: "var(--color-accent)" }} />
+            {t("blog.popular_posts")}
+          </div>
+          <div>
+            {popularPosts.map(post => (
+              <button
+                key={post.id}
+                type="button"
+                className="blog-popular-item"
+                onClick={() => navigate(`/blog/${post.slug}`)}
+                style={{ width: "100%", textAlign: "left" }}
+              >
+                <div className="blog-popular-title">{post.title}</div>
+                <div className="blog-popular-views">{post.views} {t("blog.views_suffix")}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {categories.length > 0 && (
+        <div className="blog-sidebar-card">
+          <div className="blog-sidebar-heading">
+            <Hash size={17} style={{ color: "var(--color-accent)" }} />
+            {t("blog.categories")}
+          </div>
+          <div>
+            {categories.map(([category, count]) => (
+              <div key={category} className="blog-cat-item">
+                <span className="blog-cat-name">
+                  {t(`blog.category_${CATEGORY_KEYS[category] || "technology"}`)}
+                </span>
+                <span className="blog-cat-count">{count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tags.length > 0 && (
+        <div className="blog-sidebar-card">
+          <div className="blog-sidebar-heading">
+            <Tag size={17} style={{ color: "var(--color-accent)" }} />
+            {t("blog.tags")}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+            {tags.map(tag => <span key={tag} className="blog-tag-chip">#{tag}</span>)}
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

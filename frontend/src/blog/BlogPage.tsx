@@ -1,22 +1,24 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Filter, PenLine, Sparkles, FileText } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
 import BlogCard from "./components/BlogCard";
 import BlogSidebar from "./components/BlogSidebar";
 import TrendingArticles from "./components/TrendingArticles";
 import CreatePostModal from "./components/CreatePostModal";
-import { loadPosts, getUserPostCountToday, getDailyLimit, canUserPost, type BlogPost } from "./blogStore";
+import { fetchBlogPosts } from "../api";
+import { getDailyLimit, type BlogPost } from "./blogStore";
 import "../pages/BlogPage.css";
 
 const CATEGORY_KEYS = [
-  { key: "all", value: "Tümü" },
-  { key: "technology", value: "Teknoloji" },
-  { key: "ai", value: "Yapay Zeka" },
-  { key: "design", value: "Tasarım" },
-  { key: "data_science", value: "Veri Bilimi" },
-  { key: "security", value: "Güvenlik" },
+  { key: "all", value: "All" },
+  { key: "technology", value: "Technology" },
+  { key: "ai", value: "Artificial Intelligence" },
+  { key: "design", value: "Design" },
+  { key: "data_science", value: "Data Science" },
+  { key: "security", value: "Security" },
   { key: "cloud", value: "Cloud" },
 ];
 
@@ -31,25 +33,39 @@ const cardVariants = {
 };
 
 export default function BlogPage() {
-  const { user, plan, role } = useAuth();
-  const { t } = useLanguage();
+  const { user, token, plan, role } = useAuth();
+  const { t, lang } = useLanguage();
+  const navigate = useNavigate();
   const [posts, setPosts] = useState<BlogPost[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState("Tümü");
+  const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [loadingPosts, setLoadingPosts] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [todayCount, setTodayCount] = useState(0);
   const pageSize = 4;
 
-  useEffect(() => { setPosts(loadPosts()); }, []);
+  useEffect(() => {
+    let active = true;
+    setLoadingPosts(true);
+    fetchBlogPosts()
+      .then(data => {
+        if (!active) return;
+        setPosts(data?.posts || []);
+        setLoadError("");
+      })
+      .catch(() => active && setLoadError(t("blog.load_failed")))
+      .finally(() => active && setLoadingPosts(false));
+    return () => { active = false; };
+  }, [lang]);
 
-  const email = (user as any)?.email || "";
-  const todayCount = getUserPostCountToday(email);
   const limit = getDailyLimit(plan, role);
-  const canPost = canUserPost(email, plan, role);
+  const canPost = Boolean(user && token) && todayCount < limit;
 
   const filteredPosts = useMemo(() => {
     let result = posts;
-    if (selectedCategory !== "Tümü") result = result.filter(p => p.category === selectedCategory);
+    if (selectedCategory !== "All") result = result.filter(p => p.category === selectedCategory);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(p =>
@@ -66,8 +82,9 @@ export default function BlogPage() {
 
   useEffect(() => { setCurrentPage(1); }, [selectedCategory, searchQuery]);
 
-  function handlePostCreated(newPost: BlogPost) {
+  function handlePostCreated(newPost: BlogPost, used: number) {
     setPosts(prev => [newPost, ...prev]);
+    setTodayCount(used);
   }
 
   return (
@@ -120,8 +137,8 @@ export default function BlogPage() {
                 </button>
               ))}
               <button
-                onClick={() => setShowCreateModal(true)}
-                disabled={!canPost}
+                onClick={() => user ? setShowCreateModal(true) : navigate("/login")}
+                disabled={Boolean(user) && !canPost}
                 className="blog-create-btn"
                 title={t("blog.post_quota")
                   .replace("{count}", String(todayCount))
@@ -134,7 +151,15 @@ export default function BlogPage() {
 
             {/* Blog Cards */}
             <AnimatePresence mode="wait">
-              {pagedPosts.length === 0 ? (
+              {loadingPosts ? (
+                <motion.div key="loading" className="blog-empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                  <p style={{ color: "var(--color-text-muted)" }}>{t("common.loading")}</p>
+                </motion.div>
+              ) : loadError ? (
+                <motion.div key="error" className="blog-empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                  <p style={{ color: "var(--color-danger)" }}>{loadError}</p>
+                </motion.div>
+              ) : pagedPosts.length === 0 ? (
                 <motion.div
                   key="empty"
                   className="blog-empty"
@@ -201,7 +226,7 @@ export default function BlogPage() {
           {/* Sidebar */}
           <div className="lg:col-span-1">
             <div className="sticky top-24">
-              <BlogSidebar onSearch={setSearchQuery} />
+              <BlogSidebar onSearch={setSearchQuery} posts={posts} />
             </div>
           </div>
         </div>
@@ -211,6 +236,8 @@ export default function BlogPage() {
         open={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onCreated={handlePostCreated}
+        token={token}
+        todayCount={todayCount}
       />
     </div>
   );

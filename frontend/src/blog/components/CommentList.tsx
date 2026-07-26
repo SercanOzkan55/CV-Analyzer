@@ -7,20 +7,24 @@ function CommentItem({
   comment,
   onReply,
   onLike,
+  disabled,
 }: {
   comment: Comment;
-  onReply: (commentId: string, text: string) => void;
+  onReply: (commentId: string, text: string) => boolean | void | Promise<boolean | void>;
   onLike: (commentId: string) => void;
+  disabled: boolean;
 }) {
   const [showReply, setShowReply] = useState(false);
   const [replyText, setReplyText] = useState("");
   const { t } = useLanguage();
 
-  function handleReply() {
+  async function handleReply() {
     if (!replyText.trim()) return;
-    onReply(comment.id, replyText.trim());
-    setReplyText("");
-    setShowReply(false);
+    const accepted = await onReply(comment.id, replyText.trim());
+    if (accepted !== false) {
+      setReplyText("");
+      setShowReply(false);
+    }
   }
 
   return (
@@ -65,11 +69,11 @@ function CommentItem({
 
         {/* Actions */}
         <div className="blog-comment-actions">
-          <button onClick={() => onLike(comment.id)} className="blog-comment-action-btn">
+          <button disabled={disabled} onClick={() => onLike(comment.id)} className="blog-comment-action-btn">
             <ThumbsUp size={13} />
             <span>{comment.likes.length}</span>
           </button>
-          <button onClick={() => setShowReply(!showReply)} className="blog-comment-action-btn">
+          <button disabled={disabled} onClick={() => setShowReply(!showReply)} className="blog-comment-action-btn">
             <Reply size={13} />
             <span>{t("blog.reply")}</span>
           </button>
@@ -175,10 +179,12 @@ export default function CommentList({
   comments,
   onReply,
   onLike,
+  disabled = false,
 }: {
   comments: Comment[];
-  onReply: (commentId: string, text: string) => void;
+  onReply: (commentId: string, text: string) => boolean | void | Promise<boolean | void>;
   onLike: (commentId: string) => void;
+  disabled?: boolean;
 }) {
   const { t } = useLanguage();
   const [visibleCount, setVisibleCount] = useState(5);
@@ -196,7 +202,7 @@ export default function CommentList({
   return (
     <div className="blog-comments-section">
       {visible.map(comment => (
-        <CommentItem key={comment.id} comment={comment} onReply={onReply} onLike={onLike} />
+        <CommentItem key={comment.id} comment={comment} onReply={onReply} onLike={onLike} disabled={disabled} />
       ))}
       {hasMore && (
         <button

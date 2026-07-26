@@ -1,92 +1,70 @@
-import React, { useState, useRef } from "react";
-import { Image, PenLine, X } from "lucide-react";
+import React, { useState } from "react";
+import { Loader2, PenLine, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../i18n/LanguageContext";
-import {
-  canUserPost, getUserPostCountToday, getDailyLimit,
-  incrementPostCount, loadPosts, savePosts, toSlug, type BlogPost,
-} from "../blogStore";
+import { createBlogPost } from "../../api";
+import { getDailyLimit, type BlogPost } from "../blogStore";
 
 const CATEGORY_KEYS = [
-  { key: "technology", value: "Teknoloji" },
-  { key: "ai", value: "Yapay Zeka" },
-  { key: "design", value: "Tasarım" },
-  { key: "data_science", value: "Veri Bilimi" },
-  { key: "security", value: "Güvenlik" },
+  { key: "technology", value: "Technology" },
+  { key: "ai", value: "Artificial Intelligence" },
+  { key: "design", value: "Design" },
+  { key: "data_science", value: "Data Science" },
+  { key: "security", value: "Security" },
   { key: "cloud", value: "Cloud" },
-  { key: "career", value: "Kariyer" },
+  { key: "career", value: "Career" },
 ];
 
 export default function CreatePostModal({
   open,
   onClose,
   onCreated,
+  token,
+  todayCount,
 }: {
   open: boolean;
   onClose: () => void;
-  onCreated: (post: BlogPost) => void;
+  onCreated: (post: BlogPost, used: number) => void;
+  token: string | null;
+  todayCount: number;
 }) {
-  const { user, plan, role } = useAuth();
+  const { plan, role } = useAuth();
   const { t } = useLanguage();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [category, setCategory] = useState("Teknoloji");
+  const [category, setCategory] = useState("Technology");
   const [tags, setTags] = useState("");
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   if (!open) return null;
 
-  const email = (user as any)?.email || "";
-  const userName =
-    (user as any)?.user_metadata?.full_name ||
-    email.split("@")[0] ||
-    t("blog.anonymous");
-  const todayCount = getUserPostCountToday(email);
   const limit = getDailyLimit(plan, role);
-  const canPost = canUserPost(email, plan, role);
+  const canPost = Boolean(token) && todayCount < limit;
 
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => setImagePreview(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  }
-
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim() || !content.trim() || !canPost) return;
-
-    const newPost: BlogPost = {
-      id: `post-${Date.now()}`,
-      title: title.trim(),
-      content: content.trim(),
-      summary: content.trim().slice(0, 200) + (content.length > 200 ? "..." : ""),
-      category,
-      slug: toSlug(title) + "-" + Date.now(),
-      image: imagePreview || `https://picsum.photos/id/${Math.floor(Math.random() * 200)}/900/400`,
-      author: { name: userName, email, role: role || "user", plan: plan || "free" },
-      tags: tags.split(",").map(tag => tag.trim()).filter(Boolean),
-      createdAt: new Date().toISOString(),
-      views: 0,
-      likes: [],
-      comments: [],
-    };
-
-    const posts = loadPosts();
-    posts.unshift(newPost);
-    savePosts(posts);
-    incrementPostCount(email);
-    onCreated(newPost);
-
-    setTitle("");
-    setContent("");
-    setCategory("Teknoloji");
-    setTags("");
-    setImagePreview(null);
-    onClose();
+    if (!title.trim() || !content.trim() || !canPost || submitting) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      const result = await createBlogPost(token, {
+        title: title.trim(),
+        content: content.trim(),
+        category,
+        tags: tags.split(",").map(tag => tag.trim()).filter(Boolean).slice(0, 5),
+      });
+      onCreated(result.post as BlogPost, Number(result?.quota?.used || todayCount + 1));
+      setTitle("");
+      setContent("");
+      setCategory("Technology");
+      setTags("");
+      onClose();
+    } catch (err: any) {
+      setError(err?.status === 422 ? t("blog.moderation_rejected") : (err?.message || t("blog.publish_failed")));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -205,33 +183,8 @@ export default function CreatePostModal({
               />
             </div>
 
-            <div className="blog-modal-form-field">
-              <label>{t("blog.label_image")}</label>
-              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  className="blog-img-upload-btn"
-                >
-                  <Image size={15} />
-                  {t("blog.select_image")}
-                </button>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  style={{ display: "none" }}
-                />
-                {imagePreview && (
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    style={{ height: 56, width: 84, objectFit: "cover", borderRadius: "8px", border: "1px solid var(--color-border)" }}
-                  />
-                )}
-              </div>
-            </div>
+            <p className="blog-comment-hint">{t("blog.moderation_notice")}</p>
+            {error && <p role="alert" style={{ color: "var(--color-danger)", fontSize: "0.85rem" }}>{error}</p>}
 
             <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
               <button
@@ -244,11 +197,12 @@ export default function CreatePostModal({
               </button>
               <button
                 type="submit"
-                disabled={!canPost || !title.trim() || !content.trim()}
+                disabled={!canPost || !title.trim() || content.trim().length < 40 || submitting}
                 className="btn-primary"
                 style={{ flex: 1 }}
               >
-                {t("blog.publish")}
+                {submitting && <Loader2 size={14} className="animate-spin" />}
+                {submitting ? t("blog.publishing") : t("blog.publish")}
               </button>
             </div>
           </form>

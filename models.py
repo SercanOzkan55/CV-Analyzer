@@ -52,6 +52,61 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class BlogPost(Base):
+    """A community-authored blog post that passed server-side moderation."""
+
+    __tablename__ = "blog_posts"
+    __table_args__ = (
+        CheckConstraint("status IN ('published', 'hidden')", name="check_blog_post_status"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    author_user_id = Column(Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = Column(String(160), nullable=False)
+    content = Column(Text, nullable=False)
+    summary = Column(String(320), nullable=False)
+    category = Column(String(32), nullable=False, index=True)
+    slug = Column(String(220), nullable=False, unique=True, index=True)
+    tags = Column(JSON, nullable=False, default=list)
+    status = Column(String(16), nullable=False, default="published", index=True)
+    view_count = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class BlogComment(Base):
+    """A moderated comment or one-level reply on a community blog post."""
+
+    __tablename__ = "blog_comments"
+    __table_args__ = (
+        CheckConstraint("status IN ('published', 'hidden')", name="check_blog_comment_status"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    post_id = Column(Integer, ForeignKey("blog_posts.id", ondelete="CASCADE"), nullable=False, index=True)
+    parent_id = Column(Integer, ForeignKey("blog_comments.id", ondelete="CASCADE"), nullable=True, index=True)
+    author_user_id = Column(Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    text = Column(Text, nullable=False)
+    status = Column(String(16), nullable=False, default="published", index=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+
+class BlogReaction(Base):
+    """A unique like by a user on either a post or comment."""
+
+    __tablename__ = "blog_reactions"
+    __table_args__ = (
+        CheckConstraint("target_type IN ('post', 'comment')", name="check_blog_reaction_target_type"),
+        UniqueConstraint("user_id", "target_type", "target_id", name="uq_blog_reaction_user_target"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    target_type = Column(String(16), nullable=False, index=True)
+    target_id = Column(Integer, nullable=False, index=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
 class APISubscription(Base):
     """API subscription for local processing mode - zero data retention."""
 

@@ -629,6 +629,7 @@ from routes.billing import router as billing_router  # noqa: E402
 from routes.cv_storage import router as cv_storage_router  # noqa: E402
 from routes.worker import router as worker_router  # noqa: E402
 from routes.owner_workflow import router as owner_workflow_router  # noqa: E402
+from routes.blog import router as blog_router  # noqa: E402
 
 app.include_router(system_router)
 app.include_router(cv_builder_router)
@@ -640,3 +641,4 @@ app.include_router(billing_router)
 app.include_router(cv_storage_router)
 app.include_router(worker_router, prefix="/api")
 app.include_router(owner_workflow_router)
+app.include_router(blog_router)

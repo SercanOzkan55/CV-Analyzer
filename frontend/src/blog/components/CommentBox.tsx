@@ -7,22 +7,27 @@ import { getAvatarColor, getInitials } from "../blogStore";
 export default function CommentBox({
   onSubmit,
   commentCount,
+  disabled = false,
 }: {
-  onSubmit: (text: string) => void;
+  onSubmit: (text: string) => boolean | void | Promise<boolean | void>;
   commentCount?: number;
+  disabled?: boolean;
 }) {
   const { user } = useAuth();
   const { t } = useLanguage();
   const [text, setText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const userName =
     (user as any)?.user_metadata?.full_name ||
     (user as any)?.email?.split("@")[0] ||
     "A";
 
-  function handleSubmit() {
-    if (!text.trim()) return;
-    onSubmit(text.trim());
-    setText("");
+  async function handleSubmit() {
+    if (!text.trim() || submitting) return;
+    setSubmitting(true);
+    const accepted = await onSubmit(text.trim());
+    if (accepted !== false) setText("");
+    setSubmitting(false);
   }
 
   return (
@@ -66,12 +71,13 @@ export default function CommentBox({
             placeholder={t("blog.comment_placeholder")}
             rows={3}
             className="blog-comment-textarea"
+            disabled={disabled}
           />
           <div className="blog-comment-footer">
-            <span className="blog-comment-hint">{t("blog.comment_hint")}</span>
+            <span className="blog-comment-hint">{disabled ? t("blog.sign_in_to_comment") : t("blog.comment_hint")}</span>
             <button
               onClick={handleSubmit}
-              disabled={!text.trim()}
+              disabled={disabled || submitting || !text.trim()}
               className="btn-primary btn-sm"
               style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
             >

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { ExternalLink, Clock, Heart, MessageCircle, TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
 import { fetchBlogFeed } from "../../api";
+import { useLanguage } from "../../i18n/LanguageContext";
 
 interface Article {
   id: number;
@@ -31,6 +32,7 @@ const TAG_COLORS: Record<string, string> = {
 };
 
 export default function TrendingArticles() {
+  const { t } = useLanguage();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -45,7 +47,7 @@ export default function TrendingArticles() {
       <div className="trending-section">
         <div className="trending-header">
           <TrendingUp size={18} />
-          <h2>Trending Articles</h2>
+          <h2>{t("blog.latest_news")}</h2>
           <span className="trending-badge">Dev.to</span>
         </div>
         <div className="trending-loading">
@@ -63,7 +65,7 @@ export default function TrendingArticles() {
     <div className="trending-section">
       <div className="trending-header">
         <TrendingUp size={18} style={{ color: "var(--color-accent)" }} />
-        <h2>Trending Articles</h2>
+        <h2>{t("blog.latest_news")}</h2>
         <span className="trending-badge">Dev.to</span>
       </div>
       <div className="trending-grid">
@@ -110,7 +112,7 @@ export default function TrendingArticles() {
                 <div className="trending-card-stats">
                   <span><Heart size={12} /> {article.reactions}</span>
                   <span><MessageCircle size={12} /> {article.comments}</span>
-                  <span><Clock size={12} /> {article.reading_time} dk</span>
+                  <span><Clock size={12} /> {t("blog.news_reading_time").replace("{min}", String(article.reading_time))}</span>
                 </div>
               </div>
             </div>

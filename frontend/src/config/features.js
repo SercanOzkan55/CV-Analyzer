@@ -2,8 +2,8 @@
 // environment via Vite env vars so unfinished features stay hidden in
 // production builds.
 
-// Blog currently runs on localStorage with seeded demo content — keep it
-// hidden until it is backed by a real backend.
+// The community blog is backed by authenticated, moderated API endpoints.
+// Enable it explicitly per environment after the database migration is applied.
 export const BLOG_ENABLED = import.meta.env.VITE_ENABLE_BLOG === 'true'
 
 // Checkout and billing portal stay unavailable until Stripe production

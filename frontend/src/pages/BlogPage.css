@@ -524,7 +524,10 @@
 
 .blog-popular-item {
   padding: 10px 0;
+  border: 0;
   border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  font-family: inherit;
   cursor: pointer;
   transition: all 0.2s;
 }

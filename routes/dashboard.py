@@ -678,47 +678,49 @@ _blog_feed_cache: dict = {"data": [], "ts": 0}
 @router.get("/api/v1/blog/feed")
 @rate_limit("10/minute")
 async def get_blog_feed(request: Request):
-    """Return trending tech/career articles from Dev.to (cached 4h)."""
+    """Return the latest 10 tech/career articles from Dev.to (cached 1h)."""
     import time as _time
     import httpx
 
     now = _time.time()
-    if _blog_feed_cache["data"] and (now - _blog_feed_cache["ts"]) < 14400:
+    if _blog_feed_cache["data"] and (now - _blog_feed_cache["ts"]) < 3600:
         return {"articles": _blog_feed_cache["data"]}
 
-    tags = ["career", "webdev", "programming", "ai", "python", "javascript"]
     articles = []
     try:
         async with httpx.AsyncClient(timeout=10) as client:
-            for tag in tags[:3]:
-                resp = await client.get(
-                    "https://dev.to/api/articles",
-                    params={"tag": tag, "top": 1, "per_page": 3},
-                    headers={"Accept": "application/json"},
-                )
-                if resp.status_code == 200:
-                    for item in resp.json():
-                        # Sanitize URLs - only allow https
-                        raw_url = str(item.get("url") or "")
-                        raw_image = str(item.get("cover_image") or item.get("social_image") or "")
-                        raw_avatar = str(item.get("user", {}).get("profile_image_90") or "")
-                        articles.append(
-                            {
-                                "id": item.get("id"),
-                                "title": str(item.get("title") or "")[:200],
-                                "summary": str(item.get("description") or "")[:500],
-                                "url": raw_url if raw_url.startswith("https://") else "",
-                                "image": raw_image if raw_image.startswith("https://") else "",
-                                "author": str(item.get("user", {}).get("name") or "")[:100],
-                                "author_avatar": raw_avatar if raw_avatar.startswith("https://") else "",
-                                "published_at": item.get("published_at", ""),
-                                "reading_time": item.get("reading_time_minutes", 3),
-                                "tags": item.get("tag_list", [])[:10],
-                                "reactions": item.get("positive_reactions_count", 0),
-                                "comments": item.get("comments_count", 0),
-                                "source": "dev.to",
-                            }
-                        )
+            resp = await client.get(
+                "https://dev.to/api/articles",
+                params={
+                    "tags": "career,webdev,programming,ai,python,javascript,cloud,security",
+                    "state": "fresh",
+                    "per_page": 10,
+                },
+                headers={"Accept": "application/vnd.forem.api-v1+json"},
+            )
+            if resp.status_code == 200:
+                for item in resp.json():
+                    # Sanitize URLs - only allow https
+                    raw_url = str(item.get("url") or "")
+                    raw_image = str(item.get("cover_image") or item.get("social_image") or "")
+                    raw_avatar = str(item.get("user", {}).get("profile_image_90") or "")
+                    articles.append(
+                        {
+                            "id": item.get("id"),
+                            "title": str(item.get("title") or "")[:200],
+                            "summary": str(item.get("description") or "")[:500],
+                            "url": raw_url if raw_url.startswith("https://") else "",
+                            "image": raw_image if raw_image.startswith("https://") else "",
+                            "author": str(item.get("user", {}).get("name") or "")[:100],
+                            "author_avatar": raw_avatar if raw_avatar.startswith("https://") else "",
+                            "published_at": item.get("published_at", ""),
+                            "reading_time": item.get("reading_time_minutes", 3),
+                            "tags": list(item.get("tag_list") or [])[:10],
+                            "reactions": item.get("positive_reactions_count", 0),
+                            "comments": item.get("comments_count", 0),
+                            "source": "dev.to",
+                        }
+                    )
     except Exception as exc:
         logger.warning("blog_feed: dev.to fetch failed: %s", exc)
         if _blog_feed_cache["data"]:
@@ -731,8 +733,8 @@ async def get_blog_feed(request: Request):
         if a["id"] not in seen_ids:
             seen_ids.add(a["id"])
             unique.append(a)
-    unique.sort(key=lambda x: x.get("reactions", 0), reverse=True)
-    unique = unique[:8]
+    unique.sort(key=lambda x: x.get("published_at", ""), reverse=True)
+    unique = unique[:10]
 
     _blog_feed_cache["data"] = unique
     _blog_feed_cache["ts"] = now

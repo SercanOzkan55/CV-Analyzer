@@ -10,24 +10,34 @@ import { useLanguage } from "../../i18n/LanguageContext";
 import { LANG_LABELS } from "../translateService";
 
 const CATEGORY_GRADIENTS: Record<string, string> = {
-  Teknoloji: "linear-gradient(135deg, #3b82f6, #6366f1)",
-  "Yapay Zeka": "linear-gradient(135deg, #10b981, #06b6d4)",
-  Tasarım: "linear-gradient(135deg, #a855f7, #c084fc)",
-  "Veri Bilimi": "linear-gradient(135deg, #f59e0b, #f97316)",
-  Güvenlik: "linear-gradient(135deg, #ef4444, #f43f5e)",
+  Technology: "linear-gradient(135deg, #3b82f6, #6366f1)",
+  "Artificial Intelligence": "linear-gradient(135deg, #10b981, #06b6d4)",
+  Design: "linear-gradient(135deg, #a855f7, #c084fc)",
+  "Data Science": "linear-gradient(135deg, #f59e0b, #f97316)",
+  Security: "linear-gradient(135deg, #ef4444, #f43f5e)",
   Cloud: "linear-gradient(135deg, #0ea5e9, #38bdf8)",
-  Kariyer: "linear-gradient(135deg, #c084fc, #f472b6)",
+  Career: "linear-gradient(135deg, #c084fc, #f472b6)",
 };
 
 // A category glyph replaces clichéd stock photos on the cover.
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
-  Teknoloji: Cpu,
-  "Yapay Zeka": Brain,
-  Tasarım: Palette,
-  "Veri Bilimi": BarChart3,
-  Güvenlik: ShieldCheck,
+  Technology: Cpu,
+  "Artificial Intelligence": Brain,
+  Design: Palette,
+  "Data Science": BarChart3,
+  Security: ShieldCheck,
   Cloud: Cloud,
-  Kariyer: Briefcase,
+  Career: Briefcase,
+};
+
+const CATEGORY_TRANSLATION_KEYS: Record<string, string> = {
+  Technology: "technology",
+  "Artificial Intelligence": "ai",
+  Design: "design",
+  "Data Science": "data_science",
+  Security: "security",
+  Cloud: "cloud",
+  Career: "career",
 };
 
 export default function BlogCard({ post }: { post: BlogPost }) {
@@ -67,7 +77,7 @@ export default function BlogCard({ post }: { post: BlogPost }) {
         {/* Badges overlay */}
         <div className="blog-card-badges">
           <span className="blog-cat-badge" style={{ background: catGradient }}>
-            {post.category}
+            {t(`blog.category_${CATEGORY_TRANSLATION_KEYS[post.category] || "technology"}`)}
           </span>
           <button
             className={`blog-translate-btn${isTranslated ? " active" : ""}`}

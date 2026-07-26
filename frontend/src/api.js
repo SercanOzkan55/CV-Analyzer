@@ -315,6 +315,55 @@ export async function fetchBlogFeed() {
   return res.json()
 }
 
+export async function fetchBlogPosts({ category = '', search = '' } = {}) {
+  const params = new URLSearchParams()
+  if (category) params.set('category', category)
+  if (search) params.set('search', search)
+  const suffix = params.toString() ? `?${params}` : ''
+  const res = await fetch(`${BASE}/api/v1/blog/posts${suffix}`)
+  if (!res.ok) throw new Error(`fetchBlogPosts failed: ${res.status}`)
+  return res.json()
+}
+
+export async function fetchBlogPost(slug) {
+  const res = await fetch(`${BASE}/api/v1/blog/posts/${encodeURIComponent(slug)}`)
+  if (!res.ok) throw new Error(`fetchBlogPost failed: ${res.status}`)
+  return res.json()
+}
+
+async function blogWrite(path, token, body) {
+  const headers = { 'Content-Type': 'application/json' }
+  const auth = authHeaderFrom(token)
+  if (auth) headers.Authorization = auth
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  })
+  const payload = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const error = new Error(payload?.detail || `Blog request failed: ${res.status}`)
+    error.status = res.status
+    throw error
+  }
+  return payload
+}
+
+export function createBlogPost(token, body) {
+  return blogWrite('/api/v1/blog/posts', token, body)
+}
+
+export function createBlogComment(token, postId, body) {
+  return blogWrite(`/api/v1/blog/posts/${encodeURIComponent(postId)}/comments`, token, body)
+}
+
+export function toggleBlogReaction(token, targetType, targetId) {
+  return blogWrite('/api/v1/blog/reactions', token, {
+    target_type: targetType,
+    target_id: Number(targetId),
+  })
+}
+
 export async function fetchCandidates(token) {
   const headers = {}
   const auth = authHeaderFrom(token)

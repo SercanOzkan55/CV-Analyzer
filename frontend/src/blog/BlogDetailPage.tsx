@@ -9,122 +9,110 @@ import { useLanguage } from "../i18n/LanguageContext";
 import CommentBox from "./components/CommentBox";
 import CommentList from "./components/CommentList";
 import BlogSidebar from "./components/BlogSidebar";
+import { createBlogComment, fetchBlogPost, toggleBlogReaction } from "../api";
 import { useTranslation } from "./useTranslation";
 import { LANG_LABELS } from "./translateService";
 import {
-  loadPosts, savePosts, formatDate, readingTime,
-  CATEGORY_COLORS, getAvatarColor, getInitials,
-  type BlogPost, type Comment,
+  formatDate, readingTime,
+  getAvatarColor, getInitials, type BlogPost,
 } from "./blogStore";
 import "../pages/BlogPage.css";
 
 const CATEGORY_GRADIENTS: Record<string, string> = {
-  Teknoloji: "linear-gradient(135deg, #3b82f6, #6366f1)",
-  "Yapay Zeka": "linear-gradient(135deg, #10b981, #06b6d4)",
-  Tasarım: "linear-gradient(135deg, #a855f7, #c084fc)",
-  "Veri Bilimi": "linear-gradient(135deg, #f59e0b, #f97316)",
-  Güvenlik: "linear-gradient(135deg, #ef4444, #f43f5e)",
+  Technology: "linear-gradient(135deg, #3b82f6, #6366f1)",
+  "Artificial Intelligence": "linear-gradient(135deg, #10b981, #06b6d4)",
+  Design: "linear-gradient(135deg, #a855f7, #c084fc)",
+  "Data Science": "linear-gradient(135deg, #f59e0b, #f97316)",
+  Security: "linear-gradient(135deg, #ef4444, #f43f5e)",
   Cloud: "linear-gradient(135deg, #0ea5e9, #38bdf8)",
-  Kariyer: "linear-gradient(135deg, #c084fc, #f472b6)",
+  Career: "linear-gradient(135deg, #c084fc, #f472b6)",
+};
+
+const CATEGORY_TRANSLATION_KEYS: Record<string, string> = {
+  Technology: "technology",
+  "Artificial Intelligence": "ai",
+  Design: "design",
+  "Data Science": "data_science",
+  Security: "security",
+  Cloud: "cloud",
+  Career: "career",
 };
 
 export default function BlogDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const { user, role, plan } = useAuth();
+  const { user, token } = useAuth();
   const { lang, t } = useLanguage();
   const {
     isTranslated, isLoading, error: translateError, translated, targetLang, toggle,
   } = useTranslation(lang, t("blog.translation_failed"));
   const [post, setPost] = useState<BlogPost | null>(null);
-
-  const email = (user as any)?.email || "";
-  const userName =
-    (user as any)?.user_metadata?.full_name ||
-    email.split("@")[0] ||
-    t("blog.anonymous");
+  const [loading, setLoading] = useState(true);
+  const [actionError, setActionError] = useState("");
+  const [postLiked, setPostLiked] = useState(false);
 
   useEffect(() => {
-    const posts = loadPosts();
-    const found = posts.find(p => p.slug === slug);
-    if (found) {
-      const viewKey = `blog_viewed_${found.id}`;
-      if (!sessionStorage.getItem(viewKey)) {
-        found.views += 1;
-        sessionStorage.setItem(viewKey, "1");
-        savePosts(posts);
-      }
-      setPost({ ...found });
-    }
+    let active = true;
+    setLoading(true);
+    fetchBlogPost(slug)
+      .then(data => active && setPost(data?.post || null))
+      .catch(() => active && setPost(null))
+      .finally(() => active && setLoading(false));
+    return () => { active = false; };
   }, [slug]);
 
-  function handleAddComment(text: string) {
-    if (!post) return;
-    const newComment: Comment = {
-      id: `c-${Date.now()}`,
-      author: { name: userName, email, role: role || "user", plan: plan || "free" },
-      text,
-      createdAt: new Date().toISOString(),
-      likes: [],
-      replies: [],
-    };
-    const updated = { ...post, comments: [...post.comments, newComment] };
-    setPost(updated);
-    const posts = loadPosts();
-    const idx = posts.findIndex(p => p.id === post.id);
-    if (idx >= 0) { posts[idx] = updated; savePosts(posts); }
+  async function handleAddComment(text: string) {
+    if (!post || !token) return false;
+    setActionError("");
+    try {
+      const data = await createBlogComment(token, post.id, { text });
+      setPost(data.post);
+      return true;
+    } catch (err: any) {
+      setActionError(err?.status === 422 ? t("blog.moderation_rejected") : (err?.message || t("blog.comment_failed")));
+      return false;
+    }
   }
 
-  function handleReply(commentId: string, text: string) {
-    if (!post) return;
-    const newReply = {
-      id: `r-${Date.now()}`,
-      author: { name: userName, email, role: role || "user", plan: plan || "free" },
-      text,
-      createdAt: new Date().toISOString(),
-      likes: [] as string[],
-    };
-    const updatedComments = post.comments.map(c =>
-      c.id === commentId ? { ...c, replies: [...c.replies, newReply] } : c
-    );
-    const updated = { ...post, comments: updatedComments };
-    setPost(updated);
-    const posts = loadPosts();
-    const idx = posts.findIndex(p => p.id === post.id);
-    if (idx >= 0) { posts[idx] = updated; savePosts(posts); }
+  async function handleReply(commentId: string, text: string) {
+    if (!post || !token) return false;
+    setActionError("");
+    try {
+      const data = await createBlogComment(token, post.id, { text, parent_id: Number(commentId) });
+      setPost(data.post);
+      return true;
+    } catch (err: any) {
+      setActionError(err?.status === 422 ? t("blog.moderation_rejected") : (err?.message || t("blog.comment_failed")));
+      return false;
+    }
   }
 
-  function handleLikeComment(commentId: string) {
-    if (!post || !email) return;
-    const updatedComments = post.comments.map(c => {
-      if (c.id === commentId) {
-        const already = c.likes.includes(email);
-        return { ...c, likes: already ? c.likes.filter(e => e !== email) : [...c.likes, email] };
-      }
-      return c;
-    });
-    const updated = { ...post, comments: updatedComments };
-    setPost(updated);
-    const posts = loadPosts();
-    const idx = posts.findIndex(p => p.id === post.id);
-    if (idx >= 0) { posts[idx] = updated; savePosts(posts); }
+  async function handleLikeComment(commentId: string) {
+    if (!post || !token) return;
+    try {
+      const data = await toggleBlogReaction(token, "comment", commentId);
+      setPost({
+        ...post,
+        comments: post.comments.map(comment =>
+          comment.id === commentId
+            ? { ...comment, likes: Array.from({ length: data.count }, (_, index) => `reaction-${index}`) }
+            : comment
+        ),
+      });
+    } catch { setActionError(t("blog.action_failed")); }
   }
 
-  function handleLikePost() {
-    if (!post || !email) return;
-    const already = post.likes.includes(email);
-    const updated = {
-      ...post,
-      likes: already ? post.likes.filter(e => e !== email) : [...post.likes, email],
-    };
-    setPost(updated);
-    const posts = loadPosts();
-    const idx = posts.findIndex(p => p.id === post.id);
-    if (idx >= 0) { posts[idx] = updated; savePosts(posts); }
+  async function handleLikePost() {
+    if (!post || !token) return;
+    try {
+      const data = await toggleBlogReaction(token, "post", post.id);
+      setPostLiked(Boolean(data.liked));
+      setPost({ ...post, likes: Array.from({ length: data.count }, (_, index) => `reaction-${index}`) });
+    } catch { setActionError(t("blog.action_failed")); }
   }
 
   /* ── Not found ──────────────────────────────────── */
-  if (!post) {
+  if (loading || !post) {
     return (
       <div
         style={{
@@ -136,8 +124,10 @@ export default function BlogDetailPage() {
         }}
       >
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "3.5rem", marginBottom: "16px", opacity: 0.5 }}>📄</div>
-          <p style={{ color: "var(--color-text-muted)", marginBottom: "16px" }}>{t("blog.post_not_found")}</p>
+          <div style={{ fontSize: "3.5rem", marginBottom: "16px", opacity: 0.5 }}>{loading ? <Loader2 className="animate-spin" /> : "📄"}</div>
+          <p style={{ color: "var(--color-text-muted)", marginBottom: "16px" }}>
+            {loading ? t("common.loading") : t("blog.post_not_found")}
+          </p>
           <button className="blog-detail-back" onClick={() => navigate("/blog")}>
             <ArrowLeft size={16} />
             {t("blog.back_to_blog")}
@@ -148,7 +138,7 @@ export default function BlogDetailPage() {
   }
 
   const catGradient = CATEGORY_GRADIENTS[post.category] || "var(--gradient-accent)";
-  const isLiked = post.likes.includes(email);
+  const isLiked = postLiked;
 
   return (
     <div style={{ background: "var(--bg-primary)", color: "var(--color-text)", minHeight: "100vh" }}>
@@ -174,8 +164,7 @@ export default function BlogDetailPage() {
               transition={{ duration: 0.45, delay: 0.1 }}
             >
               {/* Cover image */}
-              <div className="blog-article-img-wrap">
-                <img src={post.image} alt={post.title} className="blog-article-img" />
+              <div className="blog-article-img-wrap" style={{ background: catGradient }}>
                 <div className="blog-article-img-overlay" />
                 {/* Category badge over image */}
                 <span
@@ -193,7 +182,7 @@ export default function BlogDetailPage() {
                     zIndex: 2,
                   }}
                 >
-                  {post.category}
+                  {t(`blog.category_${CATEGORY_TRANSLATION_KEYS[post.category] || "technology"}`)}
                 </span>
               </div>
 
@@ -319,12 +308,13 @@ export default function BlogDetailPage() {
             </motion.article>
 
             {/* Comment box */}
+            {actionError && <p role="alert" style={{ color: "var(--color-danger)" }}>{actionError}</p>}
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.25 }}
             >
-              <CommentBox onSubmit={handleAddComment} commentCount={post.comments.length} />
+              <CommentBox onSubmit={handleAddComment} commentCount={post.comments.length} disabled={!user || !token} />
             </motion.div>
 
             {/* Comment list */}
@@ -337,6 +327,7 @@ export default function BlogDetailPage() {
                 comments={post.comments}
                 onReply={handleReply}
                 onLike={handleLikeComment}
+                disabled={!user || !token}
               />
             </motion.div>
           </div>
