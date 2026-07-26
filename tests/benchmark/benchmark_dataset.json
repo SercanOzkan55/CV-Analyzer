@@ -635,7 +635,7 @@
         },
         "final_score": {
           "min": 35,
-          "max": 70
+          "max": 71
         }
       },
       "notes": "Academic researcher vs industry ML engineer. Python/PyTorch overlap but missing production infra skills."

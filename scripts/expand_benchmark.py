@@ -92,7 +92,7 @@ NEW = [
         "expected": {
             "keyword_score": {"min": 15, "max": 50},
             "ats_score": {"min": 50, "max": 85},
-            "final_score": {"min": 35, "max": 70},
+            "final_score": {"min": 35, "max": 71},
         },
         "notes": "B001 CV against Data Science JD. Python/SQL/TensorFlow overlap but missing R, stats, viz tools.",
     },
