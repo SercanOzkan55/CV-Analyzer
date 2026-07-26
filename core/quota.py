@@ -82,17 +82,13 @@ def _reset_api_subscription_usage_if_needed(subscription, now: datetime | None =
         reference = getattr(subscription, "last_used_at", None) or getattr(subscription, "created_at", None)
         if reference is not None:
             reference_period = (
-                (reference.year, reference.month)
-                if reference.day >= reset_day
-                else _previous_month(reference)
+                (reference.year, reference.month) if reference.day >= reset_day else _previous_month(reference)
             )
             if reference_period != current_period:
                 subscription.monthly_usage = 0
         subscription.usage_reset_at = current
         return True
-    previous_period = (
-        (previous.year, previous.month) if previous.day >= reset_day else _previous_month(previous)
-    )
+    previous_period = (previous.year, previous.month) if previous.day >= reset_day else _previous_month(previous)
     if previous_period == current_period:
         return False
     subscription.monthly_usage = 0

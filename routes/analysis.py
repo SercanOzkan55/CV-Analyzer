@@ -33,10 +33,7 @@ _SUPPORTED_CV_UPLOAD_TYPES = {
 def _increment_persistent_analysis_usage(db, db_user) -> None:
     if db_user.role == "recruiter" and db_user.organization_id:
         organization = (
-            db.query(Organization)
-            .filter(Organization.id == db_user.organization_id)
-            .with_for_update()
-            .first()
+            db.query(Organization).filter(Organization.id == db_user.organization_id).with_for_update().first()
         )
         if organization:
             _reset_organization_usage_if_needed(organization)
@@ -53,10 +50,7 @@ def _increment_persistent_analysis_usage(db, db_user) -> None:
 def _refund_persistent_analysis_usage(db, db_user) -> None:
     if db_user.role == "recruiter" and db_user.organization_id:
         organization = (
-            db.query(Organization)
-            .filter(Organization.id == db_user.organization_id)
-            .with_for_update()
-            .first()
+            db.query(Organization).filter(Organization.id == db_user.organization_id).with_for_update().first()
         )
         if organization:
             organization.daily_usage = max(0, int(organization.daily_usage or 0) - 1)

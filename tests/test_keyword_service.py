@@ -52,9 +52,11 @@ class TestKeywordMatchScore:
         monkeypatch.setenv("MAX_JD_PHRASES", "1")
         monkeypatch.setattr(
             "services.keyword_service._extract_phrases",
-            lambda text: {"ai", "distributed microservices architecture"}
-            if text == "job"
-            else {"distributed microservices architecture"},
+            lambda text: (
+                {"ai", "distributed microservices architecture"}
+                if text == "job"
+                else {"distributed microservices architecture"}
+            ),
         )
 
         assert keyword_match_score("cv", "job") > 0

@@ -347,13 +347,13 @@ def _process_due_reminders(db):
         row[0]
         for row in (
             db.query(Reminder.id)
-        .filter(
-            Reminder.is_active == True,
-            Reminder.event_date > now,
-            Reminder.event_date <= window_end,
-            or_(Reminder.notified_3d_at.is_(None), Reminder.notified_1d_at.is_(None)),
-        )
-        .all()
+            .filter(
+                Reminder.is_active == True,
+                Reminder.event_date > now,
+                Reminder.event_date <= window_end,
+                or_(Reminder.notified_3d_at.is_(None), Reminder.notified_1d_at.is_(None)),
+            )
+            .all()
         )
     ]
     for reminder_id in reminder_ids:
