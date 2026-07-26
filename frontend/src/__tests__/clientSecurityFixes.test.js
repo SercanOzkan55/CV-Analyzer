@@ -36,6 +36,7 @@ describe('client security fixes', () => {
     expect(headers['Permissions-Policy']).toContain('microphone=(self)')
     expect(headers['Permissions-Policy']).toContain('geolocation=()')
     expect(headers['Content-Security-Policy']).toContain("img-src 'self' data: blob:")
+    expect(headers['Content-Security-Policy']).toContain('https://media2.dev.to')
     expect(headers['Content-Security-Policy']).toContain("frame-src 'self' blob:")
     expect(headers['Content-Security-Policy']).toContain("object-src 'none'")
     expect(headers['Content-Security-Policy']).toContain('pagead2.googlesyndication.com')

@@ -1090,8 +1090,24 @@
 .trending-card-img-wrap {
   height: 140px;
   overflow: hidden;
+  position: relative;
+  background: linear-gradient(135deg, var(--bg-secondary), var(--color-accent-glow));
+}
+.trending-card-img-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--color-accent);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
 }
 .trending-card-img {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -1153,10 +1169,26 @@
   gap: 6px;
   font-weight: 500;
 }
-.trending-author-avatar {
+.trending-author-avatar-wrap {
   width: 20px;
   height: 20px;
   border-radius: 50%;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 20px;
+  overflow: hidden;
+  color: #fff;
+  background: var(--color-accent);
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+.trending-author-avatar {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
 }
 .trending-card-stats {

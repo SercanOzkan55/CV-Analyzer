@@ -83,7 +83,17 @@ export default function TrendingArticles() {
           >
             {article.image && (
               <div className="trending-card-img-wrap">
-                <img src={article.image} alt="" className="trending-card-img" loading="lazy" />
+                <div className="trending-card-img-fallback" aria-hidden="true">
+                  <TrendingUp size={28} />
+                  <span>DEV</span>
+                </div>
+                <img
+                  src={article.image}
+                  alt=""
+                  className="trending-card-img"
+                  loading="lazy"
+                  onError={event => { event.currentTarget.style.display = "none"; }}
+                />
               </div>
             )}
             <div className="trending-card-body">
@@ -104,9 +114,17 @@ export default function TrendingArticles() {
 
               <div className="trending-card-footer">
                 <div className="trending-card-author">
-                  {article.author_avatar && (
-                    <img src={article.author_avatar} alt="" className="trending-author-avatar" />
-                  )}
+                  <span className="trending-author-avatar-wrap" aria-hidden="true">
+                    <span>{article.author?.charAt(0).toUpperCase() || "D"}</span>
+                    {article.author_avatar && (
+                      <img
+                        src={article.author_avatar}
+                        alt=""
+                        className="trending-author-avatar"
+                        onError={event => { event.currentTarget.style.display = "none"; }}
+                      />
+                    )}
+                  </span>
                   <span>{article.author}</span>
                 </div>
                 <div className="trending-card-stats">
