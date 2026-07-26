@@ -56,9 +56,11 @@ export default function EnProductPage({ page }) {
                 <Link to={page.ctaHref} className="btn-primary">
                   {page.ctaLabel} <ArrowRight size={17} aria-hidden="true" />
                 </Link>
-                <Link to={page.trPath} className="btn-outline">
-                  View Turkish version
-                </Link>
+                {page.trPath && (
+                  <Link to={page.trPath} className="btn-outline">
+                    View Turkish version
+                  </Link>
+                )}
               </div>
               <div className="seo-meta" aria-label="Article details">
                 <span><Clock3 size={15} aria-hidden="true" /> {page.readingTime}</span>

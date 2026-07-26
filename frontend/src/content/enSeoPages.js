@@ -181,6 +181,186 @@ export const EN_SEO_PAGES = [
     ctaLabel: 'Start Interview Practice',
     ctaHref: '/register',
   },
+  {
+    slug: 'resume-builder',
+    path: '/en/resume-builder/',
+    trPath: '/rehber/cv-nasil-hazirlanir/',
+    eyebrow: 'Free AI-assisted resume builder',
+    title: 'Free AI Resume Builder: Create an ATS-Friendly CV Online',
+    seoTitle: 'Free AI Resume Builder | Create Your CV Online | CV Analyzer',
+    description: 'Build your resume with a guided, step-by-step editor, AI-assisted summary suggestions, ATS tips, and instant PDF or DOCX export.',
+    intro: 'Instead of starting from a blank page or wrestling with a rigid template, the builder walks you through your experience, education, and skills one step at a time, then exports a clean file — with an AI assist for the hardest part: your summary.',
+    updatedAt: '2026-07-27',
+    readingTime: '5 min read',
+    highlights: [
+      'A guided 3-step process: personal details & summary, experience/education/skills, ATS tips & export',
+      'AI-suggested summary options tailored to a job description you paste in',
+      'Reorderable sections — experience, education, skills, certifications, projects, languages, social links — via drag-and-drop',
+      'A live preview as you edit, with multiple templates (classic on the free plan, more on paid plans)',
+      'Built-in ATS tips shown before you export',
+      'Direct export to PDF or DOCX',
+    ],
+    sections: [
+      {
+        heading: 'How it works',
+        paragraphs: [
+          'The builder is a guided editor, not a blank canvas.',
+        ],
+        bullets: [
+          'Start from scratch, or open a CV you already saved or analyzed directly in the builder.',
+          'Fill in your personal details and let AI suggest a summary based on a job description.',
+          'Add and reorder experience, education, skills, and other sections.',
+          'Review the ATS tips checklist before you export.',
+          'Export your finished resume as PDF or DOCX.',
+        ],
+      },
+      {
+        heading: 'Who it is for',
+        paragraphs: [
+          'For anyone who wants structure and guidance rather than a blank document to fight with.',
+        ],
+        bullets: [
+          'Candidates who want a fast, template-based starting point instead of formatting in a word processor.',
+          'Anyone who has already analyzed a CV and wants to rebuild it cleanly.',
+          'People who find writing a professional summary the hardest part of a resume.',
+        ],
+      },
+      {
+        heading: 'What the builder does — and does not — cover',
+        paragraphs: [
+          'Templates and export are the builder’s job — for real hiring-system readability testing, pair the result with the ATS Resume Checker. Template availability depends on your plan; the free plan includes one classic template.',
+          'AI-suggested summaries are starting points, not final text. Review and personalize every suggestion before you export — the same rule applies here as everywhere else: don’t claim experience or skills you don’t have.',
+        ],
+      },
+    ],
+    faq: [
+      { question: 'Is the resume builder free?', answer: 'The free plan includes one classic template. More templates are available on paid plans.' },
+      { question: 'Can I import an existing CV?', answer: 'You can open a CV you have already saved or analyzed directly in the builder. There is no separate raw file re-upload inside the builder itself.' },
+      { question: 'Does it check ATS compatibility?', answer: 'It shows ATS tips before you export. For a full readability check, run the exported file through the ATS Resume Checker.' },
+      { question: 'What file formats can I export?', answer: 'PDF or DOCX.' },
+    ],
+    ctaLabel: 'Build My Resume Free',
+    ctaHref: '/register',
+  },
+  {
+    slug: 'cover-letter-generator',
+    path: '/en/cover-letter-generator/',
+    trPath: '/rehber/on-yazi-nasil-yazilir/',
+    eyebrow: 'AI-generated, editable cover letters',
+    title: 'Free AI Cover Letter Generator: Draft a Letter From Your CV',
+    seoTitle: 'Free AI Cover Letter Generator | CV Analyzer',
+    description: 'Generate a role-specific cover letter draft from your CV and a job description, choose a tone and persona, then edit and copy it in seconds.',
+    intro: 'Paste your CV and the job description you are targeting, and the generator drafts a cover letter that connects the two — in a tone and voice you choose. You edit and finalize it before sending.',
+    updatedAt: '2026-07-27',
+    readingTime: '5 min read',
+    highlights: [
+      'Works from pasted CV text or an uploaded CV file, plus a job description',
+      '5 tone options: professional, enthusiastic, confident, creative, formal',
+      '5 role-context modes: junior, senior, manager, technical, academic',
+      'Fully editable output with a live word count',
+      'Copy to clipboard or download as a text file',
+    ],
+    sections: [
+      {
+        heading: 'How it works',
+        paragraphs: [
+          'A draft takes a few steps, and you stay in control of the final wording.',
+        ],
+        bullets: [
+          'Paste or upload your CV.',
+          'Add the job description and, optionally, the company name.',
+          'Pick a tone and a mode that matches the role.',
+          'Generate a draft.',
+          'Edit it directly, then copy it or download it as a text file.',
+        ],
+      },
+      {
+        heading: 'Who it is for',
+        paragraphs: [
+          'For anyone who finds the blank page the hardest part of writing a cover letter.',
+        ],
+        bullets: [
+          'Candidates applying to multiple similar roles who want a fast, tailored starting draft each time.',
+          'Anyone who wants a specific tone to match a company’s culture.',
+          'People who have a strong CV but struggle to summarize it into a short letter.',
+        ],
+      },
+      {
+        heading: 'What the draft can — and cannot — guarantee',
+        paragraphs: [
+          'The draft is a starting point built only from what you provide — it will not invent experience, employers, or results you have not mentioned. Verify every claim, company name, and detail before sending, the same way you would review any AI-assisted writing.',
+          'It does not check your CV’s ATS readability. Pair it with the ATS Resume Checker if you have not already verified your CV parses correctly.',
+        ],
+      },
+    ],
+    faq: [
+      { question: 'Is the cover letter generator free?', answer: 'Yes, you can generate drafts after creating a free account. Current usage limits are shown in the product.' },
+      { question: 'Will it invent experience I don’t have?', answer: 'No. It works from the CV and job description you provide — always verify the final text before sending.' },
+      { question: 'Can I export as PDF?', answer: 'You can copy the text or download it as a text file today, then format it in your own document if you need PDF.' },
+      { question: 'Do I need to provide a job description?', answer: 'Yes. The letter connects your background to a specific role, so a job description produces a far stronger result than a generic letter.' },
+    ],
+    ctaLabel: 'Generate My Cover Letter',
+    ctaHref: '/register',
+  },
+  {
+    slug: 'job-application-tracker',
+    path: '/en/job-application-tracker/',
+    eyebrow: 'Job search organization',
+    title: 'Free Job Application Tracker: Manage Your Search in One Board',
+    seoTitle: 'Free Job Application Tracker | CV Analyzer',
+    description: 'Track every application on a kanban board — wishlist to offer — with reminders, notes, and priority so nothing falls through the cracks.',
+    intro: 'Once you are applying to more than a couple of roles, a spreadsheet or your memory stops being enough. The tracker gives every application a place on a board, with reminders so follow-ups do not get missed.',
+    updatedAt: '2026-07-27',
+    readingTime: '5 min read',
+    highlights: [
+      'A kanban board with 5 stages: wishlist, applied, interview, offer, rejected',
+      'Drag and drop applications between stages as your search progresses',
+      'Per-application fields: company, role, location, date applied, job URL, salary, priority, and notes',
+      'Email reminders for interviews, offers, and follow-ups, sent automatically ahead of the date',
+      'At-a-glance stats: total applied, interviews, offers, interview rate, and weekly activity',
+    ],
+    sections: [
+      {
+        heading: 'How it works',
+        paragraphs: [
+          'The board follows the natural stages of a job search.',
+        ],
+        bullets: [
+          'Add a job as soon as you are considering it (wishlist).',
+          'Move it to applied, interview, offer, or rejected as things progress.',
+          'Fill in company, role, dates, salary, priority, and notes.',
+          'Turn on an email reminder for an upcoming interview or follow-up.',
+          'Check your stats to see your search’s overall momentum.',
+        ],
+      },
+      {
+        heading: 'Who it is for',
+        paragraphs: [
+          'For anyone whose job search has outgrown a spreadsheet or their memory.',
+        ],
+        bullets: [
+          'Candidates applying to more than a few roles at once.',
+          'Anyone juggling multiple interview stages who needs one source of truth.',
+          'People who want a nudge before they forget to follow up.',
+        ],
+      },
+      {
+        heading: 'What the tracker does — and does not — do',
+        paragraphs: [
+          'It is an organization tool, not a job-matching or application-automation service — you still find, apply to, and communicate with employers yourself.',
+          'Reminders are sent by email, so keep your account’s notification email current if you rely on them.',
+        ],
+      },
+    ],
+    faq: [
+      { question: 'Is the job tracker free?', answer: 'Yes, it is available after creating a free account.' },
+      { question: 'Does it apply to jobs for me?', answer: 'No. It organizes applications you make yourself; it does not submit applications automatically.' },
+      { question: 'Can I set reminders?', answer: 'Yes, per application, for interviews, offers, or follow-ups, with automatic emails sent ahead of the date.' },
+      { question: 'Is my board private to my account?', answer: 'Yes, your board and its data are tied to your account.' },
+    ],
+    ctaLabel: 'Track My Applications Free',
+    ctaHref: '/register',
+  },
 ]
 
 export const EN_SEO_PAGE_BY_PATH = Object.fromEntries(EN_SEO_PAGES.map((page) => [page.path, page]))
@@ -191,5 +371,5 @@ export function findEnSeoPage(pathname) {
 }
 
 export const EN_EQUIVALENT_BY_TR_PATH = Object.fromEntries(
-  EN_SEO_PAGES.map((page) => [page.trPath, page.path]),
+  EN_SEO_PAGES.filter((page) => page.trPath).map((page) => [page.trPath, page.path]),
 )

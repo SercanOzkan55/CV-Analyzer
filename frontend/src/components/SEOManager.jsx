@@ -158,7 +158,6 @@ export default function SEOManager() {
     if (enPage) {
       setRouteLangOverride('en')
       const canonical = `${SITE_URL}${enPage.path}`
-      const trUrl = `${SITE_URL}${enPage.trPath}`
 
       document.title = enPage.seoTitle
       upsertMeta('meta[name="description"]', { name: 'description', content: enPage.description })
@@ -172,7 +171,7 @@ export default function SEOManager() {
       upsertCanonical(canonical)
       upsertHreflangLinks([
         { hreflang: 'en', href: canonical },
-        { hreflang: 'tr', href: trUrl },
+        ...(enPage.trPath ? [{ hreflang: 'tr', href: `${SITE_URL}${enPage.trPath}` }] : []),
         { hreflang: 'x-default', href: canonical },
       ])
       setStructuredData(buildEnPageSchema(enPage))

@@ -279,7 +279,6 @@ for (const page of SEO_PAGES) {
 
 for (const page of EN_SEO_PAGES) {
   const canonical = `${SITE_URL}${page.path}`
-  const trUrl = `${SITE_URL}${page.trPath}`
   let html = applyMeta(baseHtml, {
     title: page.seoTitle,
     description: page.description,
@@ -288,7 +287,7 @@ for (const page of EN_SEO_PAGES) {
     htmlLang: 'en',
     alternates: [
       { hreflang: 'en', href: canonical },
-      { hreflang: 'tr', href: trUrl },
+      ...(page.trPath ? [{ hreflang: 'tr', href: `${SITE_URL}${page.trPath}` }] : []),
       { hreflang: 'x-default', href: canonical },
     ],
   })
