@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import SEOManager from '../components/SEOManager'
 
 vi.mock('../i18n/LanguageContext', () => ({
-  useLanguage: () => ({ lang: 'tr' }),
+  useLanguage: () => ({ lang: 'tr', setRouteLangOverride: () => {} }),
 }))
 
 function renderManager(pathname) {

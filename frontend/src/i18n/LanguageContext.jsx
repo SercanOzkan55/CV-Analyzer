@@ -43,6 +43,7 @@ const PRICING_CONFIG = {
  * @property {(newLang: string) => void} setLang
  * @property {(path: string) => any} t
  * @property {string[]} availableLanguages Languages exposed for manual selection.
+ * @property {(lang: string | null) => void} setRouteLangOverride Non-persisting override for fixed-language routes (e.g. /en/... SEO pages).
  */
 
 const LANGUAGE_CONTEXT_KEY = '__CV_ANALYZER_LANGUAGE_CONTEXT__'
@@ -144,6 +145,13 @@ export function LanguageProvider({ children }) {
     return 'US'
   })
 
+  // Non-persisting override used by fixed-language routes (e.g. /en/... SEO
+  // pages) so the whole UI can render in a specific language regardless of
+  // IP detection or the manual toggle, without touching `cv_lang_manual` or
+  // affecting any other route once the override is cleared.
+  const [routeLangOverride, setRouteLangOverride] = useState(null)
+  const effectiveLang = routeLangOverride || lang
+
   const regionKey = COUNTRY_TO_REGION[countryCode] || 'DEFAULT'
   const pricing = PRICING_CONFIG[regionKey]
 
@@ -159,9 +167,9 @@ export function LanguageProvider({ children }) {
   }, [])
 
   useEffect(() => {
-    document.documentElement.lang = lang
-    document.documentElement.dir = RTL_LANGUAGES.includes(lang) ? 'rtl' : 'ltr'
-  }, [lang])
+    document.documentElement.lang = effectiveLang
+    document.documentElement.dir = RTL_LANGUAGES.includes(effectiveLang) ? 'rtl' : 'ltr'
+  }, [effectiveLang])
 
   // IP-based detection on every page load (F5).
   // sessionStorage is cleared on tab close but survives navigation.
@@ -174,11 +182,11 @@ export function LanguageProvider({ children }) {
 
       // A persisted manual choice always wins and is never overridden by IP —
       // it survives navigation, hard refresh and future sessions.
+      // (document.documentElement.lang/dir is derived reactively from
+      // effectiveLang above, so it isn't set directly here.)
       const manual = (() => { try { return localStorage.getItem('cv_lang_manual') } catch { return null } })()
       if (manual && translations[manual]) {
         setLangState(manual)
-        document.documentElement.lang = manual
-        document.documentElement.dir = RTL_LANGUAGES.includes(manual) ? 'rtl' : 'ltr'
         return
       }
 
@@ -188,8 +196,6 @@ export function LanguageProvider({ children }) {
         const manual = (() => { try { return localStorage.getItem('cv_lang_manual') } catch { return null } })()
         if (!manual && detectedLang && translations[detectedLang]) {
           setLangState(detectedLang)
-          document.documentElement.lang = detectedLang
-          document.documentElement.dir = RTL_LANGUAGES.includes(detectedLang) ? 'rtl' : 'ltr'
         }
       }).catch(() => {
         // IP detection failed — keep browser language, no user-visible error
@@ -204,7 +210,7 @@ export function LanguageProvider({ children }) {
 
   function t(path) {
     const keys = path.split('.')
-    let val = translations[lang]
+    let val = translations[effectiveLang]
     for (const k of keys) {
       val = val?.[k]
     }
@@ -220,7 +226,9 @@ export function LanguageProvider({ children }) {
   // Automatic IP/browser detection may still select any language in `translations`.
   // Only English and Turkish are intentionally exposed as manual controls.
   return (
-    <LanguageContext.Provider value={{ lang, setLang, t, countryCode, pricing, availableLanguages: ['en', 'tr'] }}>
+    <LanguageContext.Provider
+      value={{ lang: effectiveLang, setLang, t, countryCode, pricing, availableLanguages: ['en', 'tr'], setRouteLangOverride }}
+    >
       {children}
     </LanguageContext.Provider>
   )

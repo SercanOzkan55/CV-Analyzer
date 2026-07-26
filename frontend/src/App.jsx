@@ -18,6 +18,7 @@ import FeedbackButton from "./components/FeedbackButton"
 import AmbientPointerField from "./components/AmbientPointerField"
 import SEOManager from "./components/SEOManager"
 import { SEO_PAGES } from "./content/seoPages"
+import { EN_SEO_PAGES } from "./content/enSeoPages"
 
 
 // ---------- LAZY PAGES ----------
@@ -57,6 +58,7 @@ const InterviewSimulatorPage = lazy(() => import("./pages/InterviewSimulatorPage
 const JobTrackerPage = lazy(() => import("./pages/JobTrackerPage"))
 const AIAgentHubPage = lazy(() => import("./pages/AIAgentHubPage"))
 const SEOContentPage = lazy(() => import("./pages/SEOContentPage"))
+const EnProductPage = lazy(() => import("./pages/EnProductPage"))
 
 
 
@@ -152,6 +154,13 @@ function AnimatedRoutes() {
             key={page.path}
             path={page.path}
             element={<PageTransition><SEOContentPage page={page} /></PageTransition>}
+          />
+        ))}
+        {EN_SEO_PAGES.map((page) => (
+          <Route
+            key={page.path}
+            path={page.path}
+            element={<PageTransition><EnProductPage page={page} /></PageTransition>}
           />
         ))}
         <Route path="/shared/:shareToken" element={<PageTransition><SharedAnalysisPage /></PageTransition>} />

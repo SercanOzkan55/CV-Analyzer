@@ -1,23 +1,20 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
-import { ArrowRight, CheckCircle2, Clock3, FileSearch, Languages, ShieldCheck } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Clock3, FileSearch, ShieldCheck } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import { SEO_PAGES } from '../content/seoPages'
-import { EN_EQUIVALENT_BY_TR_PATH } from '../content/enSeoPages'
-import { getGuideUi, getLocalizedSeoPage, getLocalizedSeoPages } from '../content/guideI18n'
-import { useLanguage } from '../i18n/LanguageContext'
+import { EN_SEO_PAGES } from '../content/enSeoPages'
 
 function sectionId(pageSlug, index) {
   return `${pageSlug}-section-${index + 1}`
 }
 
-function formatUpdatedAt(value, locale) {
+function formatUpdatedAt(value) {
   const date = new Date(`${value}T00:00:00Z`)
   if (Number.isNaN(date.getTime())) return value
 
-  return new Intl.DateTimeFormat(locale, {
+  return new Intl.DateTimeFormat('en-US', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -25,17 +22,10 @@ function formatUpdatedAt(value, locale) {
   }).format(date)
 }
 
-export default function SEOContentPage({ page: sourcePage }) {
-  const { lang } = useLanguage()
+export default function EnProductPage({ page }) {
   const reduceMotion = useReducedMotion()
-  const ui = getGuideUi(lang)
-  const page = getLocalizedSeoPage(sourcePage, lang)
-  const enEquivalentPath = EN_EQUIVALENT_BY_TR_PATH[sourcePage.path]
   const canObserve = typeof window !== 'undefined' && 'IntersectionObserver' in window
-  const relatedPages = getLocalizedSeoPages(
-    SEO_PAGES.filter((candidate) => candidate.path !== sourcePage.path).slice(0, 4),
-    lang,
-  )
+  const relatedPages = EN_SEO_PAGES.filter((candidate) => candidate.path !== page.path)
   const reveal = reduceMotion
     ? {}
     : { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } }
@@ -48,78 +38,67 @@ export default function SEOContentPage({ page: sourcePage }) {
       }
 
   return (
-    <div className="seo-page">
+    <div className="seo-page" lang="en">
       <Navbar />
       <main id="main-content">
         <header className="seo-hero">
           <div className="seo-container seo-hero-grid">
             <motion.div
               className="seo-hero-copy"
-              key={`${lang}-${page.slug}-copy`}
+              key={`${page.slug}-copy`}
               {...reveal}
               transition={{ duration: 0.28, ease: 'easeOut' }}
             >
-              <div
-                className="seo-guide-localized-copy"
-                lang={page.contentLanguage}
-                dir={lang === 'ar' && page.contentLanguage === 'en' ? 'ltr' : undefined}
-              >
-                <p className="seo-eyebrow">{page.eyebrow}</p>
-                <h1>{page.title}</h1>
-                <p className="seo-lead">{page.intro}</p>
-              </div>
-              {page.isFallback && (
-                <p className="seo-language-note" role="note">
-                  <Languages size={17} aria-hidden="true" /> {ui.fallbackNotice}
-                </p>
-              )}
+              <p className="seo-eyebrow">{page.eyebrow}</p>
+              <h1>{page.title}</h1>
+              <p className="seo-lead">{page.intro}</p>
               <div className="seo-hero-actions">
-                <Link to="/register" className="btn-primary">
-                  {ui.analyzeCta} <ArrowRight size={17} aria-hidden="true" />
+                <Link to={page.ctaHref} className="btn-primary">
+                  {page.ctaLabel} <ArrowRight size={17} aria-hidden="true" />
                 </Link>
-                <Link to="/ats-cv-kontrol/" className="btn-outline">
-                  {ui.atsCta}
+                <Link to={page.trPath} className="btn-outline">
+                  View Turkish version
                 </Link>
               </div>
-              <div className="seo-meta" aria-label={ui.contentInfo}>
+              <div className="seo-meta" aria-label="Article details">
                 <span><Clock3 size={15} aria-hidden="true" /> {page.readingTime}</span>
-                <span>{ui.updated}: {formatUpdatedAt(page.updatedAt, ui.locale)}</span>
+                <span>Updated: {formatUpdatedAt(page.updatedAt)}</span>
               </div>
               <div className="seo-trust-note">
                 <ShieldCheck size={18} aria-hidden="true" />
                 <p>
-                  <strong>{ui.editorialTeam}</strong>
-                  {ui.editorialNote}
+                  <strong>CV Analyzer Editorial Team</strong>
+                  {' '}This content is reviewed for clarity, usefulness, and accuracy.
                 </p>
               </div>
             </motion.div>
 
             <motion.div
               className="seo-product-visual"
-              aria-label={ui.sampleAria}
-              key={`${lang}-${page.slug}-sample`}
+              aria-label="Illustrative CV Analyzer evaluation summary"
+              key={`${page.slug}-sample`}
               initial={reduceMotion ? false : { opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: reduceMotion ? 0 : 0.06, ease: 'easeOut' }}
             >
               <div className="seo-product-head">
-                <span><FileSearch size={18} aria-hidden="true" /> {ui.sampleSummary}</span>
+                <span><FileSearch size={18} aria-hidden="true" /> Sample analysis summary</span>
                 <strong>84/100</strong>
               </div>
               <div className="seo-score-track" aria-hidden="true"><span /></div>
               <div className="seo-product-checks">
-                <p><CheckCircle2 size={17} /> {ui.sampleChecks[0]}</p>
-                <p><CheckCircle2 size={17} /> {ui.sampleChecks[1]}</p>
-                <p><ShieldCheck size={17} /> {ui.sampleChecks[2]}</p>
+                <p><CheckCircle2 size={17} /> Contact details are readable</p>
+                <p><CheckCircle2 size={17} /> Standard section headings</p>
+                <p><ShieldCheck size={17} /> ATS-safe text output</p>
               </div>
-              <div className="seo-product-note">{ui.sampleNote}</div>
+              <div className="seo-product-note">This is an illustrative example. Actual scores and suggestions depend on your CV and target role.</div>
             </motion.div>
           </div>
         </header>
 
-        <nav className="seo-jump-band" aria-label={ui.contents}>
+        <nav className="seo-jump-band" aria-label="Table of contents">
           <div className="seo-container">
-            <p className="seo-jump-title">{ui.inThisGuide}</p>
+            <p className="seo-jump-title">In this guide</p>
             <div className="seo-highlight-grid">
               {page.sections.map((section, index) => (
                 <a href={`#${sectionId(page.slug, index)}`} key={section.heading}>
@@ -127,18 +106,21 @@ export default function SEOContentPage({ page: sourcePage }) {
                 </a>
               ))}
               <a href={`#${page.slug}-faq-title`}>
-                <CheckCircle2 size={16} aria-hidden="true" /> {ui.faq}
+                <CheckCircle2 size={16} aria-hidden="true" /> Frequently asked questions
               </a>
             </div>
           </div>
         </nav>
 
         <article className="seo-container seo-article">
-          <div
-            className="seo-article-main"
-            lang={page.contentLanguage}
-            dir={lang === 'ar' && page.contentLanguage === 'en' ? 'ltr' : undefined}
-          >
+          <div className="seo-article-main">
+            <section aria-label="Key benefits">
+              <h2>Why use it</h2>
+              <ul>
+                {page.highlights.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </section>
+
             {page.sections.map((section, index) => (
               <motion.section
                 id={sectionId(page.slug, index)}
@@ -162,8 +144,8 @@ export default function SEOContentPage({ page: sourcePage }) {
               {...inViewReveal}
               transition={{ duration: 0.24, ease: 'easeOut' }}
             >
-              <p className="seo-eyebrow">{ui.faq}</p>
-              <h2 id={`${page.slug}-faq-title`}>{ui.questionsAbout(page.title)}</h2>
+              <p className="seo-eyebrow">Frequently asked questions</p>
+              <h2 id={`${page.slug}-faq-title`}>Questions about {page.title}</h2>
               {page.faq.map((item) => (
                 <details key={item.question}>
                   <summary>{item.question}</summary>
@@ -173,36 +155,26 @@ export default function SEOContentPage({ page: sourcePage }) {
             </motion.section>
           </div>
 
-          <aside className="seo-related" aria-label={ui.relatedGuides}>
-            <h2>{ui.relatedGuides}</h2>
-            <p>{ui.relatedDescription}</p>
-            {enEquivalentPath && (
-              <Link to={enEquivalentPath} className="seo-related-en">
-                <Languages size={15} aria-hidden="true" />{' '}
-                {lang === 'tr' ? 'İngilizce ürün sayfasını görüntüle' : 'View the English product page'}
-                {' '}<ArrowRight size={15} aria-hidden="true" />
-              </Link>
-            )}
+          <aside className="seo-related" aria-label="Related tools">
+            <h2>Related tools</h2>
+            <p>Explore other CV Analyzer tools that approach your job search from a different angle.</p>
             {relatedPages.map((relatedPage) => (
               <Link to={relatedPage.path} key={relatedPage.path}>
                 {relatedPage.eyebrow} <ArrowRight size={15} aria-hidden="true" />
               </Link>
             ))}
-            <Link to="/rehber/" className="seo-related-all">
-              {ui.allGuides} <ArrowRight size={15} aria-hidden="true" />
-            </Link>
           </aside>
         </article>
 
         <section className="seo-final-cta">
           <div className="seo-container">
             <div>
-              <p className="seo-eyebrow">{ui.finalEyebrow}</p>
-              <h2>{ui.finalTitle}</h2>
-              <p>{ui.finalDescription}</p>
+              <p className="seo-eyebrow">Check your own document</p>
+              <h2>See how your CV is read</h2>
+              <p>Review ATS readability, job matching, and practical improvement suggestions in one analysis.</p>
             </div>
-            <Link to="/register" className="btn-primary">
-              {ui.createAccount} <ArrowRight size={17} aria-hidden="true" />
+            <Link to={page.ctaHref} className="btn-primary">
+              Create a free account <ArrowRight size={17} aria-hidden="true" />
             </Link>
           </div>
         </section>

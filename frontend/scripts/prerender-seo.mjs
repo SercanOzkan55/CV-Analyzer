@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { SEO_PAGES } from '../src/content/seoPages.js'
+import { EN_SEO_PAGES, EN_EQUIVALENT_BY_TR_PATH } from '../src/content/enSeoPages.js'
 
 const SITE_URL = 'https://cvanalyzer.dev'
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -37,8 +38,8 @@ function replaceTag(html, pattern, replacement) {
   return pattern.test(html) ? html.replace(pattern, replacement) : html.replace('</head>', `${replacement}\n</head>`)
 }
 
-function applyMeta(html, { title, description, canonical, robots = 'index, follow, max-image-preview:large', schema }) {
-  let output = html.replace(/<html\s+lang="[^"]*"/, '<html lang="tr"')
+function applyMeta(html, { title, description, canonical, robots = 'index, follow, max-image-preview:large', schema, htmlLang = 'tr', alternates = [] }) {
+  let output = html.replace(/<html\s+lang="[^"]*"/, `<html lang="${htmlLang}"`)
   output = output.replace(/<title>.*?<\/title>/s, `<title>${escapeHtml(title)}</title>`)
   output = replaceTag(output, /<meta\s+name="description"[^>]*>/i, `<meta name="description" content="${escapeHtml(description)}" />`)
   output = replaceTag(output, /<meta\s+name="robots"[^>]*>/i, `<meta name="robots" content="${escapeHtml(robots)}" />`)
@@ -48,6 +49,10 @@ function applyMeta(html, { title, description, canonical, robots = 'index, follo
   output = replaceTag(output, /<meta\s+property="og:url"[^>]*>/i, `<meta property="og:url" content="${escapeHtml(canonical)}" />`)
   output = replaceTag(output, /<meta\s+name="twitter:title"[^>]*>/i, `<meta name="twitter:title" content="${escapeHtml(title)}" />`)
   output = replaceTag(output, /<meta\s+name="twitter:description"[^>]*>/i, `<meta name="twitter:description" content="${escapeHtml(description)}" />`)
+  if (alternates.length) {
+    const links = alternates.map(({ hreflang, href }) => `<link rel="alternate" hreflang="${escapeHtml(hreflang)}" href="${escapeHtml(href)}" />`).join('')
+    output = output.replace('</head>', `${links}\n</head>`)
+  }
   if (schema) {
     output = output.replace('</head>', `<script id="route-structured-data" type="application/ld+json">${JSON.stringify(schema).replaceAll('<', '\\u003c')}</script>\n</head>`)
   }
@@ -82,6 +87,68 @@ function pageSchema(page) {
       },
     ],
   }
+}
+
+function enPageSchema(page) {
+  const canonical = `${SITE_URL}${page.path}`
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Article', headline: page.title, description: page.description,
+        datePublished: page.updatedAt, dateModified: page.updatedAt, inLanguage: 'en-US',
+        mainEntityOfPage: canonical,
+        author: { '@type': 'Organization', name: 'CV Analyzer', url: SITE_URL },
+        publisher: { '@type': 'Organization', name: 'CV Analyzer', url: SITE_URL },
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'CV Analyzer', item: `${SITE_URL}/` },
+          { '@type': 'ListItem', position: 2, name: page.title, item: canonical },
+        ],
+      },
+      {
+        '@type': 'FAQPage',
+        mainEntity: page.faq.map((item) => ({
+          '@type': 'Question', name: item.question,
+          acceptedAnswer: { '@type': 'Answer', text: item.answer },
+        })),
+      },
+    ],
+  }
+}
+
+function staticEnPageContent(page) {
+  const highlights = `<ul>${page.highlights.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+  const sections = page.sections.map((section) => `
+    <section>
+      <h2>${escapeHtml(section.heading)}</h2>
+      ${section.paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join('')}
+      ${section.bullets ? `<ul>${section.bullets.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+    </section>`).join('')
+  const faq = page.faq.map((item) => `<details><summary>${escapeHtml(item.question)}</summary><p>${escapeHtml(item.answer)}</p></details>`).join('')
+  return `<main id="main-content" class="seo-container seo-article" data-prerendered="true"><article class="seo-article-main"><header><p class="seo-eyebrow">${escapeHtml(page.eyebrow)}</p><h1>${escapeHtml(page.title)}</h1><p>${escapeHtml(page.intro)}</p></header><section><h2>Why use it</h2>${highlights}</section>${sections}<section class="seo-faq"><h2>Frequently asked questions</h2>${faq}</section><p><a href="${escapeHtml(page.ctaHref)}">${escapeHtml(page.ctaLabel)}</a></p></article></main>`
+}
+
+function staticEnPublicChrome(content) {
+  return `
+    <header data-prerendered="true">
+      <nav aria-label="Main navigation">
+        <a href="/">CV Analyzer</a>
+        <a href="/pricing/">Pricing</a>
+        <a href="/about/">About</a>
+      </nav>
+    </header>
+    ${content}
+    <footer data-prerendered="true">
+      <nav aria-label="Footer">
+        <a href="/privacy/">Privacy Policy</a>
+        <a href="/terms/">Terms of Use</a>
+        <a href="mailto:support@cvanalyzer.dev">Contact</a>
+      </nav>
+      <p>© 2026 CV Analyzer</p>
+    </footer>`
 }
 
 function staticPageContent(page) {
@@ -191,13 +258,41 @@ async function writeRoute(route, html) {
 
 for (const page of SEO_PAGES) {
   const canonical = `${SITE_URL}${page.path}`
+  const enEquivalentPath = EN_EQUIVALENT_BY_TR_PATH[page.path]
+  const alternates = enEquivalentPath
+    ? [
+        { hreflang: 'tr', href: canonical },
+        { hreflang: 'en', href: `${SITE_URL}${enEquivalentPath}` },
+        { hreflang: 'x-default', href: `${SITE_URL}${enEquivalentPath}` },
+      ]
+    : []
   let html = applyMeta(baseHtml, {
     title: page.seoTitle,
     description: page.description,
     canonical,
     schema: pageSchema(page),
+    alternates,
   })
   html = html.replace('<div id="root"></div>', `<div id="root">${staticPublicChrome(staticPageContent(page))}</div>`)
+  await writeRoute(page.path, html)
+}
+
+for (const page of EN_SEO_PAGES) {
+  const canonical = `${SITE_URL}${page.path}`
+  const trUrl = `${SITE_URL}${page.trPath}`
+  let html = applyMeta(baseHtml, {
+    title: page.seoTitle,
+    description: page.description,
+    canonical,
+    schema: enPageSchema(page),
+    htmlLang: 'en',
+    alternates: [
+      { hreflang: 'en', href: canonical },
+      { hreflang: 'tr', href: trUrl },
+      { hreflang: 'x-default', href: canonical },
+    ],
+  })
+  html = html.replace('<div id="root"></div>', `<div id="root">${staticEnPublicChrome(staticEnPageContent(page))}</div>`)
   await writeRoute(page.path, html)
 }
 
@@ -218,4 +313,4 @@ for (const route of NOINDEX_ROUTES) {
   await writeRoute(route, html)
 }
 
-console.log(`Prerendered ${SEO_PAGES.length} SEO pages, ${PUBLIC_ROUTES.length} public routes and ${NOINDEX_ROUTES.length} noindex routes.`)
+console.log(`Prerendered ${SEO_PAGES.length} SEO pages, ${EN_SEO_PAGES.length} English SEO pages, ${PUBLIC_ROUTES.length} public routes and ${NOINDEX_ROUTES.length} noindex routes.`)

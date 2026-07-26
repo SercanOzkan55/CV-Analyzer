@@ -2,7 +2,7 @@
 .footer {
   background: var(--bg-primary); border-top: 1px solid var(--color-border); padding: 64px 24px 32px;
 }
-.footer-inner { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: minmax(220px, 1.6fr) repeat(4, minmax(130px, 1fr)); gap: 36px; }
+.footer-inner { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: minmax(200px, 1.4fr) repeat(5, minmax(120px, 1fr)); gap: 28px; }
 .footer-logo {
   font-size: 1.2rem; font-weight: 700; display: block; margin-bottom: 16px;
   color: var(--color-text); letter-spacing: -0.03em;

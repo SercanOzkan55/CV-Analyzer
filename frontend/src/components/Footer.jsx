@@ -37,6 +37,13 @@ export default function Footer() {
         </div>
 
         <div className="footer-col">
+          <h4>Career Tools</h4>
+          <Link to="/en/ai-cv-analyzer/">AI CV Analyzer</Link>
+          <Link to="/en/ats-resume-checker/">ATS Resume Checker</Link>
+          <Link to="/en/ai-interview-simulator/">AI Interview Simulator</Link>
+        </div>
+
+        <div className="footer-col">
           <h4>{t('landing.footer_legal')}</h4>
           <Link to="/privacy">{t('landing.footer_privacy')}</Link>
           <Link to="/terms">{t('landing.footer_terms')}</Link>

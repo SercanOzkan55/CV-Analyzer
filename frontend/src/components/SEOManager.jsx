@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { findSeoPage } from '../content/seoPages'
+import { findEnSeoPage, EN_EQUIVALENT_BY_TR_PATH } from '../content/enSeoPages'
 import { getGuideUi, getLocalizedSeoPage } from '../content/guideI18n'
 import { useLanguage } from '../i18n/LanguageContext'
 
@@ -52,6 +53,18 @@ function upsertCanonical(href) {
   node.setAttribute('href', href)
 }
 
+function upsertHreflangLinks(links) {
+  document.head.querySelectorAll('link[data-hreflang-managed="true"]').forEach((node) => node.remove())
+  links.forEach(({ hreflang, href }) => {
+    const node = document.createElement('link')
+    node.setAttribute('rel', 'alternate')
+    node.setAttribute('hreflang', hreflang)
+    node.setAttribute('href', href)
+    node.setAttribute('data-hreflang-managed', 'true')
+    document.head.appendChild(node)
+  })
+}
+
 function setStructuredData(data) {
   const existing = document.getElementById('route-structured-data')
   if (!data) {
@@ -100,11 +113,74 @@ function buildPageSchema(page) {
   }
 }
 
+function buildEnPageSchema(page) {
+  const canonical = `${SITE_URL}${page.path}`
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Article',
+        headline: page.title,
+        description: page.description,
+        dateModified: page.updatedAt,
+        datePublished: page.updatedAt,
+        inLanguage: 'en-US',
+        mainEntityOfPage: canonical,
+        author: { '@type': 'Organization', name: 'CV Analyzer', url: SITE_URL },
+        publisher: { '@type': 'Organization', name: 'CV Analyzer', url: SITE_URL },
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'CV Analyzer', item: `${SITE_URL}/` },
+          { '@type': 'ListItem', position: 2, name: page.title, item: canonical },
+        ],
+      },
+      {
+        '@type': 'FAQPage',
+        mainEntity: page.faq.map((item) => ({
+          '@type': 'Question',
+          name: item.question,
+          acceptedAnswer: { '@type': 'Answer', text: item.answer },
+        })),
+      },
+    ],
+  }
+}
+
 export default function SEOManager() {
   const { pathname } = useLocation()
-  const { lang } = useLanguage()
+  const { lang, setRouteLangOverride } = useLanguage()
 
   useEffect(() => {
+    const enPage = findEnSeoPage(pathname)
+
+    if (enPage) {
+      setRouteLangOverride('en')
+      const canonical = `${SITE_URL}${enPage.path}`
+      const trUrl = `${SITE_URL}${enPage.trPath}`
+
+      document.title = enPage.seoTitle
+      upsertMeta('meta[name="description"]', { name: 'description', content: enPage.description })
+      upsertMeta('meta[name="robots"]', { name: 'robots', content: 'index, follow, max-image-preview:large' })
+      upsertMeta('meta[property="og:title"]', { property: 'og:title', content: enPage.seoTitle })
+      upsertMeta('meta[property="og:description"]', { property: 'og:description', content: enPage.description })
+      upsertMeta('meta[property="og:url"]', { property: 'og:url', content: canonical })
+      upsertMeta('meta[property="og:locale"]', { property: 'og:locale', content: 'en_US' })
+      upsertMeta('meta[name="twitter:title"]', { name: 'twitter:title', content: enPage.seoTitle })
+      upsertMeta('meta[name="twitter:description"]', { name: 'twitter:description', content: enPage.description })
+      upsertCanonical(canonical)
+      upsertHreflangLinks([
+        { hreflang: 'en', href: canonical },
+        { hreflang: 'tr', href: trUrl },
+        { hreflang: 'x-default', href: canonical },
+      ])
+      setStructuredData(buildEnPageSchema(enPage))
+      return
+    }
+
+    setRouteLangOverride(null)
+
     const sourcePage = findSeoPage(pathname)
     const page = sourcePage ? getLocalizedSeoPage(sourcePage, lang) : null
     const guideUi = getGuideUi(lang)
@@ -137,8 +213,19 @@ export default function SEOManager() {
     upsertMeta('meta[name="twitter:title"]', { name: 'twitter:title', content: title })
     upsertMeta('meta[name="twitter:description"]', { name: 'twitter:description', content: description })
     upsertCanonical(canonical)
+
+    const enEquivalentPath = EN_EQUIVALENT_BY_TR_PATH[canonicalPath]
+    upsertHreflangLinks(
+      enEquivalentPath
+        ? [
+            { hreflang: 'tr', href: canonical },
+            { hreflang: 'en', href: `${SITE_URL}${enEquivalentPath}` },
+            { hreflang: 'x-default', href: `${SITE_URL}${enEquivalentPath}` },
+          ]
+        : [],
+    )
     setStructuredData(page ? buildPageSchema(page) : null)
-  }, [lang, pathname])
+  }, [lang, pathname, setRouteLangOverride])
 
   return null
 }
