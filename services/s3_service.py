@@ -9,9 +9,11 @@ import time
 
 try:
     import boto3
+    from botocore.config import Config as BotoConfig
     from botocore.exceptions import BotoCoreError, ClientError
 except Exception:  # pragma: no cover - exercised when optional AWS deps are absent
     boto3 = None
+    BotoConfig = None
 
     class BotoCoreError(Exception):
         pass
@@ -25,6 +27,7 @@ from config.aws import (
     AWS_SECRET_ACCESS_KEY,
     AWS_REGION,
     S3_BUCKET,
+    S3_ENDPOINT_URL,
     S3_KMS_KEY_ID,
     S3_SSE_ALGORITHM,
     PRESIGNED_URL_EXPIRY,
@@ -69,6 +72,11 @@ def _get_client():
                     "aws_secret_access_key": AWS_SECRET_ACCESS_KEY,
                 }
             )
+        if S3_ENDPOINT_URL:
+            # S3-compatible providers (Cloudflare R2, Backblaze B2) reject the
+            # default virtual-hosted addressing with a signature 403.
+            client_kwargs["endpoint_url"] = S3_ENDPOINT_URL
+            client_kwargs["config"] = BotoConfig(s3={"addressing_style": "path"})
         _client = boto3.client("s3", **client_kwargs)
     return _client
 

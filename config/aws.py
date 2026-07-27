@@ -42,6 +42,10 @@ AWS_REGION: str = os.getenv("AWS_REGION", "eu-north-1")
 S3_BUCKET: str = os.getenv("S3_BUCKET", "cv-analyzer-storage")
 AWS_USE_IAM_ROLE: bool = _bool_env("AWS_USE_IAM_ROLE", False)
 
+# Optional S3-compatible endpoint override (e.g. Cloudflare R2, Backblaze B2).
+# Leave unset to talk to real AWS S3.
+S3_ENDPOINT_URL: str = os.getenv("S3_ENDPOINT_URL", "").strip()
+
 # Allowed content types for CV uploads.
 ALLOWED_CONTENT_TYPES = frozenset(
     {
