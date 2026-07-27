@@ -39,7 +39,11 @@ sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git
 sudo usermod -aG docker $USER && newgrp docker
 
 git clone <REPO_URL> cv-analyzer && cd cv-analyzer
-cp .env.production.example .env            # fill EVERY empty value
+cp .env.production.example .env.production # fill EVERY empty value
+# docker-compose.prod.yml reads .env.production via env_file, but Compose's own
+# ${VAR} interpolation always reads a file literally named .env — so keep .env
+# as a symlink to avoid two files drifting apart:
+ln -s .env.production .env
 cp frontend/.env.production.example frontend/.env.production  # fill Supabase values
 
 # Cloudflare Dashboard -> SSL/TLS -> Origin Server -> Create certificate.

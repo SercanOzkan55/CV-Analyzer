@@ -3,12 +3,12 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     env_file:
-      - .env
+      - .env.production
     command: >-
       redis-server
       --maxmemory 256mb
       --maxmemory-policy allkeys-lru
-      --requirepass ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+      --requirepass ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env.production}
       --appendonly yes
       --bind 0.0.0.0
       --timeout 300
@@ -29,12 +29,12 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
-      - .env
+      - .env.production
     environment:
       ENV: production
       MOCK_SERVICES: "0"
-      DATABASE_URL: ${DATABASE_URL:?Set the Supabase DATABASE_URL in .env}
-      REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}@redis:6379/1
+      DATABASE_URL: ${DATABASE_URL:?Set the Supabase DATABASE_URL in .env.production}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env.production}@redis:6379/1
       TRUSTED_PROXY_COUNT: "1"
     expose:
       - "8001"
@@ -59,15 +59,15 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
-      - .env
+      - .env.production
     environment:
       ENV: production
       MOCK_SERVICES: "0"
       # Celery's CLI only puts the cwd on sys.path while importing the app,
       # so lazy imports inside tasks (e.g. `import utils`) need it pinned.
       PYTHONPATH: /app
-      DATABASE_URL: ${DATABASE_URL:?Set the Supabase DATABASE_URL in .env}
-      REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}@redis:6379/1
+      DATABASE_URL: ${DATABASE_URL:?Set the Supabase DATABASE_URL in .env.production}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env.production}@redis:6379/1
     command: celery -A services.tasks:celery_app worker --loglevel=info --concurrency=1 -Q default,pdf_processing,ai_tasks
     volumes:
       - ./resume_model.pkl:/app/resume_model.pkl:ro
