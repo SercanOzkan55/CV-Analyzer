@@ -71,6 +71,9 @@ _TECH_RE = re.compile(
     re.I,
 )
 _SKILL_DELIM_RE = re.compile(r"[,;|/]")
+# Layout debris that reaches the skills list on table-heavy CVs: bare page
+# numbers ("3") and separator remnants from "Label | : value" rows (":", "|").
+_SKILL_DEBRIS_RE = re.compile(r"[\s\-–—:|.·•*]+|\d{1,3}")
 _DATE_RANGE_RE = re.compile(
     r"(?:19|20)\d{2}\s*[-–—]\s*(?:(?:19|20)\d{2}|present|current|ongoing|halen|günümüz)",
     re.I,
@@ -882,6 +885,10 @@ def _cleanup_skills(data: Dict) -> None:
             if _URL_RAW_RE.search(s):
                 continue
             if re.match(r"^\d{4}\s*[-\u2013]\s*", s):
+                continue
+            # Structural debris rather than skills: stray page numbers and
+            # separator leftovers from "Label | : value" table rows.
+            if _SKILL_DEBRIS_RE.fullmatch(s.strip()):
                 continue
             words = s.split()
             has_delim = bool(_SKILL_DELIM_RE.search(s))

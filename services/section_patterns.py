@@ -267,7 +267,11 @@ _HEADER_HINTS: Dict[str, re.Pattern] = {
         re.I,
     ),
     "education": re.compile(
-        r"^(?:education|academic\s+background|academic\s+qualifications|educational\s+background|qualifications|academic|academics"
+        r"^(?:education|academic\s+background|academic\s+qualifications?|educational\s+background|qualifications?|academic|academics"
+        # "Educational Qualification", "Education Qualification", "Academic
+        # Details" — standard headings in South-Asian CV templates.
+        r"|education(?:al)?\s+qualifications?|education(?:al)?\s+details?|academic\s+details?"
+        r"|education(?:al)?\s+background\s+details?"
         # TR
         r"|e[gğ]itim|akademik\s*ge[cç]mi[sş]"
         # FR

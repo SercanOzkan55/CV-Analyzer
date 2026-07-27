@@ -523,6 +523,19 @@ SECTION_ALIASES = {
         "education",
         "academic background",
         "qualifications",
+        "qualification",
+        # Standard headings in South-Asian CV templates; without these the
+        # education block is invisible to ATS section scoring.
+        "educational qualification",
+        "educational qualifications",
+        "education qualification",
+        "education qualifications",
+        "academic qualification",
+        "academic qualifications",
+        "educational background",
+        "education details",
+        "educational details",
+        "academic details",
         # TR
         "eğitim",
         "akademik geçmiş",

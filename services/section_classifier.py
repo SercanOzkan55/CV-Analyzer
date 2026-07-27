@@ -470,6 +470,22 @@ _CONTACT_LINE_RE = re.compile(
     re.I,
 )
 
+# Purely decorative text that can follow a heading's colon ("Skills :-",
+# "Education : ---"). Anything matching this is punctuation, not a value.
+_DECORATIVE_TAIL_RE = re.compile(r"[-–—_.*=~:\s]+")
+
+# Standalone boilerplate lines that carry no CV content. Matched against the
+# whole normalised heading (never a substring) so job titles containing these
+# words — e.g. "Customs Declaration Officer" — are unaffected.
+#
+# Deliberately limited to "declaration": adding the neighbouring signature-block
+# words (date/place/signature) measured *worse* on the 18-CV corpus, because
+# those lines also anchor real content in some layouts.
+_NOISE_EXACT_RE = re.compile(
+    r"^(?:declarations?)$",
+    re.I,
+)
+
 # ALL-CAPS words that are safe to accept as section headers even
 # without matching _HEADER_HINTS.  Very conservative list.
 _ALLCAPS_SECTION_WORDS = frozenset(
@@ -794,9 +810,15 @@ def _sniff_header(line: str) -> str | None:
         return None
 
     # ── Key-Value guard: Lines with "Key : Value" are rarely standalone headers ──
+    # Decorative trailing punctuation is NOT a value: templates (very common in
+    # South-Asian CVs) write headings as "Educational Qualification:-" or
+    # "Technical Skills :". Treating "-" as a value silently dropped those
+    # headings, so their content leaked into the previous section.
     if ":" in stripped:
         parts = stripped.split(":", 1)
-        if len(parts[1].strip().split()) >= 1 and not parts[0].strip().isupper():
+        remainder = parts[1].strip()
+        is_decorative = not remainder or _DECORATIVE_TAIL_RE.fullmatch(remainder) is not None
+        if not is_decorative and not parts[0].strip().isupper():
             return None
 
     # Normalize for matching: remove punctuation, collapse whitespace
@@ -812,7 +834,7 @@ def _sniff_header(line: str) -> str | None:
             return canonical
 
     # 2) Noise headers
-    if _NOISE_KEYWORDS.search(normalized):
+    if _NOISE_KEYWORDS.search(normalized) or _NOISE_EXACT_RE.match(normalized):
         return "noise"
 
     # 3) Title Case check: "Education", "Experience", "Skills", etc.
