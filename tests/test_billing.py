@@ -27,8 +27,12 @@ class TestGetEntitlements:
     def test_free_plan(self):
         ent = get_entitlements("free")
         assert ent["plan"] == "free"
-        assert ent["ai_rewrite"] is False
+        # Beta: AI tools are open to everyone, but metered by a separate,
+        # much smaller daily budget than CV analysis.
+        assert ent["ai_rewrite"] is True
+        assert ent["ai_daily_limit"] == 2
         assert ent["daily_cv_limit"] >= 1
+        assert ent["recruiter_dashboard"] is False
 
     def test_pro_plan(self):
         ent = get_entitlements("pro")
@@ -52,11 +56,16 @@ class TestGetEntitlements:
 
 
 class TestIsFeatureEnabled:
-    def test_ai_rewrite_disabled_for_free(self):
-        assert is_feature_enabled("free", "ai_rewrite") is False
+    def test_ai_rewrite_enabled_for_free_during_beta(self):
+        # Access is open; the guard against runaway model spend is the
+        # separate ai_daily_limit, not the entitlement flag.
+        assert is_feature_enabled("free", "ai_rewrite") is True
 
     def test_ai_rewrite_enabled_for_pro(self):
         assert is_feature_enabled("pro", "ai_rewrite") is True
+
+    def test_recruiter_dashboard_still_gated_for_free(self):
+        assert is_feature_enabled("free", "recruiter_dashboard") is False
 
     def test_recruiter_dashboard_enterprise(self):
         assert is_feature_enabled("enterprise", "recruiter_dashboard") is True

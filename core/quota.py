@@ -219,6 +219,66 @@ def _daily_quota_key(user_id: str, now: datetime | None = None) -> str:
     return f"quota:daily:{user_id}:{dt.strftime('%Y%m%d')}"
 
 
+def _ai_daily_quota_key(user_id: str, now: datetime | None = None) -> str:
+    """Separate namespace so AI usage never consumes the CV-analysis quota."""
+    dt = now or _quota_now()
+    return f"quota:ai:{user_id}:{dt.strftime('%Y%m%d')}"
+
+
+def _resolve_ai_daily_limit_for_plan(plan_type: str | None) -> int:
+    from services.billing_service import get_entitlements
+
+    normalized = _normalize_plan(plan_type)
+    if normalized == "admin":
+        return 10**12
+    return int(get_entitlements(normalized).get("ai_daily_limit", 0))
+
+
+def _consume_ai_daily_quota(user_id: str, limit: int):
+    """Atomically consume one AI-feature unit for today.
+
+    Mirrors :func:`_consume_daily_quota` (Redis INCR with a midnight TTL and an
+    in-memory fallback) but against the ``quota:ai:`` namespace.
+    """
+    if limit <= 0:
+        return None
+
+    key = _ai_daily_quota_key(user_id)
+
+    def _memory_consume():
+        used = int(_LOCAL_DAILY_QUOTA.get(key, 0)) + 1
+        _LOCAL_DAILY_QUOTA[key] = used
+        _save_local_quota()
+        return {
+            "key": key,
+            "used": used,
+            "remaining": max(0, limit - used),
+            "limit": limit,
+            "allowed": used <= limit,
+            "source": "memory",
+        }
+
+    redis_rate = _get_redis_rate()
+    if not redis_rate:
+        return _memory_consume()
+
+    try:
+        used = int(redis_rate.incr(key))
+        ttl = int(redis_rate.ttl(key))
+        if used == 1 or ttl < 0:
+            redis_rate.expire(key, _seconds_until_next_quota_day())
+        return {
+            "key": key,
+            "used": used,
+            "remaining": max(0, limit - used),
+            "limit": limit,
+            "allowed": used <= limit,
+            "source": "redis",
+        }
+    except Exception:
+        return _memory_consume()
+
+
 def _resolve_daily_limit_for_plan(plan_type: str | None) -> int:
     normalized = _normalize_plan(plan_type)
     if normalized == "admin":

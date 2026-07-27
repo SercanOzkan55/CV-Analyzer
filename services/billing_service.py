@@ -4,22 +4,29 @@ import os
 _PLAN_DEFAULTS = {
     "free": {
         "daily_cv_limit": int(os.getenv("ENTITLE_FREE_DAILY_CV", "3")),
-        "ai_rewrite": False,
+        # Open during the beta so visitors can actually try the AI tools the
+        # marketing pages advertise. Metered separately from CV analysis by
+        # ``ai_daily_limit`` to keep model spend bounded.
+        "ai_rewrite": True,
+        "ai_daily_limit": int(os.getenv("ENTITLE_FREE_DAILY_AI", "2")),
         "recruiter_dashboard": False,
     },
     "pro": {
         "daily_cv_limit": int(os.getenv("ENTITLE_PRO_DAILY_CV", "50")),
         "ai_rewrite": True,
+        "ai_daily_limit": int(os.getenv("ENTITLE_PRO_DAILY_AI", "50")),
         "recruiter_dashboard": False,
     },
     "enterprise": {
         "daily_cv_limit": int(os.getenv("ENTITLE_ENTERPRISE_DAILY_CV", "200")),
         "ai_rewrite": True,
+        "ai_daily_limit": int(os.getenv("ENTITLE_ENTERPRISE_DAILY_AI", "200")),
         "recruiter_dashboard": True,
     },
     "admin": {
         "daily_cv_limit": 999999,
         "ai_rewrite": True,
+        "ai_daily_limit": 999999,
         "recruiter_dashboard": True,
     },
 }
