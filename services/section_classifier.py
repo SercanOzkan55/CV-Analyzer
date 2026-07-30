@@ -126,6 +126,7 @@ def split_blocks(text: str) -> List[List[str]]:
     # Also detect merged all-caps headers (e.g. "EDUCATIONCOMMUNICATION")
     # and expand them into separate header lines.
     refined: List[List[str]] = []
+    last_header: str | None = None
     for block in blocks:
         if len(block) <= 1:
             # Even single-line blocks might be merged headers
@@ -133,8 +134,11 @@ def split_blocks(text: str) -> List[List[str]]:
             if len(expanded) > 1:
                 for h in expanded:
                     refined.append([h])
+                last_header = _sniff_header(expanded[-1]) or last_header
             else:
                 refined.append(block)
+                if block:
+                    last_header = _sniff_header(block[0]) or last_header
             continue
         sub: List[str] = []
         for line in block:
@@ -147,16 +151,42 @@ def split_blocks(text: str) -> List[List[str]]:
                     sub = []
                 for h in expanded:
                     refined.append([h])
-            elif _sniff_header(line):
+                last_header = _sniff_header(expanded[-1]) or last_header
+                continue
+
+            hint = _sniff_header(line)
+            if hint and _is_skill_sublabel(line, hint, last_header):
+                sub.append(line)
+                continue
+
+            if hint:
                 if sub:
                     refined.append(sub)
                 sub = [line]
+                last_header = hint
             else:
                 sub.append(line)
         if sub:
             refined.append(sub)
 
     return refined
+
+
+# Sub-labels used *inside* a skills block to group technical skills, e.g.
+# "Diller:" / "Languages:" meaning programming languages. Standalone language
+# sections are written without a trailing colon ("YABANCI DİLLER", "DİLLER"),
+# so the colon plus the enclosing skills section is what disambiguates them.
+_SKILL_SUBLABEL_RE = re.compile(
+    r"^\s*(?:diller|programlama\s+dilleri|languages?|programming\s+languages?)\s*:\s*$",
+    re.I,
+)
+
+
+def _is_skill_sublabel(line: str, hint: str, last_header: str | None) -> bool:
+    """True when a 'languages' heading is really a category inside skills."""
+    if hint != "languages" or last_header != "skills":
+        return False
+    return bool(_SKILL_SUBLABEL_RE.match(line or ""))
 
 
 # Multi-column text reconstruction is now handled upstream by

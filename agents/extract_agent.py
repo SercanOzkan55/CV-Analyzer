@@ -605,18 +605,40 @@ def extract_structured(cv_text: str) -> Dict:
     from services.cv_autofix_service import _parse_sections as _parse_sections_deterministic
 
     _, deterministic_sections, _ = _parse_sections_deterministic(text)
-    for section_key in (
+    _OVERRIDABLE = (
         "experience",
         "projects",
         "education",
         "skills",
         "certifications",
         "languages",
-    ):
+    )
+    for section_key in _OVERRIDABLE:
         candidate = [line for line in deterministic_sections.get(section_key, []) if line]
         current_lines = [line for line in sections.get(section_key, []) if line]
-        if section_key in section_titles and len(candidate) > len(current_lines):
-            sections[section_key] = deterministic_sections[section_key]
+        if section_key not in section_titles or len(candidate) <= len(current_lines):
+            continue
+
+        # The deterministic parser has a simpler header model, so on layouts it
+        # misreads it can swallow a neighbouring section wholesale (e.g. a
+        # "Diller:" skills sub-label turning every technical skill into a
+        # foreign language). Only accept the larger result when it isn't
+        # claiming lines the classifier already assigned somewhere else.
+        claimed_elsewhere = {
+            line.strip()
+            for other_key, other_lines in sections.items()
+            if other_key != section_key and other_key in _OVERRIDABLE
+            for line in other_lines
+            if line and line.strip()
+        }
+        if claimed_elsewhere and any(line.strip() in claimed_elsewhere for line in candidate):
+            logger.debug(
+                "deterministic_override_rejected: %s would steal lines from another section",
+                section_key,
+            )
+            continue
+
+        sections[section_key] = deterministic_sections[section_key]
 
     name, title_lines, contacts, leftover = _extract_contact_block(header_lines, sections.get("contact", []))
 

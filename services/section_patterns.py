@@ -327,7 +327,7 @@ _HEADER_HINTS: Dict[str, re.Pattern] = {
         r"^(?:skills|technical\s+skills|core\s+competencies|competencies|technologies"
         r"|key\s+skills|professional\s+skills|it\s+skills|hard\s+skills|soft\s+skills|skill\s+set|skills?\s+set|skills?\s+and\s+abilities"
         # TR
-        r"|beceriler|yetenekler|teknik\s*beceriler|yetkinlikler"
+        r"|beceriler|yetenekler|teknik\s*beceriler|teknik\s*yetenekler|yetkinlikler"
         # FR
         r"|comp[ée]tences(?:\s+techniques)?|aptitudes"
         # DE
@@ -487,7 +487,7 @@ _HEADER_HINTS: Dict[str, re.Pattern] = {
     "languages": re.compile(
         r"^(?:languages?|language\s+skills|foreign\s+languages"
         # TR
-        r"|diller|yabanc[ıi]\s*diller"
+        r"|diller|yabanc[ıi]\s*dil(?:ler)?"
         # FR
         r"|langues|comp[ée]tences\s+linguistiques"
         # DE

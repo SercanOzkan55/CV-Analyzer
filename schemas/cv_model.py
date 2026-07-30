@@ -68,6 +68,13 @@ class CVModel(BaseModel):
         payload = dict(data or {})
         payload.setdefault("skills", payload.get("skills") or [])
 
+        # Callers (notably the autofix builder payload) pass the CV language as
+        # "lang". Pydantic silently drops unknown keys, so that used to fall
+        # back to English and render Turkish CVs with English headings.
+        if "language" not in payload and payload.get("lang"):
+            payload["language"] = payload["lang"]
+        payload.pop("lang", None)
+
         # Normalize languages: accept list[str] or list[dict] from frontend
         raw_langs = payload.get("languages") or []
         normalized_langs: list[str] = []

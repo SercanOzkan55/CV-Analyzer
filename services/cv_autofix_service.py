@@ -1641,6 +1641,7 @@ def _pipeline_to_structured_text(
         contacts,
         structured_sections,
         section_order,
+        lang=str(normalized.get("language") or "en"),
     )
     return text, structured_sections, dropped, section_order
 
@@ -1651,6 +1652,7 @@ def _render_structured_sections(
     contacts: list[str],
     structured_sections: dict[str, list[str]],
     section_order: list[str] | None = None,
+    lang: str = "en",
 ) -> str:
     output_lines: list[str] = []
     if name:
@@ -1668,7 +1670,7 @@ def _render_structured_sections(
         values = [value for value in (structured_sections.get(key) or []) if value]
         if not values:
             continue
-        output_lines.append(SECTION_TITLES.get(key, key.upper()))
+        output_lines.append(get_section_title(key, lang))
         output_lines.extend(values)
         output_lines.append("")
 
@@ -1854,6 +1856,7 @@ def _boost_keywords(
     job_description: str,
     mode: str = "balanced",
     section_order: list[str] | None = None,
+    lang: str = "en",
 ) -> str:
     header_lines, parsed_sections, _ = _parse_sections(structured_text)
     name, title_lines, contacts, _ = _extract_contact_block(header_lines, parsed_sections.get("contact", []))
@@ -1928,7 +1931,9 @@ def _boost_keywords(
         if top:
             boosted_sections["summary"] = [f"Professional with expertise in {', '.join(top)}."]
 
-    return _render_structured_sections(name, title_lines, contacts, boosted_sections, section_order=section_order)
+    return _render_structured_sections(
+        name, title_lines, contacts, boosted_sections, section_order=section_order, lang=lang
+    )
 
 
 def _split_concatenated_bullets(lines: list[str]) -> list[str]:
@@ -2701,6 +2706,17 @@ def _extract_categorized_skills(lines: list[str]) -> tuple[dict[str, list[str]],
     uncategorized: list[str] = []
     last_category = ""
 
+    def _add_to_category(name: str, items: list[str]) -> None:
+        bucket = categories.setdefault(name, [])
+        for item in items:
+            if item not in bucket:
+                bucket.append(item)
+
+    # A category label on its own line ("Diller:", "Backend:") whose values
+    # follow on the next line(s). Without this, the label was emitted as a
+    # bogus skill and its values never got attached to a category.
+    pending_category = ""
+
     for raw in lines or []:
         line = str(raw or "").strip()
         if not line:
@@ -2711,24 +2727,35 @@ def _extract_categorized_skills(lines: list[str]) -> tuple[dict[str, list[str]],
             values = values.lstrip(" |")
             items = [item.strip(" -*•") for item in re.split(r"\s*[,;/|]\s*", values) if item.strip(" -*•")]
             if category_clean and items:
-                categories.setdefault(category_clean, [])
-                for item in items:
-                    if item not in categories[category_clean]:
-                        categories[category_clean].append(item)
+                _add_to_category(category_clean, items)
                 last_category = category_clean
+                pending_category = ""
+                continue
+            if category_clean and not items and len(category_clean.split()) <= 4:
+                # Bare "Label:" — hold it for the following line's values.
+                pending_category = category_clean
                 continue
         if (
             last_category
+            and not pending_category
             and len(line.split()) <= 3
             and categories.get(last_category)
             and not re.match(r"^\s*[-*•]\s+", line)
         ):
             categories[last_category][-1] = f"{categories[last_category][-1]} {line}".strip()
             continue
+
+        stripped = re.sub(r"^\s*[-*•]\s*", "", line).strip()
+        items = [item.strip(" -*•") for item in re.split(r"\s*[,;/|]\s*", stripped) if item.strip(" -*•")]
+        if pending_category and items:
+            _add_to_category(pending_category, items)
+            last_category = pending_category
+            pending_category = ""
+            continue
         if re.match(r"^\s*[-*•]\s+", line):
-            uncategorized.append(re.sub(r"^\s*[-*•]\s+", "", line).strip())
+            uncategorized.append(stripped)
         else:
-            uncategorized.extend([item.strip() for item in re.split(r"\s*[,;/|]\s*", line) if item.strip()])
+            uncategorized.extend(items)
 
     if uncategorized:
         dedup_uncat: list[str] = []
@@ -3378,6 +3405,7 @@ def _restore_lost_sections(
     orig_name: str | None,
     orig_title_lines: list[str],
     orig_contacts: list[str],
+    lang: str = "en",
 ) -> tuple[str, dict[str, list[str]], list[str], list[str]]:
     """Restore sections that were lost during pipeline processing.
 
@@ -3394,6 +3422,7 @@ def _restore_lost_sections(
                 orig_contacts,
                 structured_sections,
                 section_order,
+                lang=lang,
             ),
             structured_sections,
             section_order,
@@ -3421,6 +3450,7 @@ def _restore_lost_sections(
         orig_contacts,
         structured_sections,
         section_order,
+        lang=lang,
     )
     return rebuilt_text, structured_sections, section_order, restoration_warnings
 
@@ -3437,6 +3467,7 @@ def _enforce_protected_section_floor(
     orig_name: str | None,
     orig_title_lines: list[str],
     orig_contacts: list[str],
+    lang: str = "en",
 ) -> tuple[str, dict[str, list[str]], list[str], list[str]]:
     """Never let normalization shrink evidence-heavy sections.
 
@@ -3471,6 +3502,7 @@ def _enforce_protected_section_floor(
         orig_contacts,
         rebuilt_sections,
         section_order,
+        lang=lang,
     )
     return rebuilt_text, rebuilt_sections, section_order, restored
 
@@ -3575,6 +3607,7 @@ def auto_fix_cv_text(
             orig_name=_pipe_name,
             orig_title_lines=[_pipe_title] if _pipe_title else [],
             orig_contacts=_pipe_contacts,
+            lang=lang,
         )
 
     # ═══ KEYWORD BOOSTING ═══
@@ -3586,6 +3619,7 @@ def auto_fix_cv_text(
             job_description,
             mode=boost_mode,
             section_order=section_order,
+            lang=lang,
         )
         boosted_ats = analyze_cv(boosted_text, job_description, lang=lang)
         plain_ats = analyze_cv(optimized_text, job_description, lang=lang)
@@ -3670,6 +3704,7 @@ def auto_fix_cv_text(
         orig_name=orig_name,
         orig_title_lines=[orig_title] if orig_title else [],
         orig_contacts=orig_contacts,
+        lang=lang,
     )
     warnings.extend(_floor_warns)
     if _floor_warns:
