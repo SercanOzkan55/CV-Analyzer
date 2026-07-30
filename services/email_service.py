@@ -293,16 +293,23 @@ def _reminder_type_label(value: str) -> str:
     return labels.get((value or "").strip().lower(), "Hatırlatma")
 
 
-def _render_reminder_subject(reminder: Reminder, days_left: int) -> str:
+def _reminder_lead_text(days_left: int, *, hours: bool = False) -> str:
+    """Human phrase for how much time is left before the event."""
+    if hours:
+        return "1 saat kaldı"
+    return "1 gün kaldı" if int(days_left) <= 1 else f"{int(days_left)} gün kaldı"
+
+
+def _render_reminder_subject(reminder: Reminder, days_left: int, *, hours: bool = False) -> str:
     label = _reminder_type_label(reminder.reminder_type)
-    day_text = "1 gün kaldı" if int(days_left) <= 1 else f"{int(days_left)} gün kaldı"
+    day_text = _reminder_lead_text(days_left, hours=hours)
     return f"[CV Analyzer] {label}: {reminder.title} - {day_text}"
 
 
-def _render_reminder_body(reminder: Reminder, days_left: int) -> str:
+def _render_reminder_body(reminder: Reminder, days_left: int, *, hours: bool = False) -> str:
     event_date = reminder.event_date.strftime("%Y-%m-%d %H:%M")
     label = _reminder_type_label(reminder.reminder_type)
-    day_text = "1 gün kaldı" if int(days_left) <= 1 else f"{int(days_left)} gün kaldı"
+    day_text = _reminder_lead_text(days_left, hours=hours)
     body_lines = [
         "Merhaba,",
         "",
@@ -328,15 +335,20 @@ def _render_reminder_body(reminder: Reminder, days_left: int) -> str:
     return "\n".join(body_lines)
 
 
-def _send_reminder_email(reminder: Reminder, days_left: int, recipient: str) -> bool:
-    subject = _render_reminder_subject(reminder, days_left)
-    body = _render_reminder_body(reminder, days_left)
+def _send_reminder_email(reminder: Reminder, days_left: int, recipient: str, *, hours: bool = False) -> bool:
+    subject = _render_reminder_subject(reminder, days_left, hours=hours)
+    body = _render_reminder_body(reminder, days_left, hours=hours)
     return _do_send_email(
         to_email=recipient,
         subject=subject,
         body=body,
         recruiter_email="",
     )
+
+
+# How close to the event the "1 saat kaldı" mail fires. Slightly over an hour
+# so a worker tick that lands just before the hour mark still catches it.
+_REMINDER_HOUR_LEAD = float(os.getenv("REMINDER_HOUR_LEAD", "1.25"))
 
 
 def _process_due_reminders(db):
@@ -351,7 +363,11 @@ def _process_due_reminders(db):
                 Reminder.is_active == True,
                 Reminder.event_date > now,
                 Reminder.event_date <= window_end,
-                or_(Reminder.notified_3d_at.is_(None), Reminder.notified_1d_at.is_(None)),
+                or_(
+                    Reminder.notified_3d_at.is_(None),
+                    Reminder.notified_1d_at.is_(None),
+                    Reminder.notified_1h_at.is_(None),
+                ),
             )
             .all()
         )
@@ -374,9 +390,24 @@ def _process_due_reminders(db):
             db.rollback()
             continue
         days_left = (reminder.event_date.date() - today).days
+        hours_left = (reminder.event_date - now).total_seconds() / 3600.0
         recipient = reminder.target_email or ""
         if not recipient:
             db.rollback()
+            continue
+        # Most urgent first: an event an hour away should get the "1 saat"
+        # mail, not a second "1 gün" one.
+        if reminder.notified_1h_at is None and hours_left <= _REMINDER_HOUR_LEAD:
+            if _send_reminder_email(reminder, 0, recipient, hours=True):
+                reminder.notified_1h_at = now
+                # A same-day reminder created inside the 1-hour window never
+                # had a 1-day mail to send; mark it so it isn't chased later.
+                if reminder.notified_1d_at is None:
+                    reminder.notified_1d_at = now
+                db.add(reminder)
+                db.commit()
+            else:
+                db.rollback()
             continue
         if reminder.notified_1d_at is None and days_left <= 1:
             if _send_reminder_email(reminder, 1, recipient):
@@ -405,7 +436,9 @@ def _start_reminder_worker():
     if _REMINDER_WORKER_STARTED:
         return
     _REMINDER_WORKER_STARTED = True
-    interval = int(os.getenv("REMINDER_CHECK_INTERVAL_SECONDS", "3600"))
+    # 15 minutes: an hourly tick cannot reliably land inside the 1-hour
+    # pre-event window, so the "1 saat kaldı" mail would be missed.
+    interval = int(os.getenv("REMINDER_CHECK_INTERVAL_SECONDS", "900"))
 
     def _loop():
         while True:

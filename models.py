@@ -409,6 +409,7 @@ class Reminder(Base):
     is_active = Column(Boolean, default=True)
     notified_3d_at = Column(DateTime, nullable=True)
     notified_1d_at = Column(DateTime, nullable=True)
+    notified_1h_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

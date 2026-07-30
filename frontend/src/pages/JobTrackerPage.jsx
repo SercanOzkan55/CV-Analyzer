@@ -267,7 +267,7 @@ function JobModal({ job, initialStatus, userEmail, onSave, onClose, t, lang }) {
                   </div>
                 </div>
                 <p className="jt-reminder-help">
-                  {copy(lang, 'CV Analyzer etkinliğe 3 gün ve 1 gün kala otomatik mail gönderir.', 'CV Analyzer sends automatic email reminders 3 days and 1 day before the event.')}
+                  {copy(lang, 'CV Analyzer etkinliğe 3 gün, 1 gün ve 1 saat kala otomatik mail gönderir.', 'CV Analyzer sends automatic email reminders 3 days, 1 day and 1 hour before the event.')}
                 </p>
               </>
             )}
