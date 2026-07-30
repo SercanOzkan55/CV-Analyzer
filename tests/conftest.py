@@ -7,6 +7,7 @@ Professional test conftest.py
 """
 
 import os
+import re
 from pathlib import Path
 import shutil
 import sys
@@ -187,7 +188,38 @@ def _mock_verify_jwt(authorization: str = None):
 
 
 # ─── DB URL used by all fixtures ───
-_TEST_DB_URL = os.getenv("DATABASE_URL", "postgresql+psycopg2://testuser:testpass@localhost:5433/testdb")
+_DEFAULT_TEST_DB_URL = "postgresql+psycopg2://testuser:testpass@localhost:5433/testdb"
+
+
+def _assert_disposable_database(db_url: str) -> str:
+    """Refuse to run the suite against anything but a throwaway database.
+
+    The fixtures TRUNCATE every table between tests and ``drop_all()`` at the
+    end of the session. Importing the app above also calls ``load_dotenv()``,
+    which pulls a developer's real ``DATABASE_URL`` into the environment — so
+    without this guard a plain ``pytest`` silently wipes production.
+    """
+    url = str(db_url or "")
+    if url.startswith("sqlite"):
+        return url
+
+    host = re.sub(r"^.*@", "", url).split("/")[0].split("?")[0]
+    hostname = host.split(":")[0].lower()
+    if hostname in {"localhost", "127.0.0.1", "::1", "postgres", "db", "testdb"}:
+        return url
+
+    raise RuntimeError(
+        "Refusing to run tests against a non-local database.\n"
+        f"  Resolved host: {hostname or '<unknown>'}\n"
+        "The test fixtures TRUNCATE and DROP every table, so this would destroy "
+        "real data.\n"
+        "Run tests against a local Postgres or sqlite instead, e.g.:\n"
+        "  DATABASE_URL=sqlite:///./test.db pytest\n"
+        "or unset DATABASE_URL in your .env before running pytest."
+    )
+
+
+_TEST_DB_URL = _assert_disposable_database(os.getenv("DATABASE_URL", _DEFAULT_TEST_DB_URL))
 _FALLBACK_SQLITE_URL = f"sqlite:///./.pytest_test_{os.getpid()}.db"
 _ACTIVE_TEST_DB_URL = _TEST_DB_URL
 
