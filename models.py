@@ -56,9 +56,7 @@ class BlogPost(Base):
     """A community-authored blog post that passed server-side moderation."""
 
     __tablename__ = "blog_posts"
-    __table_args__ = (
-        CheckConstraint("status IN ('published', 'hidden')", name="check_blog_post_status"),
-    )
+    __table_args__ = (CheckConstraint("status IN ('published', 'hidden')", name="check_blog_post_status"),)
 
     id = Column(Integer, primary_key=True)
     author_supabase_id = Column(String(128), nullable=False, index=True)
@@ -82,9 +80,7 @@ class BlogComment(Base):
     """A moderated comment or one-level reply on a community blog post."""
 
     __tablename__ = "blog_comments"
-    __table_args__ = (
-        CheckConstraint("status IN ('published', 'hidden')", name="check_blog_comment_status"),
-    )
+    __table_args__ = (CheckConstraint("status IN ('published', 'hidden')", name="check_blog_comment_status"),)
 
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey("blog_posts.id", ondelete="CASCADE"), nullable=False, index=True)

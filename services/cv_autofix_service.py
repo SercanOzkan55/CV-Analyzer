@@ -3813,9 +3813,7 @@ def auto_fix_cv_text(
     before_voice_count = int(before_ats.get("content", {}).get("first_person_count", 0) or 0)
     after_voice_count = int(after_ats.get("content", {}).get("first_person_count", 0) or 0)
     if after_voice_count < before_voice_count:
-        applied_changes.append(
-            "Normalized first-person resume narration using language-aware CV voice rules."
-        )
+        applied_changes.append("Normalized first-person resume narration using language-aware CV voice rules.")
     if not any(c for c in applied_changes if "Smart mode" not in c):
         applied_changes.append("Clean CV detected; kept original content unchanged.")
 

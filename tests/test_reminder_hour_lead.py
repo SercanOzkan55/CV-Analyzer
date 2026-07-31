@@ -88,9 +88,7 @@ class TestHourReminder:
 
     def test_does_not_fire_twice(self, sent):
         already = datetime.utcnow()
-        r = FakeReminder(
-            datetime.utcnow() + timedelta(minutes=40), d3=already, d1=already, h1=already
-        )
+        r = FakeReminder(datetime.utcnow() + timedelta(minutes=40), d3=already, d1=already, h1=already)
         _run(r)
         assert sent == []
 
