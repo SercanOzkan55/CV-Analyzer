@@ -11,6 +11,7 @@ from services.schema_builder import build_schema
 
 from . import rewrite_service
 from .ats_service import analyze_cv
+from .cv_voice_service import rewrite_resume_voice
 from .section_classifier import detect_sections as _block_detect_sections
 from .skill_service import extract_skills
 
@@ -517,6 +518,11 @@ def _polish_text(text: str, lang: str = "en") -> str:
         if lang == "tr":
             for pattern, replacement in _COMMON_TR_SPELLING_FIXES:
                 stripped = pattern.sub(lambda match, value=replacement: _preserve_match_case(match, value), stripped)
+
+        # Resume voice is language-specific: Turkish uses third-person
+        # singular action verbs, while English omits the first-person subject.
+        # This is deliberately applied in Auto-Fix, never in raw extraction.
+        stripped = rewrite_resume_voice(stripped, lang=lang)
 
         # Normalize bullet chars: ▪ ◦ ◆ ▸ ► → •
         stripped = re.sub(r"^[\u25AA\u25E6\u25C6\u25B8\u25BA]\s*", "• ", stripped)
@@ -3804,6 +3810,12 @@ def auto_fix_cv_text(
         applied_changes.append(
             "Applied strict wording polish: summary, experience, and project bullets were normalized with stronger ATS action verbs where safe."
         )
+    before_voice_count = int(before_ats.get("content", {}).get("first_person_count", 0) or 0)
+    after_voice_count = int(after_ats.get("content", {}).get("first_person_count", 0) or 0)
+    if after_voice_count < before_voice_count:
+        applied_changes.append(
+            "Normalized first-person resume narration using language-aware CV voice rules."
+        )
     if not any(c for c in applied_changes if "Smart mode" not in c):
         applied_changes.append("Clean CV detected; kept original content unchanged.")
 
@@ -3837,6 +3849,15 @@ def auto_fix_cv_text(
         used_ai=used_ai,
         allow_translated_narrative=bool(used_ai and source_language != lang),
     )
+    # The safe builder merge intentionally preserves source facts. Apply the
+    # same fact-neutral voice normalization after that merge so exported DOCX/
+    # PDF content agrees with the optimized text and score.
+    builder_model.summary = rewrite_resume_voice(builder_model.summary, lang=lang)
+    for experience in builder_model.experiences:
+        experience.bullets = [rewrite_resume_voice(bullet, lang=lang) for bullet in experience.bullets]
+    for project in builder_model.projects:
+        project.description = rewrite_resume_voice(project.description, lang=lang)
+        project.bullets = [rewrite_resume_voice(bullet, lang=lang) for bullet in project.bullets]
     export_safe, extraction_quality = _assess_export_safety(cv_text, builder_model)
     export_warning = "" if export_safe else UNSAFE_EXPORT_WARNING
     if export_warning and export_warning not in warnings:

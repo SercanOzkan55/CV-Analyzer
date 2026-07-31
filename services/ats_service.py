@@ -14,6 +14,7 @@ from typing import Dict, List
 
 from .keyword_service import keyword_match_score
 from .language_service import SECTION_ALIASES, clean_lower
+from .cv_voice_service import analyze_resume_voice
 
 # ── Section detection ────────────────────────────────────────────────
 
@@ -211,14 +212,6 @@ ACTION_VERBS_I18N: dict[str, list[str]] = {
         "denetledi",
         "planladı",
         "kurdu",
-        "geliştirdim",
-        "tasarladım",
-        "uyguladım",
-        "yönettim",
-        "optimize ettim",
-        "analiz ettim",
-        "iyileştirdim",
-        "oluşturdum",
         "yönetti",
         "liderlik etti",
         "koordine etti",
@@ -882,7 +875,7 @@ def _action_verb_score(cv_text: str, lang: str = "en") -> float:
         if is_en_verb:
             hits = len(re.findall(r"\b" + re.escape(clean_lower(v)) + r"(?:s|ed|ing|d)?\b", text))
         elif lang == "tr":
-            hits = len(re.findall(r"\b" + re.escape(clean_lower(v)) + r"(?:[mk])?\b", text))
+            hits = len(re.findall(r"\b" + re.escape(clean_lower(v)) + r"\b", text))
         else:
             hits = len(re.findall(r"\b" + re.escape(clean_lower(v)) + r"\b", text))
         if hits > 0:
@@ -1003,7 +996,7 @@ def _formatting_consistency_score(cv_text: str) -> float:
     return max(0.0, score)
 
 
-def _summary_score(cv_text: str) -> float:
+def _summary_score(cv_text: str, lang: str = "en") -> float:
     """Score the professional summary / profile section."""
     text_lower = clean_lower(cv_text)
     has_summary = bool(
@@ -1041,7 +1034,13 @@ def _summary_score(cv_text: str) -> float:
     if quant >= 1:
         score += 15.0
 
-    return min(100.0, score)
+    # A professional summary should not switch into first-person narration.
+    # Turkish uses third-person singular; English conventionally omits the
+    # subject. Keep this a bounded style penalty so content still dominates.
+    voice_score = float(analyze_resume_voice(summary_text, lang=lang)["score"])
+    score -= min(15.0, (100.0 - voice_score) * 0.2)
+
+    return max(0.0, min(100.0, score))
 
 
 def _skills_section_score(cv_text: str, job_text: str = "") -> float:
@@ -1124,7 +1123,7 @@ def _work_experience_score(cv_text: str, lang: str = "en") -> float:
             if is_en_verb:
                 matched = bool(re.search(r"\b" + re.escape(clean_lower(v)) + r"(?:s|ed|ing|d)?\b", text_lower))
             elif lang == "tr":
-                matched = bool(re.search(r"\b" + re.escape(clean_lower(v)) + r"(?:[mk])?\b", text_lower))
+                matched = bool(re.search(r"\b" + re.escape(clean_lower(v)) + r"\b", text_lower))
             else:
                 matched = bool(re.search(r"\b" + re.escape(clean_lower(v)) + r"\b", text_lower))
             if matched:
@@ -1168,7 +1167,7 @@ def _work_experience_score(cv_text: str, lang: str = "en") -> float:
         if is_en_verb:
             matched = bool(re.search(r"\b" + re.escape(clean_lower(v)) + r"(?:s|ed|ing|d)?\b", text_lower))
         elif lang == "tr":
-            matched = bool(re.search(r"\b" + re.escape(clean_lower(v)) + r"(?:[mk])?\b", text_lower))
+            matched = bool(re.search(r"\b" + re.escape(clean_lower(v)) + r"\b", text_lower))
         else:
             matched = bool(re.search(r"\b" + re.escape(clean_lower(v)) + r"\b", text_lower))
         if matched:
@@ -1686,6 +1685,8 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
     penalty = _keyword_density_penalty(cv_text, job_text)
 
     action_score = _action_verb_score(cv_text, lang=lang)
+    voice_report = analyze_resume_voice(cv_text, lang=lang)
+    voice_score = float(voice_report["score"])
 
     # Quantified achievements: percentages, dollar amounts, large numbers
     quant_hits = 0
@@ -1740,6 +1741,10 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
     else:
         content_score = (0.5 * action_score) + (0.5 * achievement_score)
 
+    # Good resume voice is the baseline, not a bonus. Penalize only detected
+    # first-person narration so existing clean-CV score calibration is stable.
+    content_score -= (100.0 - voice_score) * 0.15
+
     content_score = max(0.0, min(100.0, content_score))
 
     # Formatting consistency score
@@ -1747,7 +1752,7 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
 
     # ── Section-level detailed scores ────────────────────────────────
     edu_score = _education_score(cv_text)
-    summary_score = _summary_score(cv_text)
+    summary_score = _summary_score(cv_text, lang=lang)
     skills_score = _skills_section_score(cv_text, job_text)
     work_exp_score = _work_experience_score(cv_text, lang=lang)
 
@@ -1790,6 +1795,7 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
             + edu_score * 0.07
             + bullet_score * 0.06
         )
+    rule_overall -= (100.0 - voice_score) * 0.08
     rule_overall = max(0.0, min(100.0, rule_overall))
     overall = round(rule_overall, 2)
 
@@ -1858,6 +1864,35 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
             "message": _get_section_message("summary", summary_score, lang),
             "recommendations": _get_section_recommendations("summary", summary_score, lang),
         },
+        {
+            "name": "resume_voice",
+            "icon": "✍️",
+            "label": {"en": "Resume Voice", "tr": "CV Anlatım Dili"},
+            "score": round(voice_score, 0),
+            "status": _get_section_status(voice_score),
+            "message": {
+                "en": (
+                    "Resume voice is consistent and professional."
+                    if voice_score >= 85
+                    else "First-person narration weakens the professional resume style."
+                ),
+                "tr": (
+                    "CV anlatımı tutarlı ve profesyonel."
+                    if voice_score >= 85
+                    else "Birinci tekil anlatım profesyonel CV üslubunu zayıflatıyor."
+                ),
+            },
+            "recommendations": (
+                []
+                if voice_score >= 85
+                else [
+                    {
+                        "en": "Remove first-person pronouns and start bullets with action verbs (I analyzed → Analyzed).",
+                        "tr": "Birinci tekil anlatımı üçüncü tekil, sonuç odaklı fiillere dönüştürün (analiz ettim → analiz etti).",
+                    }
+                ]
+            ),
+        },
     ]
 
     # Only include keywords section when a job description is provided
@@ -1906,6 +1941,13 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
                 "tr": "Daha iyi okunabilirlik ve ATS uyumluluğu için biçimlendirme tutarlılığını iyileştirin.",
             }
         )
+    if voice_score < 70:
+        high_priority.append(
+            {
+                "en": "Use consistent resume voice: remove first-person pronouns and begin achievements with action verbs.",
+                "tr": "Deneyim ve özet cümlelerinde birinci tekil anlatım yerine üçüncü tekil, sonuç odaklı fiiller kullanın.",
+            }
+        )
 
     if edu_score < 90:
         medium_priority.append(
@@ -1926,6 +1968,13 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
             {
                 "en": "Incorporate keywords from targeted job descriptions into resume content.",
                 "tr": "Hedeflenen iş tanımlarının anahtar kelimelerini CV içeriğine ekleyin.",
+            }
+        )
+    if 70 <= voice_score < 85:
+        medium_priority.append(
+            {
+                "en": "Make resume voice consistent by replacing remaining first-person phrases with action-led statements.",
+                "tr": "Kalan birinci tekil ifadeleri üçüncü tekil, aksiyon odaklı cümlelere dönüştürerek CV anlatımını tutarlı hâle getirin.",
             }
         )
 
@@ -1969,12 +2018,20 @@ def analyze_cv(cv_text: str, job_text: str = "", lang: str = "en") -> Dict:
         suggestions.append(get_ats_suggestion("quantify_achievements", lang))
     if formatting_score < 50:
         suggestions.append(get_ats_suggestion("formatting_inconsistent", lang))
+    if voice_score < 85:
+        suggestions.append(
+            "Birinci tekil anlatımı üçüncü tekil fiillere dönüştürün (analiz ettim → analiz etti)."
+            if lang == "tr"
+            else "Remove first-person pronouns and begin resume statements with action verbs (I analyzed → Analyzed)."
+        )
 
     result = {
         "content": {
             "keyword_score": round(keyword_score, 2),
             "action_verb_score": round(action_score, 2),
             "achievement_score": round(achievement_score, 2),
+            "resume_voice_score": round(voice_score, 2),
+            "first_person_count": int(voice_report["first_person_count"]),
             "content_score": round(content_score, 2),
         },
         "layout": {

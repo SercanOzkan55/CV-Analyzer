@@ -76,6 +76,27 @@ class TestActionVerbScore:
         score = _action_verb_score(text, lang="tr")
         assert score >= 30
 
+    def test_turkish_first_person_verbs_are_not_rewarded_as_action_verbs(self):
+        first_person = "Süre farklarını analiz ettim ve raporlama sürecini geliştirdim."
+        resume_voice = "Süre farklarını analiz etti ve raporlama sürecini geliştirdi."
+
+        assert _action_verb_score(first_person, lang="tr") < _action_verb_score(resume_voice, lang="tr")
+
+
+def test_analyze_cv_scores_and_recommends_language_aware_resume_voice():
+    text = (
+        "EDANUR ÖRNEK\n"
+        "ÖZET\nÜretim süreçlerini analiz ettim ve iyileştirme önerileri sundum.\n"
+        "DENEYİM\n2024 - 2025\n- Zaman etütleri yaptım ve farkları raporladım.\n"
+        "EĞİTİM\nEndüstri Mühendisliği\nYETENEKLER\nExcel, SQL"
+    )
+
+    result = analyze_cv(text, lang="tr")
+
+    assert result["content"]["resume_voice_score"] < 85
+    assert result["content"]["first_person_count"] >= 3
+    assert any("birinci tekil" in item["tr"].lower() for item in result["priority_recommendations"]["high"])
+
 
 class TestLengthScore:
     def test_optimal_length(self):

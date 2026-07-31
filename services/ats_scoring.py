@@ -23,6 +23,7 @@ from dataclasses import dataclass
 
 from schemas.cv_model import CVModel
 from utils.cv_text import build_cv_text
+from .cv_voice_service import analyze_resume_voice
 
 
 # ── Result model ──────────────────────────────────────────────────────────
@@ -223,6 +224,16 @@ def _score_ats(model: CVModel) -> int:
     if model.phone:
         score += 5
 
+    # Style is not a parsing failure, so keep the ATS penalty small. This also
+    # covers first-person language in the summary, which has no own category.
+    narrative = "\n".join(
+        [model.summary]
+        + [bullet for exp in model.experiences for bullet in exp.bullets]
+        + [bullet for project in model.projects for bullet in project.bullets]
+    )
+    voice_score = float(analyze_resume_voice(narrative, lang=model.language)["score"])
+    score -= round(min(10.0, (100.0 - voice_score) * 0.13))
+
     return _clamp(score)
 
 
@@ -271,6 +282,12 @@ def _score_experience(model: CVModel) -> int:
     quant_count = sum(1 for e in model.experiences for b in e.bullets if re.search(r"\d+[%$€£]|\d{2,}", b))
     if quant_count >= 3:
         base += 5
+
+    # First-person narration is weaker CV style. Turkish bullets should use
+    # third-person singular; English bullets should omit the subject.
+    experience_text = "\n".join(b for e in model.experiences for b in e.bullets)
+    voice_score = float(analyze_resume_voice(experience_text, lang=model.language)["score"])
+    base -= round(min(20.0, (100.0 - voice_score) * 0.25))
 
     return _clamp(base)
 

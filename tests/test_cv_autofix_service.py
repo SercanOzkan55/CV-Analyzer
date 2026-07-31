@@ -55,6 +55,21 @@ def test_polish_text():
     assert "- Bullet two" in polished or "Bullet two" in polished
 
 
+def test_polish_text_normalizes_turkish_resume_voice():
+    text = (
+        "- Üretim hattındaki süre farklarını analiz ettim.\n"
+        "- İyileştirme önerilerinde bulundum, sundum ve raporladım.\n"
+        "EĞİTİM\nÜretim yönetimi ve yazılım tasarımı"
+    )
+
+    polished = _polish_text(text, lang="tr")
+
+    assert "analiz etti." in polished
+    assert "bulundu, sundu ve raporladı." in polished
+    assert "EĞİTİM" in polished
+    assert "Üretim yönetimi ve yazılım tasarımı" in polished
+
+
 def test_canonical_section():
     assert _canonical_section("PROFESSIONAL SUMMARY") == "summary"
     assert _canonical_section("Work Experience:") == "experience"

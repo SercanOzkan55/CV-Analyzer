@@ -81,6 +81,36 @@ class TestScoreCV:
             score = getattr(result, field)
             assert 0 <= score <= 100, f"{field} out of range: {score}"
 
+    def test_turkish_first_person_experience_scores_lower_than_resume_voice(self):
+        first_person_model = _make_model(
+            language="tr",
+            experiences=[
+                Experience(
+                    title="Stajyer",
+                    company="Fabrika",
+                    bullets=[
+                        "Üretim hattındaki süre farklarını analiz ettim.",
+                        "İyileştirme önerilerinde bulundum.",
+                        "Sonuçları yönetime sundum.",
+                        "Haftalık raporlama sürecini geliştirdim.",
+                    ],
+                )
+            ],
+        )
+        resume_voice_model = first_person_model.model_copy(deep=True)
+        resume_voice_model.experiences[0].bullets = [
+            "Üretim hattındaki süre farklarını analiz etti.",
+            "İyileştirme önerilerinde bulundu.",
+            "Sonuçları yönetime sundu.",
+            "Haftalık raporlama sürecini geliştirdi.",
+        ]
+
+        first_person_score = score_cv(first_person_model)
+        resume_voice_score = score_cv(resume_voice_model)
+
+        assert first_person_score.experience < resume_voice_score.experience
+        assert first_person_score.overall < resume_voice_score.overall
+
     def test_complete_cv_scores_high(self):
         model = _make_model()
         result = score_cv(model)
