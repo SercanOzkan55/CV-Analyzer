@@ -412,7 +412,7 @@ def _build_validation_center(result: dict, original_text: str, optimized_text: s
 async def auto_fix_cv_pdf(
     file: UploadFile = File(...),
     job_description: str = Form(""),
-    lang: str = Form("en"),
+    lang: str = Form("auto"),
     use_ai: bool = Form(True),
     mode: str = Form("safe"),
     response: Response = None,

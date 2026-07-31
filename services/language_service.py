@@ -394,6 +394,7 @@ SECTION_ALIASES = {
         "career summary",
         # TR
         "özet",
+        "profesyonel özet",
         "profil",
         "kişisel bilgiler",
         "kariyer özeti",
@@ -595,6 +596,7 @@ SECTION_ALIASES = {
         "beceriler",
         "yetenekler",
         "teknik beceriler",
+        "teknik yetenekler",
         "yetkinlikler",
         # FR
         "compétences",
@@ -727,6 +729,7 @@ SECTION_ALIASES = {
         "language skills",
         # TR
         "diller",
+        "yabancı dil",
         "yabancı diller",
         # FR
         "langues",

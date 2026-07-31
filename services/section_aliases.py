@@ -40,6 +40,7 @@ _GLOBAL_ALIASES: Dict[str, str] = {
     "introduction": "summary",
     # TR
     "özet": "summary",
+    "profesyonel özet": "summary",
     "kişisel bilgiler": "summary",
     "kariyer özeti": "summary",
     # FR

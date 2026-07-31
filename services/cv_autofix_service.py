@@ -75,6 +75,11 @@ SECTION_TITLES = {
     "interests": "INTERESTS",
 }
 
+_SKILL_LANGUAGE_SUBLABEL_RE = re.compile(
+    r"^\s*(?:diller|programlama\s+dilleri|languages?|programming\s+languages?)\s*:\s*$",
+    re.IGNORECASE,
+)
+
 # Multilingual section titles — used when CV language is known
 SECTION_TITLES_I18N: dict[str, dict[str, str]] = {
     "summary": {
@@ -414,12 +419,6 @@ _COMMON_TR_SPELLING_FIXES = (
     (re.compile(r"\bendustri\b", re.I), "endüstri"),
     (re.compile(r"\biletisim\b", re.I), "iletişim"),
     (re.compile(r"\begitim\b", re.I), "eğitim"),
-    (re.compile(r"\bdeneyim\b", re.I), "deneyim"),
-    (re.compile(r"\bprojeler\b", re.I), "projeler"),
-    (re.compile(r"\byetenekler\b", re.I), "yetenekler"),
-    (re.compile(r"\bsertifikalar\b", re.I), "sertifikalar"),
-    (re.compile(r"\bdiller\b", re.I), "diller"),
-    (re.compile(r"\bihmal\b", re.I), "ihmal"),
     (re.compile(r"\bturkce\b", re.I), "Türkçe"),
     (re.compile(r"\bingilizce\b", re.I), "İngilizce"),
     (re.compile(r"\balmanca\b", re.I), "Almanca"),
@@ -465,6 +464,15 @@ def _polish_text(text: str, lang: str = "en") -> str:
     lines = text.split("\n")
     out: list[str] = []
 
+    def _preserve_match_case(match: re.Match, replacement: str) -> str:
+        source = match.group(0)
+        if source.isupper():
+            return replacement.translate(str.maketrans({"i": "İ", "ı": "I"})).upper()
+        if source[:1].isupper():
+            first = replacement[:1].translate(str.maketrans({"i": "İ", "ı": "I"})).upper()
+            return first + replacement[1:]
+        return replacement
+
     for line in lines:
         stripped = line.strip()
         if not stripped:
@@ -508,7 +516,7 @@ def _polish_text(text: str, lang: str = "en") -> str:
 
         if lang == "tr":
             for pattern, replacement in _COMMON_TR_SPELLING_FIXES:
-                stripped = pattern.sub(replacement, stripped)
+                stripped = pattern.sub(lambda match, value=replacement: _preserve_match_case(match, value), stripped)
 
         # Normalize bullet chars: ▪ ◦ ◆ ▸ ► → •
         stripped = re.sub(r"^[\u25AA\u25E6\u25C6\u25B8\u25BA]\s*", "• ", stripped)
@@ -534,6 +542,13 @@ def _parse_sections(cv_text: str) -> tuple[list[str], dict[str, list[str]], list
             continue
 
         canonical = _canonical_section(raw_line)
+        # Inside a skills section, labels such as "Diller:" mean programming
+        # languages. They are category labels, not the start of the spoken-
+        # languages section. Keep them with the skills block so the protected
+        # section floor cannot move the remaining technical categories under
+        # LANGUAGES/DİLLER during a rebuild.
+        if canonical == "languages" and current == "skills" and _SKILL_LANGUAGE_SUBLABEL_RE.match(raw_line):
+            canonical = None
         if canonical:
             if canonical in {"references", "interests"}:
                 dropped_sections.append(canonical)
@@ -1390,12 +1405,12 @@ def _inject_skills_section_if_missing(
     return rebuilt_text, parsed_sections, True
 
 
-def _minimal_heading_rewrite(cv_text: str) -> str:
+def _minimal_heading_rewrite(cv_text: str, lang: str = "en") -> str:
     rewritten: list[str] = []
     for line in _clean_lines(cv_text):
         canonical = _canonical_section(line)
         if canonical in SECTION_TITLES:
-            rewritten.append(SECTION_TITLES[canonical])
+            rewritten.append(get_section_title(canonical, lang))
         else:
             rewritten.append(line)
     return "\n".join(rewritten).strip()
@@ -3283,6 +3298,7 @@ def _build_safe_export_model(
     safe.misc = list(source_model.misc)
     safe.social_links = list(source_model.social_links)
     safe.language = source_model.language
+    safe.section_titles = dict(source_model.section_titles)
     safe.ensure_skills_categorized()
     return safe
 
@@ -3510,7 +3526,7 @@ def _enforce_protected_section_floor(
 def auto_fix_cv_text(
     cv_text: str,
     job_description: str = "",
-    lang: str = "en",
+    lang: str = "auto",
     use_ai: bool = False,
     mode: str = "safe",
 ) -> dict:
@@ -3519,6 +3535,9 @@ def auto_fix_cv_text(
     from services.language_service import detect_language
 
     source_language = detect_language(cv_text)
+    requested_language = str(lang or "auto").strip().lower()
+    preserve_source_language = requested_language in {"", "auto", "source", "preserve"}
+    lang = source_language if preserve_source_language else requested_language
 
     # ═══ PIPELINE FIRST: raw → extract → normalize → JSON ═══
     # This handles multi-column, broken lines, GPA, bullet separation, etc.
@@ -3526,6 +3545,7 @@ def auto_fix_cv_text(
     extract_fn, normalize_fn, _get_order = _get_pipeline_agents()
     extracted = extract_fn(cv_text)
     normalized = normalize_fn(extracted)
+    source_section_titles = dict(normalized.get("section_titles") or {})
     is_multi_column = extracted.get("_multi_column_detected", False)
     _, _, raw_dropped_sections = _parse_sections(cv_text)
 
@@ -3571,7 +3591,7 @@ def auto_fix_cv_text(
 
     if detected_mode == "preserve":
         # Minimal rewrite: just standardize headings on original text
-        optimized_text = _minimal_heading_rewrite(cv_text)
+        optimized_text = _minimal_heading_rewrite(cv_text, lang=lang)
         _, parsed_secs, _ = _parse_sections(optimized_text)
         structured_sections: dict[str, list[str]] = {
             key: [line for line in values if line]
@@ -3725,7 +3745,7 @@ def auto_fix_cv_text(
     use_fallback = score_regression > 0
 
     if use_fallback:
-        fallback_text = _minimal_heading_rewrite(cv_text)
+        fallback_text = _minimal_heading_rewrite(cv_text, lang=lang)
         fallback_text = _ensure_identity_header(
             fallback_text,
             fallback_name=orig_name,
@@ -3803,10 +3823,11 @@ def auto_fix_cv_text(
         "certifications": normalized.get("certifications", []),
         "projects": normalized.get("projects", []),
         "languages": normalized.get("languages", []),
+        "language": lang,
+        "section_titles": source_section_titles if source_language == lang else {},
         "job_description": job_description or "",
         "template": "classic",
         "output_format": "docx",
-        "lang": lang,
     }
     source_builder_model = CVModel.from_mapping(builder_payload)
     source_builder_model.ensure_skills_categorized()
@@ -3829,6 +3850,7 @@ def auto_fix_cv_text(
         "score_delta": score_delta,
         "used_ai": used_ai,
         "source_language": source_language,
+        "requested_language": requested_language or "auto",
         "output_language": lang,
         "translation_requested": bool(source_language != lang),
         "dropped_sections": dropped_sections,

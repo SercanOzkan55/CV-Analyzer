@@ -640,6 +640,21 @@ def extract_structured(cv_text: str) -> Dict:
 
         sections[section_key] = deterministic_sections[section_key]
 
+        # The classifier can label a continuation block after a PDF page break
+        # as summary/misc because the section heading appeared on the previous
+        # page. Once the deterministic parser proves those exact lines belong
+        # to a richer titled section, remove the duplicate weak assignments.
+        # Strong neighbouring sections are protected by the rejection guard
+        # above, so this only cleans ambiguous buckets and the header.
+        claimed_by_section = {line.strip() for line in candidate if line and line.strip()}
+        for other_key in ("summary", "misc", "interests", "contact", "header"):
+            if other_key == section_key or not sections.get(other_key):
+                continue
+            sections[other_key] = [
+                line for line in sections[other_key] if not line or line.strip() not in claimed_by_section
+            ]
+        header_lines = [line for line in header_lines if not line or line.strip() not in claimed_by_section]
+
     name, title_lines, contacts, leftover = _extract_contact_block(header_lines, sections.get("contact", []))
 
     # ── Name rescue: if name still missing, scan raw first lines ──

@@ -57,12 +57,13 @@ vi.mock('react-router-dom', async () => {
 })
 
 const mockAnalyzePdf = vi.fn()
+const mockAutoFixCv = vi.fn()
 vi.mock('../api', async () => {
   const actual = await vi.importActual('../api')
   return {
     ...actual,
     analyzePdf: (...args) => mockAnalyzePdf(...args),
-    autoFixCv: vi.fn(),
+    autoFixCv: (...args) => mockAutoFixCv(...args),
     buildSkillRoadmap: vi.fn(),
     exportAutoFixedCV: vi.fn(),
     fetchScoreBreakdown: vi.fn(),
@@ -178,6 +179,44 @@ describe('AnalyzePage', () => {
       await waitFor(() => {
         expect(mockAddToast).toHaveBeenCalledWith('toast.analysis_complete', 'success')
         expect(mockRecordAnalysis).toHaveBeenCalled()
+      })
+    })
+
+    it('keeps the CV language independent from the English UI during auto-fix', async () => {
+      mockAnalyzePdf.mockResolvedValue({
+        ats_score: 75,
+        final_score: 78,
+        ats: { section_scores: [] },
+        skills: ['JavaScript', 'React'],
+        missing_skills: [],
+        warnings: [],
+        score_suggestions: [],
+      })
+      mockAutoFixCv.mockResolvedValue({
+        optimized_cv_text: 'Optimized CV',
+        original_cv_text: 'Original CV',
+        output_language: 'tr',
+      })
+
+      renderAnalyzePage()
+
+      const dropZone = screen.getByRole('button', { name: /analyze\.upload_desc/i })
+      const file = createFile('resume.pdf', 5000, 'application/pdf')
+      fireEvent.drop(dropZone, { dataTransfer: { files: [file] } })
+      fireEvent.click(screen.getByText('analyze.analyze_btn'))
+
+      const nextStepsTab = await screen.findByRole('button', { name: /analyze\.tab_next_steps/ })
+      fireEvent.click(nextStepsTab)
+      fireEvent.click(screen.getByRole('button', { name: /results\.download_report_btn/ }))
+      fireEvent.click(screen.getByText('analyze.autofix_ai_fix'))
+
+      await waitFor(() => {
+        expect(mockAutoFixCv).toHaveBeenCalledWith(
+          'test-token',
+          expect.any(File),
+          '',
+          { lang: 'auto', useAi: true },
+        )
       })
     })
 

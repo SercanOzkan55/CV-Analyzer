@@ -160,7 +160,7 @@ _HEADER_HINTS: Dict[str, re.Pattern] = {
         r"|executive\s+profile"
         r"|personal\s+information|introduction|personal"
         # TR
-        r"|[öo]zet|profil|ki[şs]isel\s+bilgiler|kariyer\s+[öo]zeti"
+        r"|(?:profesyonel\s+)?[öo]zet|profil|ki[şs]isel\s+bilgiler|kariyer\s+[öo]zeti"
         # FR
         r"|r[ée]sum[ée](?:\s+professionnel)?|profil\s+professionnel"
         # DE

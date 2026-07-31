@@ -664,7 +664,7 @@ export default function AnalyzePage() {
   const [autoFixError, setAutoFixError] = useState(null)
   const [exportLoading, setExportLoading] = useState(null)
   const [editedText, setEditedText] = useState('')
-  const [autoFixTargetLanguage, setAutoFixTargetLanguage] = useState(lang)
+  const [autoFixTargetLanguage, setAutoFixTargetLanguage] = useState('auto')
   const [versionSaveLoading, setVersionSaveLoading] = useState(false)
   const [savedAutoFixVersion, setSavedAutoFixVersion] = useState(null)
   const [scoreBreakdown, setScoreBreakdown] = useState(null)
@@ -784,7 +784,7 @@ export default function AnalyzePage() {
       setAutoFixLoading(true)
       setAutoFixError(null)
 
-      if (!useAi && autoFixTargetLanguage !== lang) {
+      if (!useAi && autoFixTargetLanguage !== 'auto') {
         setAutoFixError(uiCopy(lang, 'Dil dönüşümü için AI düzeltmeyi kullanın.', 'Use AI Fix for language conversion.'))
         return
       }
@@ -872,7 +872,7 @@ export default function AnalyzePage() {
         builder_payload: useStructuredPayload ? autoFixResult.builder_payload : undefined,
         job_description: jobDesc,
         output_format: format,
-        lang: autoFixTargetLanguage,
+        lang: autoFixResult.output_language || (autoFixTargetLanguage === 'auto' ? lang : autoFixTargetLanguage),
       })
 
       const blob = await response.blob()
@@ -906,7 +906,7 @@ export default function AnalyzePage() {
     setAutoFixError(null)
     setExportLoading(null)
     setEditedText('')
-    setAutoFixTargetLanguage(lang)
+    setAutoFixTargetLanguage('auto')
     setVersionSaveLoading(false)
     setSavedAutoFixVersion(null)
     setSkillRoadmap(null)
@@ -925,7 +925,7 @@ export default function AnalyzePage() {
         job_description: jobDesc,
         version_label: jobLabel ? `${jobLabel} - ATS` : undefined,
         source: 'ats_validation_center',
-        lang: autoFixTargetLanguage,
+        lang: autoFixResult.output_language || (autoFixTargetLanguage === 'auto' ? lang : autoFixTargetLanguage),
         notes: autoFixResult.export_safe ? 'Safe-export checks passed' : 'Saved after manual review',
       })
       setSavedAutoFixVersion(savedVersion)
@@ -1826,8 +1826,8 @@ export default function AnalyzePage() {
                     <label className="ats-language-control">
                       <span>{uiCopy(lang, 'Çıktı dili', 'Output language')}</span>
                       <select value={autoFixTargetLanguage} onChange={(event) => setAutoFixTargetLanguage(event.target.value)}>
-                        <option value={lang}>{uiCopy(lang, 'CV dilini koru', 'Keep CV language')}</option>
-                        {lang !== 'en' && <option value="en">English</option>}
+                        <option value="auto">{uiCopy(lang, 'CV dilini koru', 'Keep CV language')}</option>
+                        <option value="en">English</option>
                       </select>
                     </label>
                     <div className="ats-validation-launch-actions">
@@ -1838,8 +1838,8 @@ export default function AnalyzePage() {
                         type="button"
                         className="btn-outline"
                         onClick={() => handleAutoFix(false)}
-                        disabled={autoFixLoading || autoFixTargetLanguage !== lang}
-                        title={autoFixTargetLanguage !== lang ? uiCopy(lang, 'Çeviri AI gerektirir', 'Translation requires AI') : ''}
+                        disabled={autoFixLoading || autoFixTargetLanguage !== 'auto'}
+                        title={autoFixTargetLanguage !== 'auto' ? uiCopy(lang, 'Çeviri AI gerektirir', 'Translation requires AI') : ''}
                       >
                         {autoFixLoading ? t('analyze.autofix_processing') : t('analyze.autofix_quick_fix')}
                       </button>
