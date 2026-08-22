@@ -14,7 +14,7 @@ const distDir = path.join(rootDir, 'dist')
 const baseHtml = await readFile(path.join(distDir, 'index.html'), 'utf8')
 
 const PUBLIC_ROUTES = [
-  { path: '/', title: 'Ücretsiz CV Analiz ve ATS Kontrolü | CV Analyzer', description: 'CV’nizi ücretsiz analiz edin; ATS uyumunu, iş ilanı eşleşmesini, beceri boşluklarını ve geliştirme önerilerini tek ekranda görün.' },
+  { path: '/', enPath: '/en/', title: 'CV Analyzer — Ücretsiz CV Analizi ve ATS Uyum Kontrolü', description: 'CV’nizi ücretsiz analiz edin; ATS uyumunu, iş ilanı eşleşmesini, beceri boşluklarını ve geliştirme önerilerini tek ekranda görün.' },
   { path: '/rehber/', enPath: '/en/', title: 'CV Hazırlama ve ATS Rehberleri | CV Analyzer', description: 'CV hazırlama, ATS okunabilirliği, mülakat, ön yazı ve role özel CV örnekleri için özgün ve uygulanabilir rehberleri inceleyin.' },
   { path: '/pricing/', enPath: '/en/pricing/', title: 'CV Analyzer Planları ve Özellikleri', description: 'CV analizi, ATS kontrolü, iş eşleşmesi ve CV geliştirme özelliklerini karşılaştırın.' },
   { path: '/about/', enPath: '/en/about/', title: 'CV Analyzer Hakkında', description: 'CV Analyzer’ın özgeçmiş değerlendirmesini daha açık, erişilebilir ve uygulanabilir hale getirme yaklaşımını öğrenin.' },
@@ -39,6 +39,7 @@ const NOINDEX_ROUTES = [
   '/feedback', '/history', '/settings', '/profile', '/compare', '/my-cvs', '/recruiter',
   '/premium', '/cv-builder', '/cover-letter', '/interview-simulator', '/job-tracker',
   '/agents', '/data-center', '/template-marketplace', '/admin/billing', '/admin/ops',
+  '/recruiter-hub',
 ]
 
 function escapeHtml(value = '') {
@@ -519,4 +520,19 @@ for (const route of NOINDEX_ROUTES) {
   await writeRoute(route, html)
 }
 
-console.log(`Prerendered ${SEO_PAGES.length} SEO pages, ${EN_SEO_PAGES.length} English SEO pages, ${PUBLIC_ROUTES.length + EN_PUBLIC_ROUTES.length} public routes and ${NOINDEX_ROUTES.length} noindex routes.`)
+// nginx serves this for anything that does not resolve to a prerendered file,
+// with a real 404 status. Without it every unknown URL returned 200 plus the
+// indexable homepage, which let Google index unlimited duplicate copies of the
+// landing page — a soft 404 and a low-value-content signal.
+const notFoundHtml = applyMeta(baseHtml, {
+  title: 'Sayfa bulunamadı | CV Analyzer',
+  description: 'Aradığınız sayfa bulunamadı. CV rehberlerine veya ana sayfaya dönebilirsiniz.',
+  canonical: `${SITE_URL}/404`,
+  robots: 'noindex, nofollow',
+}).replace(
+  '<div id="root"></div>',
+  `<div id="root">${staticPublicChrome(`<main id="main-content" class="seo-container seo-article" data-prerendered="true"><article class="seo-article-main"><h1>Sayfa bulunamadı</h1><p>Aradığınız sayfa taşınmış, adı değişmiş veya hiç var olmamış olabilir. Aşağıdaki bağlantılardan devam edebilirsiniz.</p><ul><li><a href="/">Ana sayfa</a></li><li><a href="/rehber/">CV hazırlama ve ATS rehberleri</a></li><li><a href="/cv-analiz/">Ücretsiz CV analizi</a></li><li><a href="/iletisim/">İletişim</a></li></ul></article></main>`)}</div>`,
+)
+await writeFile(path.join(distDir, '404.html'), notFoundHtml, 'utf8')
+
+console.log(`Prerendered ${SEO_PAGES.length} SEO pages, ${EN_SEO_PAGES.length} English SEO pages, ${PUBLIC_ROUTES.length + EN_PUBLIC_ROUTES.length} public routes, ${NOINDEX_ROUTES.length} noindex routes and 404.html.`)

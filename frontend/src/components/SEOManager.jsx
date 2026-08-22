@@ -13,7 +13,7 @@ const SITE_URL = 'https://cvanalyzer.dev'
 
 const PUBLIC_META = {
   '/': {
-    title: 'Ücretsiz CV Analiz ve ATS Kontrolü | CV Analyzer',
+    title: 'CV Analyzer — Ücretsiz CV Analizi ve ATS Uyum Kontrolü',
     description: 'CV’nizi ücretsiz analiz edin; ATS uyumunu, iş ilanı eşleşmesini, beceri boşluklarını ve geliştirme önerilerini tek ekranda görün.',
   },
   '/pricing': {
