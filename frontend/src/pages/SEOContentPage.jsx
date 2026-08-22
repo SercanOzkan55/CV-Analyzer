@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { ArrowRight, CheckCircle2, Clock3, FileSearch, Languages, ShieldCheck } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import AdSlot from '../components/AdSlot'
 import { SEO_PAGES } from '../content/seoPages'
 import { EN_EQUIVALENT_BY_TR_PATH } from '../content/enSeoPages'
 import { getGuideUi, getLocalizedSeoPage, getLocalizedSeoPages } from '../content/guideI18n'
@@ -90,6 +91,9 @@ export default function SEOContentPage({ page: sourcePage }) {
                 <p>
                   <strong>{ui.editorialTeam}</strong>
                   {ui.editorialNote}
+                  <Link className="seo-editorial-link" to="/editoryal-politika/">
+                    {ui.editorialPolicyLink || 'Editoryal yaklaşımımız'}
+                  </Link>
                 </p>
               </div>
             </motion.div>
@@ -140,20 +144,22 @@ export default function SEOContentPage({ page: sourcePage }) {
             dir={lang === 'ar' && page.contentLanguage === 'en' ? 'ltr' : undefined}
           >
             {page.sections.map((section, index) => (
-              <motion.section
-                id={sectionId(page.slug, index)}
-                key={section.heading}
-                {...inViewReveal}
-                transition={{ duration: 0.24, ease: 'easeOut' }}
-              >
-                <h2>{section.heading}</h2>
-                {section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
-                {section.bullets && (
-                  <ul>
-                    {section.bullets.map((item) => <li key={item}>{item}</li>)}
-                  </ul>
-                )}
-              </motion.section>
+              <React.Fragment key={section.heading}>
+                <motion.section
+                  id={sectionId(page.slug, index)}
+                  {...inViewReveal}
+                  transition={{ duration: 0.24, ease: 'easeOut' }}
+                >
+                  <h2>{section.heading}</h2>
+                  {section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+                  {section.bullets && (
+                    <ul>
+                      {section.bullets.map((item) => <li key={item}>{item}</li>)}
+                    </ul>
+                  )}
+                </motion.section>
+                {index === 1 && <AdSlot placement="article_mid" />}
+              </React.Fragment>
             ))}
 
             <motion.section
@@ -171,6 +177,8 @@ export default function SEOContentPage({ page: sourcePage }) {
                 </details>
               ))}
             </motion.section>
+
+            <AdSlot placement="article_end" />
           </div>
 
           <aside className="seo-related" aria-label={ui.relatedGuides}>

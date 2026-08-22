@@ -48,6 +48,8 @@ const TermsPage = lazy(() => import("./pages/TermsPage"))
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"))
 const BlogPage = lazy(() => import("./pages/BlogPage"))
 const AboutPage = lazy(() => import("./pages/AboutPage"))
+const EditorialPolicyPage = lazy(() => import("./pages/EditorialPolicyPage"))
+const ContactPage = lazy(() => import("./pages/ContactPage"))
 const BlogDetailPage = lazy(() => import("./pages/BlogDetailPage"))
 const ProfilePage = lazy(() => import("./pages/ProfilePage"))
 const ComparePage = lazy(() => import("./pages/ComparePage"))
@@ -59,6 +61,8 @@ const JobTrackerPage = lazy(() => import("./pages/JobTrackerPage"))
 const AIAgentHubPage = lazy(() => import("./pages/AIAgentHubPage"))
 const SEOContentPage = lazy(() => import("./pages/SEOContentPage"))
 const EnProductPage = lazy(() => import("./pages/EnProductPage"))
+const EnglishGuideHubPage = lazy(() => import("./pages/EnglishGuideHubPage"))
+const EnglishEditorialPolicyPage = lazy(() => import("./pages/EnglishEditorialPolicyPage"))
 
 
 
@@ -149,6 +153,16 @@ function AnimatedRoutes() {
         <Route path="/privacy" element={<PageTransition><PrivacyPage /></PageTransition>} />
         <Route path="/terms" element={<PageTransition><TermsPage /></PageTransition>} />
         <Route path="/about" element={<PageTransition><AboutPage /></PageTransition>} />
+        <Route path="/editoryal-politika" element={<PageTransition><EditorialPolicyPage /></PageTransition>} />
+        <Route path="/iletisim" element={<PageTransition><ContactPage locale="tr" /></PageTransition>} />
+        <Route path="/rehber" element={<PageTransition><GuideHubPage /></PageTransition>} />
+        <Route path="/en" element={<PageTransition><EnglishGuideHubPage /></PageTransition>} />
+        <Route path="/en/about" element={<PageTransition><AboutPage /></PageTransition>} />
+        <Route path="/en/privacy" element={<PageTransition><PrivacyPage /></PageTransition>} />
+        <Route path="/en/terms" element={<PageTransition><TermsPage /></PageTransition>} />
+        <Route path="/en/pricing" element={<PageTransition><PricingPage /></PageTransition>} />
+        <Route path="/en/editorial-policy" element={<PageTransition><EnglishEditorialPolicyPage /></PageTransition>} />
+        <Route path="/en/contact" element={<PageTransition><ContactPage locale="en" /></PageTransition>} />
         {SEO_PAGES.map((page) => (
           <Route
             key={page.path}

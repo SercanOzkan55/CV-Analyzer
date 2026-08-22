@@ -52,6 +52,45 @@ describe('client security fixes', () => {
     expect(nginxConfig).toContain("script-src 'nonce-$request_id'")
     expect(nginxConfig).toContain("'strict-dynamic'")
     expect(nginxConfig).toContain("sub_filter '<script' '<script nonce=\"$request_id\"'")
+    expect(nginxConfig).toContain('location = /blog')
+    expect(nginxConfig).toContain('location ^~ /blog/')
+    expect(nginxConfig).toContain('X-Robots-Tag "noindex, nofollow"')
+  })
+
+  it('ships the AdSense loader and ownership tags review crawlers look for', () => {
+    const html = fs.readFileSync(path.join(process.cwd(), 'index.html'), 'utf8')
+    const adsTxt = fs.readFileSync(path.join(process.cwd(), 'public', 'ads.txt'), 'utf8')
+    const robotsTxt = fs.readFileSync(path.join(process.cwd(), 'public', 'robots.txt'), 'utf8')
+    const nginxConfig = fs.readFileSync(
+      path.join(process.cwd(), '..', 'deploy', 'nginx.production.conf'),
+      'utf8',
+    )
+
+    expect(html).toContain('name="google-adsense-account"')
+    expect(html).toContain('id="site-structured-data"')
+    // The loader must be in the raw HTML: AdSense review cannot approve a site
+    // where the ad code is only reachable after client-side rendering.
+    expect(html).toContain('pagead2.googlesyndication.com/pagead/js/adsbygoogle.js')
+    expect(html).toContain('client=ca-pub-6737853186639192')
+    expect(html).toContain('crossorigin="anonymous"')
+    expect(adsTxt.trim()).toBe(
+      'google.com, pub-6737853186639192, DIRECT, f08c47fec0942fa0',
+    )
+    expect(robotsTxt).toMatch(/^Allow: \/ads\.txt$/m)
+    expect(nginxConfig).toContain('location = /ads.txt')
+    expect(nginxConfig).toContain('try_files /ads.txt =404')
+  })
+
+  it('keeps the sitemap focused on reviewed first-party editorial pages', () => {
+    const sitemap = fs.readFileSync(path.join(process.cwd(), 'public', 'sitemap.xml'), 'utf8')
+
+    expect(sitemap).toContain('https://cvanalyzer.dev/editoryal-politika/')
+    expect(sitemap).toContain('https://cvanalyzer.dev/en/ai-cv-analyzer/')
+    expect(sitemap).toContain('https://cvanalyzer.dev/en/editorial-policy/')
+    // Reachable contact information is an AdSense review requirement.
+    expect(sitemap).toContain('https://cvanalyzer.dev/iletisim/')
+    expect(sitemap).toContain('https://cvanalyzer.dev/en/contact/')
+    expect(sitemap).not.toContain('https://cvanalyzer.dev/en/recruiter-cv-screening/')
   })
 
   it('clears only the current user scoped local data plus legacy global keys', async () => {

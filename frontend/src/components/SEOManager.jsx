@@ -3,6 +3,10 @@ import { useLocation } from 'react-router-dom'
 import { findSeoPage } from '../content/seoPages'
 import { findEnSeoPage, EN_EQUIVALENT_BY_TR_PATH } from '../content/enSeoPages'
 import { getGuideUi, getLocalizedSeoPage } from '../content/guideI18n'
+import { EDITORIAL_POLICY } from '../content/editorialPolicy'
+import { EDITORIAL_POLICY_EN } from '../content/editorialPolicyEn'
+import { CONTACT_EN, CONTACT_TR } from '../content/contactInfo'
+import { PRIVACY_EN, PRIVACY_TR, TERMS_EN, TERMS_TR } from '../content/legalPolicies'
 import { useLanguage } from '../i18n/LanguageContext'
 
 const SITE_URL = 'https://cvanalyzer.dev'
@@ -20,17 +24,25 @@ const PUBLIC_META = {
     title: 'CV Analyzer Hakkında',
     description: 'CV Analyzer’ın özgeçmiş değerlendirmesini daha açık, erişilebilir ve uygulanabilir hale getirme yaklaşımını öğrenin.',
   },
+  '/editoryal-politika': {
+    title: EDITORIAL_POLICY.seoTitle,
+    description: EDITORIAL_POLICY.description,
+  },
   '/rehber': {
     title: 'CV Hazırlama ve ATS Rehberleri | CV Analyzer',
     description: 'CV hazırlama, ATS okunabilirliği, mülakat, ön yazı ve role özel CV örnekleri için özgün ve uygulanabilir rehberleri inceleyin.',
   },
   '/privacy': {
-    title: 'Gizlilik Politikası | CV Analyzer',
-    description: 'CV Analyzer’ın CV dosyalarını, analiz sonuçlarını ve hesap verilerini nasıl işlediğini inceleyin.',
+    title: PRIVACY_TR.seoTitle,
+    description: PRIVACY_TR.description,
   },
   '/terms': {
-    title: 'Kullanım Koşulları | CV Analyzer',
-    description: 'CV Analyzer hizmetlerinin kullanım koşullarını ve kullanıcı sorumluluklarını inceleyin.',
+    title: TERMS_TR.seoTitle,
+    description: TERMS_TR.description,
+  },
+  '/iletisim': {
+    title: CONTACT_TR.seoTitle,
+    description: CONTACT_TR.description,
   },
 }
 
@@ -78,6 +90,53 @@ function setStructuredData(data) {
   if (!existing) document.head.appendChild(node)
 }
 
+const EN_PUBLIC_META = {
+  '/en': {
+    title: 'English CV, ATS and Application Guides | CV Analyzer',
+    description: 'Practical English guidance for reviewing CVs, checking ATS readability, preparing applications and practising interviews across varied European markets.',
+    trPath: '/rehber/',
+  },
+  '/en/about': {
+    title: 'About CV Analyzer',
+    description: 'Learn how CV Analyzer provides explainable document checks and practical guidance without promising a hiring outcome.',
+    trPath: '/about/',
+  },
+  '/en/privacy': {
+    title: PRIVACY_EN.seoTitle,
+    description: PRIVACY_EN.description,
+    trPath: '/privacy/',
+  },
+  '/en/terms': {
+    title: TERMS_EN.seoTitle,
+    description: TERMS_EN.description,
+    trPath: '/terms/',
+  },
+  '/en/pricing': {
+    title: 'CV Analyzer Plans and Features',
+    description: 'Compare CV analysis, ATS checking and career-tool plans available from CV Analyzer.',
+    trPath: '/pricing/',
+  },
+  '/en/editorial-policy': {
+    title: EDITORIAL_POLICY_EN.seoTitle,
+    description: EDITORIAL_POLICY_EN.description,
+    trPath: '/editoryal-politika/',
+  },
+  '/en/contact': {
+    title: CONTACT_EN.seoTitle,
+    description: CONTACT_EN.description,
+    trPath: '/iletisim/',
+  },
+}
+
+const EN_PUBLIC_BY_TR_PATH = Object.fromEntries(
+  Object.entries(EN_PUBLIC_META).map(([path, meta]) => [meta.trPath, `${path}/`]),
+)
+
+function setSiteStructuredDataEnabled(enabled) {
+  const node = document.getElementById('site-structured-data')
+  if (node) node.type = enabled ? 'application/ld+json' : 'application/json'
+}
+
 function buildPageSchema(page) {
   const canonical = `${SITE_URL}${page.path}`
   return {
@@ -91,7 +150,7 @@ function buildPageSchema(page) {
         datePublished: page.updatedAt,
         inLanguage: page.contentLanguage === 'tr' ? 'tr-TR' : 'en-US',
         mainEntityOfPage: canonical,
-        author: { '@type': 'Organization', name: 'CV Analyzer', url: SITE_URL },
+        author: { '@type': 'Organization', name: 'CV Analyzer Editoryal Ekibi', url: `${SITE_URL}/editoryal-politika/` },
         publisher: { '@type': 'Organization', name: 'CV Analyzer', url: SITE_URL },
       },
       {
@@ -124,9 +183,9 @@ function buildEnPageSchema(page) {
         description: page.description,
         dateModified: page.updatedAt,
         datePublished: page.updatedAt,
-        inLanguage: 'en-US',
+        inLanguage: 'en',
         mainEntityOfPage: canonical,
-        author: { '@type': 'Organization', name: 'CV Analyzer', url: SITE_URL },
+        author: { '@type': 'Organization', name: 'CV Analyzer Editorial Team', url: `${SITE_URL}/en/editorial-policy/` },
         publisher: { '@type': 'Organization', name: 'CV Analyzer', url: SITE_URL },
       },
       {
@@ -158,32 +217,68 @@ export default function SEOManager() {
     if (enPage) {
       setRouteLangOverride('en')
       const canonical = `${SITE_URL}${enPage.path}`
+      setSiteStructuredDataEnabled(false)
 
       document.title = enPage.seoTitle
       upsertMeta('meta[name="description"]', { name: 'description', content: enPage.description })
-      upsertMeta('meta[name="robots"]', { name: 'robots', content: 'index, follow, max-image-preview:large' })
+      upsertMeta('meta[name="robots"]', {
+        name: 'robots',
+        content: enPage.indexable === false ? 'noindex, follow' : 'index, follow, max-image-preview:large',
+      })
       upsertMeta('meta[property="og:title"]', { property: 'og:title', content: enPage.seoTitle })
       upsertMeta('meta[property="og:description"]', { property: 'og:description', content: enPage.description })
       upsertMeta('meta[property="og:url"]', { property: 'og:url', content: canonical })
-      upsertMeta('meta[property="og:locale"]', { property: 'og:locale', content: 'en_US' })
+      upsertMeta('meta[property="og:locale"]', { property: 'og:locale', content: 'en_GB' })
       upsertMeta('meta[name="twitter:title"]', { name: 'twitter:title', content: enPage.seoTitle })
       upsertMeta('meta[name="twitter:description"]', { name: 'twitter:description', content: enPage.description })
       upsertCanonical(canonical)
-      upsertHreflangLinks([
+      upsertHreflangLinks(enPage.indexable === false ? [] : [
         { hreflang: 'en', href: canonical },
         ...(enPage.trPath ? [{ hreflang: 'tr', href: `${SITE_URL}${enPage.trPath}` }] : []),
-        { hreflang: 'x-default', href: canonical },
+        { hreflang: 'x-default', href: `${SITE_URL}/en/` },
       ])
-      setStructuredData(buildEnPageSchema(enPage))
+      setStructuredData(enPage.indexable === false ? null : buildEnPageSchema(enPage))
+      return
+    }
+
+    const normalizedPath = pathname !== '/' ? pathname.replace(/\/$/, '') : '/'
+    const enPublicMeta = EN_PUBLIC_META[normalizedPath]
+    if (enPublicMeta) {
+      setRouteLangOverride('en')
+      setSiteStructuredDataEnabled(false)
+      const canonical = `${SITE_URL}${normalizedPath}/`
+      document.title = enPublicMeta.title
+      upsertMeta('meta[name="description"]', { name: 'description', content: enPublicMeta.description })
+      upsertMeta('meta[name="robots"]', { name: 'robots', content: 'index, follow, max-image-preview:large' })
+      upsertMeta('meta[property="og:title"]', { property: 'og:title', content: enPublicMeta.title })
+      upsertMeta('meta[property="og:description"]', { property: 'og:description', content: enPublicMeta.description })
+      upsertMeta('meta[property="og:url"]', { property: 'og:url', content: canonical })
+      upsertMeta('meta[property="og:locale"]', { property: 'og:locale', content: 'en_GB' })
+      upsertMeta('meta[name="twitter:title"]', { name: 'twitter:title', content: enPublicMeta.title })
+      upsertMeta('meta[name="twitter:description"]', { name: 'twitter:description', content: enPublicMeta.description })
+      upsertCanonical(canonical)
+      upsertHreflangLinks([
+        { hreflang: 'en', href: canonical },
+        { hreflang: 'tr', href: `${SITE_URL}${enPublicMeta.trPath}` },
+        { hreflang: 'x-default', href: `${SITE_URL}/en/` },
+      ])
+      setStructuredData({
+        '@context': 'https://schema.org',
+        '@type': 'WebPage',
+        name: enPublicMeta.title,
+        description: enPublicMeta.description,
+        url: canonical,
+        inLanguage: 'en',
+      })
       return
     }
 
     setRouteLangOverride(null)
+    setSiteStructuredDataEnabled(true)
 
     const sourcePage = findSeoPage(pathname)
     const page = sourcePage ? getLocalizedSeoPage(sourcePage, lang) : null
     const guideUi = getGuideUi(lang)
-    const normalizedPath = pathname !== '/' ? pathname.replace(/\/$/, '') : '/'
     const publicMeta = normalizedPath === '/rehber'
       ? {
           title: `${guideUi.hubTitle} | CV Analyzer`,
@@ -213,7 +308,7 @@ export default function SEOManager() {
     upsertMeta('meta[name="twitter:description"]', { name: 'twitter:description', content: description })
     upsertCanonical(canonical)
 
-    const enEquivalentPath = EN_EQUIVALENT_BY_TR_PATH[canonicalPath]
+    const enEquivalentPath = EN_EQUIVALENT_BY_TR_PATH[canonicalPath] || EN_PUBLIC_BY_TR_PATH[canonicalPath]
     upsertHreflangLinks(
       enEquivalentPath
         ? [

@@ -121,6 +121,20 @@
   color: var(--color-text);
 }
 
+.seo-editorial-link {
+  display: inline-block;
+  margin-top: 5px;
+  color: var(--color-accent);
+  font-weight: 650;
+  text-underline-offset: 3px;
+}
+
+.seo-editorial-link:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
 .seo-product-visual {
   padding: 24px;
   border: 1px solid var(--color-border);
@@ -699,4 +713,28 @@
   [dir="rtl"] .seo-final-cta a:hover svg {
     transform: scaleX(-1);
   }
+}
+
+/* AdSense display slots. Reserve height so the article does not reflow when a
+   unit fills, and keep the "Reklam" label visible — AdSense requires ads to be
+   distinguishable from editorial content. */
+.ad-slot {
+  display: block;
+  margin: 2.5rem 0;
+  min-height: 100px;
+}
+
+.ad-slot-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted, #64748b);
+}
+
+.ad-slot .adsbygoogle {
+  display: block;
+  width: 100%;
 }

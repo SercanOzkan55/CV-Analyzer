@@ -31,11 +31,14 @@
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
-    <!-- Google AdSense site verification -->
+    <!-- AdSense loader. nginx `sub_filter` stamps a per-request nonce onto every
+         <script> tag, so this satisfies the 'strict-dynamic' CSP. The loader is
+         site-wide (review crawlers must find it in the raw HTML), but ad *units*
+         render only on public editorial routes — see components/AdSlot.jsx. -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6737853186639192" crossorigin="anonymous"></script>
 
     <!-- JSON-LD Structured Data -->
-    <script type="application/ld+json">
+    <script id="site-structured-data" type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "WebApplication",
