@@ -14,6 +14,7 @@ const GUIDE_UI = {
     contentInfo: 'İçerik bilgileri',
     editorialTeam: 'CV Analyzer Editoryal Ekibi',
     editorialNote: 'Bu içerik; anlaşılabilirlik, uygulanabilirlik ve güncellik açısından gözden geçirilmiştir.',
+    editorialPolicyLink: 'Editoryal yaklaşımımız',
     sampleSummary: 'Örnek analiz özeti',
     sampleAria: 'Temsili CV Analyzer değerlendirme özeti',
     sampleChecks: ['İletişim bilgileri okunabilir', 'Standart bölüm başlıkları', 'Güvenli ATS metin çıktısı'],
@@ -52,6 +53,7 @@ const GUIDE_UI = {
     contentInfo: 'Article details',
     editorialTeam: 'CV Analyzer Editorial Team',
     editorialNote: 'This content is reviewed for clarity, usefulness, and accuracy.',
+    editorialPolicyLink: 'Our editorial approach',
     sampleSummary: 'Sample analysis summary',
     sampleAria: 'Illustrative CV Analyzer evaluation summary',
     sampleChecks: ['Contact details are readable', 'Standard section headings', 'ATS-safe text output'],
@@ -298,6 +300,9 @@ export function getGuideUi(lang) {
 export function getLocalizedSeoPage(page, lang) {
   if (!page || lang === 'tr') return { ...page, contentLanguage: 'tr', isFallback: false }
   const english = ENGLISH_PAGES[page.slug]
+  if (!english) {
+    return { ...page, contentLanguage: 'tr', isFallback: true }
+  }
   return {
     ...page,
     ...english,

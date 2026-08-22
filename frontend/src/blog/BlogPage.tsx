@@ -6,7 +6,6 @@ import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
 import BlogCard from "./components/BlogCard";
 import BlogSidebar from "./components/BlogSidebar";
-import TrendingArticles from "./components/TrendingArticles";
 import CreatePostModal from "./components/CreatePostModal";
 import { fetchBlogPosts } from "../api";
 import { getDailyLimit, type BlogPost } from "./blogStore";
@@ -109,9 +108,6 @@ export default function BlogPage() {
           </motion.div>
         </div>
       </section>
-
-      {/* ── Trending Articles from Dev.to ──────────── */}
-      <TrendingArticles />
 
       {/* ── Main ─────────────────────────────────────── */}
       <div className="blog-main">

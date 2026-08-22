@@ -26,7 +26,7 @@
       ]
     },
     {
-      "source": "/(favicon.svg|og-image.svg|manifest.json|robots.txt|sitemap.xml)",
+      "source": "/(favicon.svg|og-image.svg|manifest.json|robots.txt|sitemap.xml|ads.txt)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=86400" }
       ]

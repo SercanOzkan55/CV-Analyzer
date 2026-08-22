@@ -1,3 +1,5 @@
+import { EN_PAGE_ENHANCEMENTS } from './enPageEnhancements.js'
+
 export const EN_SEO_PAGES = [
   {
     slug: 'ai-cv-analyzer',
@@ -654,7 +656,17 @@ export const EN_SEO_PAGES = [
     finalCtaDescription: 'Recruiter screening requires recruiter-role or admin access — see plans or contact your administrator.',
     finalCtaLabel: 'See Recruiter Plans',
   },
-]
+].map((page) => {
+  const enhancement = EN_PAGE_ENHANCEMENTS[page.slug]
+  return {
+    ...page,
+    sections: enhancement ? [...page.sections, ...enhancement.sections] : page.sections,
+    faq: enhancement?.faq ? [...page.faq, ...enhancement.faq] : page.faq,
+    readingTime: enhancement?.readingTime || page.readingTime,
+    updatedAt: enhancement ? '2026-08-08' : page.updatedAt,
+    indexable: Boolean(enhancement),
+  }
+})
 
 export const EN_SEO_PAGE_BY_PATH = Object.fromEntries(EN_SEO_PAGES.map((page) => [page.path, page]))
 
@@ -664,5 +676,5 @@ export function findEnSeoPage(pathname) {
 }
 
 export const EN_EQUIVALENT_BY_TR_PATH = Object.fromEntries(
-  EN_SEO_PAGES.filter((page) => page.trPath).map((page) => [page.trPath, page.path]),
+  EN_SEO_PAGES.filter((page) => page.trPath && page.indexable !== false).map((page) => [page.trPath, page.path]),
 )

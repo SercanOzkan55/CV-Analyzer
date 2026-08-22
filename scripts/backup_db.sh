@@ -28,10 +28,24 @@ CHECKSUM_FILE="${BACKUP_FILE}.sha256"
 TMP_FILE="${BACKUP_FILE}.tmp"
 
 BACKUP_ENCRYPTION_PASSPHRASE="${BACKUP_ENCRYPTION_PASSPHRASE:-}"
-BACKUP_S3_BUCKET="${BACKUP_S3_BUCKET:-}"
+BACKUP_S3_BUCKET="${BACKUP_S3_BUCKET:-${S3_BUCKET:-}}"
 BACKUP_S3_PREFIX="${BACKUP_S3_PREFIX:-db-backups}"
 BACKUP_S3_KMS_KEY_ID="${BACKUP_S3_KMS_KEY_ID:-}"
 BACKUP_S3_STORAGE_CLASS="${BACKUP_S3_STORAGE_CLASS:-STANDARD_IA}"
+BACKUP_S3_ENDPOINT_URL="${BACKUP_S3_ENDPOINT_URL:-${S3_ENDPOINT_URL:-}}"
+BACKUP_S3_ACCESS_KEY_ID="${BACKUP_S3_ACCESS_KEY_ID:-}"
+BACKUP_S3_SECRET_ACCESS_KEY="${BACKUP_S3_SECRET_ACCESS_KEY:-}"
+BACKUP_S3_REGION="${BACKUP_S3_REGION:-${AWS_REGION:-auto}}"
+
+if [ -n "${BACKUP_S3_ACCESS_KEY_ID}" ] || [ -n "${BACKUP_S3_SECRET_ACCESS_KEY}" ]; then
+    if [ -z "${BACKUP_S3_ACCESS_KEY_ID}" ] || [ -z "${BACKUP_S3_SECRET_ACCESS_KEY}" ]; then
+        echo "Both BACKUP_S3_ACCESS_KEY_ID and BACKUP_S3_SECRET_ACCESS_KEY are required" >&2
+        exit 1
+    fi
+    export AWS_ACCESS_KEY_ID="${BACKUP_S3_ACCESS_KEY_ID}"
+    export AWS_SECRET_ACCESS_KEY="${BACKUP_S3_SECRET_ACCESS_KEY}"
+fi
+export AWS_DEFAULT_REGION="${BACKUP_S3_REGION}"
 
 log() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) backup: $*"; }
 
@@ -114,15 +128,23 @@ if [ -n "${BACKUP_S3_BUCKET}" ]; then
     require_command aws
     S3_URI="s3://${BACKUP_S3_BUCKET}/${BACKUP_S3_PREFIX%/}/$(basename "${FINAL_FILE}")"
     S3_SUM_URI="${S3_URI}.sha256"
-    AWS_ARGS=(--storage-class "${BACKUP_S3_STORAGE_CLASS}")
-    if [ -n "${BACKUP_S3_KMS_KEY_ID}" ]; then
-        AWS_ARGS+=(--sse aws:kms --sse-kms-key-id "${BACKUP_S3_KMS_KEY_ID}")
+    AWS_ENDPOINT_ARGS=()
+    AWS_UPLOAD_ARGS=()
+    if [ -n "${BACKUP_S3_ENDPOINT_URL}" ]; then
+        # S3-compatible providers such as Cloudflare R2 encrypt objects at
+        # rest automatically and may not implement AWS-specific KMS headers.
+        AWS_ENDPOINT_ARGS=(--endpoint-url "${BACKUP_S3_ENDPOINT_URL}")
     else
-        AWS_ARGS+=(--sse AES256)
+        AWS_UPLOAD_ARGS=(--storage-class "${BACKUP_S3_STORAGE_CLASS}")
     fi
-    log "Uploading backup to S3: s3://${BACKUP_S3_BUCKET}/${BACKUP_S3_PREFIX%/}/$(basename "${FINAL_FILE}")"
-    aws s3 cp "${FINAL_FILE}" "${S3_URI}" "${AWS_ARGS[@]}"
-    aws s3 cp "${CHECKSUM_FILE}" "${S3_SUM_URI}" "${AWS_ARGS[@]}"
+    if [ -n "${BACKUP_S3_KMS_KEY_ID}" ] && [ -z "${BACKUP_S3_ENDPOINT_URL}" ]; then
+        AWS_UPLOAD_ARGS+=(--sse aws:kms --sse-kms-key-id "${BACKUP_S3_KMS_KEY_ID}")
+    elif [ -z "${BACKUP_S3_ENDPOINT_URL}" ]; then
+        AWS_UPLOAD_ARGS+=(--sse AES256)
+    fi
+    log "Uploading backup to object storage: s3://${BACKUP_S3_BUCKET}/${BACKUP_S3_PREFIX%/}/$(basename "${FINAL_FILE}")"
+    aws "${AWS_ENDPOINT_ARGS[@]}" s3 cp "${FINAL_FILE}" "${S3_URI}" "${AWS_UPLOAD_ARGS[@]}"
+    aws "${AWS_ENDPOINT_ARGS[@]}" s3 cp "${CHECKSUM_FILE}" "${S3_SUM_URI}" "${AWS_UPLOAD_ARGS[@]}"
 fi
 
 DELETED="$(

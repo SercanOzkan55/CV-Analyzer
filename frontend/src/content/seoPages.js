@@ -509,6 +509,204 @@ export const SEO_PAGES = [
       { question: 'Yanlış bir öneri görürsem ne yapmalıyım?', answer: 'Öneriyi uygulamayın; çıkarılmış CV metnini ve ilan bağlamını kontrol edin. Kişisel veri paylaşmadan geri bildirim gönderebilir veya öneriyi yok sayabilirsiniz.' },
     ],
   },
+  {
+    slug: 'profesyonel-ozet-nasil-yazilir',
+    path: '/rehber/profesyonel-ozet-nasil-yazilir/',
+    eyebrow: 'CV özeti yazma rehberi',
+    title: 'CV İçin Profesyonel Özet Nasıl Yazılır? Örnekler ve Kontrol Listesi',
+    seoTitle: 'CV Profesyonel Özet Nasıl Yazılır? Örneklerle Rehber',
+    description: 'CV profesyonel özet bölümünü hedef role göre yazmayı; belirsiz sıfatları somut deneyime dönüştürmeyi ve Türkçe örnekleri adım adım inceleyin.',
+    intro: 'Profesyonel özet, CV’nin üst kısmında yer alan kısa bir yönlendirme metnidir. Görevi bütün kariyer geçmişini tekrar etmek değil; hedef rolü, en ilgili deneyimi ve adayın sunabildiği kanıtı birkaç açık cümlede bir araya getirmektir. Bu rehber, genel ve yapay görünen ifadeler yerine doğrulanabilir bir özet oluşturmak için uygulanabilir bir yöntem sunar.',
+    updatedAt: '2026-08-07',
+    readingTime: '10 dk',
+    highlights: [
+      'Hedef rolü ilk cümlede netleştirme',
+      'Sıfat yerine deneyim ve kapsam kullanma',
+      'Yeni mezun ve deneyimli aday örnekleri',
+      'Anahtar kelime tekrarından kaçınma',
+    ],
+    sections: [
+      {
+        heading: 'Profesyonel özet hangi sorulara cevap vermeli?',
+        paragraphs: [
+          'İyi bir özet okuyucuya üç temel bilgi verir: hangi role yöneldiğiniz, bu rolle ilişkili hangi deneyime sahip olduğunuz ve katkınızı hangi bağlamda gösterebildiğiniz. “Dinamik, sonuç odaklı ve takım çalışmasına yatkın” gibi ifadeler tek başına bu soruların hiçbirini yanıtlamaz. Bu özellikler ancak bir proje, sorumluluk veya sonuçla desteklendiğinde anlam kazanır.',
+          'Özeti yazmadan önce hedef ilandaki görevleri ayırın ve gerçek deneyiminizle örtüşen iki veya üç noktayı seçin. Her gereksinimi özete sıkıştırmaya çalışmayın. Teknik araçların uzun listesini beceriler bölümünde bırakın; özette yalnızca rolün yönünü belirleyen alanları kullanın. Üç ya da dört cümle çoğu aday için yeterlidir.',
+        ],
+        bullets: [
+          'Hedeflediğiniz rol veya uzmanlık alanı nedir?',
+          'İlgili deneyiminizin kapsamı ve kıdem seviyesi nedir?',
+          'Hangi problem, süreç veya kullanıcı grubuyla çalıştınız?',
+          'CV’nin devamında doğrulanabilecek en güçlü katkınız nedir?',
+        ],
+      },
+      {
+        heading: 'Zayıf bir özeti kanıta dayalı hâle getirme',
+        paragraphs: [
+          'Zayıf örnek: “Yenilikçi, iletişimi güçlü ve sonuç odaklı bir yazılım geliştiriciyim.” Bu cümle hedef teknoloji alanını, deneyim kapsamını veya ortaya çıkan katkıyı göstermez. Daha güçlü sürüm: “React ve Python tabanlı web uygulamalarında çalışan, başvuru ve raporlama akışlarının geliştirilmesine katkı sunan yazılım geliştiriciyim. Son projelerimde form kullanılabilirliği, API entegrasyonu ve otomatik test kapsamına odaklandım.”',
+          'Güçlü sürümde de kanıtlanamayacak iddia kullanılmamalıdır. Örneğin performansı yüzde 40 artırdığınızı yazıyorsanız ölçümün nereden geldiğini açıklayabilmelisiniz. Sayısal sonuç bulunmuyorsa kapsamı, teslim edilen çıktıyı veya çözülen problemi anlatın. Dürüst ve somut bir ifade, uydurma ölçümden daha güvenilirdir.',
+        ],
+      },
+      {
+        heading: 'Deneyim seviyesine göre özet örnekleri',
+        paragraphs: [
+          'Yeni mezun örneği: “Bilgisayar mühendisliği mezunu; web geliştirme ve veri analizi projelerinde Python, SQL ve React kullandım. Bitirme projemde veri temizleme sürecini ve kullanıcı arayüzünü üstlendim. Junior yazılım geliştirici rolünde test edilebilir ürün özellikleri geliştirmeye ve ekip içi kod inceleme pratiğimi ilerletmeye odaklanıyorum.” Bu metin profesyonel deneyim uydurmadan proje kanıtlarını görünür kılar.',
+          'Deneyimli aday örneği: “B2B SaaS ürünlerinde altı yıllık deneyime sahip ürün yöneticisiyim. Müşteri geri bildirimi, kullanım verisi ve teknik kısıtları birlikte değerlendirerek keşif ve teslim süreçlerini yönettim. Son iki ürün alanında onboarding sürtünmelerini azaltan deneyler ve ekipler arası önceliklendirme çalışmaları yürüttüm.” Buradaki kapsam yalnızca CV’de örnekleri varsa kullanılmalıdır.',
+        ],
+        bullets: [
+          'Yeni mezun: eğitim unvanından çok ilgili proje ve kişisel katkıyı gösterin.',
+          'Kariyer değişikliği: aktarılabilir beceriyi yeni rolün bağlamıyla eşleştirin.',
+          'Uzman: belirli alanı, problem türünü ve sorumluluk kapsamını yazın.',
+          'Yönetici: ekip büyüklüğü yerine karar, süreç ve iş etkisini açıklayın.',
+        ],
+      },
+      {
+        heading: 'ATS ve okunabilirlik için son kontrol',
+        paragraphs: [
+          'Özet bölümünde ilandaki rol adı ve gerçek deneyiminizle eşleşen temel kavramlar doğal biçimde bulunabilir. Aynı anahtar kelimeyi tekrar etmek veya ilgisiz araçları sıralamak metni güçlendirmez. ATS açısından tanınabilir bir “Profesyonel Özet” ya da “Kariyer Özeti” başlığı kullanın ve iletişim bilgileriyle deneyim bölümü arasında açık bir metin alanı bırakın.',
+          'Son metni yüksek sesle okuyun. Bir cümle yalnızca olumlu bir sıfat içeriyor fakat kanıt sunmuyorsa kaldırın veya somutlaştırın. Özette verdiğiniz her iddianın CV’nin deneyim, proje, eğitim ya da beceri bölümünde karşılığını bulun. Hedef rol değiştiğinde yalnızca anahtar kelimeleri değil, öne çıkardığınız deneyim kanıtını da yeniden değerlendirin.',
+        ],
+      },
+    ],
+    faq: [
+      { question: 'Profesyonel özet kaç kelime olmalı?', answer: 'Kesin bir sınır yoktur. Çoğu CV için yaklaşık 50–90 kelimelik üç veya dört kısa cümle yeterlidir. Tekrarları çıkarıp hedef rol, deneyim ve kanıta odaklanın.' },
+      { question: 'Yeni mezunlar profesyonel özet yazmalı mı?', answer: 'İlgili proje, staj veya hedef rolü açıklayabiliyorsa yazabilir. Yalnızca genel kariyer hedeflerinden oluşan bir paragraf eklemek zorunlu değildir.' },
+      { question: 'Özette kişisel özellikler yazılır mı?', answer: 'Yazılabilir ancak tek başına sıfat olarak değil, deneyimle desteklenmelidir. Örneğin iletişim becerisini paydaş toplantısı, sunum veya koordinasyon sorumluluğuyla gösterin.' },
+    ],
+  },
+  {
+    slug: 'cv-pdf-mi-docx-mi',
+    path: '/rehber/cv-pdf-mi-docx-mi/',
+    eyebrow: 'Dosya biçimi ve ATS rehberi',
+    title: 'CV PDF mi DOCX mi Olmalı? ATS, Tasarım ve Gönderim Karşılaştırması',
+    seoTitle: 'CV PDF mi DOCX mi? ATS İçin Doğru Dosya Formatı',
+    description: 'CV gönderirken PDF ve DOCX biçimlerinin ATS okunabilirliği, tasarım tutarlılığı, düzenlenebilirlik ve güvenlik farklarını ayrıntılı karşılaştırın.',
+    intro: 'PDF ve DOCX arasında her durumda geçerli tek bir kazanan yoktur. Doğru seçim, ilanın talimatına, belgenin nasıl üretildiğine ve metnin sistem tarafından okunabilir olup olmadığına bağlıdır. Bu rehber iki biçimin avantajlarını, risklerini ve dosyayı göndermeden önce yapabileceğiniz pratik kontrolleri açıklar.',
+    updatedAt: '2026-08-07',
+    readingTime: '9 dk',
+    highlights: [
+      'PDF ve DOCX avantajlarının karşılaştırılması',
+      'Metin çıkarma ve okuma sırası kontrolü',
+      'Taranmış PDF ve font riskleri',
+      'Göndermeden önce dosya güvenliği',
+    ],
+    sections: [
+      {
+        heading: 'İlanın dosya talimatı her zaman önceliklidir',
+        paragraphs: [
+          'Başvuru sistemi yalnızca DOCX kabul ediyorsa PDF yüklemeye çalışmayın; işveren özellikle PDF istiyorsa farklı biçim göndermeyin. Dosya türüyle ilgili açık talimat bulunmadığında, metin tabanlı ve doğru dışa aktarılmış bir PDF çoğu durumda görsel düzeni korur. Ancak bazı eski veya özel başvuru sistemleri DOCX üzerinde daha güvenilir ayrıştırma yapabilir.',
+          'Dosya uzantısını yalnızca yeniden adlandırmak biçimi dönüştürmez. Belgeyi kullandığınız düzenleyiciden “Farklı Kaydet” veya “Dışa Aktar” yöntemiyle üretin. Çevrim içi dönüştürücülere CV yüklerken kişisel verilerin nasıl işlendiğini bilmediğiniz için dikkatli olun; mümkünse yerel ve güvenilir bir araç kullanın.',
+        ],
+      },
+      {
+        heading: 'PDF ne zaman daha iyi bir seçimdir?',
+        paragraphs: [
+          'PDF, fontlar ve sayfa yerleşimi doğru gömüldüğünde farklı cihazlarda tutarlı görünür. Satır kırılmalarının, boşlukların ve başlık hiyerarşisinin korunması özellikle doğrudan işe alım uzmanına e-posta gönderirken avantaj sağlar. Metnin seçilebilir olması, PDF’nin yalnızca görüntüden oluşmadığını gösteren ilk kontroldür.',
+          'Bununla birlikte PDF her zaman ATS uyumlu değildir. Taranmış sayfalar, metni görsele dönüştüren tasarım araçları, bozuk font eşlemesi ve karmaşık metin kutuları çıkarılan içeriği bozabilir. İki sütunlu bir belgede sağ ve sol bölümler yanlış sırada birleşebilir. Bu nedenle dosyayı yalnızca görünüşüne bakarak değerlendirmeyin.',
+        ],
+        bullets: [
+          'Metnin tamamını fareyle seçebildiğinizi kontrol edin.',
+          'Kopyalayıp düz metin düzenleyiciye yapıştırarak okuma sırasına bakın.',
+          'Türkçe karakterlerin ve madde işaretlerinin bozulmadığını doğrulayın.',
+          'Bağlantıların hem tıklanabilir hem de görünen metninin anlaşılır olmasını sağlayın.',
+        ],
+      },
+      {
+        heading: 'DOCX ne zaman tercih edilebilir?',
+        paragraphs: [
+          'DOCX yapısal metin, başlık, paragraf ve liste bilgisini koruyabildiği için bazı ATS ürünlerinde güvenilir sonuç verebilir. İşveren belgenin üzerinde not almak veya düzenleme yapmak istiyorsa da tercih edilebilir. Sade stiller, standart fontlar ve gerçek liste işaretleri kullanılan bir DOCX genellikle okunabilir bir başlangıç noktasıdır.',
+          'Risk, belgenin farklı ofis yazılımı ve font ortamlarında yeniden akmasıdır. Bilgisayarda bulunmayan fontlar değişebilir, satırlar yeni sayfaya kayabilir ve metin kutuları farklı konumlanabilir. Göndermeden önce dosyayı farklı bir görüntüleyicide açmak ve mümkünse aynı belgenin PDF önizlemesiyle karşılaştırmak yararlıdır.',
+        ],
+      },
+      {
+        heading: 'Göndermeden önce iki aşamalı kontrol',
+        paragraphs: [
+          'İlk aşamada içeriği kontrol edin: iletişim bilgileri, şirketler, unvanlar, tarihler ve beceriler doğru sırada mı? İkinci aşamada sunumu kontrol edin: sayfa sonlarında yalnız kalan başlık, kesilen satır, görünmeyen bağlantı veya gereksiz boş sayfa var mı? Dosya adında yalnızca ad-soyad ve rol gibi profesyonel bilgiler kullanın; “son_final_2” gibi belirsiz adlardan kaçının.',
+          'Kişisel veri güvenliği için belge özelliklerindeki yazar, yorum ve değişiklik geçmişini de gözden geçirin. Özellikle başka bir CV şablonunu uyarladıysanız eski kişinin adı, gizli yorumlar veya izlenen değişiklikler dosyada kalabilir. Son gönderim dosyasını açıp baştan sona kontrol etmeden yalnızca düzenleyicideki çalışma kopyasına güvenmeyin.',
+        ],
+        bullets: [
+          'İlanın istediği dosya türünü kullanın.',
+          'Dosyanın uzantısını değiştirmek yerine doğru biçimde dışa aktarın.',
+          'Metin çıkarma sırasını ve görsel sayfa düzenini ayrı ayrı inceleyin.',
+          'Yorumları, değişiklik geçmişini ve gereksiz belge meta verilerini temizleyin.',
+        ],
+      },
+    ],
+    faq: [
+      { question: 'ATS için PDF kesin olarak güvenli midir?', answer: 'Hayır. PDF’nin metin tabanlı, doğru sıralı ve bozulmamış olması gerekir. Taranmış veya karmaşık yerleşimli PDF’ler yanlış okunabilir.' },
+      { question: 'CV’yi hem PDF hem DOCX göndermeli miyim?', answer: 'İşveren istemedikçe iki dosya göndermek gereksiz olabilir. Talimatı izleyin; emin değilseniz başvuru sisteminin kabul ettiği ve kontrol ettiğiniz biçimi kullanın.' },
+      { question: 'Google Docs bağlantısı CV yerine kullanılabilir mi?', answer: 'Genellikle başvuru sistemine dosya yüklemek daha güvenlidir. Paylaşım izinleri, sonradan değişen içerik ve erişim sorunları nedeniyle bağlantıyı yalnızca özellikle istendiğinde kullanın.' },
+    ],
+  },
+  {
+    slug: 'ingilizce-cv-hatalari',
+    path: '/rehber/ingilizce-cv-hatalari/',
+    eyebrow: 'İngilizce CV kontrol rehberi',
+    title: 'İngilizce CV Hazırlarken Yapılan 12 Hata ve Doğru Kullanım Örnekleri',
+    seoTitle: 'İngilizce CV Hazırlama: Yaygın Hatalar ve Örnekler',
+    description: 'İngilizce CV’de başlık, tarih, fiil zamanı, iş unvanı, ölçülebilir sonuç ve Türkçeden doğrudan çeviri hatalarını örneklerle düzeltin.',
+    intro: 'İngilizce CV hazırlamak yalnızca Türkçe metni cümle cümle çevirmek değildir. İş unvanları, fiil zamanları, tarih biçimleri ve başarı anlatımı hedef pazardaki okuyucunun beklentisine göre tutarlı olmalıdır. Aşağıdaki kontrol, akıcı görünen fakat anlamı belirsiz veya yanlış yönlendiren ifadeleri yakalamanıza yardımcı olur.',
+    updatedAt: '2026-08-07',
+    readingTime: '10 dk',
+    highlights: [
+      'Türkçeden doğrudan çeviri hataları',
+      'İş unvanı ve fiil zamanı tutarlılığı',
+      'Action verb kullanımında ölçülülük',
+      'İngilizce son okuma kontrol listesi',
+    ],
+    sections: [
+      {
+        heading: 'Unvanları kelime kelime çevirmeyin',
+        paragraphs: [
+          'Türkiye’de kullanılan bir unvanın kelime kelime çevirisi başka bir pazarda farklı kıdem veya sorumluluk çağrıştırabilir. Önce yaptığınız işi ve sorumluluk kapsamını açıklayın, ardından hedef ilandaki karşılıklarla kıyaslayın. Resmî unvan çok yerelse parantez içinde anlaşılır bir karşılık verilebilir; fakat daha kıdemli görünmek için unvanı değiştirmeyin.',
+          '“Responsible of”, “worked about” veya “made researches” gibi ifadeler Türkçe yapıların doğrudan aktarılmasından doğar. Doğal karşılık bağlama göre “responsible for”, “worked on” ve “conducted research” olabilir. Yine de güçlü görünen fiili seçmekten önce cümlenin gerçekten neyi anlattığını doğrulayın.',
+        ],
+        bullets: [
+          'Resmî unvanı ve anlaşılır İngilizce karşılığını çeliştirmeyin.',
+          'Kıdem seviyesini yükselten serbest çevirilerden kaçının.',
+          'Sektöre özel unvanı hedef ilandaki sorumluluklarla karşılaştırın.',
+          'Aynı unvan biçimini LinkedIn ve başvuru formunda da tutarlı kullanın.',
+        ],
+      },
+      {
+        heading: 'Fiil zamanı ve cümle yapısını tutarlı kullanın',
+        paragraphs: [
+          'Devam eden görevlerde present tense, tamamlanmış geçmiş görevlerde past tense kullanmak yaygın ve anlaşılır bir yaklaşımdır. Aynı deneyim altındaki maddelerin bir kısmını isim, bir kısmını uzun “I was responsible for” cümlesi olarak yazmak taramayı zorlaştırır. Maddeleri doğrudan eylem fiiliyle başlatın ve kişisel zamiri çoğu durumda kullanmayın.',
+          '“Managed”, “led” ve “owned” gibi fiiller gerçek sorumluluk düzeyini yansıtmalıdır. Bir toplantıya katılmak süreci yönetmek anlamına gelmez. “Assisted”, “contributed”, “coordinated” veya “implemented” gibi daha doğru bir fiil, şişirilmiş iddiadan daha profesyoneldir. Her maddeyi eylem, bağlam ve sonuç sırasıyla kontrol edin.',
+        ],
+      },
+      {
+        heading: 'Görev listesini başarı hikâyesine dönüştürürken abartmayın',
+        paragraphs: [
+          'Zayıf örnek: “Responsible for reports and customer communication.” Daha açık sürüm: “Prepared weekly support reports from CRM records and summarized recurring issues for the customer success team.” İkinci cümle araç, sıklık ve kullanıcıyı gösterir. Ölçülmüş bir sonuç varsa eklenebilir; yoksa rastgele yüzde üretmek gerekmez.',
+          'İngilizce CV örneklerinde sık görülen büyük sayılar herkese uygulanamaz. Gelir, hız veya maliyet etkisini doğrudan ölçmediyseniz kapsamı başka biçimde anlatın: kaç paydaşla çalıştığınız, hangi çıktıyı teslim ettiğiniz, hangi süreci standartlaştırdığınız veya hangi hata türünü azalttığınız doğrulanabilir alternatifler olabilir.',
+        ],
+        bullets: [
+          'Weak: Worked on the company website.',
+          'Clearer: Implemented accessible form states for the customer application flow.',
+          'Weak: Improved performance significantly.',
+          'Clearer: Reduced repeated API requests by caching stable reference data.',
+        ],
+      },
+      {
+        heading: 'Dil, tarih ve biçim için son okuma',
+        paragraphs: [
+          'US English veya UK English seçip yazım biçimini tutarlı kullanın. “Analyzed/analyse”, tarih sırası ve noktalama tercihleri belge içinde değişmemelidir. Ay adlarını açık yazmak, 03/04/2025 gibi farklı ülkelerde farklı yorumlanabilecek sayısal tarihlerden daha güvenlidir. Tarihlerin sağa hizalanması görsel bir tercihtir; çıkarılan metinde deneyimle birlikte doğru sırada kaldığını kontrol edin.',
+          'Otomatik çeviri ve dil araçları son kontrolü hızlandırabilir ancak şirket adı, ürün, sertifika, teknoloji ve ölçüm gibi gerçekleri doğrulayamaz. Son metni hedef ilandaki terminolojiyle karşılaştırın, ardından cümleleri sesli okuyun. Anlamını kendi sözlerinizle açıklayamadığınız bir ifadeyi CV’de bırakmayın; görüşmede aynı deneyimi anlatmanız beklenecektir.',
+        ],
+        bullets: [
+          'US veya UK English biçimlerinden birini seçip tutarlı kalın.',
+          'Ay adlarını açık yazarak tarih belirsizliğini azaltın.',
+          'İletişim bilgilerindeki ülke kodunu ve konum ifadesini kontrol edin.',
+          'Her İngilizce iddianın Türkçe kaynak CV’nizde veya gerçek deneyiminizde karşılığını bulun.',
+        ],
+      },
+    ],
+    faq: [
+      { question: 'İngilizce CV’de fotoğraf olmalı mı?', answer: 'Ülke ve sektör uygulamaları değişir. ABD ve Birleşik Krallık gibi pazarlarda fotoğraf çoğu kurumsal başvuruda beklenmez. İlanı ve yerel uygulamayı kontrol edin.' },
+      { question: 'CV’de seviyemi native veya fluent yazabilir miyim?', answer: 'Yalnızca gerçekten karşılıyorsa yazın. CEFR düzeyi, sınav sonucu veya dili kullandığınız iş bağlamı daha açıklayıcı olabilir.' },
+      { question: 'Türkçe karakterleri İngilizce CV’de kaldırmalı mıyım?', answer: 'Adınızı ve resmî kurum adlarını doğru biçimde koruyun. Başvuru sistemi sorun çıkarıyorsa alternatif Latin harfli yazımı ilgili alanda ayrıca kullanabilirsiniz; belgenin metin çıkarma testini yapın.' },
+    ],
+  },
 ]
 
 const SEO_PAGE_ENRICHMENTS = {
@@ -588,6 +786,47 @@ const SEO_PAGE_ENRICHMENTS = {
       'Mid-level: sahiplik, kalite, performans ve teslim etkisi.',
       'Senior: teknik karar, risk, ölçek ve ekip etkisi.',
       'Her seviyede sonucu doğrulanabilir bağlamla destekleyin.',
+    ],
+  },
+  'profesyonel-ozet-nasil-yazilir': {
+    heading: 'Beş dakikalık özet çalışma kâğıdı',
+    paragraphs: [
+      'Boş bir sayfaya önce hedef rolü, sonra bu rolle ilişkili üç deneyim kanıtını yazın. Her kanıtın yanına bağlamı ekleyin: hangi ekip, ürün, müşteri, süreç veya teknoloji içinde çalıştınız? Ardından yalnızca en güçlü iki kanıtı seçin. İlk cümlede rol yönünü, ikinci ve üçüncü cümlede kanıtları, son cümlede ise hedeflediğiniz katkı alanını anlatın. Bu taslak, özeti sıfat listesinden çıkarıp CV’nin geri kalanına bağlar.',
+      'Taslağı ilana uyarlarken şirket adını veya ilan cümlelerini kopyalamayın. İlandaki beklentinin sizdeki gerçek karşılığını bulun. Örneğin ilanda “cross-functional collaboration” geçiyorsa, gerçekten ürün, tasarım ve mühendislik ekipleriyle yürüttüğünüz bir işi öne çıkarın. Böyle bir deneyiminiz yoksa terimi yalnızca ATS eşleşmesi için eklemeyin. Son olarak her cümledeki iddianın hangi CV maddesiyle doğrulandığını işaretleyin.',
+    ],
+    bullets: [
+      'Rol: Başvurduğum pozisyon veya uzmanlık alanı ne?',
+      'Kanıt: Bu rol için gösterebildiğim en ilgili iki deneyim hangisi?',
+      'Bağlam: Çalışmanın kullanıcı, ekip veya teknik kapsamı neydi?',
+      'Doğrulama: Her iddianın CV’nin devamında açık bir karşılığı var mı?',
+    ],
+  },
+  'cv-pdf-mi-docx-mi': {
+    heading: 'Kendi ATS ön testinizi adım adım uygulayın',
+    paragraphs: [
+      'Çalışma dosyanızdan hem PDF hem DOCX sürümü üretin ve ikisini de kapatıp yeniden açın. PDF’den bütün metni seçip düz metin düzenleyiciye yapıştırın. DOCX’i mümkünse farklı bir ofis uygulamasında görüntüleyin. Her iki sürümde ad, iletişim bilgileri, deneyim başlıkları, kurumlar, tarihler ve maddelerin aynı mantıksal sırada kaldığını kontrol edin. Bu test belirli bir ATS sonucunu garanti etmez fakat görünmeyen dışa aktarma sorunlarını erken yakalar.',
+      'Sonra iki dosyanın boyutunu ve içeriğini kontrol edin. Gereksiz yüksek çözünürlüklü görseller dosyayı büyütebilir; gömülmeyen özel fontlar görünümü değiştirebilir. Şifreli veya parola korumalı dosyalar başvuru sistemleri tarafından işlenemeyebilir. Son sürümü kendinize e-posta ile gönderip indirerek bağlantıların ve dosya adının alıcı tarafında da doğru göründüğünü doğrulayabilirsiniz; gerçek başvurudan önce test amacıyla kişisel veriyi yeni bir hizmete yüklemeyin.',
+    ],
+    bullets: [
+      'PDF’den çıkarılan metni baştan sona okuyun.',
+      'DOCX’i ikinci bir görüntüleyicide açıp sayfa kaymalarını kontrol edin.',
+      'Şifre, yorum, izlenen değişiklik ve eski şablon bilgisini temizleyin.',
+      'İlan talimatı yoksa en temiz çıkan tek sürümü gönderin.',
+    ],
+  },
+  'ingilizce-cv-hatalari': {
+    heading: 'Göndermeden önce 12 maddelik İngilizce CV denetimi',
+    paragraphs: [
+      'Son okuma sırasında yalnızca dilbilgisine bakmak yeterli değildir. Belgeyi önce gerçekler, sonra dil ve son olarak biçim açısından üç ayrı turda inceleyin. Gerçekler turunda unvan, tarih, kurum, teknoloji ve ölçümleri kaynak CV’nizle karşılaştırın. Dil turunda fiil zamanı, tekil-çoğul kullanım, US/UK yazımı ve doğal olmayan doğrudan çevirileri kontrol edin. Biçim turunda başlıkların, tarihlerin, noktalamanın ve madde yapısının tutarlı kaldığını doğrulayın.',
+      'Mümkünse hedef rolü bilen bir kişiden yalnızca ilk otuz saniyede ne anladığını söylemesini isteyin. Okuyucu hedef rolü, kıdemi ve en güçlü iki kanıtı çıkaramıyorsa sorun yalnızca İngilizce olmayabilir; bilgi önceliği de yeniden düzenlenmelidir. Geri bildirim alırken başkasının daha etkileyici görünmesi için eklediği fakat size ait olmayan sonuçları kabul etmeyin. Akıcı bir CV’nin temel şartı doğruluk ve tutarlılıktır.',
+    ],
+    bullets: [
+      'Unvan doğru seviyeyi yansıtıyor mu ve belge boyunca aynı mı?',
+      'Devam eden ve tamamlanan görevlerde fiil zamanları tutarlı mı?',
+      'Her güçlü fiil gerçek sorumluluk düzeyiyle destekleniyor mu?',
+      'Tarih, yazım, noktalama ve sayı biçimi tek bir standardı izliyor mu?',
+      'Belirsiz sıfatlar yerine görev, bağlam ve sonuç kullanılmış mı?',
+      'Türkçe kaynaktan taşınan bütün özel adlar ve ölçümler doğrulanmış mı?',
     ],
   },
 }

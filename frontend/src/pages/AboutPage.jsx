@@ -1,7 +1,6 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import { useLanguage } from '../i18n/LanguageContext'
-import PageTransition from '../components/PageTransition'
 import { Target, Eye, Shield, Zap, Mail, Github, Linkedin } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -16,7 +15,7 @@ export default function AboutPage() {
   ]
 
   return (
-    <PageTransition>
+    <>
       <div className="about-public-page">
         <Navbar />
         <main id="main-content" className="main-content about-page">
@@ -113,8 +112,8 @@ export default function AboutPage() {
               <a href="https://linkedin.com/in/sercan-özkan-a205852a7/" target="_blank" rel="noopener noreferrer" className="btn-outline" style={{ borderRadius: 'var(--radius-md)' }}>
                 <Linkedin size={20} /> LinkedIn
               </a>
-              <a href="mailto:ozkansercan55@gmail.com" className="btn-outline" style={{ borderRadius: 'var(--radius-md)' }}>
-                <Mail size={20} /> Mail
+              <a href="mailto:support@cvanalyzer.dev" className="btn-outline" style={{ borderRadius: 'var(--radius-md)' }}>
+                <Mail size={20} /> support@cvanalyzer.dev
               </a>
               <a 
                 href="/cv_sercan_ozkan.pdf" 
@@ -211,6 +210,6 @@ export default function AboutPage() {
           }
         }
       `}</style>
-    </PageTransition>
+    </>
   )
 }

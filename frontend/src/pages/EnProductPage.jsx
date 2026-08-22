@@ -14,7 +14,7 @@ function formatUpdatedAt(value) {
   const date = new Date(`${value}T00:00:00Z`)
   if (Number.isNaN(date.getTime())) return value
 
-  return new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat('en-GB', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -25,7 +25,9 @@ function formatUpdatedAt(value) {
 export default function EnProductPage({ page }) {
   const reduceMotion = useReducedMotion()
   const canObserve = typeof window !== 'undefined' && 'IntersectionObserver' in window
-  const relatedPages = EN_SEO_PAGES.filter((candidate) => candidate.path !== page.path)
+  const relatedPages = EN_SEO_PAGES
+    .filter((candidate) => candidate.path !== page.path && candidate.indexable !== false)
+    .slice(0, 4)
   const reveal = reduceMotion
     ? {}
     : { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } }
@@ -64,13 +66,14 @@ export default function EnProductPage({ page }) {
               </div>
               <div className="seo-meta" aria-label="Article details">
                 <span><Clock3 size={15} aria-hidden="true" /> {page.readingTime}</span>
-                <span>Updated: {formatUpdatedAt(page.updatedAt)}</span>
+                <span>Updated: <time dateTime={page.updatedAt}>{formatUpdatedAt(page.updatedAt)}</time></span>
               </div>
               <div className="seo-trust-note">
                 <ShieldCheck size={18} aria-hidden="true" />
                 <p>
                   <strong>CV Analyzer Editorial Team</strong>
                   {' '}This content is reviewed for clarity, usefulness, and accuracy.
+                  <Link className="seo-editorial-link" to="/en/editorial-policy/">Our editorial approach</Link>
                 </p>
               </div>
             </motion.div>
@@ -165,6 +168,7 @@ export default function EnProductPage({ page }) {
                 {relatedPage.eyebrow} <ArrowRight size={15} aria-hidden="true" />
               </Link>
             ))}
+            <Link to="/en/">View all English guides <ArrowRight size={15} aria-hidden="true" /></Link>
           </aside>
         </article>
 

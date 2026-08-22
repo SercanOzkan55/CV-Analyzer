@@ -1,0 +1,16 @@
+FROM postgres:17-alpine
+
+RUN apk add --no-cache \
+    aws-cli \
+    bash \
+    coreutils \
+    findutils \
+    gnupg \
+    gzip
+
+WORKDIR /app
+COPY scripts/backup_db.sh /app/scripts/backup_db.sh
+COPY scripts/run_backup_loop.sh /app/scripts/run_backup_loop.sh
+RUN chmod 700 /app/scripts/backup_db.sh /app/scripts/run_backup_loop.sh
+
+ENTRYPOINT ["/app/scripts/run_backup_loop.sh"]

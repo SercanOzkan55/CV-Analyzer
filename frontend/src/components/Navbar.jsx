@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ChevronDown,
@@ -16,6 +16,7 @@ import { useTheme } from '../context/ThemeContext'
 import { BLOG_ENABLED } from '../config/features'
 import { getGuideUi } from '../content/guideI18n'
 import { findSeoPage } from '../content/seoPages'
+import { findEnSeoPage, EN_EQUIVALENT_BY_TR_PATH } from '../content/enSeoPages'
 import NotificationCenter from './NotificationCenter'
 
 const langLabels = { en: 'EN', tr: 'TR' }
@@ -25,6 +26,8 @@ export default function Navbar() {
   const { t, lang, setLang, availableLanguages } = useLanguage()
   const { theme, toggleTheme } = useTheme()
   const location = useLocation()
+  const navigate = useNavigate()
+  const fixedEnglishRoute = location.pathname === '/en' || location.pathname.startsWith('/en/')
   const guideUi = getGuideUi(lang)
   const isGuideRoute = location.pathname.startsWith('/rehber/') || Boolean(findSeoPage(location.pathname))
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -53,6 +56,29 @@ export default function Navbar() {
     await signOut()
   }
 
+  function handleLanguageChange(languageCode) {
+    setLang(languageCode)
+    if (!isLanding) return
+
+    const normalized = location.pathname.endsWith('/') ? location.pathname : `${location.pathname}/`
+    const enPublicToTr = {
+      '/en/': '/rehber/', '/en/about/': '/about/', '/en/privacy/': '/privacy/',
+      '/en/terms/': '/terms/', '/en/pricing/': '/pricing/', '/en/editorial-policy/': '/editoryal-politika/',
+    }
+    const trPublicToEn = Object.fromEntries(Object.entries(enPublicToTr).map(([enPath, trPath]) => [trPath, enPath]))
+
+    if (languageCode === 'tr' && fixedEnglishRoute) {
+      navigate(findEnSeoPage(normalized)?.trPath || enPublicToTr[normalized] || '/')
+      return
+    }
+
+    if (languageCode === 'en' && !fixedEnglishRoute) {
+      const sourcePage = findSeoPage(normalized)
+      const englishPath = (sourcePage && EN_EQUIVALENT_BY_TR_PATH[sourcePage.path]) || trPublicToEn[normalized]
+      if (englishPath) navigate(englishPath)
+    }
+  }
+
   return (
     <motion.nav
       className={`navbar${scrolled ? ' navbar-scrolled' : ''}`}
@@ -61,7 +87,7 @@ export default function Navbar() {
       transition={{ duration: 0.35 }}
     >
       <div className="navbar-inner">
-        <Link to="/" className="navbar-logo" aria-label="CV Analyzer home">
+        <Link to={fixedEnglishRoute ? '/en/' : '/'} className="navbar-logo" aria-label="CV Analyzer home">
           <motion.span
             className="logo-icon"
             animate={{ opacity: [0.82, 1, 0.82] }}
@@ -90,7 +116,7 @@ export default function Navbar() {
               <a href="/#features" className="nav-link">{t('nav.features')}</a>
               <a href="/#pricing" className="nav-link">{t('nav.pricing')}</a>
               <a href="/#faq" className="nav-link">{t('nav.faq')}</a>
-              <NavLink to="/rehber/" active={isGuideRoute}>{guideUi.hubTitle}</NavLink>
+              <NavLink to={fixedEnglishRoute ? '/en/' : '/rehber/'} active={isGuideRoute || fixedEnglishRoute}>{guideUi.hubTitle}</NavLink>
               {BLOG_ENABLED && <NavLink to="/blog" active={location.pathname === '/blog'}>Blog</NavLink>}
             </>
           ) : (
@@ -153,7 +179,7 @@ export default function Navbar() {
                 key={languageCode}
                 type="button"
                 className={`lang-btn ${lang === languageCode ? 'active' : ''}`}
-                onClick={() => setLang(languageCode)}
+                onClick={() => handleLanguageChange(languageCode)}
                 aria-pressed={lang === languageCode}
               >
                 {langLabels[languageCode] || languageCode.toUpperCase()}

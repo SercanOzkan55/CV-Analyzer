@@ -82,6 +82,24 @@ services:
       start_period: 60s
       retries: 3
 
+  backup:
+    build:
+      context: .
+      dockerfile: Dockerfile.backup
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set the Supabase DATABASE_URL in .env.production}
+      BACKUP_DIR: /app/backups
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_PREFIX: ${BACKUP_S3_PREFIX:-prod/db-backups}
+      BACKUP_S3_ENDPOINT_URL: ${BACKUP_S3_ENDPOINT_URL:-${S3_ENDPOINT_URL:-}}
+    volumes:
+      - backups:/app/backups
+
   frontend-build:
     build:
       context: ./frontend

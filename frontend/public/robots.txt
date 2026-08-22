@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
+Allow: /ads.txt
 Disallow: /dashboard
 Disallow: /analyze
 Disallow: /history

@@ -27,6 +27,30 @@ BACKUP_S3_STORAGE_CLASS=STANDARD_IA
 Use AWS Secrets Manager, SSM Parameter Store, Docker secrets, or your CI/CD
 secret store for `BACKUP_ENCRYPTION_PASSPHRASE`. Do not commit it.
 
+### Cloudflare R2
+
+R2 is S3-compatible. Use a private, backup-only bucket and a token restricted
+to that bucket:
+
+```env
+BACKUP_S3_ACCESS_KEY_ID=<R2 access key ID>
+BACKUP_S3_SECRET_ACCESS_KEY=<R2 secret access key>
+BACKUP_S3_REGION=auto
+BACKUP_S3_BUCKET=cv-analyzer-db-backups
+BACKUP_S3_ENDPOINT_URL=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+BACKUP_S3_PREFIX=prod/db
+BACKUP_ENCRYPTION_PASSPHRASE=<secret-manager value>
+```
+
+The production Compose stack includes a dedicated `backup` service. It runs a
+backup immediately on startup and repeats every `BACKUP_INTERVAL_SECONDS`
+(24 hours by default):
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build backup
+docker compose -f docker-compose.prod.yml logs --tail=100 backup
+```
+
 ## Cron Example
 
 ```bash
