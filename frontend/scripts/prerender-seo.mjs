@@ -86,11 +86,29 @@ function removeSiteStructuredData(html) {
 // opt-out routes in the privacy policy.
 const URL_PATTERN = /(https?:\/\/[^\s]+)/g
 
+// Cloudflare's Email Address Obfuscation rewrites mailto links and bare
+// addresses into /cdn-cgi/l/email-protection stubs that need a decoder script.
+// That script is injected after our nginx sub_filter has stamped nonces, so
+// 'strict-dynamic' blocks it and the address renders broken. These comment
+// markers are Cloudflare's documented opt-out and need no dashboard change.
+// https://developers.cloudflare.com/waf/tools/scrape-shield/email-address-obfuscation/
+function emailOff(html) {
+  return `<!--email_off-->${html}<!--/email_off-->`
+}
+
+const EMAIL_PATTERN = /([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/g
+
+function protectEmails(value = '') {
+  return String(value).split(EMAIL_PATTERN)
+    .map((part, index) => (index % 2 === 0 ? part : emailOff(part)))
+    .join('')
+}
+
 function escapeHtmlWithLinks(value = '') {
   return String(value)
     .split(URL_PATTERN)
     .map((part, index) => (index % 2 === 0
-      ? escapeHtml(part)
+      ? protectEmails(escapeHtml(part))
       : `<a href="${escapeHtml(part)}" target="_blank" rel="noopener noreferrer">${escapeHtml(part)}</a>`))
     .join('')
 }
@@ -103,8 +121,8 @@ function staticDocContent(page, { isEnglish, updatedAt, email }) {
       ${section.bullets ? `<ul>${section.bullets.map((item) => `<li>${escapeHtmlWithLinks(item)}</li>`).join('')}</ul>` : ''}
     </section>`).join('')
   const updatedLabel = isEnglish ? 'Last updated' : 'Son güncelleme'
-  const emailLine = email ? `<p><a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a></p>` : ''
-  return `<main id="main-content" class="seo-container seo-article" data-prerendered="true"><article class="seo-article-main"><h1>${escapeHtml(page.title)}</h1><p><time datetime="${escapeHtml(updatedAt)}">${updatedLabel}: ${escapeHtml(updatedAt)}</time></p><p>${escapeHtml(page.intro)}</p>${emailLine}${sections}</article></main>`
+  const emailLine = email ? `<p>${emailOff(`<a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>`)}</p>` : ''
+  return `<main id="main-content" class="seo-container seo-article" data-prerendered="true"><article class="seo-article-main"><h1>${escapeHtml(page.title)}</h1><p><time datetime="${escapeHtml(updatedAt)}">${updatedLabel}: ${escapeHtml(updatedAt)}</time></p><p>${escapeHtmlWithLinks(page.intro)}</p>${emailLine}${sections}</article></main>`
 }
 
 function contactSchema(page, { isEnglish }) {
@@ -270,7 +288,7 @@ function staticEnglishPublicPage(routePath) {
   }
   const [title, intro, sections = []] = pages[routePath] || []
   if (!title) return ''
-  return staticEnPublicChrome(`<main id="main-content" class="seo-container seo-article" data-prerendered="true"><article class="seo-article-main"><h1>${escapeHtml(title)}</h1><p>${escapeHtml(intro)}</p>${sections.map(([heading, body]) => `<section><h2>${escapeHtml(heading)}</h2><p>${escapeHtml(body)}</p></section>`).join('')}</article></main>`)
+  return staticEnPublicChrome(`<main id="main-content" class="seo-container seo-article" data-prerendered="true"><article class="seo-article-main"><h1>${escapeHtml(title)}</h1><p>${escapeHtml(intro)}</p>${sections.map(([heading, body]) => `<section><h2>${escapeHtml(heading)}</h2><p>${escapeHtmlWithLinks(body)}</p></section>`).join('')}</article></main>`)
 }
 
 function staticPageContent(page) {
@@ -383,7 +401,7 @@ function staticPublicPage(routePath) {
   const page = pages[routePath]
   if (!page) return ''
   const sections = page.sections
-    .map(([heading, body]) => `<section><h2>${escapeHtml(heading)}</h2><p>${escapeHtml(body)}</p></section>`)
+    .map(([heading, body]) => `<section><h2>${escapeHtml(heading)}</h2><p>${escapeHtmlWithLinks(body)}</p></section>`)
     .join('')
   return staticPublicChrome(
     `<main id="main-content" class="seo-container seo-article" data-prerendered="true"><article class="seo-article-main"><h1>${escapeHtml(page.title)}</h1><p>${escapeHtml(page.intro)}</p>${sections}</article></main>`,
