@@ -2,83 +2,83 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://cvanalyzer.dev/</loc>
-    <lastmod>2026-07-14</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/cv-analiz/</loc>
-    <lastmod>2026-07-14</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/rehber/</loc>
-    <lastmod>2026-08-07</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/ats-cv-kontrol/</loc>
-    <lastmod>2026-07-14</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/ats-uyumlu-cv/</loc>
-    <lastmod>2026-07-14</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/rehber/cv-nasil-hazirlanir/</loc>
-    <lastmod>2026-07-14</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/rehber/mulakat-hazirligi/</loc>
-    <lastmod>2026-07-26</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/rehber/on-yazi-nasil-yazilir/</loc>
-    <lastmod>2026-07-26</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/rehber/profesyonel-ozet-nasil-yazilir/</loc>
-    <lastmod>2026-08-07</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/rehber/cv-pdf-mi-docx-mi/</loc>
-    <lastmod>2026-08-07</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/rehber/ingilizce-cv-hatalari/</loc>
-    <lastmod>2026-08-07</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/cv-ornekleri/yeni-mezun/</loc>
-    <lastmod>2026-07-14</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/cv-ornekleri/yazilim-muhendisi/</loc>
-    <lastmod>2026-07-14</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/metodoloji/cv-analizi/</loc>
-    <lastmod>2026-07-26</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/en/</loc>
-    <lastmod>2026-08-08</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/en/ai-cv-analyzer/</loc>
-    <lastmod>2026-08-08</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/en/ats-resume-checker/</loc>
-    <lastmod>2026-08-08</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/en/ai-interview-simulator/</loc>
-    <lastmod>2026-08-08</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/en/resume-builder/</loc>
-    <lastmod>2026-08-08</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/en/about/</loc>
-    <lastmod>2026-08-08</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/en/privacy/</loc>
@@ -89,24 +89,16 @@
     <lastmod>2026-08-22</lastmod>
   </url>
   <url>
-    <loc>https://cvanalyzer.dev/en/pricing/</loc>
-    <lastmod>2026-08-08</lastmod>
-  </url>
-  <url>
     <loc>https://cvanalyzer.dev/en/editorial-policy/</loc>
-    <lastmod>2026-08-08</lastmod>
-  </url>
-  <url>
-    <loc>https://cvanalyzer.dev/pricing/</loc>
-    <lastmod>2026-07-14</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/about/</loc>
-    <lastmod>2026-08-08</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/editoryal-politika/</loc>
-    <lastmod>2026-08-08</lastmod>
+    <lastmod>2026-08-22</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/privacy/</loc>
@@ -122,6 +114,14 @@
   </url>
   <url>
     <loc>https://cvanalyzer.dev/en/contact/</loc>
+    <lastmod>2026-08-22</lastmod>
+  </url>
+  <url>
+    <loc>https://cvanalyzer.dev/pricing/</loc>
+    <lastmod>2026-08-22</lastmod>
+  </url>
+  <url>
+    <loc>https://cvanalyzer.dev/en/pricing/</loc>
     <lastmod>2026-08-22</lastmod>
   </url>
 </urlset>
