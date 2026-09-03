@@ -20,12 +20,30 @@ check() {
 
 check "health"                "$BASE/health"                        200
 check "frontend index"        "$BASE/"                              200
-check "privacy page (SPA)"    "$BASE/privacy"                       200
+check "privacy page"          "$BASE/privacy/"                      200
+check "ATS text tool"         "$BASE/araclar/ats-metin-kontrolu/"   200
+check "ads.txt"               "$BASE/ads.txt"                       200
 check "robots.txt"            "$BASE/robots.txt"                    200
 check "sitemap.xml"           "$BASE/sitemap.xml"                   200
 check "global benchmark API"  "$BASE/api/v1/benchmark/global"       200
 check "auth required on API"  "$BASE/api/v1/me/data-summary"        "401|403"
 check "metrics locked down"   "$BASE/metrics"                       "401|403"
+
+expected_ads="google.com, pub-6737853186639192, DIRECT, f08c47fec0942fa0"
+ads_txt=$(curl -fsS --max-time 15 -A "Mediapartners-Google" "$BASE/ads.txt" | tr -d '\r')
+if [ "$ads_txt" = "$expected_ads" ]; then
+  echo "PASS  ads.txt publisher authorization"
+else
+  echo "FAIL  ads.txt publisher authorization"
+  FAIL=1
+fi
+
+if curl -fsS --max-time 15 "$BASE/sitemap.xml" | grep -qF "$BASE/araclar/ats-metin-kontrolu/"; then
+  echo "PASS  ATS text tool in sitemap"
+else
+  echo "FAIL  ATS text tool missing from sitemap"
+  FAIL=1
+fi
 
 # HTTPS hardening
 hsts=$(curl -s -I --max-time 15 "$BASE/" | grep -ci "strict-transport-security")
