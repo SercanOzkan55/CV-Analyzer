@@ -11,6 +11,8 @@ import { Colors, Spacing, FontSize, BorderRadius } from '../theme';
 
 interface Props { navigation: any; }
 
+const MIN_PASSWORD_LENGTH = 12;
+
 export default function RegisterScreen({ navigation }: Props) {
   const { register } = useAuth();
   const [email, setEmail] = useState('');
@@ -24,7 +26,7 @@ export default function RegisterScreen({ navigation }: Props) {
     const errs: Record<string, string> = {};
     if (!email.trim()) errs.email = 'Email is required';
     if (!password) errs.password = 'Password is required';
-    else if (password.length < 6) errs.password = 'Minimum 6 characters';
+    else if (password.length < MIN_PASSWORD_LENGTH) errs.password = `Minimum ${MIN_PASSWORD_LENGTH} characters`;
     if (password !== confirm) errs.confirm = 'Passwords do not match';
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});

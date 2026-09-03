@@ -1,0 +1,35 @@
+# Optional production overlay for malware scanning.
+#
+# Capacity warning: ClamAV's signature database is memory-intensive. Confirm the
+# host has roughly 4 GB of memory available before enabling this overlay.
+# Start with:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.clamav.yml up -d --build
+services:
+  clamav:
+    image: clamav/clamav:1.4
+    restart: unless-stopped
+    expose:
+      - "3310"
+    volumes:
+      - clamavdata:/var/lib/clamav
+
+  app:
+    environment:
+      CLAMAV_ENABLED: "1"
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: "3310"
+    depends_on:
+      clamav:
+        condition: service_healthy
+
+  worker:
+    environment:
+      CLAMAV_ENABLED: "1"
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: "3310"
+    depends_on:
+      clamav:
+        condition: service_healthy
+
+volumes:
+  clamavdata:

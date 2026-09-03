@@ -5,6 +5,7 @@ import { useTheme } from '../context/ThemeContext'
 import { useToast } from '../components/Toast'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
+import { MIN_PASSWORD_LENGTH, meetsPasswordLength } from '../utils/passwordPolicy'
 
 export default function SettingsPage() {
   const { user, plan, planLoading, updatePassword, deleteUser } = useAuth()
@@ -33,6 +34,10 @@ export default function SettingsPage() {
   async function handlePasswordChange(e) {
     e.preventDefault()
     setPassError(null)
+    if (!meetsPasswordLength(newPassword)) {
+      setPassError(t('auth.password_min_length'))
+      return
+    }
     if (newPassword !== confirmPassword) {
       setPassError(t('auth.passwords_no_match'))
       return
@@ -115,11 +120,11 @@ export default function SettingsPage() {
             <form onSubmit={handlePasswordChange}>
               <div className="settings-field">
                 <label>{t('settings.new_password')}</label>
-                <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={6} autoComplete="new-password" />
+                <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" />
               </div>
               <div className="settings-field">
                 <label>{t('settings.confirm_password')}</label>
-                <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={6} autoComplete="new-password" />
+                <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" />
               </div>
               {passError && <p className="error">{passError}</p>}
               <button type="submit" className="btn-primary" disabled={passLoading}>

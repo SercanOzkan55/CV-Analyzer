@@ -119,8 +119,9 @@ def score_breakdown_endpoint(
         match = match_cv_to_job(model, body.job_description)
         feedback = generate_feedback(model, body.job_description, match)
         rec = recruiter_score(model, body.job_description)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Score breakdown failed: {e}")
+    except Exception:
+        logger.exception("score_breakdown failed")
+        raise HTTPException(status_code=500, detail="Score breakdown failed") from None
 
     return {
         "ats_scores": {

@@ -167,6 +167,7 @@
     "check_email": "Check your email for the confirmation link!",
     "reset_sent": "Password reset link sent! Check your email.",
     "passwords_no_match": "Passwords do not match",
+    "password_min_length": "Password must be at least 12 characters",
     "or_divider": "or"
   },
   "dashboard": {

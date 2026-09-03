@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/LanguageContext'
 import { useToast } from '../components/Toast'
 import Navbar from '../components/Navbar'
+import { MIN_PASSWORD_LENGTH, meetsPasswordLength } from '../utils/passwordPolicy'
 
 export default function RegisterPage() {
   const { signUp, signInWithGoogle } = useAuth()
@@ -25,6 +26,10 @@ export default function RegisterPage() {
     e.preventDefault()
     setError(null)
     setSuccess(null)
+    if (!meetsPasswordLength(password)) {
+      setError(t('auth.password_min_length'))
+      return
+    }
     if (password !== confirmPassword) {
       setError(t('auth.passwords_no_match'))
       return
@@ -75,11 +80,11 @@ export default function RegisterPage() {
             </div>
             <div className="form-group">
               <label>{t('auth.password')}</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete="new-password" />
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" />
             </div>
             <div className="form-group">
               <label>{t('auth.confirm_password')}</label>
-              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={6} autoComplete="new-password" />
+              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" />
             </div>
 
             {error && <p className="error">{error}</p>}

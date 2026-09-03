@@ -102,6 +102,7 @@
     "check_email": "Prüfen Sie Ihre E-Mail für den Bestätigungslink!",
     "reset_sent": "Zurücksetzungslink gesendet! Prüfen Sie Ihre E-Mail.",
     "passwords_no_match": "Passwörter stimmen nicht überein",
+    "password_min_length": "Das Passwort muss mindestens 12 Zeichen lang sein",
     "or_divider": "oder"
   },
   "dashboard": {

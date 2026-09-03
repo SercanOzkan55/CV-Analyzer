@@ -102,6 +102,7 @@
     "check_email": "Vérifiez votre e-mail pour le lien de confirmation !",
     "reset_sent": "Lien de réinitialisation envoyé ! Vérifiez votre e-mail.",
     "passwords_no_match": "Les mots de passe ne correspondent pas",
+    "password_min_length": "Le mot de passe doit contenir au moins 12 caractères",
     "or_divider": "ou"
   },
   "dashboard": {

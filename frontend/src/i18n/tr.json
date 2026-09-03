@@ -167,6 +167,7 @@
     "check_email": "Doğrulama bağlantısı için e-postanızı kontrol edin!",
     "reset_sent": "Şifre sıfırlama bağlantısı gönderildi! E-postanızı kontrol edin.",
     "passwords_no_match": "Şifreler eşleşmiyor",
+    "password_min_length": "Şifre en az 12 karakter olmalıdır",
     "or_divider": "veya"
   },
   "dashboard": {

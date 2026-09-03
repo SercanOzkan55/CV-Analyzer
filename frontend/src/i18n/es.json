@@ -102,6 +102,7 @@
     "check_email": "¡Revisa tu email para el enlace de confirmación!",
     "reset_sent": "¡Enlace de restablecimiento enviado! Revisa tu email.",
     "passwords_no_match": "Las contraseñas no coinciden",
+    "password_min_length": "La contraseña debe tener al menos 12 caracteres",
     "or_divider": "o"
   },
   "dashboard": {

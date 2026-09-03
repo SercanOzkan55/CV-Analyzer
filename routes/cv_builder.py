@@ -198,8 +198,10 @@ def cv_builder_generate(
         )
     except RuntimeError as exc:
         if "overloaded" in str(exc).lower():
-            raise HTTPException(status_code=503, detail=str(exc))
-        raise HTTPException(status_code=500, detail="CV generation failed")
+            logger.exception("CV builder generation service overloaded")
+            raise HTTPException(status_code=503, detail="CV generation service temporarily unavailable") from None
+        logger.exception("CV builder generation failed")
+        raise HTTPException(status_code=500, detail="CV generation failed") from None
     except Exception:
         logger.exception("CV builder generation failed")
         raise HTTPException(status_code=500, detail="CV generation failed")

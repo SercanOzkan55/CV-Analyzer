@@ -48,20 +48,18 @@ def _scan_upload_for_viruses(contents: bytes) -> None:
         return
 
     try:
-        import clamd  # type: ignore[import-untyped, import-not-found]
+        from clamdpy import ClamdNetworkSocket
     except Exception:
-        raise HTTPException(status_code=500, detail="Virus scanning backend unavailable")
+        raise HTTPException(status_code=500, detail="Virus scanning backend unavailable") from None
 
     try:
-        client = clamd.ClamdNetworkSocket(host=CLAMAV_HOST, port=CLAMAV_PORT)
+        client = ClamdNetworkSocket(host=CLAMAV_HOST, port=CLAMAV_PORT, timeout=15)
         result = client.instream(io.BytesIO(contents))
     except Exception:
-        raise HTTPException(status_code=500, detail="Virus scan failed")
+        raise HTTPException(status_code=500, detail="Virus scan failed") from None
 
-    try:
-        _name, (status, signature) = next(iter(result.items()))
-    except Exception:
-        status, signature = None, None
+    status = getattr(result, "status", None)
+    signature = getattr(result, "reason", None)
 
     if status != "OK":
         detail = "File failed virus scan"
@@ -491,16 +489,18 @@ def _ocr_extract_text_remote(image_bytes: bytes, lang: str = "en") -> str:
         if not text:
             raise ValueError("OCR service returned empty text")
         return text.strip()
-    except requests.exceptions.RequestException as exc:
+    except requests.exceptions.RequestException:
+        logging.getLogger("app.scan").exception("remote_ocr_request_failed")
         raise HTTPException(
             status_code=502,
-            detail=f"Remote OCR service unavailable: {exc}",
-        )
-    except ValueError as exc:
+            detail="Remote OCR service unavailable",
+        ) from None
+    except ValueError:
+        logging.getLogger("app.scan").exception("remote_ocr_response_invalid")
         raise HTTPException(
             status_code=502,
-            detail=f"Remote OCR service error: {exc}",
-        )
+            detail="Remote OCR service returned an invalid response",
+        ) from None
 
 
 def _build_tesseract_lang(lang: str) -> str:
@@ -574,11 +574,11 @@ def _ocr_extract_text(image_bytes: bytes, lang: str = "en") -> str:
             try:
                 text = pytesseract.image_to_string(img, lang="eng", config="--psm 6")
                 return text.strip()
-            except Exception as e2:
-                _log.error("ocr_fallback_failed error=%s", e2)
-                raise HTTPException(status_code=500, detail=f"OCR processing failed: {e2}")
-        _log.error("ocr_failed error=%s", e)
-        raise HTTPException(status_code=500, detail=f"OCR processing failed: {e}")
+            except Exception:
+                _log.exception("ocr_fallback_failed")
+                raise HTTPException(status_code=500, detail="OCR processing failed") from None
+        _log.exception("ocr_failed")
+        raise HTTPException(status_code=500, detail="OCR processing failed") from None
 
 
 def _reflow_ocr_lines(text: str) -> str:

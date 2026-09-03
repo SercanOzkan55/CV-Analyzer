@@ -2106,8 +2106,9 @@ async def recruiter_scan_cv(
             page_texts.append(text)
         except HTTPException:
             raise
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"OCR failed on page {idx + 1}: {e}")
+        except Exception:
+            logger.exception("scan_cv OCR failed page=%s", idx + 1)
+            raise HTTPException(status_code=500, detail="OCR processing failed") from None
 
     combined_text = "\n\n".join(page_texts)
     combined_text = _main()._normalize_ocr_text_for_cv_processing(combined_text)

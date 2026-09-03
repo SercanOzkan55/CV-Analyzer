@@ -463,11 +463,12 @@ async def auto_fix_cv_pdf(
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
-        except RuntimeError as e:
-            raise HTTPException(status_code=503, detail=str(e))
-        except Exception as e:
+        except RuntimeError:
+            logger.exception("auto_fix_cv_text service unavailable")
+            raise HTTPException(status_code=503, detail="AI service temporarily unavailable") from None
+        except Exception:
             logger.exception("auto_fix_cv_text unexpected error")
-            raise HTTPException(status_code=500, detail=f"Auto-fix error: {e}")
+            raise HTTPException(status_code=500, detail="Auto-fix failed") from None
     finally:
         guard.__exit__(None, None, None)
 
@@ -683,8 +684,9 @@ def rewrite_cv_endpoint(
                 )
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e))
-            except RuntimeError as e:
-                raise HTTPException(status_code=503, detail=str(e))
+            except RuntimeError:
+                logger.exception("ai_rewrite_cv service unavailable")
+                raise HTTPException(status_code=503, detail="AI service temporarily unavailable") from None
     except ValueError as exc:
         raise HTTPException(status_code=429, detail=str(exc))
 
@@ -759,9 +761,10 @@ def export_auto_fixed_cv(
         _metric_parse_latency("build_cv", time.time() - _t0)
     except Exception as exc:
         if "overloaded" in str(exc).lower():
-            raise HTTPException(status_code=503, detail=str(exc))
+            logger.exception("build_cv service overloaded in auto-fix export")
+            raise HTTPException(status_code=503, detail="CV generation service temporarily unavailable") from None
         logger.exception("build_cv failed in auto-fix export")
-        raise HTTPException(status_code=500, detail="CV generation failed")
+        raise HTTPException(status_code=500, detail="CV generation failed") from None
 
     try:
         audit_log(
@@ -969,8 +972,9 @@ def rewrite_bullets_endpoint(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+    except RuntimeError:
+        logger.exception("rewrite_bullets service unavailable")
+        raise HTTPException(status_code=503, detail="AI service temporarily unavailable") from None
 
     try:
         audit_log(
@@ -1021,8 +1025,9 @@ def rewrite_cover_letter_endpoint(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+    except RuntimeError:
+        logger.exception("rewrite_cover_letter service unavailable")
+        raise HTTPException(status_code=503, detail="AI service temporarily unavailable") from None
 
     try:
         audit_log(
@@ -1084,8 +1089,9 @@ def interview_questions_endpoint(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+    except RuntimeError:
+        logger.exception("interview_questions service unavailable")
+        raise HTTPException(status_code=503, detail="AI service temporarily unavailable") from None
 
     _consume_billable_usage(db, db_user, "interview-questions", response=response)
 
@@ -1128,8 +1134,9 @@ def interview_evaluate_endpoint(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+    except RuntimeError:
+        logger.exception("interview_evaluate service unavailable")
+        raise HTTPException(status_code=503, detail="AI service temporarily unavailable") from None
 
     _consume_billable_usage(db, db_user, "interview-evaluate", response=response)
 
@@ -1172,8 +1179,9 @@ def optimize_linkedin_endpoint(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+    except RuntimeError:
+        logger.exception("linkedin_optimize service unavailable")
+        raise HTTPException(status_code=503, detail="AI service temporarily unavailable") from None
 
     try:
         audit_log(
@@ -1210,8 +1218,9 @@ def job_match_score_endpoint(
             job_description=body.job_description,
             lang=body.lang,
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Job match scoring failed: {e}")
+    except Exception:
+        logger.exception("job_match_score failed")
+        raise HTTPException(status_code=500, detail="Job match scoring failed") from None
 
     # ── Mode-specific score adjustment ───────────────────────────────
     # Each career mode has different weight expectations so the same CV
@@ -1357,8 +1366,9 @@ def keyword_gap_detector_endpoint(
 
     try:
         result = compare(body.cv_text, body.job_description)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Keyword gap detection failed: {e}")
+    except Exception:
+        logger.exception("keyword_gap_detection failed")
+        raise HTTPException(status_code=500, detail="Keyword gap detection failed") from None
 
     try:
         audit_log(
@@ -1674,5 +1684,6 @@ def agent_chat_endpoint(
             max_tokens=800,
         )
         return {"response": (response.choices[0].message.content or "").strip()}
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Agent service error: {str(e)}")
+    except Exception:
+        logger.exception("agent_chat service unavailable")
+        raise HTTPException(status_code=503, detail="Agent service temporarily unavailable") from None
