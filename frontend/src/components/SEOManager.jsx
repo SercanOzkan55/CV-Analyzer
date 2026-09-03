@@ -10,6 +10,7 @@ import { PRIVACY_EN, PRIVACY_TR, TERMS_EN, TERMS_TR } from '../content/legalPoli
 import { useLanguage } from '../i18n/LanguageContext'
 
 const SITE_URL = 'https://cvanalyzer.dev'
+const ATS_TEXT_CHECK_PATH = '/araclar/ats-metin-kontrolu'
 
 const PUBLIC_META = {
   '/': {
@@ -43,6 +44,10 @@ const PUBLIC_META = {
   '/iletisim': {
     title: CONTACT_TR.seoTitle,
     description: CONTACT_TR.description,
+  },
+  [ATS_TEXT_CHECK_PATH]: {
+    title: 'Ücretsiz ATS Metin Ön Kontrolü | CV Analyzer',
+    description: 'CV metninizi bölüm başlıkları, iletişim bilgileri, okuma düzeni ve kanıta dayalı deneyim anlatımı açısından tarayıcınızda ücretsiz kontrol edin.',
   },
 }
 
@@ -150,7 +155,7 @@ function buildPageSchema(page) {
         datePublished: page.updatedAt,
         inLanguage: page.contentLanguage === 'tr' ? 'tr-TR' : 'en-US',
         mainEntityOfPage: canonical,
-        author: { '@type': 'Organization', name: 'CV Analyzer Editoryal Ekibi', url: `${SITE_URL}/editoryal-politika/` },
+        author: { '@type': 'Person', name: 'Sercan Özkan', jobTitle: 'Kurucu geliştirici ve içerik sorumlusu', url: `${SITE_URL}/about/` },
         publisher: { '@type': 'Organization', name: 'CV Analyzer', url: SITE_URL },
       },
       {
@@ -185,7 +190,7 @@ function buildEnPageSchema(page) {
         datePublished: page.updatedAt,
         inLanguage: 'en',
         mainEntityOfPage: canonical,
-        author: { '@type': 'Organization', name: 'CV Analyzer Editorial Team', url: `${SITE_URL}/en/editorial-policy/` },
+        author: { '@type': 'Person', name: 'Sercan Özkan', jobTitle: 'Founder-developer and publishing lead', url: `${SITE_URL}/about/` },
         publisher: { '@type': 'Organization', name: 'CV Analyzer', url: SITE_URL },
       },
       {
@@ -203,6 +208,32 @@ function buildEnPageSchema(page) {
           acceptedAnswer: { '@type': 'Answer', text: item.answer },
         })),
       },
+    ],
+  }
+}
+
+function buildAtsTextCheckSchema() {
+  const canonical = `${SITE_URL}${ATS_TEXT_CHECK_PATH}/`
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'ATS Metin Ön Kontrolü',
+    description: PUBLIC_META[ATS_TEXT_CHECK_PATH].description,
+    url: canonical,
+    applicationCategory: 'BusinessApplication',
+    operatingSystem: 'Any',
+    browserRequirements: 'Requires JavaScript',
+    inLanguage: 'tr-TR',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'TRY',
+    },
+    featureList: [
+      'Standart CV bölüm başlıklarını kontrol etme',
+      'Düz metin okuma düzenini kontrol etme',
+      'İletişim bilgisi bulunabilirliğini kontrol etme',
+      'Eylem ve ölçülebilir kanıt ifadelerini açıklama',
     ],
   }
 }
@@ -318,7 +349,13 @@ export default function SEOManager() {
           ]
         : [],
     )
-    setStructuredData(page ? buildPageSchema(page) : null)
+    setStructuredData(
+      page
+        ? buildPageSchema(page)
+        : normalizedPath === ATS_TEXT_CHECK_PATH
+          ? buildAtsTextCheckSchema()
+          : null,
+    )
   }, [lang, pathname, setRouteLangOverride])
 
   return null

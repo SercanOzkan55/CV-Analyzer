@@ -533,7 +533,7 @@ export const SEO_PAGES = [
       {
         heading: 'Teknik CV’de sık görülen zayıflıklar',
         paragraphs: [
-          'Yazılım CV’lerinde tekrar eden birkaç kalıp, içerik güçlü olsa bile değerlendirmeyi zorlaştırır. Aşağıdakiler analiz ettiğimiz teknik CV’lerde en sık rastladığımız durumlar.',
+          'Yazılım CV’lerinde tekrar eden bazı kalıplar, içerik güçlü olsa bile değerlendirmeyi zorlaştırabilir. Aşağıdaki liste teknik bir CV’yi gözden geçirirken doğrudan kontrol edebileceğiniz örüntüleri gösterir; istatistiksel bir kullanıcı örneklemi iddiası değildir.',
         ],
         bullets: [
           'Her maddenin "geliştirdim" ile başlaması: fiil çeşitliliği anlatımı belirginleştirir.',

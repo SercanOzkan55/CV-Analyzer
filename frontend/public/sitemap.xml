@@ -90,7 +90,7 @@
   </url>
   <url>
     <loc>https://cvanalyzer.dev/en/editorial-policy/</loc>
-    <lastmod>2026-08-22</lastmod>
+    <lastmod>2026-09-03</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/about/</loc>
@@ -98,7 +98,7 @@
   </url>
   <url>
     <loc>https://cvanalyzer.dev/editoryal-politika/</loc>
-    <lastmod>2026-08-22</lastmod>
+    <lastmod>2026-09-03</lastmod>
   </url>
   <url>
     <loc>https://cvanalyzer.dev/privacy/</loc>
@@ -123,5 +123,9 @@
   <url>
     <loc>https://cvanalyzer.dev/en/pricing/</loc>
     <lastmod>2026-08-22</lastmod>
+  </url>
+  <url>
+    <loc>https://cvanalyzer.dev/araclar/ats-metin-kontrolu/</loc>
+    <lastmod>2026-09-03</lastmod>
   </url>
 </urlset>

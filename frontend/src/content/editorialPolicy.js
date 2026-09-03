@@ -3,13 +3,13 @@ export const EDITORIAL_POLICY = {
   title: 'Editoryal Politika ve İçerik Hazırlama Süreci',
   seoTitle: 'Editoryal Politika ve İçerik Süreci | CV Analyzer',
   description: 'CV Analyzer rehberlerinin kim tarafından, hangi amaçla ve nasıl hazırlandığını; yapay zekâ desteği, kaynak kullanımı, düzeltme ve ticari bağımsızlık ilkelerini inceleyin.',
-  updatedAt: '2026-08-08',
+  updatedAt: '2026-09-03',
   intro: 'Bu sayfa, CV Analyzer üzerindeki CV, ATS, iş başvurusu ve kariyer rehberlerinin hazırlanma ve yayımlanma yaklaşımını açıklar. Amacımız kesin sonuç vaat etmek değil; kullanıcıların kendi belgelerini daha bilinçli biçimde gözden geçirebilmesi için anlaşılır, uygulanabilir ve sınırları açık içerikler sunmaktır.',
   sections: [
     {
       heading: 'Yayın sahibi ve sorumluluk',
       paragraphs: [
-        'CV Analyzer, kurucusu ve geliştiricisi Sercan Özkan tarafından yürütülen bağımsız bir yazılım ürünüdür. Rehberlerin yayın sahibi CV Analyzer’dır. İçeriklerde “CV Analyzer Editoryal Ekibi” imzası kullanıldığında bu ifade, içeriğin sorumluluğunu üstlenen yayıncıyı belirtir; dışarıdan bir işe alım şirketi, ATS sağlayıcısı veya meslek kuruluşu onayı anlamına gelmez.',
+        'CV Analyzer, kurucusu ve geliştiricisi Sercan Özkan tarafından yürütülen bağımsız bir yazılım ürünüdür. Rehberlerde görünen “Sercan Özkan — kurucu geliştirici ve içerik sorumlusu” imzası yayın sorumluluğunu açıklar; işe alım uzmanlığı, dışarıdan bir işe alım şirketi, ATS sağlayıcısı veya meslek kuruluşu onayı iddiası değildir.',
         'Ürün, belirli bir işveren adına işe alım kararı vermez ve herhangi bir ticari ATS ürünüyle resmî ortaklık iddiasında bulunmaz. Sorular, hata bildirimleri ve düzeltme talepleri support@cvanalyzer.dev adresine gönderilebilir.',
       ],
     },
@@ -53,6 +53,13 @@ export const EDITORIAL_POLICY = {
       paragraphs: [
         'Yanlış, güncelliğini yitirmiş veya açıklaması yetersiz bir ifade görürseniz sayfanın bağlantısını ve sorunlu bölümü support@cvanalyzer.dev adresine gönderebilirsiniz. Bildirim için CV’nizin tamamını veya özel kişisel bilgilerinizi paylaşmanız gerekmez.',
         'Ürün davranışıyla ilgili bir hata bildirirken kişisel veri içermeyen kısa bir örnek ve mümkünse analiz kimliği yeterlidir. İçerik geri bildirimleri, sonraki düzeltme ve yeni rehber seçimlerinde değerlendirilir.',
+      ],
+    },
+    {
+      heading: 'Düzeltme ve sürüm geçmişi',
+      paragraphs: [
+        '3 Eylül 2026 — Kanıtsız doğruluk, evrensel dil desteği ve ATS geçiş garantisi izlenimi veren ürün ifadeleri sınırlandırıldı. Rehberlerdeki ortak temsili puan kartı konuya özel kapsam özetiyle değiştirildi; yayın sorumlusu görünür hâle getirildi.',
+        '3 Eylül 2026 — Tarayıcı içinde çalışan, metni sunucuya göndermeyen ATS metin ön kontrolü yayıma hazırlandı. Kontrol formülü, kurgusal örnek ve aracın yapmadıkları aynı sayfada açıklandı.',
       ],
     },
   ],

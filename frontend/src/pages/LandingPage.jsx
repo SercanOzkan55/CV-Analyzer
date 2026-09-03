@@ -101,7 +101,6 @@ function ProofStat({ value, suffix, label }) {
 function DemoCard({ t }) {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: true, amount: 0.3 })
-  const score = useAnimatedCounter(isInView ? 82 : 0, 1400)
 
   return (
     <div ref={ref} className="lp-demo-wrapper">
@@ -120,7 +119,7 @@ function DemoCard({ t }) {
         transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut', delay: 0.8 }}
       >
         <Shield size={12} style={{ color: 'var(--color-success)' }} />
-        ATS Ready
+        Illustrative check
       </motion.div>
 
       {/* Main demo card */}
@@ -151,20 +150,19 @@ function DemoCard({ t }) {
         <div className="demo-body">
           <div className="demo-score-section">
             <CircularProgress
-              value={score}
+              value={100}
               size={104}
               strokeWidth={8}
               color="var(--color-success)"
               trackColor="var(--landing-progress-track, color-mix(in srgb, var(--color-success) 14%, var(--color-border)))"
               glow="color-mix(in srgb, var(--color-success) 28%, transparent)"
               className="demo-ring lp-demo-circle"
-              label={`Match score ${score}%`}
+              label="Illustrative result preview"
             >
               <span className="demo-score-value">
                 <span className="demo-num" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                  {score}
+                  {t('landing.demo_badge')}
                 </span>
-                <span className="demo-pct">%</span>
               </span>
             </CircularProgress>
             <span className="demo-label">{t('landing.demo_interpretation')}</span>
@@ -210,11 +208,11 @@ function DemoCard({ t }) {
                     className="bar-fill"
                     style={{ background: 'var(--gradient-accent)' }}
                     initial={{ width: 0 }}
-                    animate={isInView ? { width: '94%' } : {}}
+                    animate={isInView ? { width: '72%' } : {}}
                     transition={{ delay: 0.6, duration: 1.2, ease: 'easeOut' }}
                   />
                 </div>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>94%</span>
+                <span>{t('landing.demo_check_label')}</span>
               </div>
             </div>
           </div>
@@ -282,11 +280,11 @@ function KineticHeroStage({ t, scrollYProgress }) {
         >
           <div className="hero-metric-tile hero-metric-tile-a">
             <span>ATS</span>
-            <strong>94%</strong>
+            <strong>{t('landing.demo_badge')}</strong>
           </div>
           <div className="hero-metric-tile hero-metric-tile-b">
             <span>{t('landing.hero_float_match_label')}</span>
-            <strong>82%</strong>
+            <strong>{t('landing.demo_signal_label')}</strong>
           </div>
           <div className="hero-flow-line hero-flow-line-a" />
           <div className="hero-flow-line hero-flow-line-b" />
@@ -374,7 +372,7 @@ function ScrollAnalysisStory({ t }) {
           <div className="lp-scroll-story-signals" aria-label={t('landing.demo_title')}>
             <span><FileText size={15} /> CV</span>
             <span><Brain size={15} /> AI Match</span>
-            <span><CheckCircle2 size={15} /> ATS 94%</span>
+            <span><CheckCircle2 size={15} /> ATS check</span>
           </div>
         </motion.div>
 
@@ -403,8 +401,8 @@ function ScrollAnalysisStory({ t }) {
                   <i /><i /><i />
                 </div>
                 <div className="lp-scroll-sheet-score">
-                  <strong>82</strong>
-                  <span>Match</span>
+                  <strong>✓</strong>
+                  <span>Signals</span>
                 </div>
               </div>
               <div className="lp-scroll-sheet-skills">
@@ -423,12 +421,12 @@ function ScrollAnalysisStory({ t }) {
                 <strong>02</strong>
               </div>
               <div className="lp-scroll-evidence-ring">
-                <span>94%</span>
-                <small>ATS ready</small>
+                <span>4</span>
+                <small>checks</small>
               </div>
-              <div className="lp-scroll-evidence-row"><span>Role fit</span><strong>High</strong></div>
-              <div className="lp-scroll-evidence-row"><span>Signals</span><strong>12 found</strong></div>
-              <div className="lp-scroll-evidence-row"><span>Rewrite</span><strong>Ready</strong></div>
+              <div className="lp-scroll-evidence-row"><span>Role fit</span><strong>Review</strong></div>
+              <div className="lp-scroll-evidence-row"><span>Signals</span><strong>Explained</strong></div>
+              <div className="lp-scroll-evidence-row"><span>Rewrite</span><strong>User choice</strong></div>
             </div>
 
             <div className="lp-scroll-sheet-edge" />
@@ -613,7 +611,7 @@ export default function LandingPage() {
                     <p>{f.desc}</p>
                   </div>
 
-                  <div className="lp-flip-card-face lp-flip-card-back">
+                  <div className="lp-flip-card-face lp-flip-card-back" aria-hidden="true">
                     <span className="lp-flip-kicker">{t('landing.feature_kicker')} {String(i + 1).padStart(2, '0')}</span>
                     <h3>{f.title}</h3>
                     <p>{f.desc}</p>

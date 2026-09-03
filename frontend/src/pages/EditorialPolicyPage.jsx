@@ -13,7 +13,7 @@ export default function EditorialPolicyPage() {
           <h1>{EDITORIAL_POLICY.title}</h1>
           <p className="legal-updated">
             Son güncelleme:{' '}
-            <time dateTime={EDITORIAL_POLICY.updatedAt}>8 Ağustos 2026</time>
+            <time dateTime={EDITORIAL_POLICY.updatedAt}>3 Eylül 2026</time>
           </p>
           <p>{EDITORIAL_POLICY.intro}</p>
 

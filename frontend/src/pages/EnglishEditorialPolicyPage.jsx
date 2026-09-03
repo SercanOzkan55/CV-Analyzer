@@ -23,7 +23,7 @@ export default function EnglishEditorialPolicyPage() {
         <article className="legal-container">
           <h1>{EDITORIAL_POLICY_EN.title}</h1>
           <p className="legal-updated">
-            Last updated: <time dateTime={EDITORIAL_POLICY_EN.updatedAt}>8 August 2026</time>
+            Last updated: <time dateTime={EDITORIAL_POLICY_EN.updatedAt}>3 September 2026</time>
           </p>
           <p>{EDITORIAL_POLICY_EN.intro}</p>
           {EDITORIAL_POLICY_EN.sections.map((section) => (

@@ -1,20 +1,33 @@
 import React, { useEffect, useRef } from 'react'
 
-// The AdSense loader lives in index.html so review crawlers find it in the raw
-// HTML. Individual display units render only where this component is mounted,
-// which is limited to public editorial routes with substantive content —
-// AdSense policy forbids ads on login, empty, or utility screens.
-//
 // Slot ids come from env so the markup stays out of the build until real ad
 // units exist in the AdSense dashboard. Until then this renders nothing, which
 // is deliberate: an <ins> with an empty data-ad-slot is a policy violation and
 // logs errors on every page view.
 const AD_CLIENT = 'ca-pub-6737853186639192'
+const ADSENSE_LOADER_ID = 'adsense-page-loader'
+const ADSENSE_LOADER_SRC = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${AD_CLIENT}`
 
 const SLOT_IDS = {
   article_top: import.meta.env.VITE_ADSENSE_SLOT_ARTICLE_TOP || '',
   article_mid: import.meta.env.VITE_ADSENSE_SLOT_ARTICLE_MID || '',
   article_end: import.meta.env.VITE_ADSENSE_SLOT_ARTICLE_END || '',
+}
+
+function ensureAdSenseLoader() {
+  if (typeof document === 'undefined') return
+
+  const existingLoader = document.getElementById(ADSENSE_LOADER_ID)
+    || document.querySelector('script[src^="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]')
+
+  if (existingLoader) return
+
+  const script = document.createElement('script')
+  script.id = ADSENSE_LOADER_ID
+  script.async = true
+  script.src = ADSENSE_LOADER_SRC
+  script.crossOrigin = 'anonymous'
+  document.head.appendChild(script)
 }
 
 export default function AdSlot({ placement, className = '' }) {
@@ -23,11 +36,16 @@ export default function AdSlot({ placement, className = '' }) {
   const slotId = SLOT_IDS[placement] || ''
 
   useEffect(() => {
+    // AdSlot is mounted only by reviewed, substantive editorial pages. Loading
+    // the script here prevents Auto ads from appearing on auth, account,
+    // private app, loading, error, and other utility routes. It also lets Auto
+    // ads run on editorial pages before manual display-unit ids are configured.
+    ensureAdSenseLoader()
+
     if (!slotId || pushedRef.current || !insRef.current) return
 
     try {
-      // The loader defines window.adsbygoogle as a push-array before it
-      // finishes downloading, so this is safe to call immediately.
+      // Queue the display unit while the async loader is downloading.
       ;(window.adsbygoogle = window.adsbygoogle || []).push({})
       pushedRef.current = true
     } catch {

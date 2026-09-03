@@ -63,6 +63,7 @@ const SEOContentPage = lazy(() => import("./pages/SEOContentPage"))
 const EnProductPage = lazy(() => import("./pages/EnProductPage"))
 const EnglishGuideHubPage = lazy(() => import("./pages/EnglishGuideHubPage"))
 const EnglishEditorialPolicyPage = lazy(() => import("./pages/EnglishEditorialPolicyPage"))
+const ATSTextCheckPage = lazy(() => import("./pages/ATSTextCheckPage"))
 
 
 
@@ -156,6 +157,7 @@ function AnimatedRoutes() {
         <Route path="/editoryal-politika" element={<PageTransition><EditorialPolicyPage /></PageTransition>} />
         <Route path="/iletisim" element={<PageTransition><ContactPage locale="tr" /></PageTransition>} />
         <Route path="/rehber" element={<PageTransition><GuideHubPage /></PageTransition>} />
+        <Route path="/araclar/ats-metin-kontrolu" element={<PageTransition><ATSTextCheckPage /></PageTransition>} />
         <Route path="/en" element={<PageTransition><EnglishGuideHubPage /></PageTransition>} />
         <Route path="/en/about" element={<PageTransition><AboutPage /></PageTransition>} />
         <Route path="/en/privacy" element={<PageTransition><PrivacyPage /></PageTransition>} />

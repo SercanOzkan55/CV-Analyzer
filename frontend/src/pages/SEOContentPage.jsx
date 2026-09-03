@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
-import { ArrowRight, CheckCircle2, Clock3, FileSearch, Languages, ShieldCheck } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Clock3, Languages, ShieldCheck } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import AdSlot from '../components/AdSlot'
@@ -33,8 +33,21 @@ export default function SEOContentPage({ page: sourcePage }) {
   const page = getLocalizedSeoPage(sourcePage, lang)
   const enEquivalentPath = EN_EQUIVALENT_BY_TR_PATH[sourcePage.path]
   const canObserve = typeof window !== 'undefined' && 'IntersectionObserver' in window
+  const sourceSection = sourcePage.path.split('/').filter(Boolean)[0]
   const relatedPages = getLocalizedSeoPages(
-    SEO_PAGES.filter((candidate) => candidate.path !== sourcePage.path).slice(0, 4),
+    SEO_PAGES
+      .filter((candidate) => candidate.path !== sourcePage.path)
+      .map((candidate, order) => {
+        const candidateSection = candidate.path.split('/').filter(Boolean)[0]
+        const sharedTerms = sourcePage.highlights.filter((term) =>
+          `${candidate.title} ${candidate.intro} ${candidate.highlights.join(' ')}`.toLocaleLowerCase('tr-TR')
+            .includes(term.toLocaleLowerCase('tr-TR').split(' ')[0]),
+        ).length
+        return { candidate, score: (candidateSection === sourceSection ? 10 : 0) + sharedTerms, order }
+      })
+      .sort((a, b) => b.score - a.score || a.order - b.order)
+      .slice(0, 4)
+      .map(({ candidate }) => candidate),
     lang,
   )
   const reveal = reduceMotion
@@ -89,8 +102,11 @@ export default function SEOContentPage({ page: sourcePage }) {
               <div className="seo-trust-note">
                 <ShieldCheck size={18} aria-hidden="true" />
                 <p>
-                  <strong>{ui.editorialTeam}</strong>
-                  {ui.editorialNote}
+                  <strong>Sercan Özkan</strong>
+                  {ui.publisherAccountability || ui.editorialNote}
+                  <Link className="seo-editorial-link" to="/about/">
+                    {ui.aboutPublisher || 'Yayın sorumlusu hakkında'}
+                  </Link>
                   <Link className="seo-editorial-link" to="/editoryal-politika/">
                     {ui.editorialPolicyLink || 'Editoryal yaklaşımımız'}
                   </Link>
@@ -100,23 +116,22 @@ export default function SEOContentPage({ page: sourcePage }) {
 
             <motion.div
               className="seo-product-visual"
-              aria-label={ui.sampleAria}
+              aria-label={ui.inThisGuide}
               key={`${lang}-${page.slug}-sample`}
               initial={reduceMotion ? false : { opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: reduceMotion ? 0 : 0.06, ease: 'easeOut' }}
             >
               <div className="seo-product-head">
-                <span><FileSearch size={18} aria-hidden="true" /> {ui.sampleSummary}</span>
-                <strong>84/100</strong>
+                <span><CheckCircle2 size={18} aria-hidden="true" /> {ui.inThisGuide}</span>
+                <strong>{page.highlights.length}</strong>
               </div>
-              <div className="seo-score-track" aria-hidden="true"><span /></div>
               <div className="seo-product-checks">
-                <p><CheckCircle2 size={17} /> {ui.sampleChecks[0]}</p>
-                <p><CheckCircle2 size={17} /> {ui.sampleChecks[1]}</p>
-                <p><ShieldCheck size={17} /> {ui.sampleChecks[2]}</p>
+                {page.highlights.map((highlight) => (
+                  <p key={highlight}><CheckCircle2 size={17} aria-hidden="true" /> {highlight}</p>
+                ))}
               </div>
-              <div className="seo-product-note">{ui.sampleNote}</div>
+              <div className="seo-product-note">{ui.guideSummaryNote || 'Bu özet, yalnızca bu rehberin ele aldığı adımları gösterir.'}</div>
             </motion.div>
           </div>
         </header>

@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
-import { ArrowRight, BookOpen, Clock3, Languages } from 'lucide-react'
+import { ArrowRight, BookOpen, Clock3, Languages, LockKeyhole, ScanText } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { SEO_PAGES } from '../content/seoPages'
@@ -59,6 +59,22 @@ export default function GuideHubPage() {
         </header>
 
         <div className="seo-container seo-hub-content">
+          <section className="seo-tool-callout" aria-labelledby="seo-tool-callout-title">
+            <div className="seo-tool-callout-icon" aria-hidden="true"><ScanText size={24} /></div>
+            <div>
+              <p className="seo-eyebrow">Okumadan önce deneyin</p>
+              <h2 id="seo-tool-callout-title">CV metninizi tarayıcınızda ücretsiz kontrol edin</h2>
+              <p>
+                Bölüm başlıklarını, iletişim bilgisini, düz metin sırasını ve deneyim maddelerindeki
+                kanıtları açıklanabilir bir kontrol listesiyle inceleyin.
+              </p>
+              <span><LockKeyhole size={15} aria-hidden="true" /> Metin cihazınızdan ayrılmaz</span>
+            </div>
+            <Link className="btn-primary" to="/araclar/ats-metin-kontrolu/">
+              ATS metin kontrolünü aç <ArrowRight size={17} aria-hidden="true" />
+            </Link>
+          </section>
+
           {CATEGORY_MATCHERS.map((matches, categoryIndex) => {
             const categoryPages = pages.filter(matches)
             const [title, description] = ui.categories[categoryIndex]

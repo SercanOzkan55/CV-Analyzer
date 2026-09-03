@@ -18,6 +18,7 @@ const PUBLIC_ROUTES = [
   { path: '/rehber/', enPath: '/en/', title: 'CV Hazırlama ve ATS Rehberleri | CV Analyzer', description: 'CV hazırlama, ATS okunabilirliği, mülakat, ön yazı ve role özel CV örnekleri için özgün ve uygulanabilir rehberleri inceleyin.' },
   { path: '/pricing/', enPath: '/en/pricing/', title: 'CV Analyzer Planları ve Özellikleri', description: 'CV analizi, ATS kontrolü, iş eşleşmesi ve CV geliştirme özelliklerini karşılaştırın.' },
   { path: '/about/', enPath: '/en/about/', title: 'CV Analyzer Hakkında', description: 'CV Analyzer’ın özgeçmiş değerlendirmesini daha açık, erişilebilir ve uygulanabilir hale getirme yaklaşımını öğrenin.' },
+  { path: '/araclar/ats-metin-kontrolu/', title: 'Ücretsiz ATS Metin Ön Kontrolü | CV Analyzer', description: 'CV metninizi bölüm başlıkları, iletişim bilgileri, okuma düzeni ve kanıta dayalı deneyim anlatımı açısından tarayıcınızda ücretsiz kontrol edin.' },
   { path: EDITORIAL_POLICY.path, enPath: EDITORIAL_POLICY_EN.path, title: EDITORIAL_POLICY.seoTitle, description: EDITORIAL_POLICY.description },
   { path: PRIVACY_TR.path, enPath: PRIVACY_EN.path, title: PRIVACY_TR.seoTitle, description: PRIVACY_TR.description },
   { path: TERMS_TR.path, enPath: TERMS_EN.path, title: TERMS_TR.seoTitle, description: TERMS_TR.description },
@@ -158,7 +159,7 @@ function pageSchema(page) {
         '@type': 'Article', headline: page.title, description: page.description,
         datePublished: page.updatedAt, dateModified: page.updatedAt, inLanguage: 'tr-TR',
         mainEntityOfPage: canonical,
-        author: { '@type': 'Organization', name: 'CV Analyzer Editoryal Ekibi', url: `${SITE_URL}/editoryal-politika/` },
+        author: { '@type': 'Person', name: 'Sercan Özkan', jobTitle: 'Kurucu geliştirici ve içerik sorumlusu', url: `${SITE_URL}/about/` },
         publisher: { '@type': 'Organization', name: 'CV Analyzer', url: SITE_URL },
       },
       {
@@ -188,7 +189,7 @@ function enPageSchema(page) {
         '@type': 'Article', headline: page.title, description: page.description,
         datePublished: page.updatedAt, dateModified: page.updatedAt, inLanguage: 'en',
         mainEntityOfPage: canonical,
-        author: { '@type': 'Organization', name: 'CV Analyzer Editorial Team', url: `${SITE_URL}/en/editorial-policy/` },
+        author: { '@type': 'Person', name: 'Sercan Özkan', jobTitle: 'Founder-developer and publishing lead', url: `${SITE_URL}/about/` },
         publisher: { '@type': 'Organization', name: 'CV Analyzer', url: SITE_URL },
       },
       {
@@ -254,7 +255,7 @@ function staticEnglishPublicPage(routePath) {
 
   if (routePath === EDITORIAL_POLICY_EN.path) {
     const sections = EDITORIAL_POLICY_EN.sections.map((section) => `<section><h2>${escapeHtml(section.heading)}</h2>${section.paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join('')}</section>`).join('')
-    return staticEnPublicChrome(`<main id="main-content" class="seo-container seo-article" data-prerendered="true"><article class="seo-article-main"><h1>${escapeHtml(EDITORIAL_POLICY_EN.title)}</h1><p><time datetime="${escapeHtml(EDITORIAL_POLICY_EN.updatedAt)}">Last updated: 8 August 2026</time></p><p>${escapeHtml(EDITORIAL_POLICY_EN.intro)}</p>${sections}</article></main>`)
+    return staticEnPublicChrome(`<main id="main-content" class="seo-container seo-article" data-prerendered="true"><article class="seo-article-main"><h1>${escapeHtml(EDITORIAL_POLICY_EN.title)}</h1><p><time datetime="${escapeHtml(EDITORIAL_POLICY_EN.updatedAt)}">Last updated: 3 September 2026</time></p><p>${escapeHtml(EDITORIAL_POLICY_EN.intro)}</p>${sections}</article></main>`)
   }
 
   if (routePath === CONTACT_EN.path) {
@@ -274,10 +275,10 @@ function staticEnglishPublicPage(routePath) {
       ['Why we built it', 'Feedback on a job application is usually either absent or reduced to a single line such as "your CV was not a match". CV Analyzer exists to make that feedback concrete and explainable: which section looks weak, why it looks weak, and what could be changed.'],
       ['Our approach', 'We review document structure, text readability, experience and skills evidence, and relevance to a target vacancy as separate signals. Results support the user’s own review and do not guarantee employment.'],
       ['Transparency and control', 'Suggestions are grounded in what the CV actually contains; we do not invent experience or skills. Users can manage and delete their saved analyses and CV versions from their account at any time.'],
-      ['Who writes the guides', 'Our guide and methodology pages are written by the CV Analyzer editorial team, reviewed before publication and revised when they fall out of date. The editorial policy page sets out how that process works.'],
+      ['Who writes the guides', 'Founder-developer Sercan Özkan is accountable for publishing the guides and methodology pages. This does not claim recruiter credentials. Content is checked against product behaviour and revised when it falls out of date; the editorial policy explains the process.'],
       ['Independence', 'CV Analyzer is operated independently by founder-developer Sercan Özkan. We have no commercial relationship with any employer, job board or ATS vendor, so our assessments are not shaped by third-party interests.'],
       ['How the product is funded', 'The product is funded by paid subscriptions and by advertising shown on public content pages. Advertising revenue has no influence on analysis results; ads appear only alongside guide content and never inside analysis screens.'],
-      ['Who uses the product', 'Most of our users are recent graduates preparing a first application, professionals changing role or sector, and candidates applying abroad. Small recruitment teams reviewing a candidate pool also use the product; the tools provided for them support manual review and never make an automated hiring decision.'],
+      ['Who the product is designed for', 'The product provides separate workflows for people preparing a first CV, changing role or sector, applying abroad, and authorised teams manually reviewing a candidate pool. This describes intended use, not measured user demographics. The tools do not make automated hiring decisions.'],
       ['We are explicit about our limits', 'There is a limit to what any CV analysis tool can do, and we do not hide it. We cannot reproduce the exact behaviour of every applicant tracking system on the market, we cannot anticipate an employer’s subjective judgement, and we do not produce hiring-probability predictions. Our methodology page sets out what we measure and what we deliberately do not.'],
       ['Contact', 'Questions about the product, privacy or our content can be sent through the contact page or to support@cvanalyzer.dev. General questions are answered within 1-2 working days; privacy and deletion requests within 30 days at the latest.'],
     ]],
@@ -285,7 +286,6 @@ function staticEnglishPublicPage(routePath) {
       ['Start for free', 'The free plan covers core CV analysis, ATS readability checks and explainable improvement suggestions without a card. Daily analysis and AI tool usage are capped on this plan.'],
       ['What every plan includes', 'All plans include section structure review, text extraction quality checks, skills and experience analysis, and vacancy matching. Higher tiers add larger daily limits, retained history and additional career tools.'],
       ['Individual and team use', 'Different options support individual applicants and authorised recruitment teams. Recruiter tools assist manual review and do not make an automated hiring decision.'],
-      ['Billing and cancellation', 'Paid plans are subscriptions and can be cancelled at any time. After cancelling you keep access until the end of the current period. Price and limit changes never apply to your disadvantage before the current period ends.'],
       ['Is the free plan enough?', 'For most people working on a single CV and preparing a handful of applications, the free plan is enough. The daily allowance covers editing a CV and re-checking it. If you are applying to many roles at once, tailoring the document for each vacancy, or making heavy use of the AI tools, a higher tier will suit you better.'],
       ['Choosing a plan', 'Recent graduates and candidates focused on one target role usually start on the free plan. Professionals in an active search, preparing several applications a week, tend to upgrade once the daily allowance stops being sufficient. Recruitment teams reviewing a candidate pool need the batch analysis and comparison features instead.'],
       ['Billing and cancellation', 'Paid plans are subscriptions and can be cancelled at any time from the settings screen in the application. After cancelling you keep access until the end of the current period, with no mid-term charge. Price or limit changes never take effect to your disadvantage before the current period ends.'],
@@ -306,7 +306,7 @@ function staticPageContent(page) {
       ${section.bullets ? `<ul>${section.bullets.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
     </section>`).join('')
   const faq = page.faq.map((item) => `<details><summary>${escapeHtml(item.question)}</summary><p>${escapeHtml(item.answer)}</p></details>`).join('')
-  return `<main id="main-content" class="seo-container seo-article" data-prerendered="true"><article class="seo-article-main"><header><p class="seo-eyebrow">${escapeHtml(page.eyebrow)}</p><h1>${escapeHtml(page.title)}</h1><p>${escapeHtml(page.intro)}</p><p class="seo-trust-note"><strong>CV Analyzer Editoryal Ekibi</strong> · <a href="/editoryal-politika/">Editoryal yaklaşımımız</a></p></header>${sections}<section class="seo-faq"><h2>Sık sorulan sorular</h2>${faq}</section><p><a href="/register">CV’nizi ücretsiz analiz edin</a></p></article></main>`
+  return `<main id="main-content" class="seo-container seo-article" data-prerendered="true"><article class="seo-article-main"><header><p class="seo-eyebrow">${escapeHtml(page.eyebrow)}</p><h1>${escapeHtml(page.title)}</h1><p>${escapeHtml(page.intro)}</p><p class="seo-trust-note"><strong>Sercan Özkan</strong> — kurucu geliştirici ve içerik sorumlusu · <a href="/about/">Yayın sorumlusu hakkında</a> · <a href="/editoryal-politika/">Editoryal yaklaşımımız</a></p></header>${sections}<section class="seo-faq"><h2>Sık sorulan sorular</h2>${faq}</section><p><a href="/register">CV’nizi ücretsiz analiz edin</a></p></article></main>`
 }
 
 function staticPublicChrome(content) {
@@ -315,6 +315,7 @@ function staticPublicChrome(content) {
       <nav aria-label="Ana navigasyon">
         <a href="/">CV Analyzer</a>
         <a href="/rehber/">CV rehberleri</a>
+        <a href="/araclar/ats-metin-kontrolu/">ATS metin kontrolü</a>
         <a href="/pricing/">Fiyatlandırma</a>
         <a href="/about/">Hakkımızda</a>
         <a href="/editoryal-politika/">Editoryal politika</a>
@@ -334,6 +335,10 @@ function staticPublicChrome(content) {
 }
 
 function staticPublicPage(routePath) {
+  if (routePath === '/araclar/ats-metin-kontrolu/') {
+    return staticPublicChrome(`<main id="main-content" class="seo-container seo-article" data-prerendered="true"><article class="seo-article-main"><p class="seo-eyebrow">Herkese açık ve ücretsiz araç</p><h1>ATS Metin Ön Kontrolü</h1><p>CV’nizden kopyaladığınız düz metni standart bölüm başlıkları, iletişim bilgileri, okuma düzeni ve kanıta dayalı deneyim anlatımı açısından tarayıcınızda kontrol edin. Metin sunucuya gönderilmez ve kaydedilmez.</p><section><h2>Kontrol formülü</h2><p>Toplam puan beş görünür bileşenden oluşur: bölüm yapısı 30, iletişim 15, metin kapsamı 15, düz metin okuma düzeni 20 ve eylem ile ölçülebilir kanıt 20 puan. Sonuç bir işverenin özel ATS sıralamasını taklit etmez.</p></section><section><h2>Neleri kontrol eder?</h2><ul><li>Deneyim, eğitim, beceriler, özet ve proje gibi standart başlıkları</li><li>Seçilebilir e-posta ve telefon metnini</li><li>Birleşmiş sütunlara işaret edebilen çok uzun satırları ve tablo ayırıcılarını</li><li>Eylem fiilleriyle desteklenen ölçülebilir kapsam ifadelerini</li></ul></section><section><h2>Kurgusal önce ve sonra örneği</h2><p><strong>Önce:</strong> Raporlardan ve müşterilerle iletişimden sorumluydum.</p><p><strong>Sonra:</strong> CRM kayıtlarından haftalık destek raporu oluşturdu; tekrar eden 6 sorun türünü ürün ekibine aktararak takip süresini kısalttı.</p><p>Bu örnek gerçek bir adaya ait değildir. Sayı yalnızca cümlenin kapsamını görünür kılmak için kullanılan temsili veridir.</p></section><section><h2>Sınırlar</h2><p>Araç dosyayı ayrıştırmaz, gerçekleri doğrulamaz, işe alınma ihtimali üretmez ve belirli bir ATS ürününü taklit etmez. PDF veya DOCX’in görsel yapısını ayrıca kontrol etmeniz gerekir.</p></section><p><a href="/metodoloji/cv-analizi/">Ürün metodolojisini inceleyin</a> · <a href="/editoryal-politika/">Editoryal yaklaşımımız</a> · <a href="/rehber/">CV rehberleri</a></p></article></main>`)
+  }
+
   if (routePath === '/rehber/') {
     const guides = SEO_PAGES.map(
       (page) => `<article><h2><a href="${escapeHtml(page.path)}">${escapeHtml(page.title)}</a></h2><p>${escapeHtml(page.description)}</p></article>`,
@@ -350,7 +355,7 @@ function staticPublicPage(routePath) {
         ${section.paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join('')}
       </section>`).join('')
     return staticPublicChrome(
-      `<main id="main-content" class="seo-container seo-article" data-prerendered="true"><article class="seo-article-main"><h1>${escapeHtml(EDITORIAL_POLICY.title)}</h1><p><time datetime="${escapeHtml(EDITORIAL_POLICY.updatedAt)}">Son güncelleme: 8 Ağustos 2026</time></p><p>${escapeHtml(EDITORIAL_POLICY.intro)}</p>${sections}</article></main>`,
+      `<main id="main-content" class="seo-container seo-article" data-prerendered="true"><article class="seo-article-main"><h1>${escapeHtml(EDITORIAL_POLICY.title)}</h1><p><time datetime="${escapeHtml(EDITORIAL_POLICY.updatedAt)}">Son güncelleme: 3 Eylül 2026</time></p><p>${escapeHtml(EDITORIAL_POLICY.intro)}</p>${sections}</article></main>`,
     )
   }
 
@@ -379,7 +384,6 @@ function staticPublicPage(routePath) {
         ['Ücretsiz başlayın', 'Hesap oluşturarak CV dosyanızı analiz edebilir, ATS görünümünü inceleyebilir ve geliştirme adımlarını kendi belgeniz üzerinde uygulayabilirsiniz. Ücretsiz plan günlük kullanım sınırlarıyla sunulur.'],
         ['Analiz nasıl çalışır?', 'CV dosyanızı yükledikten sonra belge önce metne çevrilir. Bu aşama kritiktir: çok sütunlu yerleşimler, tablolar veya görsel içine gömülmüş yazılar doğru okunamazsa sonraki tüm değerlendirmeler eksik veriyle yapılır. Bu nedenle metin çıkarma kalitesini ayrı bir başlık olarak gösteririz. Ardından bölümler sınıflandırılır, içerik sinyalleri değerlendirilir ve varsa iş ilanıyla karşılaştırma yapılır.'],
         ['Hedef ilanla karşılaştırma', 'Başvurmayı düşündüğünüz ilanın metnini eklediğinizde, ilandaki sorumluluk ve nitelik ifadeleriyle CV’nizdeki kanıtlar karşılaştırılır. Eksik kalan başlıkları ve halihazırda güçlü olduğunuz alanları ayrı ayrı görürsünüz. Bu karşılaştırma birebir kelime eşleşmesinden ibaret değildir; yakın anlamlı ifadeler ve yaygın kısaltmalar da dikkate alınır.'],
-        ['Verileriniz üzerinde kontrol', 'Yüklediğiniz dosyalar hesabınıza bağlı olarak saklanır ve Veri Merkezi ekranından dilediğiniz zaman tek tek veya toplu olarak silinebilir. CV içeriğiniz reklam hedeflemesi için kullanılmaz, reklam ağlarıyla paylaşılmaz ve reklam profili oluşturmak amacıyla işlenmez.'],
         ['Neyi vaat etmiyoruz?', 'Analiz sonucu bir işe alınma tahmini değildir. Piyasadaki her aday takip sisteminin davranışını birebir taklit edemeyiz ve işverenin öznel değerlendirmesini öngöremeyiz. Neyi ölçtüğümüzü ve bilinçli olarak neyi ölçmediğimizi metodoloji sayfamızda ayrıntılı biçimde açıklıyoruz.'],
         ['Kariyer rehberleri', 'CV hazırlama, ATS okunabilirliği, ön yazı, mülakat hazırlığı ve role özel CV örnekleri için herkese açık rehber merkezimizi ziyaret edebilirsiniz. Rehberler editoryal politikamıza göre hazırlanır, yayımlanmadan önce gözden geçirilir ve güncelliğini yitirdiğinde revize edilir.'],
       ],
@@ -391,7 +395,6 @@ function staticPublicPage(routePath) {
         ['Ücretsiz başlangıç', 'Temel CV analizi, ATS okunabilirlik kontrolü ve açıklanabilir geliştirme önerileriyle ürünü kredi kartı gerekmeden deneyebilirsiniz. Ücretsiz planda günlük analiz ve yapay zekâ aracı kullanımı belirli bir sayıyla sınırlıdır.'],
         ['Neler dahil?', 'Tüm planlarda bölüm yapısı incelemesi, metin çıkarma kalitesi kontrolü, beceri ve deneyim analizi ile iş ilanı eşleşmesi yer alır. Üst planlar daha yüksek günlük limit, geçmiş kayıtlarının saklanması ve ek kariyer araçları sunar.'],
         ['Bireysel ve ekip kullanımı', 'Daha yüksek analiz ihtiyacı olan kullanıcılar ile aday havuzu yöneten ekipler için farklı kullanım seçenekleri bulunur. İşe alım araçları manuel değerlendirmeyi destekler; otomatik olarak işe alım kararı vermez.'],
-        ['Ödeme ve iptal', 'Ücretli planlar abonelik biçiminde sunulur ve dilediğiniz zaman iptal edilebilir. İptal ettiğinizde mevcut dönem sonuna kadar erişiminiz devam eder. Fiyat ve limit değişiklikleri yürürlükteki dönem bitmeden aleyhinize uygulanmaz.'],
         ['Ücretsiz plan gerçekten yeterli mi?', 'Tek bir CV üzerinde çalışan ve birkaç başvuru hazırlayan çoğu kullanıcı için ücretsiz plan yeterlidir. Günlük analiz hakkı, bir CV’yi düzenleyip tekrar kontrol etmeye imkân verir. Aynı anda çok sayıda role başvuruyor, her ilan için ayrı uyarlama yapıyor veya yapay zekâ araçlarını yoğun kullanıyorsanız üst planlar daha uygun olur.'],
         ['Hangi plan size uygun?', 'Yeni mezunlar ve tek hedefe odaklanan adaylar genellikle ücretsiz planla başlar. Aktif iş arayışında olan, haftada birden fazla başvuru hazırlayan profesyoneller günlük limitin yeterli gelmediği noktada plan yükseltir. Aday havuzu değerlendiren işe alım ekipleri ise toplu analiz ve karşılaştırma özelliklerine ihtiyaç duyar.'],
         ['Ödeme ve iptal koşulları', 'Ücretli planlar abonelik biçiminde sunulur ve uygulama içindeki ayarlar ekranından dilediğiniz zaman iptal edilebilir. İptal ettiğinizde erişiminiz mevcut dönemin sonuna kadar devam eder; ara dönemde ek ücret alınmaz. Fiyat veya limit değişiklikleri, yürürlükteki abonelik dönemi bitmeden aleyhinize uygulanmaz.'],
@@ -406,10 +409,10 @@ function staticPublicPage(routePath) {
         ['Neden kurduk?', 'İş arayanların aldığı geri bildirim çoğu zaman ya hiç gelmiyor ya da “CV’niz uygun değil” gibi tek cümlelik bir sonuçtan ibaret kalıyor. CV Analyzer’ı, bu geri bildirimi somut ve gerekçeli hale getirmek için geliştirdik: hangi bölümün neden zayıf göründüğünü ve nasıl düzeltilebileceğini açıkça göstermek istiyoruz.'],
         ['Yaklaşımımız', 'CV’nin bölüm yapısını, metin okunabilirliğini, deneyim ve beceri anlatımını ve hedef iş ilanıyla ilişkisini ayrı sinyaller olarak değerlendiririz. Sonuçlar işe alınma garantisi değil, adayın kendi belgesini gözden geçirmesine yardımcı olan rehberliktir.'],
         ['Şeffaflık ve kontrol', 'Önerilerin gerçekte CV’de bulunan bilgilere dayanmasını, uydurma deneyim veya beceri eklememesini hedefleriz. Kullanıcılar kayıtlı analizlerini ve CV sürümlerini hesaplarından yönetebilir ve silebilir.'],
-        ['İçeriklerimizi kim hazırlıyor?', 'Rehber ve metodoloji sayfalarımız CV Analyzer editoryal ekibi tarafından hazırlanır, yayımlanmadan önce gözden geçirilir ve güncelliğini yitirdiğinde revize edilir. İçeriklerin nasıl üretildiğini ve hangi ilkelere uyduğumuzu editoryal politika sayfamızda ayrıntılı olarak açıklıyoruz.'],
+        ['İçeriklerimizi kim hazırlıyor?', 'Rehber ve metodoloji sayfalarının yayın sorumlusu kurucu geliştirici Sercan Özkan’dır. Bu ifade işe alım uzmanlığı iddiası değildir. İçerikler yayımlanmadan önce ürün davranışı ve kesin sonuç izlenimi veren ifadeler açısından gözden geçirilir; süreç editoryal politika sayfasında açıklanır.'],
         ['Ürünü işleten', 'CV Analyzer, kurucu geliştirici Sercan Özkan tarafından bağımsız olarak işletilmektedir. Herhangi bir işveren, iş ilanı platformu veya ATS sağlayıcısıyla ticari bağımız yoktur; değerlendirmelerimiz bu nedenle üçüncü taraf çıkarlarından etkilenmez.'],
         ['Nasıl finanse ediliyoruz?', 'Ürün, ücretli abonelikler ve herkese açık içerik sayfalarında gösterilen reklamlarla finanse edilir. Reklam gelirinin analiz sonuçları üzerinde hiçbir etkisi yoktur; reklamlar yalnızca rehber içeriklerinde ve analiz ekranlarının dışında gösterilir.'],
-        ['Ürünü kimler kullanıyor?', 'Kullanıcılarımızın büyük bölümü ilk işini arayan yeni mezunlar, sektör veya rol değiştirmek isteyen profesyoneller ve yurt dışı başvurusu hazırlayan adaylardan oluşuyor. Ayrıca aday havuzunu manuel olarak değerlendiren küçük işe alım ekipleri de ürünü kullanıyor; bu ekipler için sunulan araçlar otomatik işe alım kararı vermez, yalnızca insan değerlendirmesini destekler.'],
+        ['Kimler için tasarlandı?', 'Ürün; ilk CV’sini hazırlayanlar, rol veya sektör değiştirenler, yurt dışı başvurusuna hazırlananlar ve aday havuzunu manuel inceleyen yetkili ekipler için farklı çalışma alanları sunar. Bu bir kullanıcı dağılımı iddiası değildir; işe alım araçları otomatik karar vermez ve insan değerlendirmesinin yerini almaz.'],
         ['Sınırlarımızı açıkça söylüyoruz', 'Bir CV analiz aracının yapabilecekleri sınırlıdır ve bunu gizlemiyoruz. Piyasadaki her aday takip sisteminin davranışını birebir taklit edemeyiz, işverenin öznel değerlendirmesini öngöremeyiz ve işe alınma olasılığı tahmini üretmeyiz. Metodoloji sayfamızda neyi ölçtüğümüzü ve bilinçli olarak neyi ölçmediğimizi ayrıntılı biçimde açıklıyoruz.'],
         ['İletişim', 'Ürün, gizlilik veya içeriklerle ilgili sorularınızı iletişim sayfamız üzerinden veya support@cvanalyzer.dev adresine iletebilirsiniz. Genel soruları hafta içi 1-2 iş günü içinde, gizlilik ve veri silme taleplerini ise en geç 30 gün içinde yanıtlıyoruz.'],
       ],
@@ -484,7 +487,16 @@ for (const route of PUBLIC_ROUTES) {
     ...route,
     canonical,
     alternates,
-    schema: route.path === CONTACT_TR.path ? contactSchema(CONTACT_TR, { isEnglish: false }) : null,
+    schema: route.path === CONTACT_TR.path
+      ? contactSchema(CONTACT_TR, { isEnglish: false })
+      : route.path === '/araclar/ats-metin-kontrolu/'
+        ? {
+            '@context': 'https://schema.org', '@type': 'WebApplication',
+            name: 'ATS Metin Ön Kontrolü', description: route.description, url: canonical,
+            applicationCategory: 'BusinessApplication', operatingSystem: 'Any', inLanguage: 'tr-TR',
+            offers: { '@type': 'Offer', price: '0', priceCurrency: 'TRY' },
+          }
+        : null,
   })
   html = html.replace('<div id="root"></div>', `<div id="root">${staticPublicPage(route.path)}</div>`)
   await writeRoute(route.path, html)

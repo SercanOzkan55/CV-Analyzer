@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
-import { ArrowRight, CheckCircle2, Clock3, FileSearch, ShieldCheck } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Clock3, ShieldCheck } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { EN_SEO_PAGES } from '../content/enSeoPages'
@@ -25,9 +25,18 @@ function formatUpdatedAt(value) {
 export default function EnProductPage({ page }) {
   const reduceMotion = useReducedMotion()
   const canObserve = typeof window !== 'undefined' && 'IntersectionObserver' in window
+  const pageTerms = new Set(`${page.title} ${page.highlights.join(' ')}`.toLowerCase().match(/[a-z]{4,}/g) || [])
   const relatedPages = EN_SEO_PAGES
     .filter((candidate) => candidate.path !== page.path && candidate.indexable !== false)
+    .map((candidate, order) => ({
+      candidate,
+      order,
+      score: (`${candidate.title} ${candidate.highlights.join(' ')}`.toLowerCase().match(/[a-z]{4,}/g) || [])
+        .filter((term) => pageTerms.has(term)).length,
+    }))
+    .sort((a, b) => b.score - a.score || a.order - b.order)
     .slice(0, 4)
+    .map(({ candidate }) => candidate)
   const reveal = reduceMotion
     ? {}
     : { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } }
@@ -71,8 +80,9 @@ export default function EnProductPage({ page }) {
               <div className="seo-trust-note">
                 <ShieldCheck size={18} aria-hidden="true" />
                 <p>
-                  <strong>CV Analyzer Editorial Team</strong>
-                  {' '}This content is reviewed for clarity, usefulness, and accuracy.
+                  <strong>Sercan Özkan</strong>
+                  {' '}Founder-developer and publishing lead for this guide.
+                  <Link className="seo-editorial-link" to="/about/">About the publisher</Link>
                   <Link className="seo-editorial-link" to="/en/editorial-policy/">Our editorial approach</Link>
                 </p>
               </div>
@@ -80,23 +90,22 @@ export default function EnProductPage({ page }) {
 
             <motion.div
               className="seo-product-visual"
-              aria-label="Illustrative CV Analyzer evaluation summary"
+              aria-label="What this guide covers"
               key={`${page.slug}-sample`}
               initial={reduceMotion ? false : { opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: reduceMotion ? 0 : 0.06, ease: 'easeOut' }}
             >
               <div className="seo-product-head">
-                <span><FileSearch size={18} aria-hidden="true" /> Sample analysis summary</span>
-                <strong>84/100</strong>
+                <span><CheckCircle2 size={18} aria-hidden="true" /> What this guide covers</span>
+                <strong>{page.highlights.length}</strong>
               </div>
-              <div className="seo-score-track" aria-hidden="true"><span /></div>
               <div className="seo-product-checks">
-                <p><CheckCircle2 size={17} /> Contact details are readable</p>
-                <p><CheckCircle2 size={17} /> Standard section headings</p>
-                <p><ShieldCheck size={17} /> ATS-safe text output</p>
+                {page.highlights.map((highlight) => (
+                  <p key={highlight}><CheckCircle2 size={17} aria-hidden="true" /> {highlight}</p>
+                ))}
               </div>
-              <div className="seo-product-note">This is an illustrative example. Actual scores and suggestions depend on your CV and target role.</div>
+              <div className="seo-product-note">This summary lists the specific outcomes covered by this page; it is not an ATS score.</div>
             </motion.div>
           </div>
         </header>

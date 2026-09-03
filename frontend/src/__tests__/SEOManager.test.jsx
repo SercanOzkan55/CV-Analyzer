@@ -61,6 +61,18 @@ describe('SEOManager', () => {
     )
   })
 
+  it('indexes the public ATS text tool with WebApplication schema', async () => {
+    renderManager('/araclar/ats-metin-kontrolu/')
+
+    await waitFor(() => expect(document.title).toContain('ATS Metin Ön Kontrolü'))
+    expect(document.querySelector('meta[name="robots"]')).toHaveAttribute('content', expect.stringContaining('index'))
+    expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute(
+      'href',
+      'https://cvanalyzer.dev/araclar/ats-metin-kontrolu/',
+    )
+    expect(document.getElementById('route-structured-data')?.textContent).toContain('WebApplication')
+  })
+
   it('indexes reviewed English guides with neutral English metadata', async () => {
     renderManager('/en/ai-cv-analyzer/')
 

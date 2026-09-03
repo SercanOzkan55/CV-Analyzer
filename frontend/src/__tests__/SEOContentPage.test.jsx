@@ -31,7 +31,8 @@ describe('SEOContentPage', () => {
     expect(screen.getByText('CV analizi ücretsiz mi?')).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: /ücretsiz/i }).length).toBeGreaterThan(0)
     expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content')
-    expect(screen.getByText('CV Analyzer Editoryal Ekibi')).toBeInTheDocument()
+    expect(screen.getByText('Sercan Özkan')).toBeInTheDocument()
+    expect(screen.queryByText('84/100')).not.toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'İçindekiler' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: page.sections[0].heading })).toHaveAttribute(
       'href',

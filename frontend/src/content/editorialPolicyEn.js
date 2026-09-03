@@ -3,13 +3,13 @@ export const EDITORIAL_POLICY_EN = {
   title: 'Editorial Policy and Content Process',
   seoTitle: 'Editorial Policy and Content Process | CV Analyzer',
   description: 'Learn who publishes CV Analyzer guidance, how sources and AI assistance are used, how corrections work, and where the limits of our career content lie.',
-  updatedAt: '2026-08-08',
+  updatedAt: '2026-09-03',
   intro: 'This page explains how CV Analyzer prepares and publishes English-language guidance about CVs, applicant tracking systems, applications and interviews. Our purpose is not to promise a hiring outcome. It is to give readers clear, practical information whose limits are visible.',
   sections: [
     {
       heading: 'Publisher and accountability',
       paragraphs: [
-        'CV Analyzer is an independent software product operated by its founder and developer, Sercan Özkan. CV Analyzer is the publisher of the guides. The byline “CV Analyzer Editorial Team” identifies the organisation responsible for the content; it does not imply approval by an employer, recruitment agency, ATS provider or professional body.',
+        'CV Analyzer is an independent software product operated by its founder and developer, Sercan Özkan. The byline “Sercan Özkan — founder-developer and publishing lead” states publishing accountability; it is not a claim of recruiter credentials or approval by an employer, ATS provider or professional body.',
         'The product does not make hiring decisions for an employer and does not claim an official partnership with a commercial ATS provider. Questions, corrections and content feedback can be sent to support@cvanalyzer.dev.',
       ],
     },
@@ -53,6 +53,13 @@ export const EDITORIAL_POLICY_EN = {
       paragraphs: [
         'If you find an inaccurate, outdated or unclear statement, send the page URL and the relevant section to support@cvanalyzer.dev. You do not need to send your full CV or private personal information to report a content issue.',
         'For a product-behaviour report, a short example without personal data and, where available, an analysis identifier is sufficient. Feedback is considered when corrections and future guide topics are prioritised.',
+      ],
+    },
+    {
+      heading: 'Correction and revision history',
+      paragraphs: [
+        '3 September 2026 — Unsupported accuracy, universal-language, and ATS-passage claims were narrowed. The repeated illustrative score card on guides was replaced with page-specific coverage, and publishing accountability was made explicit.',
+        '3 September 2026 — A browser-only ATS text pre-check was prepared for publication with a visible scoring formula, fictional example, and explicit limitations.',
       ],
     },
   ],

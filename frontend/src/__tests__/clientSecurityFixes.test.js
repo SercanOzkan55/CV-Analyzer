@@ -57,7 +57,7 @@ describe('client security fixes', () => {
     expect(nginxConfig).toContain('X-Robots-Tag "noindex, nofollow"')
   })
 
-  it('ships the AdSense loader and ownership tags review crawlers look for', () => {
+  it('ships AdSense ownership proof without globally loading ads', () => {
     const html = fs.readFileSync(path.join(process.cwd(), 'index.html'), 'utf8')
     const adsTxt = fs.readFileSync(path.join(process.cwd(), 'public', 'ads.txt'), 'utf8')
     const robotsTxt = fs.readFileSync(path.join(process.cwd(), 'public', 'robots.txt'), 'utf8')
@@ -67,12 +67,9 @@ describe('client security fixes', () => {
     )
 
     expect(html).toContain('name="google-adsense-account"')
+    expect(html).toContain('content="ca-pub-6737853186639192"')
     expect(html).toContain('id="site-structured-data"')
-    // The loader must be in the raw HTML: AdSense review cannot approve a site
-    // where the ad code is only reachable after client-side rendering.
-    expect(html).toContain('pagead2.googlesyndication.com/pagead/js/adsbygoogle.js')
-    expect(html).toContain('client=ca-pub-6737853186639192')
-    expect(html).toContain('crossorigin="anonymous"')
+    expect(html).not.toContain('pagead2.googlesyndication.com/pagead/js/adsbygoogle.js')
     expect(adsTxt.trim()).toBe(
       'google.com, pub-6737853186639192, DIRECT, f08c47fec0942fa0',
     )
@@ -87,10 +84,25 @@ describe('client security fixes', () => {
     expect(sitemap).toContain('https://cvanalyzer.dev/editoryal-politika/')
     expect(sitemap).toContain('https://cvanalyzer.dev/en/ai-cv-analyzer/')
     expect(sitemap).toContain('https://cvanalyzer.dev/en/editorial-policy/')
+    expect(sitemap).toContain('https://cvanalyzer.dev/araclar/ats-metin-kontrolu/')
     // Reachable contact information is an AdSense review requirement.
     expect(sitemap).toContain('https://cvanalyzer.dev/iletisim/')
     expect(sitemap).toContain('https://cvanalyzer.dev/en/contact/')
     expect(sitemap).not.toContain('https://cvanalyzer.dev/en/recruiter-cv-screening/')
+    expect(sitemap).toMatch(/https:\/\/cvanalyzer\.dev\/araclar\/ats-metin-kontrolu\/<\/loc>\s*<lastmod>2026-09-03<\/lastmod>/)
+  })
+
+  it('does not publish unsupported accuracy, volume, or ATS-passage claims on public landing and guide surfaces', () => {
+    const publicCopy = [
+      'src/i18n/tr.json',
+      'src/i18n/en.json',
+      'src/pages/LandingPage.jsx',
+      'src/pages/SEOContentPage.jsx',
+      'src/pages/EnProductPage.jsx',
+    ].map((file) => fs.readFileSync(path.join(process.cwd(), file), 'utf8')).join('\n')
+
+    expect(publicCopy).not.toMatch(/yüksek doğruluk|pinpoint accuracy|join thousands|gerçek bir analiz|upload CVs in any language|ATS sistemlerinden geçmesini sağlayın/i)
+    expect(publicCopy).not.toContain('84/100')
   })
 
   it('clears only the current user scoped local data plus legacy global keys', async () => {
