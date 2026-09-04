@@ -7,7 +7,6 @@ import DevContextGuard from "./components/DevContextGuard"
 import { ThemeProvider } from "./context/ThemeContext"
 import { LanguageProvider } from "./i18n/LanguageContext"
 import { AuthProvider, useAuth } from "./context/AuthContext"
-import { RecruiterSessionProvider } from "./context/RecruiterSessionContext"
 import { ToastProvider } from "./components/Toast"
 import LoadingScreen from "./components/LoadingScreen"
 import PageTransition from "./components/PageTransition"
@@ -199,22 +198,20 @@ export default function App() {
         <ThemeProvider>
           <AuthProvider>
             <ToastProvider>
-              <RecruiterSessionProvider>
-                <MotionConfig reducedMotion="user">
-                  <BrowserRouter>
-                    <SEOManager />
-                    <DevContextGuard />
-                    <AmbientPointerField />
-                    <a href="#main-content" className="skip-link">Skip to main content</a>
-                    <Suspense fallback={<LoadingScreen />}>
-                      <AnimatedRoutes />
-                    </Suspense>
-                    <CookieConsent />
-                    <BackToTop />
-                    <FeedbackButton />
-                  </BrowserRouter>
-                </MotionConfig>
-              </RecruiterSessionProvider>
+              <MotionConfig reducedMotion="user">
+                <BrowserRouter>
+                  <SEOManager />
+                  <DevContextGuard />
+                  <AmbientPointerField />
+                  <a href="#main-content" className="skip-link">Skip to main content</a>
+                  <Suspense fallback={<LoadingScreen />}>
+                    <AnimatedRoutes />
+                  </Suspense>
+                  <CookieConsent />
+                  <BackToTop />
+                  <FeedbackButton />
+                </BrowserRouter>
+              </MotionConfig>
             </ToastProvider>
           </AuthProvider>
         </ThemeProvider>
