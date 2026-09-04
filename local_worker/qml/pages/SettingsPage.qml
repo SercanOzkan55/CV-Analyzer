@@ -202,7 +202,7 @@ ScrollView {
                         fill: Theme.primary; fillHover: Theme.primaryHover
                         fillPressed: Qt.darker(Theme.primary, 1.15); stroke: Theme.primary
                         textColor: "#ffffff"
-                        onClicked: page.requestPage(4)
+                        onClicked: page.requestPage(6)
                     }
                     AppButton {
                         text: "Refresh queue"

@@ -1,9 +1,7 @@
 import csv
-import hashlib
 import json
 import logging
 import os
-import re
 import sys
 import tempfile
 import traceback
@@ -46,15 +44,13 @@ import worker as worker_module
 from credentials import load_worker_api_key, save_worker_api_key
 from worker import (
     API_BASE_URL,
-    MAX_FILE_BYTES,
     LocalWorker,
     csv_safe,
-    extract_text,
     iter_supported_local_files,
-    maybe_apply_ai_review,
-    score_cv,
+    run_batch,
 )
 from workspace import WorkspaceStore
+from scoring import criteria as scoring_criteria
 
 
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt"}
@@ -116,10 +112,6 @@ def decision_label(decision: str) -> str:
         "rejected": "Rejected",
         "pending": "Pending",
     }.get(decision or "", decision or "Pending")
-
-
-def decision_rank(decision: str) -> int:
-    return {"recommended_accept": 0, "recommended_review": 1, "recommended_reject": 2}.get(decision, 3)
 
 
 def decision_accent(decision: str) -> str:
@@ -212,70 +204,37 @@ class AnalysisWorker(QObject):
         self.run_created.emit(run_id)
         self.progress_max.emit(len(files))
 
-        results: list[dict] = []
-        failed_files: list[str] = []
-        seen_hashes: dict[str, str] = {}
+        def _on_row(row: dict):
+            self.store.add_result(run_id, row)
+            self.row.emit(row)
 
-        for index, path in enumerate(files, start=1):
-            if self.cancelled:
-                self.status.emit("Cancelled. Writing partial results...")
-                break
+        def _on_progress(index: int, total: int, path: Path):
+            self.status.emit(f"Processed {index}/{total}: {path.name}")
+            self.progress.emit(index)
 
-            self.status.emit(f"Processing {index}/{len(files)}: {path.name}")
-            try:
-                if path.stat().st_size > MAX_FILE_BYTES:
-                    raise ValueError(f"File exceeds max size: {MAX_FILE_BYTES} bytes")
-                data = path.read_bytes()
-                file_hash = hashlib.sha256(data).hexdigest()
-                duplicate_of = seen_hashes.get(file_hash)
-                if not duplicate_of:
-                    seen_hashes[file_hash] = str(path)
+        # See worker.run_batch's docstring for why the GUI and CLI paths pass
+        # different values here (no quota/AI-review cap in GUI mode, GUI-only
+        # email extraction, different sync-status/timestamp field names, ...).
+        ranked, failed_files = run_batch(
+            files,
+            self.config,
+            self.ai_mode,
+            on_row=_on_row,
+            on_progress=_on_progress,
+            is_cancelled=lambda: self.cancelled,
+            ai_review_limit=None,
+            enrich_owner_workflow=False,
+            timestamp_field="analyzed_at",
+            sync_status="offline_ready",
+            failure_sync_status="failed",
+            failure_risk_flag="processing_failed",
+            extract_email=True,
+            rank_by_decision=True,
+        )
+        if self.cancelled:
+            self.status.emit("Cancelled. Writing partial results...")
 
-                text = extract_text(data, path.suffix.lstrip("."), path.name)
-                result = score_cv(text, self.config)
-                result = maybe_apply_ai_review(text, self.config, result, self.ai_mode)
-
-                email_match = re.search(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", text)
-                email = email_match.group(0) if email_match else ""
-                row = {
-                    **result,
-                    "rank": 0,
-                    "file": str(path),
-                    "file_hash": file_hash,
-                    "is_duplicate": bool(duplicate_of),
-                    "duplicate_of": duplicate_of or "",
-                    "email": email,
-                    "sync_status": "offline_ready",
-                    "analyzed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-                }
-                self.store.add_result(run_id, row)
-                results.append(row)
-                self.row.emit(row)
-            except Exception as exc:
-                failed_files.append(str(path))
-                self.row.emit(
-                    {
-                        "rank": 0,
-                        "file": str(path),
-                        "score": 0,
-                        "decision": "recommended_reject",
-                        "confidence": "low",
-                        "matched_skills": [],
-                        "missing_skills": [],
-                        "risk_flags": ["processing_failed"],
-                        "summary": "Processing failed.",
-                        "explanation": str(exc),
-                        "is_duplicate": False,
-                        "sync_status": "failed",
-                        "analyzed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-                    }
-                )
-            finally:
-                self.progress.emit(index)
-
-        ranked = sorted(results, key=lambda row: (-float(row.get("score") or 0), decision_rank(row.get("decision"))))
-        for rank, row in enumerate(ranked, start=1):
-            row["rank"] = rank
+        success_count = len(ranked) - len(failed_files)
 
         json_path = self.output / "local_worker_results.json"
         csv_path = self.output / "local_worker_results.csv"
@@ -302,7 +261,7 @@ class AnalysisWorker(QObject):
                         "cv_folder": str(self.folder),
                         "output_folder": str(self.output),
                         "total_files": len(files),
-                        "processed": len(results),
+                        "processed": success_count,
                         "failed": len(failed_files),
                         "created_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                     },
@@ -317,9 +276,16 @@ class AnalysisWorker(QObject):
             ),
             encoding="utf-8",
         )
-        self.done.emit(f"Done. {len(results)} processed, {len(failed_files)} failed. Output: {self.output}")
+        self.done.emit(f"Done. {success_count} processed, {len(failed_files)} failed. Output: {self.output}")
 
     def _write_csv(self, path: Path, rows: list[dict]):
+        # One "score_<criterion>" column per live criterion, driven off the
+        # registry so it grows automatically as new criteria go live —
+        # previously `extrasaction="ignore"` silently dropped score_breakdown
+        # entirely.
+        breakdown_fields = [
+            f"score_{key}" for key, meta in scoring_criteria.CRITERIA.items() if meta.get("scorer") is not None
+        ]
         with path.open("w", newline="", encoding="utf-8-sig") as fh:
             writer = csv.DictWriter(
                 fh,
@@ -336,17 +302,24 @@ class AnalysisWorker(QObject):
                     "missing_skills",
                     "risk_flags",
                     "explanation",
+                    *breakdown_fields,
                     "analyzed_at",
                 ],
                 extrasaction="ignore",
             )
             writer.writeheader()
             for row in rows:
+                breakdown = row.get("score_breakdown") or {}
                 csv_row = {
                     **row,
                     "matched_skills": list_to_text(row.get("matched_skills")),
                     "missing_skills": list_to_text(row.get("missing_skills")),
                     "risk_flags": list_to_text(row.get("risk_flags")),
+                    **{
+                        f"score_{key}": breakdown.get(key, "")
+                        for key, meta in scoring_criteria.CRITERIA.items()
+                        if meta.get("scorer") is not None
+                    },
                 }
                 writer.writerow({key: csv_safe(value) for key, value in csv_row.items()})
 
@@ -366,6 +339,7 @@ class ResultListModel(QAbstractListModel):
     ExplanationRole = Qt.UserRole + 12
     AccentRole = Qt.UserRole + 13
     SyncRole = Qt.UserRole + 14
+    ScoreBreakdownRole = Qt.UserRole + 15
 
     def __init__(self):
         super().__init__()
@@ -406,6 +380,8 @@ class ResultListModel(QAbstractListModel):
             return decision_accent(row.get("decision", ""))
         if role == self.SyncRole:
             return row.get("sync_status", "offline_ready")
+        if role == self.ScoreBreakdownRole:
+            return row.get("score_breakdown", {})
         return None
 
     def roleNames(self):
@@ -424,6 +400,7 @@ class ResultListModel(QAbstractListModel):
             self.ExplanationRole: QByteArray(b"explanation"),
             self.AccentRole: QByteArray(b"accent"),
             self.SyncRole: QByteArray(b"syncStatus"),
+            self.ScoreBreakdownRole: QByteArray(b"scoreBreakdown"),
         }
 
     def rows(self) -> list[dict]:
@@ -757,6 +734,27 @@ class LocalWorkerBackend(QObject):
         self._hard_reject_criteria = ""
         self._accept_threshold = 75
         self._review_threshold = 50
+        # One weight per live (scorer != None) criterion, keyed by the same
+        # criteria.CRITERIA key used in config["scoring_weights"] and
+        # score_breakdown. Seeded from PRESETS["balanced"] — the registry's
+        # own docstring is explicit that CRITERIA[key]["default_weight"] is
+        # a *different* thing (score_cv's backward-compat fallback for a
+        # caller that omits scoring_weights entirely, intentionally summing
+        # to 100 across only the original 3 legacy criteria with every
+        # other criterion at 0). Using that field here instead of a preset
+        # was fine while Background's members were still at their reserved
+        # default_weight of 0, but broke once they got real nonzero
+        # defaults: the legacy 3 alone already sum to 100, so adding
+        # Background's ~10 on top overshoots to ~110. PRESETS["balanced"]
+        # is the one mapping guaranteed (and tested, see
+        # tests/test_scoring_criteria_registry.py) to sum to exactly 100
+        # across all live criteria, so it's the only safe seed for a fresh
+        # GUI session's starting weights.
+        self._scoring_weights: dict[str, int] = {
+            key: int(scoring_criteria.PRESETS["balanced"].get(key, 0))
+            for key, meta in scoring_criteria.CRITERIA.items()
+            if meta.get("scorer") is not None
+        }
         self._ai_mode = "none"
         self._status = "Ready to analyze"
         self._is_running = False
@@ -920,6 +918,119 @@ class LocalWorkerBackend(QObject):
         self._review_threshold = int(value)
         self.stateChanged.emit()
 
+    @Property("QVariantMap", notify=stateChanged)
+    def scoringWeights(self):
+        """dict[str, int] — one weight per live criterion, keyed by the
+        same criteria.CRITERIA key used in config["scoring_weights"] and
+        score_breakdown (e.g. "required_skills", "skills_coverage", ...)."""
+        return dict(self._scoring_weights)
+
+    @Slot(str, int)
+    def setScoringWeight(self, key: str, value: int):
+        if key not in self._scoring_weights:
+            return
+        other_total = sum(w for k, w in self._scoring_weights.items() if k != key)
+        self._scoring_weights[key] = worker_module.clamp_scoring_weight(value, other_total)
+        self.stateChanged.emit()
+
+    @Slot("QVariantList")
+    def setScoringWeights(self, updates):
+        """Apply several {key, value} weight updates as ONE atomic change.
+
+        AnalyzePage.qml's budget UI (category drag, member drag, presets)
+        always needs to move several criteria's weights together to keep
+        the "sums to 100" invariant — e.g. a member drag rebalances the
+        OTHER 1-2 members of its category in the same gesture. Applying
+        those one at a time via repeated setScoringWeight() calls (the
+        original approach) emits stateChanged after EVERY individual call,
+        so QML re-evaluates every dependent binding (a sibling slider's
+        `to:` range bound to the live category aggregate, the "Total: X /
+        100" label, etc.) against each transient, not-yet-fully-applied
+        intermediate state — visible as sliders/labels jumping mid-drag.
+        Applying the whole batch here, then emitting stateChanged exactly
+        once, removes those intermediate states entirely.
+
+        `updates` must already be in a safe apply order (see
+        WeightAllocator.orderForApply's docstring: decreases before
+        increases) — this method does not reorder, it only makes the
+        already-ordered batch atomic from QML's point of view.
+        """
+        changed = False
+        for update in updates:
+            key = update.get("key")
+            value = update.get("value")
+            if key not in self._scoring_weights:
+                continue
+            other_total = sum(w for k, w in self._scoring_weights.items() if k != key)
+            self._scoring_weights[key] = worker_module.clamp_scoring_weight(int(value), other_total)
+            changed = True
+        if changed:
+            self.stateChanged.emit()
+
+    @Slot(str, result=int)
+    def getScoringWeight(self, key: str) -> int:
+        return int(self._scoring_weights.get(key, 0))
+
+    @Property("QVariantList", constant=True)
+    def criteriaCatalog(self):
+        """List of {key, label, category, categoryLabel, description,
+        defaultWeight, hasScorer} for EVERY registered criterion, live and
+        reserved alike.
+
+        Unlike `scoringWeights`/`setScoringWeight` (which only ever hold
+        real weight for live criteria), this deliberately includes the 3
+        reserved (scorer=None) criteria too — specifically so the Phase 3
+        budget UI can render the "Background" category and grey out its
+        members using `hasScorer`, instead of hardcoding
+        "education"/"language"/"recruiter_score" key names. When Phase 4
+        gives one of these a real scorer, it starts reporting
+        hasScorer=true here automatically, with no QML changes needed.
+        """
+        return [
+            {
+                "key": key,
+                "label": meta["label"],
+                "category": meta["category"],
+                "categoryLabel": scoring_criteria.CATEGORIES.get(meta["category"], {}).get("label", meta["category"]),
+                "description": meta.get("description", ""),
+                "defaultWeight": meta.get("default_weight", 0.0),
+                "hasScorer": meta.get("scorer") is not None,
+            }
+            for key, meta in scoring_criteria.CRITERIA.items()
+        ]
+
+    @Property("QVariantList", constant=True)
+    def categoryCatalog(self):
+        """List of {key, label, defaultWeight} for the 4 top-level weight
+        categories (criteria.CATEGORIES) — lets QML build the category
+        budget rows without hardcoding "skills_match"/"job_fit"/
+        "cv_quality"/"background"."""
+        return [
+            {"key": key, "label": meta["label"], "defaultWeight": meta.get("default_weight", 0.0)}
+            for key, meta in scoring_criteria.CATEGORIES.items()
+        ]
+
+    @Property("QVariantList", constant=True)
+    def presetCatalog(self):
+        """List of {key, label} for every named weight preset
+        (criteria.PRESETS) — drives the preset button row without
+        hardcoding preset names."""
+        labels = {"balanced": "Balanced", "skills_focused": "Skills-focused", "ats_focused": "ATS-focused"}
+        return [
+            {"key": name, "label": labels.get(name, name.replace("_", " ").title())}
+            for name in scoring_criteria.PRESETS
+        ]
+
+    @Slot(str)
+    def applyPreset(self, name: str):
+        preset = scoring_criteria.PRESETS.get(name)
+        if not preset:
+            return
+        for key in self._scoring_weights:
+            if key in preset:
+                self._scoring_weights[key] = int(preset[key])
+        self.stateChanged.emit()
+
     @Property(str, notify=stateChanged)
     def aiMode(self):
         return self._ai_mode
@@ -1062,6 +1173,7 @@ class LocalWorkerBackend(QObject):
                     "missing": list_to_text(row.get("missing_skills")),
                     "risks": list_to_text(row.get("risk_flags")),
                     "sync": row.get("sync_status", "offline_ready"),
+                    "scoreBreakdown": dict(row.get("score_breakdown") or {}),
                 }
             )
         return out
@@ -1270,6 +1382,15 @@ class LocalWorkerBackend(QObject):
         row = self._selected_row()
         return list_to_text(row.get("risk_flags")) if row else "-"
 
+    @Property("QVariantMap", notify=selectedChanged)
+    def selectedScoreBreakdown(self):
+        """The selected candidate's per-criterion score_breakdown dict
+        (same shape as ResultListModel.ScoreBreakdownRole) — the detail
+        panel isn't bound to the list model directly, it uses this
+        singular-selection accessor like every other selectedXxx property."""
+        row = self._selected_row()
+        return dict(row.get("score_breakdown") or {}) if row else {}
+
     @Property(str, notify=reportChanged)
     def reportPreview(self):
         return self._report_preview
@@ -1379,6 +1500,7 @@ class LocalWorkerBackend(QObject):
             "accept_threshold": self._accept_threshold,
             "review_threshold": self._review_threshold,
             "reject_threshold": 30,
+            "scoring_weights": {key: float(value) for key, value in self._scoring_weights.items()},
         }
 
     @Slot(QUrl)

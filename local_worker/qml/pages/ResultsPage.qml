@@ -10,11 +10,38 @@ Item {
     id: page
 
     property string query: ""
+    // 0 = candidate list + detail, 1 = report & exports (folded in from the
+    // former standalone Reports page).
+    property int resultsTab: 0
     readonly property bool hasData: backend.totalCandidates > 0
 
     function _chips(text) {
         if (!text) return []
         return text.split(/[,\n;]+/).map(function (s) { return s.trim() }).filter(function (s) { return s.length > 0 })
+    }
+
+    // Groups a flat score_breakdown dict ({criterionKey: value, ...}) into
+    // the same 4 categories the Analyze page's weight budget uses, via
+    // backend.categoryCatalog/criteriaCatalog — no criterion names
+    // hardcoded here either. A category with nothing scored (e.g.
+    // "Background", whose 3 members never appear in score_breakdown while
+    // they're reserved) is simply omitted rather than shown empty.
+    function breakdownGroups(breakdown) {
+        var groups = []
+        var cats = backend.categoryCatalog
+        var catalog = backend.criteriaCatalog
+        for (var i = 0; i < cats.length; i++) {
+            var catKey = cats[i].key
+            var items = []
+            for (var j = 0; j < catalog.length; j++) {
+                var c = catalog[j]
+                if (c.category === catKey && breakdown && breakdown.hasOwnProperty(c.key)) {
+                    items.push({ key: c.key, label: c.label, value: breakdown[c.key] })
+                }
+            }
+            if (items.length > 0) groups.push({ key: catKey, label: cats[i].label, items: items })
+        }
+        return groups
     }
 
     ColumnLayout {
@@ -69,9 +96,38 @@ Item {
             }
         }
 
+        // ── Tab switcher ──
+        RowLayout {
+            Layout.fillWidth: true
+            visible: page.hasData
+            spacing: Theme.space2
+
+            AppButton {
+                text: "Candidates"
+                strong: page.resultsTab === 0
+                fill: page.resultsTab === 0 ? Theme.primary : Theme.surfaceElevated
+                fillHover: page.resultsTab === 0 ? Theme.primaryHover : Theme.surfaceMuted
+                fillPressed: Theme.surfaceMuted
+                stroke: page.resultsTab === 0 ? Theme.primary : Theme.border
+                textColor: page.resultsTab === 0 ? "#ffffff" : Theme.textPrimary
+                onClicked: page.resultsTab = 0
+            }
+            AppButton {
+                text: "Report & Exports"
+                strong: page.resultsTab === 1
+                fill: page.resultsTab === 1 ? Theme.primary : Theme.surfaceElevated
+                fillHover: page.resultsTab === 1 ? Theme.primaryHover : Theme.surfaceMuted
+                fillPressed: Theme.surfaceMuted
+                stroke: page.resultsTab === 1 ? Theme.primary : Theme.border
+                textColor: page.resultsTab === 1 ? "#ffffff" : Theme.textPrimary
+                onClicked: page.resultsTab = 1
+            }
+            Item { Layout.fillWidth: true }
+        }
+
         // ── Master / detail ──
         RowLayout {
-            visible: page.hasData
+            visible: page.hasData && page.resultsTab === 0
             Layout.fillWidth: true
             Layout.fillHeight: true
             spacing: Theme.space4
@@ -261,6 +317,55 @@ Item {
 
                         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
 
+                        // Score breakdown — per-criterion contribution,
+                        // grouped by the same 4 categories as the Analyze
+                        // page's weight budget (backend.selectedScoreBreakdown).
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: Theme.space3
+                            visible: page.breakdownGroups(backend.selectedScoreBreakdown).length > 0
+
+                            Text { text: "Score breakdown"; color: Theme.textPrimary; font.pixelSize: Typography.subheadingSize; font.weight: Typography.weightSemiBold }
+                            Text {
+                                Layout.fillWidth: true
+                                text: "Points earned toward this run's weight allocation for each criterion."
+                                color: Theme.textMuted
+                                font.pixelSize: Typography.captionSize
+                                wrapMode: Text.WordWrap
+                            }
+
+                            Repeater {
+                                model: page.breakdownGroups(backend.selectedScoreBreakdown)
+                                delegate: ColumnLayout {
+                                    id: groupCol
+                                    required property var modelData
+                                    Layout.fillWidth: true
+                                    spacing: Theme.space2
+
+                                    Text {
+                                        text: groupCol.modelData.label
+                                        color: Theme.textMuted
+                                        font.pixelSize: Typography.captionSize
+                                        font.weight: Typography.weightSemiBold
+                                        font.capitalization: Font.AllUppercase
+                                        font.letterSpacing: 1
+                                    }
+                                    Repeater {
+                                        model: groupCol.modelData.items
+                                        delegate: ScoreBar {
+                                            required property var modelData
+                                            Layout.fillWidth: true
+                                            label: modelData.label
+                                            value: modelData.value
+                                            tint: Theme.primary
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border; visible: page.breakdownGroups(backend.selectedScoreBreakdown).length > 0 }
+
                         // Summary
                         ColumnLayout {
                             Layout.fillWidth: true
@@ -342,6 +447,79 @@ Item {
                         }
 
                         Item { Layout.preferredHeight: Theme.space4 }
+                    }
+                }
+            }
+        }
+
+        // ── Report & exports (folded in from the former standalone Reports
+        // page — same local output package the worker writes to disk). ──
+        ScrollView {
+            id: reportScroll
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: true
+            visible: page.hasData && page.resultsTab === 1
+            contentWidth: availableWidth
+
+            AppCard {
+                id: reportCard
+                width: reportScroll.availableWidth
+                ColumnLayout {
+                    id: reportCol
+                    width: parent.width
+                    spacing: Theme.space4
+
+                    SectionHeader {
+                        Layout.fillWidth: true
+                        title: "Report & exports"
+                        subtitle: "Every export is written to your local output folder. Nothing leaves the device."
+                    }
+
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: width < 640 ? 1 : 2
+                        columnSpacing: Theme.space5
+                        rowSpacing: Theme.space3
+                        Repeater {
+                            model: [
+                                { name: "local_worker_results.csv", kind: "Spreadsheet of ranked candidates" },
+                                { name: "local_worker_results.json", kind: "Structured result payload" },
+                                { name: "local_worker_report.html", kind: "Shareable HTML report" },
+                                { name: "sync_manifest.json", kind: "Pending website-sync manifest" }
+                            ]
+                            delegate: RowLayout {
+                                required property var modelData
+                                Layout.fillWidth: true
+                                spacing: Theme.space3
+                                Rectangle { width: 8; height: 8; radius: 2; color: Theme.primary; Layout.alignment: Qt.AlignVCenter }
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 0
+                                    Text { Layout.fillWidth: true; text: modelData.name; color: Theme.textPrimary; font.pixelSize: Typography.labelSize; font.weight: Typography.weightSemiBold; font.family: "Cascadia Mono, Consolas, monospace"; elide: Text.ElideMiddle }
+                                    Text { Layout.fillWidth: true; text: modelData.kind; color: Theme.textMuted; font.pixelSize: Typography.captionSize }
+                                }
+                            }
+                        }
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "Output folder: " + (backend.outputFolder || "Default")
+                        color: Theme.textMuted
+                        font.pixelSize: Typography.captionSize
+                        elide: Text.ElideMiddle
+                    }
+
+                    Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
+
+                    Text { text: "Report preview"; color: Theme.textPrimary; font.pixelSize: Typography.subheadingSize; font.weight: Typography.weightSemiBold }
+                    AppTextArea {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 260
+                        readOnlyField: true
+                        mono: true
+                        text: backend.reportPreview
                     }
                 }
             }

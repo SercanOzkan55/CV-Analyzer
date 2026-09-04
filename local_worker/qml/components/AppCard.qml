@@ -16,8 +16,14 @@ Rectangle {
     property real maxTilt: 5
     default property alias content: body.data
 
+    // Content (e.g. a Repeater'd list) can be taller than the card ends up
+    // rendered at (Layout.fillHeight cards, small windows). Without clip,
+    // an overflowing row's sharp rectangular corners poke straight through
+    // this Rectangle's own rounded corners — clip keeps overflow cleanly
+    // cropped to the card's shape instead.
+    clip: true
     color: elevated ? Theme.surfaceElevated : Theme.surface
-    radius: Theme.radiusLg
+    radius: Theme.radiusMd
     border.width: 1
     border.color: hovered && hoverable ? Theme.borderStrong : Theme.border
     implicitWidth: body.implicitWidth + pad * 2
@@ -50,13 +56,17 @@ Rectangle {
     Behavior on tiltX { NumberAnimation { duration: Theme.durHover; easing.type: Easing.OutCubic } }
     Behavior on tiltY { NumberAnimation { duration: Theme.durHover; easing.type: Easing.OutCubic } }
 
-    layer.enabled: !Theme.reducedMotion
+    // Ledger direction: quiet, flat surfaces by default (a 1px border does
+    // the separating), with a shadow appearing only as hover-lift feedback
+    // on cards that are actually interactive — not as permanent ambient
+    // weight under every static panel.
+    layer.enabled: hoverable && hovered && !Theme.reducedMotion
     layer.effect: MultiEffect {
         shadowEnabled: true
         shadowColor: Theme.shadowColor
-        shadowOpacity: card.hovered && card.hoverable ? Theme.shadowOpacity : Theme.shadowOpacity * 0.55
-        shadowBlur: card.hovered && card.hoverable ? 0.9 : 0.55
-        shadowVerticalOffset: 6
+        shadowOpacity: Theme.shadowOpacity
+        shadowBlur: 0.7
+        shadowVerticalOffset: 4
     }
 
     Item {

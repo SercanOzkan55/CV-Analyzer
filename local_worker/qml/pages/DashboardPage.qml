@@ -45,12 +45,6 @@ ScrollView {
                     font.pixelSize: Typography.subheadingSize
                 }
             }
-            Hero3D {
-                Layout.preferredWidth: 92
-                Layout.preferredHeight: 92
-                Layout.alignment: Qt.AlignVCenter
-                visible: page.width > 760
-            }
             AppButton {
                 text: "New Analysis"
                 strong: true
@@ -243,7 +237,7 @@ ScrollView {
                             implicitHeight: 32
                             fill: "transparent"; fillHover: Theme.surfaceMuted; fillPressed: Theme.surfaceMuted
                             stroke: Theme.border; textColor: Theme.textSecondary
-                            onClicked: page.requestPage(3)
+                            onClicked: page.requestPage(4)
                         }
                     }
                     // Empty state — centered in the remaining space; no button

@@ -7,6 +7,10 @@ keyring>=24.3.0,<26
 windnd>=1.0.7,<2
 pyinstaller>=6.10.0,<7
 
+# CV structural parser (local_worker/cv_model/, Phase 4)
+pydantic>=2.9.0,<3
+PyYAML>=6.0,<7
+
 # Optional dependencies for OCR path (Phase 7)
 pymupdf>=1.24.0,<2
 pytesseract>=0.3.10,<1

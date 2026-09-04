@@ -25,43 +25,55 @@ QtObject {
         mode = darkMode ? "light" : "dark"
     }
 
+    // ── "Ledger" palette ──────────────────────────────────────────────
+    // Cool paper neutrals + a single deep-teal accent (in place of the
+    // earlier purple/blue/cyan trio). Category tints (see AnalyzePage.qml's
+    // categoryTint()) now come from ONE hue family at different values
+    // (primary/secondary/accent below) rather than three unrelated hues —
+    // distinguishable by lightness, not by competing colors. success/
+    // warning/danger stay semantic and deliberately don't share the accent
+    // hue. Dark mode is its own considered variant (this app defaults to
+    // dark), not an inversion of the light one.
+
     // ── Surfaces ──
-    readonly property color background: darkMode ? "#080D1C" : "#F4F7FC"
-    readonly property color sidebar: darkMode ? "#070B17" : "#FFFFFF"
-    readonly property color surface: darkMode ? "#11182B" : "#FFFFFF"
-    readonly property color surfaceElevated: darkMode ? "#172039" : "#F8FAFD"
-    readonly property color surfaceMuted: darkMode ? "#0D1425" : "#EEF2F8"
-    readonly property color overlay: darkMode ? "#040711" : "#1F2733"
+    readonly property color background: darkMode ? "#10181A" : "#F5F6F8"
+    readonly property color sidebar: darkMode ? "#0C1213" : "#EFF1F3"
+    readonly property color surface: darkMode ? "#161D1F" : "#FFFFFF"
+    readonly property color surfaceElevated: darkMode ? "#1C2426" : "#FFFFFF"
+    readonly property color surfaceMuted: darkMode ? "#10181A" : "#EEF0F3"
+    readonly property color overlay: darkMode ? "#05090A" : "#1A2027"
 
     // ── Text ──
-    readonly property color textPrimary: darkMode ? "#F7F9FF" : "#101828"
-    readonly property color textSecondary: darkMode ? "#A8B5D1" : "#5E6B85"
-    readonly property color textMuted: darkMode ? "#74809C" : "#8994A8"
-    readonly property color textInverse: darkMode ? "#0A1020" : "#FFFFFF"
+    readonly property color textPrimary: darkMode ? "#EDF1F1" : "#1A2027"
+    readonly property color textSecondary: darkMode ? "#A9B4B4" : "#3C4450"
+    readonly property color textMuted: darkMode ? "#6F7B7B" : "#6B7480"
+    readonly property color textInverse: darkMode ? "#0E1516" : "#FFFFFF"
 
     // ── Borders ──
-    readonly property color border: darkMode ? "#26314D" : "#DCE3EE"
-    readonly property color borderStrong: darkMode ? "#384564" : "#C8D1E0"
+    readonly property color border: darkMode ? "#253133" : "#DEE2E8"
+    readonly property color borderStrong: darkMode ? "#34474A" : "#C7CDD5"
 
-    // ── Brand / accents (constant across themes for identity) ──
-    readonly property color primary: "#7657F6"
-    readonly property color primaryHover: "#866CFF"
-    readonly property color primarySoft: darkMode ? "#1B1740" : "#ECE9FF"
-    readonly property color secondary: "#38A9FF"
-    readonly property color accent: "#22D3EE"
-    readonly property color success: "#2DD48A"
-    readonly property color warning: "#FFBD4A"
-    readonly property color danger: "#FF667A"
-    readonly property color info: "#49A8FF"
+    // ── Brand / accents (one teal family; brighter in dark mode for
+    // contrast against a dark ground, deeper in light mode) ──
+    readonly property color primary: darkMode ? "#2DBBAB" : "#0F766E"
+    readonly property color primaryHover: darkMode ? "#45CCBC" : "#14877D"
+    readonly property color primarySoft: darkMode ? "#10302C" : "#E3F3F1"
+    readonly property color secondary: darkMode ? "#5FAFA5" : "#4C978F"
+    readonly property color accent: darkMode ? "#8ECFC4" : "#7BAEA6"
+    readonly property color success: darkMode ? "#3FB86A" : "#2F9E52"
+    readonly property color warning: darkMode ? "#E0A23A" : "#C8850F"
+    readonly property color danger: darkMode ? "#E36259" : "#C6403A"
+    readonly property color info: darkMode ? "#5A93B0" : "#3B6E8F"
 
     // ── Semantic soft fills (for badges/states) ──
-    readonly property color successSoft: darkMode ? "#0F2E22" : "#E2F8EE"
-    readonly property color warningSoft: darkMode ? "#33260C" : "#FFF3DC"
-    readonly property color dangerSoft: darkMode ? "#33121A" : "#FFE5E9"
+    readonly property color successSoft: darkMode ? "#133021" : "#E3F5E9"
+    readonly property color warningSoft: darkMode ? "#332508" : "#FBEED9"
+    readonly property color dangerSoft: darkMode ? "#34140F" : "#FBE7E5"
 
-    // ── Elevation (shadow strength) ──
-    readonly property real shadowOpacity: darkMode ? 0.45 : 0.16
-    readonly property color shadowColor: darkMode ? "#000000" : "#4A5A75"
+    // ── Elevation (shadow strength; light mode leans on thin borders more
+    // than shadow, per Ledger's flatter, quieter feel) ──
+    readonly property real shadowOpacity: darkMode ? 0.45 : 0.10
+    readonly property color shadowColor: darkMode ? "#000000" : "#1A2027"
 
     // ── Motion ──
     property bool reducedMotion: false

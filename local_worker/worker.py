@@ -18,6 +18,8 @@ import urllib.parse
 from owner_workflow import build_candidate_notification, enrich_row_with_owner_workflow
 from credentials import load_worker_api_key, save_worker_api_key
 from workspace import WorkspaceStore
+from scoring import criteria as scoring_criteria
+from scoring import stuffing_guard
 
 
 API_BASE_URL = os.environ.get("CV_ANALYZER_API_URL", "http://127.0.0.1:8001/api/worker")
@@ -1047,7 +1049,12 @@ def extract_text(file_bytes: bytes, file_type: str, file_name: str = "") -> str:
     raise LocalWorkerError(f"Unsupported file type: {kind}")
 
 
-def score_cv(cv_text: str, config: dict) -> dict:
+def clamp_scoring_weight(value: int, other_total: int) -> int:
+    """Clamp a scoring weight so it plus the other two weights never exceeds 100."""
+    return max(0, min(int(value), 100 - other_total))
+
+
+def score_cv(cv_text: str, config: dict, cv_model=None) -> dict:
     text_norm = _normalize(cv_text)
     text_tokens = _token_set(text_norm)
     required = list(config.get("required_skills") or [])
@@ -1059,24 +1066,88 @@ def score_cv(cv_text: str, config: dict) -> dict:
     matched_required = [skill for skill in required if _matches_term(text_norm, text_tokens, skill)]
     missing_required = [skill for skill in required if skill not in matched_required]
     matched_nice = [skill for skill in nice if _matches_term(text_norm, text_tokens, skill)]
-    risk_flags = [criterion for criterion in hard_reject if _matches_term(text_norm, text_tokens, criterion)]
+    # Only hard_reject_criteria matches drive the auto-reject penalty/decision below.
+    # The JD-overlap anti-gaming flag (added further down) shares the same
+    # `risk_flags` list for recruiter visibility but must NOT trigger it —
+    # a false positive there would silently zero out an otherwise-good CV.
+    hard_reject_flags = [criterion for criterion in hard_reject if _matches_term(text_norm, text_tokens, criterion)]
 
-    weights = dict(config.get("scoring_weights") or {})
-    required_weight = float(weights.get("required_skills", 70.0))
-    nice_weight = float(weights.get("nice_to_have_skills", 20.0))
-    content_weight = float(weights.get("content_quality", 10.0))
-    total_weight = max(1.0, required_weight + nice_weight + content_weight)
+    # Read each live criterion's weight from config["scoring_weights"], falling
+    # back to the registry's default_weight when absent. For the 3 legacy keys
+    # (required_skills/nice_to_have_skills/content_quality) that default is the
+    # original 70/20/10 so old callers that never set scoring_weights keep
+    # scoring exactly as before; every new criterion's registry default is 0.0
+    # (or, for the 3 Background criteria, a small nonzero share — see
+    # scoring/criteria.py), so old callers' behavior is unchanged unless they
+    # explicitly opt in via scoring_weights.
+    weights_config = dict(config.get("scoring_weights") or {})
+    weights: dict[str, float] = {}
+    for key, meta in scoring_criteria.CRITERIA.items():
+        weights[key] = float(weights_config.get(key, meta.get("default_weight", 0.0)))
+
+    total_weight = max(1.0, sum(weights.values()))
     scale = 100.0 / total_weight
+
+    required_weight = weights.get("required_skills", 0.0)
+    nice_weight = weights.get("nice_to_have_skills", 0.0)
+    content_weight = weights.get("content_quality", 0.0)
 
     required_score = required_weight if not required else required_weight * (len(matched_required) / len(required))
     nice_score = nice_weight if not nice else nice_weight * (len(matched_nice) / len(nice))
     content_score = min(content_weight, max(0.0, len(cv_text or "") / 300.0 * (content_weight / 10.0)))
-    penalty = 25.0 if risk_flags else 0.0
-    score = max(0.0, min(100.0, ((required_score + nice_score + content_score) * scale) - penalty))
+
+    score_breakdown: dict[str, float] = {
+        "required_skills": round(required_score, 2),
+        "nice_to_have_skills": round(nice_score, 2),
+        "content_quality": round(content_score, 2),
+    }
+    component_total = required_score + nice_score + content_score
+
+    # Every criterion's scorer shares a uniform scorer(cv_text, config,
+    # cv_model=None) signature from the registry — only the 3 Background
+    # criteria below actually use cv_model, the rest ignore it. Skip the
+    # (regex-heavy, or structural-parse-heavy) call entirely when a
+    # criterion's weight is 0 — its contribution is 0 regardless of the raw
+    # score, and most configs will leave most of these at 0 by default.
+    _BACKGROUND_KEYS = ("education", "language", "recruiter_score")
+    _PORTED_KEYS = ("skills_coverage", "experience_match", "role_title_match", "keyword_match", "ats_format", "soft_skills")
+
+    # Structural CVModel parsing is comparatively expensive (a full section
+    # classification + entry-parsing pass), so build it at most once per
+    # file — only when at least one Background criterion actually carries
+    # weight — and reuse it across all 3, rather than reparsing per
+    # criterion. A caller that already parsed one (e.g. a future batch
+    # optimization) can pass it in directly via the cv_model parameter.
+    resolved_cv_model = cv_model
+    if resolved_cv_model is None and any(weights.get(k, 0.0) > 0 for k in _BACKGROUND_KEYS):
+        import cv_model as _cv_model_pkg
+
+        resolved_cv_model = _cv_model_pkg.parse_cv_model(cv_text)
+
+    for key in _PORTED_KEYS + _BACKGROUND_KEYS:
+        weight = weights.get(key, 0.0)
+        if weight > 0:
+            scorer = scoring_criteria.CRITERIA[key]["scorer"]
+            raw_score = float(scorer(cv_text, config, resolved_cv_model) or 0.0)
+        else:
+            raw_score = 0.0
+        component = weight * (raw_score / 100.0)
+        score_breakdown[key] = round(component, 2)
+        component_total += component
+
+    job_description = config.get("description", "") or ""
+    jd_overlap_flag = stuffing_guard.detect_jd_overlap(cv_text, job_description)
+    risk_flags = list(hard_reject_flags)
+    if jd_overlap_flag:
+        risk_flags.append(jd_overlap_flag)
+
+    penalty = 25.0 if hard_reject_flags else 0.0
+    score = max(0.0, min(100.0, (component_total * scale) - penalty))
+    score_breakdown["risk_penalty"] = round(penalty, 2)
 
     accept_threshold = int(config.get("accept_threshold") or 75)
     review_threshold = int(config.get("review_threshold") or 50)
-    if risk_flags:
+    if hard_reject_flags:
         decision = "recommended_reject"
     elif score >= accept_threshold:
         decision = "recommended_accept"
@@ -1099,8 +1170,10 @@ def score_cv(cv_text: str, config: dict) -> dict:
     explanation = summary
     if missing_required:
         explanation += " Missing required skills: " + ", ".join(missing_required[:8]) + "."
-    if risk_flags:
-        explanation += " Hard reject criteria detected: " + ", ".join(risk_flags[:5]) + "."
+    if hard_reject_flags:
+        explanation += " Hard reject criteria detected: " + ", ".join(hard_reject_flags[:5]) + "."
+    if jd_overlap_flag:
+        explanation += " " + jd_overlap_flag + ": CV text closely mirrors the job description; verify originality."
 
     return {
         "score": round(score, 2),
@@ -1111,12 +1184,7 @@ def score_cv(cv_text: str, config: dict) -> dict:
         "missing_skills": missing_required,
         "risk_flags": risk_flags,
         "explanation": explanation,
-        "score_breakdown": {
-            "required_skills": round(required_score, 2),
-            "nice_to_have": round(nice_score, 2),
-            "content_quality": round(content_score, 2),
-            "risk_penalty": round(penalty, 2),
-        },
+        "score_breakdown": score_breakdown,
     }
 
 
@@ -1216,6 +1284,16 @@ def _generate_html_report(ranked_rows: list[dict], config: dict, html_path: Path
 
     rows_json = _script_safe_json(ranked_rows)
     config_json = _script_safe_json(config)
+    # Only live (scorer != None) criteria appear in score_breakdown. As of
+    # Phase 4 all 12 registry criteria are live (none reserved), so this
+    # filter is currently a no-op — kept so a future reserved criterion
+    # (if one is ever added again) is excluded automatically.
+    live_criteria = [
+        {"key": key, "label": meta["label"], "defaultWeight": meta.get("default_weight", 0.0)}
+        for key, meta in scoring_criteria.CRITERIA.items()
+        if meta.get("scorer") is not None
+    ]
+    criteria_json = _script_safe_json(live_criteria)
     title = html.escape(str(config.get("title") or "Yerel Değerlendirme"), quote=True)
 
     html_content = f"""<!DOCTYPE html>
@@ -1830,22 +1908,7 @@ def _generate_html_report(ranked_rows: list[dict], config: dict, html_path: Path
           </div>
           <div class="modal-block">
             <h3 class="section-label" style="margin-bottom: 0.75rem;">Skor Dağılımı</h3>
-            <div class="score-breakdown-row">
-              <span>Zorunlu Yetenekler</span>
-              <span id="breakdownRequired">0</span>
-            </div>
-            <div class="score-breakdown-row">
-              <span>Artı Yetenekler</span>
-              <span id="breakdownNice">0</span>
-            </div>
-            <div class="score-breakdown-row">
-              <span>İçerik Kalitesi</span>
-              <span id="breakdownContent">0</span>
-            </div>
-            <div class="score-breakdown-row" style="color: var(--color-reject);">
-              <span>Risk Cezası</span>
-              <span id="breakdownPenalty">0</span>
-            </div>
+            <div id="scoreBreakdownRows"><!-- Rendered dynamically from the criteria registry --></div>
           </div>
         </div>
 
@@ -1876,6 +1939,7 @@ def _generate_html_report(ranked_rows: list[dict], config: dict, html_path: Path
   <script>
     const candidates = {rows_json};
     const jobConfig = {config_json};
+    const criteriaList = {criteria_json};
     let currentFilter = 'all';
 
     if (jobConfig.description) {{
@@ -2049,15 +2113,21 @@ def _generate_html_report(ranked_rows: list[dict], config: dict, html_path: Path
       decisionPill.textContent = translateDecision(candidate.decision);
       
       const breakdown = candidate.score_breakdown || {{}};
-      const reqWeight = jobConfig.scoring_weights?.required_skills !== undefined ? jobConfig.scoring_weights.required_skills : 70;
-      const niceWeight = jobConfig.scoring_weights?.nice_to_have_skills !== undefined ? jobConfig.scoring_weights.nice_to_have_skills : 20;
-      const contentWeight = jobConfig.scoring_weights?.content_quality !== undefined ? jobConfig.scoring_weights.content_quality : 10;
-      
-      document.getElementById('breakdownRequired').textContent = (breakdown.required_skills !== undefined ? breakdown.required_skills : 0) + ' / ' + reqWeight;
-      document.getElementById('breakdownNice').textContent = (breakdown.nice_to_have !== undefined ? breakdown.nice_to_have : 0) + ' / ' + niceWeight;
-      document.getElementById('breakdownContent').textContent = (breakdown.content_quality !== undefined ? breakdown.content_quality : 0) + ' / ' + contentWeight;
-      document.getElementById('breakdownPenalty').textContent = '-' + (breakdown.risk_penalty !== undefined ? breakdown.risk_penalty : 0);
-      
+      const weights = jobConfig.scoring_weights || {{}};
+      const breakdownRowsHtml = criteriaList
+        .map(c => {{
+          const value = breakdown[c.key] !== undefined ? breakdown[c.key] : 0;
+          const weight = weights[c.key] !== undefined ? weights[c.key] : c.defaultWeight;
+          return (
+            '<div class="score-breakdown-row"><span>' + escapeHtml(c.label) + '</span><span>' +
+            value + ' / ' + weight + '</span></div>'
+          );
+        }})
+        .join('') +
+        '<div class="score-breakdown-row" style="color: var(--color-reject);"><span>Risk Cezası</span><span>-' +
+        (breakdown.risk_penalty !== undefined ? breakdown.risk_penalty : 0) + '</span></div>';
+      document.getElementById('scoreBreakdownRows').innerHTML = breakdownRowsHtml;
+
       document.getElementById('modalExplanation').textContent = candidate.explanation || candidate.summary || 'Herhangi bir detaylı açıklama yok.';
       
       const riskBlock = document.getElementById('modalRiskBlock');
@@ -2120,6 +2190,147 @@ def _generate_html_report(ranked_rows: list[dict], config: dict, html_path: Path
 </html>"""
 
     html_path.write_text(html_content, encoding="utf-8")
+
+
+def decision_rank(decision: str) -> int:
+    return {"recommended_accept": 0, "recommended_review": 1, "recommended_reject": 2}.get(decision, 3)
+
+
+def _build_failed_score(message: str, *, risk_flag: str, config: dict) -> dict:
+    required = list(config.get("required_skills") or [])
+    return {
+        "score": 0,
+        "decision": "recommended_reject",
+        "confidence": "low",
+        "summary": message,
+        "matched_skills": [],
+        "missing_skills": required[:20],
+        "risk_flags": [risk_flag],
+        "explanation": message,
+    }
+
+
+def run_batch(
+    files: list,
+    config: dict,
+    ai_mode: str,
+    *,
+    on_row=None,
+    on_progress=None,
+    is_cancelled=None,
+    ai_review_limit: int | None = None,
+    enrich_owner_workflow: bool = False,
+    actor_name: str = "Local Worker",
+    timestamp_field: str = "processed_at",
+    sync_status: str = "pending",
+    failure_sync_status: str | None = None,
+    failure_risk_flag: str = "extraction_failed",
+    extract_email: bool = False,
+    rank_by_decision: bool = False,
+) -> tuple[list[dict], list[str]]:
+    """Shared per-file scoring loop for both the CLI (``LocalWorker._run_local_folder``)
+    and the GUI (``AnalysisWorker._run`` in qml_gui.py). Extracts text, dedupes by
+    content hash, scores each CV via ``score_cv``, optionally applies AI review
+    (capped by ``ai_review_limit`` when given), and returns
+    ``(ranked_rows, failed_files)``.
+
+    Per-path behavior that historically differed between the CLI and GUI is
+    kept as parameters rather than silently unified:
+      - ``ai_review_limit``: the CLI enforces a cap on paid AI reviews per
+        run; the GUI does not (pass ``None``).
+      - ``enrich_owner_workflow``: the CLI enriches every row with
+        candidate_status/notification fields (``owner_workflow.py``); the
+        GUI does not.
+      - ``timestamp_field`` / ``sync_status`` / ``failure_sync_status``: the
+        two paths historically used different field names and sync-state
+        values for the same concept.
+      - ``failure_risk_flag``: the risk-flag string recorded for a file that
+        failed to process (CLI used "extraction_failed", GUI used
+        "processing_failed").
+      - ``extract_email``: the GUI extracts an email address per row for
+        display; the CLI does not.
+      - ``rank_by_decision``: the GUI's final sort breaks score ties by
+        decision (accept before review before reject); the CLI sorts by
+        score alone.
+
+    One deliberate behavior harmonization made during this consolidation:
+    ``AnalysisWorker._run`` previously dropped failed files from its
+    results/JSON/CSV/workspace-store output entirely (only listing them in
+    failed_files.txt), while the CLI path always kept them as a
+    ``recommended_reject`` row with risk_flags. This shared implementation
+    always includes failed files in the returned rows — the CLI's
+    behavior, which is also the one covered by tests.
+    """
+    rows: list[dict] = []
+    failed_files: list[str] = []
+    seen_hashes: dict[str, str] = {}
+    ai_reviews_used = 0
+    total = len(files)
+    failure_sync_status = sync_status if failure_sync_status is None else failure_sync_status
+
+    for index, file_path in enumerate(files, start=1):
+        if is_cancelled is not None and is_cancelled():
+            break
+        path = Path(file_path)
+
+        text = ""
+        file_hash = ""
+        duplicate_of = ""
+        try:
+            if path.stat().st_size > MAX_FILE_BYTES:
+                raise LocalWorkerError(f"File exceeds max size: {MAX_FILE_BYTES} bytes")
+            data = path.read_bytes()
+            file_hash = hashlib.sha256(data).hexdigest()
+            duplicate_of = seen_hashes.get(file_hash)
+            if not duplicate_of:
+                seen_hashes[file_hash] = str(path)
+            text = extract_text(data, path.suffix.lstrip("."), path.name)
+            base_score = score_cv(text, config)
+            if ai_review_limit is not None and ai_mode == "customer_openai_key" and ai_reviews_used >= ai_review_limit:
+                result = {**base_score, "ai_review_status": "skipped_ai_review_limit"}
+            else:
+                result = maybe_apply_ai_review(text, config, base_score, ai_mode)
+                if result.get("ai_review_status") == "completed":
+                    ai_reviews_used += 1
+            row_sync_status = sync_status
+        except Exception as exc:
+            failed_files.append(str(path))
+            result = _build_failed_score(str(exc), risk_flag=failure_risk_flag, config=config)
+            row_sync_status = failure_sync_status
+
+        row = {
+            "file": str(path),
+            "file_hash": file_hash,
+            "is_duplicate": bool(duplicate_of),
+            "duplicate_of": duplicate_of or "",
+            "worker_version": WORKER_VERSION,
+            "engine_version": ENGINE_VERSION,
+            timestamp_field: datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+            "sync_status": row_sync_status,
+            **result,
+        }
+        if extract_email:
+            email_match = re.search(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", text)
+            row["email"] = email_match.group(0) if email_match else ""
+        if enrich_owner_workflow:
+            row = enrich_row_with_owner_workflow(row, config, actor_name=actor_name)
+
+        rows.append(row)
+        if on_row:
+            on_row(row)
+        if on_progress:
+            on_progress(index, total, path)
+
+    if rank_by_decision:
+        ranked_rows = sorted(
+            rows, key=lambda item: (-float(item.get("score") or 0), decision_rank(item.get("decision")))
+        )
+    else:
+        ranked_rows = sorted(rows, key=lambda item: float(item.get("score") or 0), reverse=True)
+    for rank, row in enumerate(ranked_rows, start=1):
+        row["rank"] = rank
+
+    return ranked_rows, failed_files
 
 
 class LocalWorker:
@@ -2322,17 +2533,7 @@ class LocalWorker:
         print(f"Submitted candidate={candidate_id} score={score['score']} decision={score['decision']}")
 
     def _failed_score(self, message: str, *, risk_flag: str, config: dict) -> dict:
-        required = list(config.get("required_skills") or [])
-        return {
-            "score": 0,
-            "decision": "recommended_reject",
-            "confidence": "low",
-            "summary": message,
-            "matched_skills": [],
-            "missing_skills": required[:20],
-            "risk_flags": [risk_flag],
-            "explanation": message,
-        }
+        return _build_failed_score(message, risk_flag=risk_flag, config=config)
 
     def _run_local_folder(
         self, job_id: int, folder_path: str | None, config: dict | None = None, output_folder: str | None = None
@@ -2363,64 +2564,36 @@ class LocalWorker:
             raise LocalWorkerError(
                 f"Folder has {len(files)} CV file(s), but this worker key has {self.quota_remaining} scan(s) left."
             )
-        rows = []
-        failed_files = []
-        seen_hashes: dict[str, str] = {}
-        ai_reviews_used = 0
         ai_review_limit = int(config.get("ai_max_reviews") or os.environ.get("CV_WORKER_AI_MAX_REVIEWS", "25") or "25")
-        for file_path in files:
-            path = Path(file_path)
-            try:
-                if path.stat().st_size > MAX_FILE_BYTES:
-                    raise LocalWorkerError(f"File exceeds max size: {MAX_FILE_BYTES} bytes")
-                data = path.read_bytes()
-                file_hash = hashlib.sha256(data).hexdigest()
-                duplicate_of = seen_hashes.get(file_hash)
-                if not duplicate_of:
-                    seen_hashes[file_hash] = str(path)
-                text = extract_text(data, path.suffix.lstrip("."), path.name)
-                base_score = score_cv(text, config)
-                ai_mode = self.ai_mode
-                if ai_mode == "customer_openai_key" and ai_reviews_used >= ai_review_limit:
-                    result = {**base_score, "ai_review_status": "skipped_ai_review_limit"}
-                else:
-                    result = maybe_apply_ai_review(text, config, base_score, ai_mode)
-                    if result.get("ai_review_status") == "completed":
-                        ai_reviews_used += 1
-            except Exception as exc:
-                failed_files.append(str(path))
-                file_hash = ""
-                duplicate_of = ""
-                text = ""
-                result = self._failed_score(str(exc), risk_flag="extraction_failed", config=config)
-            row = {
-                "file": str(path),
-                "file_hash": file_hash,
-                "is_duplicate": bool(duplicate_of),
-                "duplicate_of": duplicate_of or "",
-                "worker_version": WORKER_VERSION,
-                "engine_version": ENGINE_VERSION,
-                "processed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-                "sync_status": "pending",
-                **result,
-            }
-            row = enrich_row_with_owner_workflow(row, config, actor_name=self.device_name or "Local Worker")
-            rows.append(row)
+
+        def _print_row(row: dict):
             print(
                 json.dumps(
                     {
-                        "file": str(path),
+                        "file": row.get("file"),
                         "score": row["score"],
                         "decision": row["decision"],
-                        "candidate_status": row["candidate_status"],
+                        "candidate_status": row.get("candidate_status"),
                     },
                     ensure_ascii=False,
                 )
             )
 
-        ranked_rows = sorted(rows, key=lambda item: float(item.get("score") or 0), reverse=True)
-        for rank, row in enumerate(ranked_rows, start=1):
-            row["rank"] = rank
+        ranked_rows, failed_files = run_batch(
+            files,
+            config,
+            self.ai_mode,
+            on_row=_print_row,
+            ai_review_limit=ai_review_limit,
+            enrich_owner_workflow=True,
+            actor_name=self.device_name or "Local Worker",
+            timestamp_field="processed_at",
+            sync_status="pending",
+            failure_risk_flag="extraction_failed",
+            extract_email=False,
+            rank_by_decision=False,
+        )
+        ai_reviews_used = sum(1 for row in ranked_rows if row.get("ai_review_status") == "completed")
 
         json_path = output / "local_worker_results.json"
         csv_path = output / "local_worker_results.csv"

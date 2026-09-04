@@ -64,6 +64,27 @@ ScrollView {
         return text.split(/[,\n;]+/).map(function (s) { return s.trim() }).filter(function (s) { return s.length > 0 })
     }
 
+    // Same grouping as ResultsPage.qml's breakdownGroups — groups a flat
+    // score_breakdown dict into the 4 weight-budget categories via
+    // backend.categoryCatalog/criteriaCatalog, no criterion names hardcoded.
+    function breakdownGroups(breakdown) {
+        var groups = []
+        var cats = backend.categoryCatalog
+        var catalog = backend.criteriaCatalog
+        for (var i = 0; i < cats.length; i++) {
+            var catKey = cats[i].key
+            var items = []
+            for (var j = 0; j < catalog.length; j++) {
+                var c = catalog[j]
+                if (c.category === catKey && breakdown && breakdown.hasOwnProperty(c.key)) {
+                    items.push({ key: c.key, label: c.label, value: breakdown[c.key] })
+                }
+            }
+            if (items.length > 0) groups.push({ key: catKey, label: cats[i].label, items: items })
+        }
+        return groups
+    }
+
     ColumnLayout {
         x: Math.max(page.gutter, (page.availableWidth - page.contentW()) / 2)
         y: page.gutter
@@ -241,6 +262,48 @@ ScrollView {
                             }
 
                             Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
+
+                            // Score breakdown — per-criterion contribution,
+                            // grouped by the same 4 categories as the Analyze
+                            // page's weight budget.
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: Theme.space2
+                                visible: page.breakdownGroups(col.modelData.scoreBreakdown).length > 0
+
+                                Text { text: "Score breakdown"; color: Theme.textSecondary; font.pixelSize: Typography.captionSize; font.weight: Typography.weightSemiBold }
+
+                                Repeater {
+                                    model: page.breakdownGroups(col.modelData.scoreBreakdown)
+                                    delegate: ColumnLayout {
+                                        id: groupCol
+                                        required property var modelData
+                                        Layout.fillWidth: true
+                                        spacing: 4
+
+                                        Text {
+                                            text: groupCol.modelData.label
+                                            color: Theme.textMuted
+                                            font.pixelSize: Typography.microSize
+                                            font.weight: Typography.weightSemiBold
+                                            font.capitalization: Font.AllUppercase
+                                            font.letterSpacing: 1
+                                        }
+                                        Repeater {
+                                            model: groupCol.modelData.items
+                                            delegate: ScoreBar {
+                                                required property var modelData
+                                                Layout.fillWidth: true
+                                                label: modelData.label
+                                                value: modelData.value
+                                                tint: col.isTop ? Theme.success : Theme.primary
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border; visible: page.breakdownGroups(col.modelData.scoreBreakdown).length > 0 }
 
                             // Matched skills
                             ColumnLayout {

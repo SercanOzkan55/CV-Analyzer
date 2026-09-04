@@ -66,8 +66,6 @@ Item {
                         onClicked: backend.setTemplateMode("reject")
                     }
 
-                    Item { Layout.fillHeight: true }
-
                     Rectangle {
                         Layout.fillWidth: true
                         Layout.preferredHeight: noteCol.implicitHeight + 24
@@ -125,20 +123,32 @@ Item {
                         Layout.fillWidth: true
                         Layout.topMargin: 4
                         spacing: Theme.space2
-                        Text { text: "INSERT"; color: Theme.textMuted; font.pixelSize: Typography.captionSize; font.weight: Typography.weightSemiBold; Layout.alignment: Qt.AlignVCenter }
-                        Repeater {
-                            model: ["{name}", "{email}", "{role}", "{score}"]
-                            delegate: AppButton {
-                                required property string modelData
-                                Layout.preferredWidth: 86
-                                implicitHeight: 38
-                                text: modelData
-                                fill: Theme.surfaceElevated; fillHover: Theme.surfaceMuted
-                                fillPressed: Theme.surfaceMuted; stroke: Theme.border
-                                textColor: Theme.textSecondary
-                                onClicked: backend.insertTemplateVariable(modelData)
+                        Text { text: "INSERT"; color: Theme.textMuted; font.pixelSize: Typography.captionSize; font.weight: Typography.weightSemiBold; Layout.alignment: Qt.AlignTop; Layout.topMargin: 10 }
+                        // Flow (not RowLayout) so the chips wrap to a second
+                        // line instead of overflowing the card's actual width
+                        // — a fixed 4 x 86px row plus the Save button below
+                        // needed more room than this column reliably gets.
+                        Flow {
+                            Layout.fillWidth: true
+                            spacing: Theme.space2
+                            Repeater {
+                                model: ["{name}", "{email}", "{role}", "{score}"]
+                                delegate: AppButton {
+                                    required property string modelData
+                                    width: 86
+                                    implicitHeight: 38
+                                    text: modelData
+                                    fill: Theme.surfaceElevated; fillHover: Theme.surfaceMuted
+                                    fillPressed: Theme.surfaceMuted; stroke: Theme.border
+                                    textColor: Theme.textSecondary
+                                    onClicked: backend.insertTemplateVariable(modelData)
+                                }
                             }
                         }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
                         Item { Layout.fillWidth: true }
                         AppButton {
                             text: "Save"

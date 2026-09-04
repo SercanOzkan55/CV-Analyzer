@@ -667,6 +667,9 @@ def download_worker_package(
     qml_dir = _LOCAL_WORKER_DIR / "qml"
     if not qml_dir.exists():
         missing.append("qml/")
+    scoring_dir = _LOCAL_WORKER_DIR / "scoring"
+    if not scoring_dir.exists():
+        missing.append("scoring/")
     if missing:
         raise HTTPException(status_code=500, detail="Local worker package files are missing")
 
@@ -678,6 +681,9 @@ def download_worker_package(
         for path in qml_dir.rglob("*"):
             if path.is_file():
                 archive.write(path, arcname=str(Path("qml") / path.relative_to(qml_dir)))
+        for path in scoring_dir.rglob("*"):
+            if path.is_file() and path.suffix != ".pyc" and "__pycache__" not in path.parts:
+                archive.write(path, arcname=str(Path("scoring") / path.relative_to(scoring_dir)))
         archive.writestr("README.md", _worker_package_readme(api_base_url))
         archive.writestr("run-worker.ps1", _worker_run_script(api_base_url))
         archive.writestr(".env.example", _worker_env_example(api_base_url))

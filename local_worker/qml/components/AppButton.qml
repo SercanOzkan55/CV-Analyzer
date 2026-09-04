@@ -12,41 +12,22 @@ Button {
     property bool strong: false
     property real radius: 12
 
-    // Ripple effect properties
-    property real rippleRadius: 0
-    property real rippleOpacity: 0
-    property point rippleCenter: Qt.point(0, 0)
-
     implicitHeight: 46
     implicitWidth: Math.max(132, contentItem.implicitWidth + 42)
     padding: 0
     hoverEnabled: true
 
+    // Disabled buttons previously looked almost identical to enabled ones —
+    // only the text/border color shifted slightly, background fill didn't
+    // change at all — so a correctly-disabled button (e.g. "Clear all" with
+    // nothing to clear) read as broken/unresponsive rather than as
+    // intentionally off. One clear, uniform dim signal fixes that.
+    opacity: control.enabled ? 1 : 0.45
+
     scale: down ? 0.965 : (hovered ? 1.018 : 1)
 
     Behavior on scale {
         NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
-    }
-
-    // Ripple animation
-    ParallelAnimation {
-        id: rippleAnim
-        NumberAnimation {
-            target: control
-            property: "rippleRadius"
-            from: 0
-            to: Math.max(control.width, control.height) * 1.5
-            duration: 380
-            easing.type: Easing.OutQuad
-        }
-        NumberAnimation {
-            target: control
-            property: "rippleOpacity"
-            from: 0.36
-            to: 0.0
-            duration: 380
-            easing.type: Easing.OutQuad
-        }
     }
 
     contentItem: Text {
@@ -83,65 +64,6 @@ Button {
             }
             Behavior on opacity {
                 NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
-            }
-        }
-
-        // Ripple Effect Canvas (clipped to rounded corners)
-        Canvas {
-            id: rippleCanvas
-            anchors.fill: parent
-            opacity: control.rippleOpacity
-            visible: control.rippleOpacity > 0.001
-
-            onPaint: {
-                var ctx = getContext("2d")
-                ctx.clearRect(0, 0, width, height)
-
-                // Draw clip path for rounded corners
-                var r = control.radius
-                ctx.beginPath()
-                ctx.moveTo(r, 0)
-                ctx.lineTo(width - r, 0)
-                ctx.arcTo(width, 0, width, r, r)
-                ctx.lineTo(width, height - r)
-                ctx.arcTo(width, height, width - r, height, r)
-                ctx.lineTo(r, height)
-                ctx.arcTo(0, height, 0, height - r, r)
-                ctx.lineTo(0, r)
-                ctx.arcTo(0, 0, r, 0, r)
-                ctx.closePath()
-                ctx.clip()
-
-                // Draw ripple circle
-                ctx.beginPath()
-                ctx.arc(control.rippleCenter.x, control.rippleCenter.y, control.rippleRadius, 0, Math.PI * 2)
-                ctx.fillStyle = (typeof root !== 'undefined' && !root.darkTheme && !control.strong) ?
-                                "rgba(99, 102, 241, 0.22)" : "rgba(255, 255, 255, 0.42)"
-                ctx.fill()
-            }
-
-            Connections {
-                target: control
-                function onRippleRadiusChanged() { rippleCanvas.requestPaint() }
-            }
-        }
-
-        // Click event tracker for ripple coordinates
-        MouseArea {
-            anchors.fill: parent
-            propagateComposedEvents: true
-            hoverEnabled: false
-            acceptedButtons: Qt.LeftButton
-
-            onPressed: (mouse) => {
-                if (typeof backend === 'undefined' || backend.motionEnabled) {
-                    control.rippleCenter = Qt.point(mouse.x, mouse.y)
-                    rippleAnim.stop()
-                    control.rippleRadius = 0
-                    control.rippleOpacity = 0.36
-                    rippleAnim.start()
-                }
-                mouse.accepted = false // propagate to standard Button click handler
             }
         }
     }

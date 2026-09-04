@@ -17,6 +17,7 @@ from worker import (  # noqa: E402
     _should_verify_ssl,
     _validate_api_base_url,
     _validate_download_url,
+    clamp_scoring_weight,
     csv_safe,
     iter_supported_local_files,
     maybe_apply_ai_review,
@@ -198,6 +199,258 @@ def test_score_cv_honors_custom_scoring_weights():
 
     assert weighted_score["score"] > default_score["score"]
     assert weighted_score["score_breakdown"]["required_skills"] == 90
+
+
+# ── Phase 2: expanded scoring criteria ──────────────────────────────
+# LIVE_CRITERIA_KEYS mirrors the 9 criteria that have a working scorer today
+# (the 3 pre-existing ones plus the 6 ported in Phase 2). education/language/
+# recruiter_score are excluded on purpose — they're reserved, weight-0
+# placeholders until a later phase ports a CV structural parser.
+LIVE_CRITERIA_KEYS = (
+    "required_skills",
+    "nice_to_have_skills",
+    "skills_coverage",
+    "experience_match",
+    "role_title_match",
+    "keyword_match",
+    "ats_format",
+    "content_quality",
+    "soft_skills",
+)
+
+
+def _weights_isolating(key: str) -> dict:
+    """scoring_weights that put all 100 points on a single criterion, so a
+    test can check that criterion's contribution in isolation."""
+    return {k: (100.0 if k == key else 0.0) for k in LIVE_CRITERIA_KEYS}
+
+
+def test_score_cv_skills_coverage_criterion_responds_to_taxonomy_matches():
+    job_description = "We need a DevOps engineer skilled in Docker, Kubernetes, AWS, and Terraform."
+    good_cv = "Experience with Docker, Kubernetes, AWS, and Terraform for infrastructure automation."
+    bad_cv = "Retail assistant managing inventory and customer service in a supermarket."
+    config = {
+        "required_skills": [],
+        "description": job_description,
+        "accept_threshold": 75,
+        "review_threshold": 50,
+        "scoring_weights": _weights_isolating("skills_coverage"),
+    }
+
+    good_score = score_cv(good_cv, config)
+    bad_score = score_cv(bad_cv, config)
+
+    assert good_score["score_breakdown"]["skills_coverage"] > bad_score["score_breakdown"]["skills_coverage"]
+    assert good_score["score"] > bad_score["score"]
+
+
+def test_score_cv_experience_match_criterion_responds_to_years():
+    job_description = "Looking for a candidate with 5+ years of experience in software engineering."
+    good_cv = "Software Engineer, 2015 - 2023, building backend systems for eight years."
+    bad_cv = "Software Engineering intern for a few months in 2023."
+    config = {
+        "required_skills": [],
+        "description": job_description,
+        "accept_threshold": 75,
+        "review_threshold": 50,
+        "scoring_weights": _weights_isolating("experience_match"),
+    }
+
+    good_score = score_cv(good_cv, config)
+    bad_score = score_cv(bad_cv, config)
+
+    assert good_score["score_breakdown"]["experience_match"] > bad_score["score_breakdown"]["experience_match"]
+    assert good_score["score"] > bad_score["score"]
+
+
+def test_score_cv_role_title_match_criterion_responds_to_title_and_seniority():
+    job_description = "We are hiring a Senior Backend Engineer to join our platform team."
+    good_cv = "Senior Backend Engineer with proven leadership managing backend platform systems."
+    bad_cv = "Marketing Coordinator specializing in social media campaigns and event planning."
+    config = {
+        "required_skills": [],
+        "description": job_description,
+        "accept_threshold": 75,
+        "review_threshold": 50,
+        "scoring_weights": _weights_isolating("role_title_match"),
+    }
+
+    good_score = score_cv(good_cv, config)
+    bad_score = score_cv(bad_cv, config)
+
+    assert good_score["score_breakdown"]["role_title_match"] > bad_score["score_breakdown"]["role_title_match"]
+    assert good_score["score"] > bad_score["score"]
+
+
+def test_score_cv_keyword_match_criterion_responds_to_jd_overlap():
+    job_description = (
+        "We need an engineer experienced with GraphQL, microservices, and distributed systems "
+        "to design resilient event-driven architectures."
+    )
+    good_cv = "Designed GraphQL microservices and distributed systems with event-driven architectures."
+    bad_cv = "Baked artisan bread and managed a small neighborhood cafe kitchen for five years."
+    config = {
+        "required_skills": [],
+        "description": job_description,
+        "accept_threshold": 75,
+        "review_threshold": 50,
+        "scoring_weights": _weights_isolating("keyword_match"),
+    }
+
+    good_score = score_cv(good_cv, config)
+    bad_score = score_cv(bad_cv, config)
+
+    assert good_score["score_breakdown"]["keyword_match"] > bad_score["score_breakdown"]["keyword_match"]
+    assert good_score["score"] > bad_score["score"]
+
+
+def test_score_cv_ats_format_criterion_responds_to_structure():
+    good_cv = (
+        "Jane Doe | jane@example.com | +1 555 123 4567\n\n"
+        "EXPERIENCE\n"
+        "- Built scalable APIs using Python and SQL\n"
+        "- Led a team of five engineers\n\n"
+        "EDUCATION\n"
+        "- BSc Computer Science, MIT\n\n"
+        "SKILLS\n"
+        "- Python, SQL, Docker\n"
+    )
+    bad_cv = "words " * 5 + "with no sections bullets or contact information whatsoever just one wall of text"
+    config = {
+        "required_skills": [],
+        "description": "",
+        "accept_threshold": 75,
+        "review_threshold": 50,
+        "scoring_weights": _weights_isolating("ats_format"),
+    }
+
+    good_score = score_cv(good_cv, config)
+    bad_score = score_cv(bad_cv, config)
+
+    assert good_score["score_breakdown"]["ats_format"] > bad_score["score_breakdown"]["ats_format"]
+    assert good_score["score"] > bad_score["score"]
+
+
+def test_score_cv_soft_skills_criterion_responds_to_soft_skill_terms():
+    good_cv = "Strong leadership, teamwork, communication, and problem solving skills, with a track record of mentoring."
+    bad_cv = "Python, Docker, Kubernetes, SQL, REST APIs."
+    config = {
+        "required_skills": [],
+        "description": "",
+        "accept_threshold": 75,
+        "review_threshold": 50,
+        "scoring_weights": _weights_isolating("soft_skills"),
+    }
+
+    good_score = score_cv(good_cv, config)
+    bad_score = score_cv(bad_cv, config)
+
+    assert good_score["score_breakdown"]["soft_skills"] > bad_score["score_breakdown"]["soft_skills"]
+    assert good_score["score"] > bad_score["score"]
+
+
+def test_score_breakdown_has_all_live_criteria_even_with_empty_scoring_weights():
+    result = score_cv(
+        "Candidate with Python and SQL production experience.",
+        {
+            "required_skills": ["Python", "SQL"],
+            "nice_to_have_skills": [],
+            "description": "Backend role requiring Python and SQL.",
+            "accept_threshold": 75,
+            "review_threshold": 50,
+            "scoring_weights": {},
+        },
+    )
+
+    for key in LIVE_CRITERIA_KEYS:
+        assert key in result["score_breakdown"], f"missing {key} in score_breakdown"
+    assert "risk_penalty" in result["score_breakdown"]
+
+
+def test_stuffing_guard_flags_jd_overlap_without_affecting_decision():
+    job_description = (
+        "We are hiring a Senior Backend Engineer with 5+ years of Python and SQL experience to build "
+        "scalable REST APIs using FastAPI and PostgreSQL on AWS. The ideal candidate has strong "
+        "leadership skills and has worked in agile cross functional teams delivering high quality "
+        "software on tight deadlines consistently."
+    )
+    # Copy-pastes almost the entire JD verbatim into the CV — classic keyword stuffing.
+    stuffed_cv = "Jane Doe\njane@example.com\n" + job_description
+    config = {
+        "required_skills": ["Python", "SQL"],
+        "nice_to_have_skills": [],
+        "hard_reject_criteria": [],
+        "description": job_description,
+        "accept_threshold": 75,
+        "review_threshold": 50,
+    }
+
+    stuffed_result = score_cv(stuffed_cv, config)
+    assert any("JD overlap" in flag for flag in stuffed_result["risk_flags"])
+    # The flag must NOT auto-reject or zero the score by itself.
+    assert stuffed_result["decision"] != "recommended_reject"
+    assert stuffed_result["score"] > 50
+
+    normal_cv = (
+        "Jane Doe\njane@example.com\nEXPERIENCE\nSenior Python Developer at Acme (2018-2024)\n"
+        "- Built scalable APIs using Python and SQL\nEDUCATION\nBSc Computer Science, MIT\n"
+        "SKILLS\nPython, SQL"
+    )
+    normal_result = score_cv(normal_cv, config)
+    assert not any("JD overlap" in flag for flag in normal_result["risk_flags"])
+
+
+def test_write_csv_includes_score_breakdown_columns(tmp_path):
+    pytest.importorskip("PySide6")
+    import os as _os
+
+    _os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtCore import QCoreApplication
+
+    import qml_gui  # noqa: E402  (deferred: needs PySide6, guarded above)
+    from scoring import criteria as scoring_criteria  # noqa: E402
+
+    QCoreApplication.instance() or QCoreApplication([])
+
+    worker = qml_gui.AnalysisWorker(tmp_path, tmp_path, {}, "none", "Test Job")
+    score_breakdown = {
+        key: (42.0 if meta.get("scorer") is not None else 0.0) for key, meta in scoring_criteria.CRITERIA.items()
+    }
+    rows = [
+        {
+            "rank": 1,
+            "file": "cv1.pdf",
+            "score": 88.5,
+            "decision": "recommended_accept",
+            "confidence": "high",
+            "is_duplicate": False,
+            "duplicate_of": "",
+            "summary": "ok",
+            "matched_skills": ["Python"],
+            "missing_skills": [],
+            "risk_flags": [],
+            "explanation": "ok",
+            "analyzed_at": "2026-01-01T00:00:00Z",
+            "score_breakdown": score_breakdown,
+        }
+    ]
+    csv_path = tmp_path / "out.csv"
+    worker._write_csv(csv_path, rows)
+    content = csv_path.read_text(encoding="utf-8-sig")
+
+    for key, meta in scoring_criteria.CRITERIA.items():
+        if meta.get("scorer") is not None:
+            assert f"score_{key}" in content
+    assert "42.0" in content or "42" in content
+
+
+def test_clamp_scoring_weight_keeps_total_at_or_below_100():
+    # Normal in-range value is returned unchanged.
+    assert clamp_scoring_weight(70, other_total=30) == 70
+    # A value that would push the total over 100 gets clamped down.
+    assert clamp_scoring_weight(90, other_total=30) == 70
+    # Negative input clamps to 0.
+    assert clamp_scoring_weight(-5, other_total=30) == 0
 
 
 def test_worker_api_url_policy_allows_http_only_for_localhost():

@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "../theme"
 import "../components"
+import "../logic/WeightAllocator.js" as WeightAllocator
 
 // Step-based analysis setup over the existing PySide6 backend. Cards are
 // content-sized (preferredHeight bound to their inner column) because the page
@@ -83,6 +84,7 @@ ScrollView {
             AppCard {
                 id: jobCard
                 Layout.fillWidth: true
+                Layout.alignment: Qt.AlignTop
                 Layout.preferredHeight: jobCol.implicitHeight + jobCard.pad * 2
                 ColumnLayout {
                     id: jobCol
@@ -187,11 +189,130 @@ ScrollView {
             AppCard {
                 id: scoreCard
                 Layout.fillWidth: true
+                Layout.alignment: Qt.AlignTop
                 Layout.preferredHeight: scoreCol.implicitHeight + scoreCard.pad * 2
                 ColumnLayout {
                     id: scoreCol
                     width: parent.width
                     spacing: Theme.space3
+
+                    // Which category rows are expanded to show member sliders.
+                    property var expandedCategories: ({})
+
+                    // Sanity-check display only — the redistribution functions
+                    // below are designed to keep this at exactly 100 at all
+                    // times; if it's ever anything else, that's a bug.
+                    readonly property int liveWeightTotal: {
+                        var sum = 0
+                        var weights = backend.scoringWeights
+                        for (var k in weights) sum += weights[k]
+                        return sum
+                    }
+
+                    function membersFor(catKey) {
+                        var out = []
+                        var catalog = backend.criteriaCatalog
+                        for (var i = 0; i < catalog.length; i++) {
+                            if (catalog[i].category === catKey) out.push(catalog[i])
+                        }
+                        return out
+                    }
+
+                    // Sum of a category's members' CURRENT weights from
+                    // backend.scoringWeights. Reserved members are never in
+                    // that map, so a fully-reserved category (Background)
+                    // naturally aggregates to 0 — no special-casing needed.
+                    function categoryAggregate(catKey) {
+                        var members = scoreCol.membersFor(catKey)
+                        var weights = backend.scoringWeights
+                        var sum = 0
+                        for (var i = 0; i < members.length; i++) {
+                            var w = weights[members[i].key]
+                            sum += (w !== undefined ? w : 0)
+                        }
+                        return sum
+                    }
+
+                    // A category is locked (not-yet-scorable) when every one
+                    // of its members has hasScorer=false — driven entirely by
+                    // criteriaCatalog data, not by hardcoded key names, so
+                    // this keeps working unchanged once Phase 4 lands.
+                    function isCategoryLocked(catKey) {
+                        var members = scoreCol.membersFor(catKey)
+                        if (members.length === 0) return false
+                        for (var i = 0; i < members.length; i++) {
+                            if (members[i].hasScorer) return false
+                        }
+                        return true
+                    }
+
+                    function toggleExpanded(catKey) {
+                        var next = {}
+                        for (var k in scoreCol.expandedCategories) next[k] = scoreCol.expandedCategories[k]
+                        next[catKey] = !next[catKey]
+                        scoreCol.expandedCategories = next
+                    }
+
+                    function categoryTint(catKey) {
+                        if (catKey === "skills_match") return Theme.primary
+                        if (catKey === "job_fit") return Theme.secondary
+                        if (catKey === "cv_quality") return Theme.accent
+                        return Theme.textMuted
+                    }
+
+                    // Pushes a WeightAllocator result to the backend in ONE
+                    // atomic call (setScoringWeights), ordered the one way
+                    // that's always safe for the per-key clamp
+                    // (`clamp_scoring_weight`) to land every key exactly on
+                    // target: decreases before increases. See
+                    // WeightAllocator.orderForApply's docstring for why the
+                    // order matters, and setScoringWeights' docstring for
+                    // why this must be one call, not one call per key —
+                    // multiple calls each fire their own change signal, so
+                    // sliders bound to a category's live aggregate (their
+                    // `to:` range) visibly jump through every intermediate
+                    // state of the batch instead of just the final one.
+                    function applyWeights(updates) {
+                        var oldByKey = {}
+                        for (var i = 0; i < updates.length; i++) {
+                            oldByKey[updates[i].key] = backend.getScoringWeight(updates[i].key)
+                        }
+                        var ordered = WeightAllocator.orderForApply(oldByKey, updates)
+                        backend.setScoringWeights(ordered)
+                    }
+
+                    // Category slider moved: redistribute the aggregate delta
+                    // across the OTHER live categories (a disk-usage-style
+                    // budget bar), then scale every affected category's own
+                    // members proportionally so their weights follow along.
+                    function onCategoryMoved(catKey, newValue) {
+                        var cats = backend.categoryCatalog.map(function (c) {
+                            return { key: c.key, value: scoreCol.categoryAggregate(c.key), locked: scoreCol.isCategoryLocked(c.key) }
+                        })
+                        var targets = WeightAllocator.redistribute(cats, 100, catKey, newValue)
+                        var updates = []
+                        for (var i = 0; i < targets.length; i++) {
+                            if (scoreCol.isCategoryLocked(targets[i].key)) continue
+                            var members = scoreCol.membersFor(targets[i].key).map(function (m) {
+                                return { key: m.key, value: backend.getScoringWeight(m.key), locked: !m.hasScorer }
+                            })
+                            var scaled = WeightAllocator.scaleGroup(members, targets[i].value)
+                            updates = updates.concat(scaled)
+                        }
+                        scoreCol.applyWeights(updates)
+                    }
+
+                    // Member slider moved: redistribute the delta across the
+                    // OTHER members of the SAME category only — the
+                    // category's own aggregate never changes from this.
+                    function onMemberMoved(catKey, memberKey, newValue) {
+                        var members = scoreCol.membersFor(catKey).map(function (m) {
+                            return { key: m.key, value: backend.getScoringWeight(m.key), locked: !m.hasScorer }
+                        })
+                        var budget = scoreCol.categoryAggregate(catKey)
+                        var targets = WeightAllocator.redistribute(members, budget, memberKey, newValue)
+                        scoreCol.applyWeights(targets)
+                    }
 
                     Text { text: "Scoring criteria"; color: Theme.textPrimary; font.pixelSize: Typography.headingSize; font.weight: Typography.weightBold }
 
@@ -240,6 +361,189 @@ ScrollView {
                         tint: Theme.warning
                         value: backend.reviewThreshold
                         onMoved: backend.reviewThreshold = Math.round(value)
+                    }
+
+                    Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border; Layout.topMargin: 4 }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Theme.space3
+                        Text {
+                            text: "SCORING WEIGHTS"
+                            color: Theme.textMuted; font.pixelSize: Typography.captionSize; font.weight: Typography.weightSemiBold
+                        }
+                        Item { Layout.fillWidth: true }
+                        Text {
+                            text: "Total: " + scoreCol.liveWeightTotal + " / 100"
+                            color: scoreCol.liveWeightTotal === 100 ? Theme.textSecondary : Theme.warning
+                            font.pixelSize: Typography.labelSize
+                            font.weight: Typography.weightBold
+                        }
+                    }
+
+                    // Presets, driven off criteria.PRESETS via backend.presetCatalog.
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Theme.space2
+                        Repeater {
+                            model: backend.presetCatalog
+                            delegate: AppButton {
+                                required property var modelData
+                                Layout.fillWidth: true
+                                text: modelData.label
+                                fill: Theme.surfaceElevated; fillHover: Theme.surfaceMuted
+                                fillPressed: Theme.surfaceMuted; stroke: Theme.border
+                                textColor: Theme.textPrimary
+                                onClicked: backend.applyPreset(modelData.key)
+                            }
+                        }
+                    }
+
+                    // 4-category budget bar. Each row expands to reveal its
+                    // member criteria for power users.
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: Theme.space3
+
+                        Repeater {
+                            model: backend.categoryCatalog
+                            delegate: ColumnLayout {
+                                id: catRow
+                                required property var modelData
+                                readonly property string catKey: modelData.key
+                                readonly property var members: scoreCol.membersFor(catKey)
+                                readonly property bool locked: scoreCol.isCategoryLocked(catKey)
+                                readonly property int aggregate: scoreCol.categoryAggregate(catKey)
+                                readonly property bool expanded: scoreCol.expandedCategories[catKey] === true
+                                readonly property color tint: scoreCol.categoryTint(catKey)
+
+                                Layout.fillWidth: true
+                                spacing: 6
+                                opacity: catRow.locked ? 0.55 : 1
+                                Behavior on opacity { NumberAnimation { duration: Theme.durHover } }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: Theme.space2
+
+                                    Rectangle {
+                                        id: chevronBtn
+                                        Layout.preferredWidth: 22
+                                        Layout.preferredHeight: 22
+                                        radius: Theme.radiusSm
+                                        color: chevronArea.containsMouse ? Theme.surfaceMuted : "transparent"
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: catRow.expanded ? "⌄" : "›"
+                                            color: Theme.textMuted
+                                            font.pixelSize: Typography.labelSize
+                                            font.weight: Typography.weightBold
+                                        }
+                                        MouseArea {
+                                            id: chevronArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: scoreCol.toggleExpanded(catRow.catKey)
+                                        }
+                                    }
+
+                                    Text {
+                                        text: catRow.modelData.label
+                                        color: Theme.textPrimary
+                                        font.pixelSize: Typography.labelSize
+                                        font.weight: Typography.weightSemiBold
+                                        Layout.fillWidth: true
+                                    }
+
+                                    AppBadge { visible: catRow.locked; text: "Coming soon"; tint: Theme.textMuted }
+
+                                    Text {
+                                        text: catRow.aggregate + " / 100"
+                                        color: Theme.textSecondary
+                                        font.pixelSize: Typography.captionSize
+                                        font.weight: Typography.weightSemiBold
+                                    }
+                                }
+
+                                AppSlider {
+                                    Layout.fillWidth: true
+                                    enabled: !catRow.locked
+                                    tint: catRow.tint
+                                    value: catRow.aggregate
+                                    onMoved: scoreCol.onCategoryMoved(catRow.catKey, Math.round(value))
+                                }
+
+                                Text {
+                                    visible: catRow.locked
+                                    Layout.fillWidth: true
+                                    text: "Reserved for " + catRow.members.map(function (m) { return m.label }).join(", ") + " — not scored yet."
+                                    color: Theme.textMuted
+                                    font.pixelSize: Typography.captionSize
+                                    wrapMode: Text.WordWrap
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    Layout.leftMargin: Theme.space5
+                                    Layout.topMargin: 2
+                                    Layout.bottomMargin: 4
+                                    spacing: Theme.space2
+                                    visible: catRow.expanded
+
+                                    Repeater {
+                                        model: catRow.members
+                                        delegate: ColumnLayout {
+                                            id: memberRow
+                                            required property var modelData
+                                            readonly property bool memberLocked: !modelData.hasScorer
+                                            readonly property int memberWeight: memberRow.memberLocked
+                                                ? 0
+                                                : (backend.scoringWeights[modelData.key] !== undefined ? backend.scoringWeights[modelData.key] : 0)
+
+                                            Layout.fillWidth: true
+                                            spacing: 3
+                                            opacity: memberRow.memberLocked ? 0.6 : 1
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                spacing: Theme.space2
+                                                Text {
+                                                    text: memberRow.modelData.label
+                                                    color: Theme.textSecondary
+                                                    font.pixelSize: Typography.captionSize
+                                                    font.weight: Typography.weightMedium
+                                                    Layout.fillWidth: true
+                                                }
+                                                AppBadge { visible: memberRow.memberLocked; text: "Coming soon"; tint: Theme.textMuted }
+                                                Text {
+                                                    text: memberRow.memberWeight
+                                                    color: Theme.textMuted
+                                                    font.pixelSize: Typography.captionSize
+                                                }
+                                            }
+                                            AppSlider {
+                                                Layout.fillWidth: true
+                                                implicitHeight: 18
+                                                enabled: !memberRow.memberLocked && catRow.aggregate > 0
+                                                to: Math.max(1, catRow.aggregate)
+                                                tint: catRow.tint
+                                                value: memberRow.memberWeight
+                                                onMoved: scoreCol.onMemberMoved(catRow.catKey, memberRow.modelData.key, Math.round(value))
+                                            }
+                                            Text {
+                                                visible: memberRow.memberLocked
+                                                Layout.fillWidth: true
+                                                text: memberRow.modelData.description
+                                                color: Theme.textMuted
+                                                font.pixelSize: Typography.microSize
+                                                wrapMode: Text.WordWrap
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     Text { text: "AI REVIEW MODE"; color: Theme.textMuted; font.pixelSize: Typography.captionSize; font.weight: Typography.weightSemiBold; Layout.topMargin: 4 }
