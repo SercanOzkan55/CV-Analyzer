@@ -10,6 +10,7 @@ importing each other.
 
 import json
 import os
+import sys
 import tempfile
 from pathlib import Path
 
@@ -17,7 +18,16 @@ SETTINGS_FILENAME = "smtp_settings.json"
 
 
 def app_data_dir() -> Path:
-    base = os.environ.get("LOCALAPPDATA") or tempfile.gettempdir()
+    # Same per-OS convention as workspace.py/qml_gui.py's app_data_dir --
+    # LOCALAPPDATA only exists on Windows, so macOS/Linux need their own
+    # persistent per-user data directory instead of falling through to a
+    # temp dir that gets cleared between sessions.
+    if sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA") or tempfile.gettempdir()
+    elif sys.platform == "darwin":
+        base = str(Path.home() / "Library" / "Application Support")
+    else:
+        base = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
     path = Path(base) / "CV Analyzer Local Worker"
     path.mkdir(parents=True, exist_ok=True)
     return path

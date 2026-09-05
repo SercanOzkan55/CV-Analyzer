@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import smtplib
+import subprocess
 import sys
 import tempfile
 import traceback
@@ -30,16 +31,22 @@ try:
     from PySide6.QtQml import QQmlApplicationEngine
     from PySide6.QtQuickControls2 import QQuickStyle
 except ImportError:
-    from ctypes import windll
-
     message = (
         "PySide6 with Qt Quick is required for the Local Worker app.\n\n"
-        "Run install_windows.cmd or start_here.cmd again so dependencies are installed."
+        "Reinstall dependencies from local_worker/requirements.txt and try again."
     )
-    try:
-        windll.user32.MessageBoxW(None, message, "CV Analyzer Local Worker", 0x10)
-    except Exception:
-        print(message, file=sys.stderr)
+    # A native message box is a Windows-only nicety (ctypes.windll doesn't
+    # exist on macOS/Linux -- importing it there would itself raise
+    # ImportError, masking the real "PySide6 missing" message with an
+    # unrelated crash). Every platform still gets the message on stderr.
+    if sys.platform == "win32":
+        try:
+            from ctypes import windll
+
+            windll.user32.MessageBoxW(None, message, "CV Analyzer Local Worker", 0x10)
+        except Exception:
+            pass
+    print(message, file=sys.stderr)
     sys.exit(1)
 
 import worker as worker_module
@@ -70,7 +77,14 @@ def resource_path(relative_path: str) -> Path:
 
 
 def app_data_dir() -> Path:
-    base = os.environ.get("LOCALAPPDATA") or tempfile.gettempdir()
+    # Same per-OS convention as workspace.py/smtp_settings.py's
+    # app_data_dir -- see those for why LOCALAPPDATA alone isn't enough.
+    if sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA") or tempfile.gettempdir()
+    elif sys.platform == "darwin":
+        base = str(Path.home() / "Library" / "Application Support")
+    else:
+        base = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
     path = Path(base) / "CV Analyzer Local Worker"
     path.mkdir(parents=True, exist_ok=True)
     return path
@@ -1775,7 +1789,14 @@ class LocalWorkerBackend(QObject):
         target = Path(self._output_folder or Path.cwd()).expanduser()
         target.mkdir(parents=True, exist_ok=True)
         try:
-            os.startfile(str(target))
+            # os.startfile is Windows-only; macOS/Linux open a folder via
+            # their own launcher command instead.
+            if sys.platform == "win32":
+                os.startfile(str(target))
+            elif sys.platform == "darwin":
+                subprocess.run(["open", str(target)], check=True)
+            else:
+                subprocess.run(["xdg-open", str(target)], check=True)
         except Exception as exc:
             self.toast.emit(f"Could not open output folder: {exc}", "error")
 

@@ -2,13 +2,24 @@ import json
 import os
 import shutil
 import sqlite3
+import sys
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
 
 def _app_data_dir() -> Path:
-    base = os.environ.get("LOCALAPPDATA") or tempfile.gettempdir()
+    # Per-OS conventional per-user data directory. LOCALAPPDATA only exists
+    # on Windows -- on macOS/Linux it was silently falling through to the
+    # system temp dir, which gets cleared on reboot/cleanup, so workspace
+    # data (run history, candidate decisions) could vanish between
+    # sessions on those platforms.
+    if sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA") or tempfile.gettempdir()
+    elif sys.platform == "darwin":
+        base = str(Path.home() / "Library" / "Application Support")
+    else:
+        base = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
     path = Path(base) / "CV Analyzer Local Worker"
     path.mkdir(parents=True, exist_ok=True)
     return path
