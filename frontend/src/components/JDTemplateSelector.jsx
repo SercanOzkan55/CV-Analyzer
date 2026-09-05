@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { fetchJDTemplates, createJDTemplate, deleteJDTemplate } from '../api'
 
 export default function JDTemplateSelector({ onSelect, currentText }) {
-  const { token, plan } = useAuth()
+  const { token } = useAuth()
   const [templates, setTemplates] = useState([])
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -125,9 +125,6 @@ export default function JDTemplateSelector({ onSelect, currentText }) {
                   </button>
                 </div>
               ))
-            )}
-            {plan === 'free' && templates.length >= 3 && (
-              <p className="jd-template-limit">Free planda max 3 şablon. Pro'ya yükseltin.</p>
             )}
           </motion.div>
         )}

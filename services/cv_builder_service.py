@@ -2026,16 +2026,12 @@ def generate_typst(cv_data: dict, template: str = "classic", font_family: str = 
 # All CV templates are ATS-compliant (Application Tracking System)
 # They use standard fonts, clean formatting, and proper structure
 # to ensure compatibility with automated resume scanning systems
-TEMPLATES = {
-    "free": ["classic"],
-    "pro": ["classic", "modern", "executive", "professional", "creative"],
-    "enterprise": ["classic", "modern", "executive", "professional", "creative", "corporate", "tech", "consulting"],
-    "admin": ["classic", "modern", "executive", "professional", "creative", "corporate", "tech", "consulting"],
-}
+ALL_TEMPLATES = ["classic", "modern", "executive", "professional", "creative", "corporate", "tech", "consulting"]
 
 
-def get_available_templates(plan: str) -> list:
-    return TEMPLATES.get(plan, TEMPLATES["free"])
+def get_available_templates(plan: str = None) -> list:
+    """Every template is available to every account -- there's no paid tier."""
+    return list(ALL_TEMPLATES)
 
 
 def _is_truthy_env(name: str, default: str = "0") -> bool:

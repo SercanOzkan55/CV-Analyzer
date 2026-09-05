@@ -11,7 +11,7 @@ import { useLanguage } from '../i18n/LanguageContext'
 import Navbar from '../components/Navbar'
 import ScoreCircle from '../components/ScoreCircle'
 import { useToast } from '../components/Toast'
-import { createBillingPortalSession, fetchAnalysisTrends } from '../api'
+import { fetchAnalysisTrends } from '../api'
 import { getHistory } from '../utils/historyStorage'
 import useAnimatedCounter from '../hooks/useAnimatedCounter'
 import { getScoreColor } from '../utils/scoreColors'
@@ -289,20 +289,6 @@ export default function DashboardPage() {
 
   const trendHistory = remoteTrends.length >= 2 ? remoteTrends : history
 
-  async function onManageBilling() {
-    if (!token) return
-    try {
-      const session = await createBillingPortalSession(token, {
-        return_url: `${window.location.origin}/dashboard`,
-      })
-      if (session?.mode === 'mock') return
-      if (session?.url) { window.location.assign(session.url); return }
-      addToast(t('toast.billing_unavailable'), 'error')
-    } catch {
-      addToast(t('toast.billing_unavailable'), 'error')
-    }
-  }
-
   const planLabel = planLoading
     ? '...'
     : plan === 'admin' ? 'Admin'
@@ -447,21 +433,10 @@ export default function DashboardPage() {
 
           <DBStatCard
             icon={Crown}
-            iconColor={plan === 'free' ? 'var(--color-text-muted)' : 'var(--status-warning)'}
+            iconColor="var(--status-warning)"
             value={planLabel}
             label={t('dashboard.plan')}
-          >
-            {!planLoading && plan === 'free' && (
-              <Link to="/pricing" className="db-stat-cta">
-                {t('nav.upgrade')} <ArrowRight size={11} style={{ display: 'inline', verticalAlign: 'middle' }} />
-              </Link>
-            )}
-            {!planLoading && plan !== 'free' && plan !== 'admin' && (
-              <button type="button" className="db-stat-cta" onClick={onManageBilling}>
-                {t('pricing.manage_billing')}
-              </button>
-            )}
-          </DBStatCard>
+          />
 
           <DBStatCard
             icon={Award}
@@ -487,7 +462,7 @@ export default function DashboardPage() {
                 <strong>{t('dashboard.daily_limit_reached')}</strong>
                 <p>{t('dashboard.daily_limit_desc')}</p>
               </div>
-              <Link to="/pricing" className="btn-primary btn-sm">{t('nav.upgrade')}</Link>
+              <Link to="/recruiter" className="btn-primary btn-sm">Local Worker</Link>
             </motion.div>
           )}
         </AnimatePresence>
@@ -677,11 +652,7 @@ export default function DashboardPage() {
                     {t('dashboard.premium_hub_title')}
                   </div>
                   <p className="text-muted" style={{ fontSize: '0.82rem', marginBottom: 14, lineHeight: 1.55 }}>
-                    {planLoading
-                      ? '...'
-                      : plan === 'free'
-                      ? t('dashboard.premium_hub_locked')
-                      : t('dashboard.premium_hub_ready')}
+                    {t('dashboard.premium_hub_ready')}
                   </p>
                   <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                     <Link to="/premium" className="btn-primary btn-sm" style={{ display: 'inline-flex', gap: 6 }}>

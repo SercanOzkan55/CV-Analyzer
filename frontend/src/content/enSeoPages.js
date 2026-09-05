@@ -638,23 +638,23 @@ export const EN_SEO_PAGES = [
       {
         heading: 'Access and limitations',
         paragraphs: [
-          'This requires recruiter access — it is not available on a standard individual account. Contact your organization’s administrator or upgrade your plan to get access.',
+          'Bulk resume screening runs through Local Worker, a free download that processes CVs on your own machine — no paid plan or organization admin approval required, just an account.',
           'Rankings are a first-pass screening signal to help prioritize manual review, not an automated hiring decision.',
         ],
       },
     ],
     faq: [
-      { question: 'Who can access this?', answer: 'Accounts with recruiter role access, or billing admins on an organization plan. There is no separate self-serve recruiter signup.' },
-      { question: 'How many resumes can I upload at once?', answer: 'It supports bulk/batch upload — check your plan’s current limits in the product.' },
+      { question: 'Who can access this?', answer: 'Any signed-in account. There is no paid tier or separate recruiter signup — download Local Worker and log in.' },
+      { question: 'How many resumes can I upload at once?', answer: 'Local Worker processes a whole folder of resumes at once, with no daily cap since it runs on your own machine.' },
       { question: 'Can I export the results?', answer: 'Yes, as CSV, HTML, or JSON.' },
       { question: 'Does it replace reviewing candidates manually?', answer: 'No. It is a first-pass ranking and organization tool to help you prioritize who to review more closely.' },
     ],
-    ctaLabel: 'See Recruiter Plans',
-    ctaHref: '/pricing',
+    ctaLabel: 'Try Local Worker',
+    ctaHref: '/recruiter',
     finalCtaEyebrow: 'Screening for hiring teams',
-    finalCtaTitle: 'Get recruiter access for your team',
-    finalCtaDescription: 'Recruiter screening requires recruiter-role or admin access — see plans or contact your administrator.',
-    finalCtaLabel: 'See Recruiter Plans',
+    finalCtaTitle: 'Get Local Worker for your team',
+    finalCtaDescription: 'Bulk CV screening is free -- download Local Worker and run it on your own machine.',
+    finalCtaLabel: 'Try Local Worker',
   },
 ].map((page) => {
   const enhancement = EN_PAGE_ENHANCEMENTS[page.slug]

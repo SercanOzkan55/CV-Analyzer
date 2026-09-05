@@ -39,13 +39,13 @@ export default function QuotaWarningBanner() {
       icon: <AlertTriangle size={16} />,
       className: 'quota-banner quota-banner-warning',
       title: `Son ${remaining} analiz hakkınız!`,
-      desc: 'Limitiniz dolmak üzere. Pro plana geçerek sınırsız analiz yapın.',
+      desc: 'Limitiniz yarın sıfırlanır. Sınırsız işlem için Local Worker\'ı deneyin.',
     },
     critical: {
       icon: <AlertTriangle size={16} />,
       className: 'quota-banner quota-banner-critical',
       title: t('dashboard.daily_limit_reached') || 'Günlük limit doldu',
-      desc: t('dashboard.daily_limit_desc') || 'Pro plana yükselterek sınırsız analiz yapabilirsiniz.',
+      desc: t('dashboard.daily_limit_desc') || 'Yarın tekrar deneyin, veya Local Worker ile kendi bilgisayarınızda sınırsız işlem yapın.',
     },
   }
 
@@ -68,8 +68,8 @@ export default function QuotaWarningBanner() {
         <div className="quota-banner-bar">
           <div className="quota-banner-bar-fill" style={{ width: `${Math.min(pct, 100)}%` }} />
         </div>
-        <Link to="/pricing" className="quota-banner-cta">
-          Upgrade <ArrowRight size={13} />
+        <Link to="/recruiter" className="quota-banner-cta">
+          Local Worker <ArrowRight size={13} />
         </Link>
       </motion.div>
     </AnimatePresence>

@@ -22,7 +22,7 @@ import NotificationCenter from './NotificationCenter'
 const langLabels = { en: 'EN', tr: 'TR' }
 
 export default function Navbar() {
-  const { user, signOut, plan, planLoading } = useAuth()
+  const { user, signOut } = useAuth()
   const { t, lang, setLang, availableLanguages } = useLanguage()
   const { theme, toggleTheme } = useTheme()
   const location = useLocation()
@@ -164,7 +164,7 @@ export default function Navbar() {
                 </div>
               )}
               <NavLink to="/premium" active={location.pathname === '/premium'}>
-                {planLoading ? '...' : plan === 'free' ? t('nav.premium_preview') : t('nav.premium')}
+                {t('nav.premium')}
               </NavLink>
               <NavLink to="/recruiter" active={location.pathname === '/recruiter'}>{t('nav.recruiter')}</NavLink>
               {BLOG_ENABLED && <NavLink to="/blog" active={location.pathname === '/blog'}>Blog</NavLink>}

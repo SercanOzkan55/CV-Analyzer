@@ -19,12 +19,7 @@ const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'Native']
 
 const DEFAULT_SECTION_ORDER = ['experience', 'education', 'skills', 'certifications', 'projects', 'languages']
 
-const PLAN_TEMPLATES = {
-  free:       ['classic'],
-  pro:        ['classic', 'modern', 'executive', 'professional', 'creative'],
-  enterprise: ['classic', 'modern', 'executive', 'professional', 'creative', 'corporate', 'tech', 'consulting'],
-  admin:      ['classic', 'modern', 'executive', 'professional', 'creative', 'corporate', 'tech', 'consulting'],
-}
+const ALL_TEMPLATES = ['classic', 'modern', 'executive', 'professional', 'creative', 'corporate', 'tech', 'consulting']
 
 function extractNonEmptyTitles(experiences) {
   return (Array.isArray(experiences) ? experiences : [])
@@ -36,12 +31,11 @@ function extractNonEmptyNames(items, key = 'name') {
 }
 
 export default function CVBuilderPage() {
-  const { token, plan, planLoading, canAnalyze, recordAnalysis, refreshUsage } = useAuth()
+  const { token, canAnalyze, recordAnalysis, refreshUsage } = useAuth()
   const { t, lang } = useLanguage()
   const { addToast } = useToast()
   const routeLocation = useLocation()
   const prefillAppliedRef = useRef(false)
-  const premium = !planLoading && (plan === 'pro' || plan === 'enterprise' || plan === 'admin')
 
   // ── Form state ──────────────────────────────────────────────────────────────
   const [fullName,       setFullName]       = useState('')
@@ -65,8 +59,7 @@ export default function CVBuilderPage() {
   const [fontFamily,    setFontFamily]    = useState('')
   const [availableFonts, setAvailableFonts] = useState([])
   const [defaultFont,   setDefaultFont]   = useState('Arial')
-  const resolvedPlan       = planLoading ? 'free' : plan
-  const availableTemplates = PLAN_TEMPLATES[resolvedPlan] || PLAN_TEMPLATES.free
+  const availableTemplates = ALL_TEMPLATES
 
   // ── UI state ─────────────────────────────────────────────────────────────────
   const [loading,           setLoading]           = useState(false)
@@ -910,40 +903,30 @@ export default function CVBuilderPage() {
                     <span style={{ fontSize: '0.65rem' }}>{t(`cv_builder.template_${tpl}`)?.split(' ')[0]}</span>
                   </button>
                 ))}
-                {!premium && (
-                  <div className="cv-template-thumb-btn" style={{ opacity: 0.5, cursor: 'default' }}>
-                    <div style={{ fontSize: '1.2rem' }}>🔒</div>
-                    <span style={{ fontSize: '0.65rem' }}>PRO</span>
-                  </div>
-                )}
               </div>
 
               {/* Font selector */}
               <div style={{ padding: '6px 12px', background: 'var(--bg-card)', border: '1px solid var(--color-border)', borderTop: 'none', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 600, opacity: 0.7 }}>{t('cv_builder.choose_font')}</span>
-                {premium ? (
-                  <select
-                    value={fontFamily}
-                    onChange={e => setFontFamily(e.target.value)}
-                    style={{
-                      fontSize: '0.75rem',
-                      padding: '3px 8px',
-                      borderRadius: 4,
-                      border: '1px solid var(--color-border)',
-                      background: 'var(--bg-card)',
-                      color: 'var(--text-primary)',
-                      fontFamily: fontFamily || 'inherit',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <option value="">{t('cv_builder.font_default')} ({defaultFont})</option>
-                    {availableFonts.map(f => (
-                      <option key={f.id} value={f.id} style={{ fontFamily: f.label }}>{f.label}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>🔒 {t('cv_builder.font_pro_only')}</span>
-                )}
+                <select
+                  value={fontFamily}
+                  onChange={e => setFontFamily(e.target.value)}
+                  style={{
+                    fontSize: '0.75rem',
+                    padding: '3px 8px',
+                    borderRadius: 4,
+                    border: '1px solid var(--color-border)',
+                    background: 'var(--bg-card)',
+                    color: 'var(--text-primary)',
+                    fontFamily: fontFamily || 'inherit',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <option value="">{t('cv_builder.font_default')} ({defaultFont})</option>
+                  {availableFonts.map(f => (
+                    <option key={f.id} value={f.id} style={{ fontFamily: f.label }}>{f.label}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Live preview */}

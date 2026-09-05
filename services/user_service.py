@@ -14,9 +14,6 @@ from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 
 from models import Analysis, Organization, User
-from core.quota import (
-    _is_premium_plan,
-)
 
 logger = logging.getLogger("app.user")
 
@@ -298,26 +295,9 @@ def _build_premium_insights(result: dict) -> dict:
 
 
 def _apply_plan_based_result_features(result: dict, effective_plan: str) -> dict:
-    premium_access = _is_premium_plan(effective_plan)
+    """Attach the full analysis result -- every plan gets full recommendations,
+    missing_skills, and premium_insights (there's no paid tier to gate this on)."""
     result["effective_plan"] = effective_plan
-    result["premium_access"] = premium_access
-
-    if premium_access:
-        result["premium_insights"] = _build_premium_insights(result)
-        return result
-
-    recs = result.get("recommendations") or []
-    if isinstance(recs, list) and len(recs) > 2:
-        result["recommendations"] = recs[:2]
-        result["recommendations_truncated"] = True
-
-    missing = result.get("missing_skills") or []
-    if isinstance(missing, list) and len(missing) > 6:
-        result["missing_skills"] = missing[:6]
-        result["missing_skills_truncated"] = True
-
-    result["premium_locked"] = {
-        "advanced_breakdown": True,
-        "full_recommendations": True,
-    }
+    result["premium_access"] = True
+    result["premium_insights"] = _build_premium_insights(result)
     return result

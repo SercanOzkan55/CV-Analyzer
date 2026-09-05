@@ -70,25 +70,10 @@ export default function SettingsPage() {
     }
   }
 
-  const planFeatures = {
-    free: [t('pricing.free_f1'), t('pricing.free_f2'), t('pricing.free_f3'), t('pricing.free_f4')],
-    pro: [t('pricing.pro_f1'), t('pricing.pro_f2'), t('pricing.pro_f3'), t('pricing.pro_f4'), t('pricing.pro_f5')],
-    admin: [
-      t('pricing.pro_f1'),
-      t('pricing.pro_f2'),
-      t('pricing.pro_f3'),
-      t('pricing.pro_f4'),
-      t('pricing.pro_f5'),
-    ],
-  }
+  const includedFeatures = [t('pricing.f1'), t('pricing.f2'), t('pricing.f3'), t('pricing.f4'), t('pricing.f5')]
 
   const effectivePlan = isBillingAdmin ? 'admin' : plan
-  const planLabel =
-    effectivePlan === 'admin'
-      ? 'Admin'
-      : effectivePlan === 'free'
-      ? t('dashboard.free_plan')
-      : t('dashboard.pro_plan')
+  const planLabel = effectivePlan === 'admin' ? 'Admin' : t('dashboard.free_plan')
 
   return (
     <div className="app-layout">
@@ -169,11 +154,10 @@ export default function SettingsPage() {
             <h2>{t('settings.plan_management')}</h2>
             <div className="plan-badge-row">
               <span className="plan-badge">{planLoading ? '...' : planLabel}</span>
-              {!planLoading && effectivePlan === 'free' && <Link to="/pricing" className="btn-primary btn-sm">{t('settings.change_plan')}</Link>}
             </div>
             <h4>{t('settings.plan_features')}</h4>
             <ul className="plan-features-list">
-              {((planLoading ? planFeatures.free : (planFeatures[effectivePlan] || planFeatures.free))).map((f, i) => (
+              {includedFeatures.map((f, i) => (
                 <li key={i}>✓ {f}</li>
               ))}
             </ul>

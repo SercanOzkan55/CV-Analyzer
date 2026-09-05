@@ -20,23 +20,6 @@ const COUNTRY_TO_LANG = {
   SA: 'ar', EG: 'ar', AE: 'ar', MA: 'ar', DZ: 'ar', IQ: 'ar', JO: 'ar', KW: 'ar', QA: 'ar',
 }
 
-const COUNTRY_TO_REGION = {
-  TR: 'TR', RU: 'RU', GB: 'GB', MX: 'MX', AR: 'AR', SA: 'SA', AE: 'AE',
-  DE: 'EU', FR: 'EU', ES: 'EU', IT: 'EU', NL: 'EU', BE: 'EU', AT: 'EU', FI: 'EU', PT: 'EU', IE: 'EU'
-}
-
-const PRICING_CONFIG = {
-  TR: { pro: '599 TL', free: '0 TL', enterprise: '3999 TL', periodKey: 'pricing.period_monthly' },
-  EU: { pro: '€19', free: '€0', enterprise: '€100', periodKey: 'pricing.period_monthly' },
-  GB: { pro: '£17', free: '£0', enterprise: '£85', periodKey: 'pricing.period_monthly' },
-  RU: { pro: '1500 ₽', free: '0 ₽', enterprise: '10000 ₽', periodKey: 'pricing.period_monthly' },
-  MX: { pro: '$350 MXN', free: '$0', enterprise: '$2000 MXN', periodKey: 'pricing.period_monthly' },
-  AR: { pro: '$4500 ARS', free: '$0', enterprise: '$25000 ARS', periodKey: 'pricing.period_monthly' },
-  SA: { pro: '70 SR', free: '0 SR', enterprise: '400 SR', periodKey: 'pricing.period_monthly' },
-  AE: { pro: '70 DH', free: '0 DH', enterprise: '400 DH', periodKey: 'pricing.period_monthly' },
-  DEFAULT: { pro: '$19', free: '$0', enterprise: '$100', periodKey: 'pricing.period_monthly' }
-}
-
 /**
  * @typedef {Object} LanguageContextValue
  * @property {string} lang
@@ -152,9 +135,6 @@ export function LanguageProvider({ children }) {
   const [routeLangOverride, setRouteLangOverride] = useState(null)
   const effectiveLang = routeLangOverride || lang
 
-  const regionKey = COUNTRY_TO_REGION[countryCode] || 'DEFAULT'
-  const pricing = PRICING_CONFIG[regionKey]
-
   // Manual selection by user (EN/TR buttons) — persisted so it survives
   // navigation, hard refresh, and future sessions; IP detection never overrides it.
   const setLang = useCallback((newLang) => {
@@ -227,7 +207,7 @@ export function LanguageProvider({ children }) {
   // Only English and Turkish are intentionally exposed as manual controls.
   return (
     <LanguageContext.Provider
-      value={{ lang: effectiveLang, setLang, t, countryCode, pricing, availableLanguages: ['en', 'tr'], setRouteLangOverride }}
+      value={{ lang: effectiveLang, setLang, t, countryCode, availableLanguages: ['en', 'tr'], setRouteLangOverride }}
     >
       {children}
     </LanguageContext.Provider>

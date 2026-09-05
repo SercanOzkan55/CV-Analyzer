@@ -747,8 +747,7 @@ def export_auto_fixed_cv(
 
     try:
         _t0 = time.time()
-        # Font selection: only premium plans can override font
-        _font = body.font_family if _is_premium_plan(effective_plan) else ""
+        _font = body.font_family
         result = build_cv(
             cv_data=cv_data,
             job_description=body.job_description or "",

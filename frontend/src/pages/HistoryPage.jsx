@@ -12,10 +12,9 @@ import ScoreBars from '../components/ScoreBars'
 import SkillTags from '../components/SkillTags'
 import { getHistory, removeHistoryItem, clearHistory } from '../utils/historyStorage'
 import { toggleFavorite, fetchFavoriteIds, exportHistoryCSV, createShareLink, saveAnalysisNote, fetchAnalysisNote, downloadAnalysisReport } from '../api'
-import UpgradePrompt from '../components/UpgradePrompt'
 
 export default function HistoryPage() {
-  const { user, token, plan } = useAuth()
+  const { user, token } = useAuth()
   const { t } = useLanguage()
   const { addToast } = useToast()
   const [history, setHistoryState] = useState(() => getHistory(user))
@@ -65,15 +64,8 @@ export default function HistoryPage() {
 
   // CSV export
   const [exporting, setExporting] = useState(false)
-  const [showUpgrade, setShowUpgrade] = useState(false)
-  const [upgradeFeature, setUpgradeFeature] = useState('')
 
   async function handleExportCSV() {
-    if (plan === 'free') {
-      setUpgradeFeature('CSV Dışa Aktarım')
-      setShowUpgrade(true)
-      return
-    }
     setExporting(true)
     try {
       await exportHistoryCSV(token)
@@ -92,11 +84,6 @@ export default function HistoryPage() {
   async function handleShare(item) {
     if (!item?.analysis_id) {
       addToast('Bu analiz paylaşılamaz', 'warning')
-      return
-    }
-    if (plan === 'free') {
-      setUpgradeFeature('Analiz Paylaşımı')
-      setShowUpgrade(true)
       return
     }
     try {
@@ -400,12 +387,6 @@ export default function HistoryPage() {
           </motion.div>
         )}
       </main>
-      <UpgradePrompt
-        show={showUpgrade}
-        onClose={() => setShowUpgrade(false)}
-        feature={upgradeFeature}
-        description="Pro plana yükselterek bu özelliğin kilidini açın."
-      />
     </div>
   )
 }

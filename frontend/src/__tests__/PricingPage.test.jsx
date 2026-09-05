@@ -4,41 +4,20 @@ import { beforeAll, describe, expect, it, vi } from 'vitest'
 
 import PricingPage from '../pages/PricingPage'
 
-const createCheckoutSession = vi.fn()
-
-vi.mock('../api', () => ({
-  createBillingPortalSession: vi.fn(),
-  createCheckoutSession: (...args) => createCheckoutSession(...args),
-  createContactSalesRequest: vi.fn(),
-}))
-
 vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({
-    plan: 'free',
-    refreshUsage: vi.fn(),
-    token: 'test-token',
-    user: { email: 'user@gmail.com' },
+    user: null,
   }),
 }))
 
 vi.mock('../i18n/LanguageContext', () => ({
   useLanguage: () => ({
-    countryCode: 'TR',
-    pricing: {
-      enterprise: 'Custom',
-      free: '$0',
-      periodKey: 'pricing.period_monthly',
-      pro: '$19',
-    },
     t: (key) => key,
   }),
 }))
 
 vi.mock('../components/Navbar', () => ({ default: () => <nav /> }))
 vi.mock('../components/Footer', () => ({ default: () => <footer /> }))
-vi.mock('../components/Toast', () => ({
-  useToast: () => ({ addToast: vi.fn() }),
-}))
 
 beforeAll(() => {
   vi.stubGlobal(
@@ -53,20 +32,19 @@ beforeAll(() => {
 })
 
 describe('PricingPage', () => {
-  it('keeps paid checkout unavailable while billing is disabled', () => {
+  it('shows a single free plan with no paid CTAs or billing copy', () => {
     render(
       <MemoryRouter>
         <PricingPage />
       </MemoryRouter>,
     )
 
-    const paidPlanButtons = screen.getAllByRole('button', {
-      name: 'pricing.billing_coming_soon',
-    })
+    expect(screen.getByText('pricing.title')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'pricing.free_cta' })).toHaveAttribute('href', '/register')
+    expect(screen.getByRole('link', { name: 'pricing.local_worker_cta' })).toHaveAttribute('href', '/recruiter')
 
-    expect(paidPlanButtons).toHaveLength(2)
-    paidPlanButtons.forEach((button) => expect(button).toBeDisabled())
+    expect(screen.queryByText(/upgrade/i)).not.toBeInTheDocument()
     expect(screen.queryByText('pricing.billing_title')).not.toBeInTheDocument()
-    expect(createCheckoutSession).not.toHaveBeenCalled()
+    expect(screen.queryByText(/599 TL|3999 TL|\$19|\$100/)).not.toBeInTheDocument()
   })
 })

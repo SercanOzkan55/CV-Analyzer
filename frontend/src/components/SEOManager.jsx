@@ -18,8 +18,8 @@ const PUBLIC_META = {
     description: 'CV’nizi ücretsiz analiz edin; ATS uyumunu, iş ilanı eşleşmesini, beceri boşluklarını ve geliştirme önerilerini tek ekranda görün.',
   },
   '/pricing': {
-    title: 'CV Analyzer Planları ve Özellikleri',
-    description: 'CV analizi, ATS kontrolü, iş eşleşmesi ve CV geliştirme özelliklerini karşılaştırın.',
+    title: 'CV Analyzer -- Ücretsiz, Üyelik Yok',
+    description: 'CV Analyzer tamamen ücretsizdir: CV analizi, ATS kontrolü, iş eşleşmesi ve CV geliştirme herkese açık.',
   },
   '/about': {
     title: 'CV Analyzer Hakkında',
@@ -117,8 +117,8 @@ const EN_PUBLIC_META = {
     trPath: '/terms/',
   },
   '/en/pricing': {
-    title: 'CV Analyzer Plans and Features',
-    description: 'Compare CV analysis, ATS checking and career-tool plans available from CV Analyzer.',
+    title: 'CV Analyzer -- Free, No Membership',
+    description: 'CV Analyzer is completely free: CV analysis, ATS checking, job matching and CV building are open to everyone.',
     trPath: '/pricing/',
   },
   '/en/editorial-policy': {

@@ -18,7 +18,7 @@ from services import rewrite_service
 from services.ai_feature_service import ensure_ai_rewrite_allowed as _ensure_ai_rewrite_allowed
 from services.cv_builder_service import build_cv, compile_cv_model, get_available_templates
 from services.user_service import _ensure_not_expired, get_or_create_user
-from core.quota import _consume_billable_usage, _is_premium_plan, _resolve_effective_plan
+from core.quota import _consume_billable_usage, _resolve_effective_plan
 from core.http_runtime import _MAX_RESPONSE_BODY_BYTES, audit_log
 
 
@@ -183,7 +183,7 @@ def cv_builder_generate(
 
     db_user = _resolve_request_user(db, user)
     plan = _resolve_effective_plan(db, db_user)
-    font_family = body.font_family if _is_premium_plan(plan) else ""
+    font_family = body.font_family
     _consume_billable_usage(db, db_user, "cv-builder-generate", response=response)
 
     try:

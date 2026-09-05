@@ -142,7 +142,6 @@ export default function ProfilePage() {
             <div className="profile-actions">
               <Link to="/settings" className="btn-outline">{t('nav.settings')}</Link>
               <Link to="/analyze" className="btn-primary">{t('dashboard.quick_analyze')}</Link>
-              {plan === 'free' && <Link to="/pricing" className="btn-primary btn-sm">{t('nav.upgrade')}</Link>}
             </div>
             {bestScore > 0 && (
               <div className="profile-best-score">

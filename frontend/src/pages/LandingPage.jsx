@@ -477,7 +477,7 @@ function ScrollAnalysisStory({ t }) {
 }
 
 export default function LandingPage() {
-  const { t, pricing } = useLanguage()
+  const { t } = useLanguage()
   const prefersReducedMotion = useReducedMotion()
   const { scrollYProgress } = useScroll()
   const revealSectionProps = prefersReducedMotion
@@ -699,47 +699,20 @@ export default function LandingPage() {
         <SectionTitle title={t('landing.pricing_title')} subtitle={t('landing.pricing_subtitle')} />
         <motion.div
           className="pricing-grid"
+          style={{ gridTemplateColumns: 'minmax(0, 480px)', justifyContent: 'center' }}
           {...revealGridProps}
         >
-          <motion.div className="pricing-card" variants={scrollItem} whileHover={{ y: -2 }}>
+          <motion.div className="pricing-card popular" variants={scrollScaleItem} whileHover={{ y: -2 }}>
             <h3>{t('pricing.free_name')}</h3>
-            <div className="pricing-price">{pricing.free}<span>/{t(pricing.periodKey)}</span></div>
+            <div className="pricing-price">{t('pricing.zero_price')}<span>/{t('pricing.forever')}</span></div>
             <ul>
-              <li>{t('pricing.free_f1')}</li>
-              <li>{t('pricing.free_f2')}</li>
-              <li>{t('pricing.free_f3')}</li>
-              <li>{t('pricing.free_f4')}</li>
+              <li>{t('pricing.f1')}</li>
+              <li>{t('pricing.f2')}</li>
+              <li>{t('pricing.f3')}</li>
+              <li>{t('pricing.f4')}</li>
+              <li>{t('pricing.f5')}</li>
             </ul>
-            <Link to="/register" className="btn-outline btn-full">{t('pricing.free_cta')}</Link>
-          </motion.div>
-
-          <motion.div className="pricing-card popular lp-pricing-popular" variants={scrollScaleItem} whileHover={{ y: -2 }}>
-            <div className="popular-badge">{t('pricing.popular')}</div>
-            <div className="lp-pricing-header">
-              <h3>{t('pricing.pro_name')}</h3>
-              <div className="pricing-price">{pricing.pro}<span>/{t(pricing.periodKey)}</span></div>
-            </div>
-            <ul>
-              <li>{t('pricing.pro_f1')}</li>
-              <li>{t('pricing.pro_f2')}</li>
-              <li>{t('pricing.pro_f3')}</li>
-              <li>{t('pricing.pro_f4')}</li>
-              <li>{t('pricing.pro_f5')}</li>
-            </ul>
-            <Link to="/register" className="btn-primary btn-full">{t('pricing.pro_cta')}</Link>
-          </motion.div>
-
-          <motion.div className="pricing-card" variants={scrollItem} whileHover={{ y: -2 }}>
-            <h3>{t('pricing.enterprise_name')}</h3>
-            <div className="pricing-price">{pricing.enterprise}<span>/{t(pricing.periodKey)}</span></div>
-            <ul>
-              <li>{t('pricing.enterprise_f1')}</li>
-              <li>{t('pricing.enterprise_f2')}</li>
-              <li>{t('pricing.enterprise_f3')}</li>
-              <li>{t('pricing.enterprise_f4')}</li>
-              <li>{t('pricing.enterprise_f5')}</li>
-            </ul>
-            <a href="mailto:sales@cvanalyzer.dev" className="btn-outline btn-full">{t('pricing.enterprise_cta')}</a>
+            <Link to="/register" className="btn-primary btn-full">{t('pricing.free_cta')}</Link>
           </motion.div>
         </motion.div>
       </motion.section>

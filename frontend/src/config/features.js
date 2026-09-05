@@ -5,7 +5,3 @@
 // The community blog is backed by authenticated, moderated API endpoints.
 // Enable it explicitly per environment after the database migration is applied.
 export const BLOG_ENABLED = import.meta.env.VITE_ENABLE_BLOG === 'true'
-
-// Checkout and billing portal stay unavailable until Stripe production
-// products, redirects, and webhooks are configured and verified.
-export const BILLING_ENABLED = import.meta.env.VITE_ENABLE_BILLING === 'true'

@@ -82,22 +82,6 @@ def toggle_favorite(
     db_user = get_or_create_user(db, supabase_id, email)
     _get_owned_analysis_or_404(db, body.analysis_id, db_user)
 
-    # Check plan limit for free users
-    if db_user.plan_type == "free":
-        fav_count = db.query(Favorite).filter(Favorite.user_id == db_user.id).count()
-        if fav_count >= 5:
-            # Check if we're removing (toggling off) — allow that
-            existing = (
-                db.query(Favorite)
-                .filter(Favorite.user_id == db_user.id, Favorite.analysis_id == body.analysis_id)
-                .first()
-            )
-            if not existing:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Free plan limited to 5 favorites. Upgrade for unlimited.",
-                )
-
     existing = (
         db.query(Favorite).filter(Favorite.user_id == db_user.id, Favorite.analysis_id == body.analysis_id).first()
     )
@@ -175,7 +159,7 @@ def create_jd_template(
     user=Depends(verify_supabase_jwt),
     db=Depends(get_db),
 ):
-    """Create a saved JD template. Free: max 3, Pro: unlimited."""
+    """Create a saved JD template."""
     from models import JobTemplate
 
     supabase_id = user.get("user_id")
@@ -184,15 +168,6 @@ def create_jd_template(
 
     if not body.title.strip() or not body.description.strip():
         raise HTTPException(status_code=400, detail="Title and description required")
-
-    effective_plan = _resolve_effective_plan(db, db_user)
-    if effective_plan == "free":
-        count = db.query(JobTemplate).filter(JobTemplate.user_id == db_user.id).count()
-        if count >= 3:
-            raise HTTPException(
-                status_code=403,
-                detail="Free plan limited to 3 templates. Upgrade for unlimited.",
-            )
 
     tmpl = JobTemplate(
         user_id=db_user.id,
@@ -237,7 +212,7 @@ def create_share_link(
     user=Depends(verify_supabase_jwt),
     db=Depends(get_db),
 ):
-    """Create a public share link for an analysis (Pro feature)."""
+    """Create a public share link for an analysis."""
     from models import AnalysisShare
     import secrets
 
@@ -245,12 +220,6 @@ def create_share_link(
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
 
-    effective_plan = _resolve_effective_plan(db, db_user)
-    if effective_plan == "free":
-        raise HTTPException(
-            status_code=403,
-            detail="Sharing is a Pro feature. Upgrade to share analyses.",
-        )
     _get_owned_analysis_or_404(db, body.analysis_id, db_user)
 
     # Check if share already exists
@@ -342,20 +311,13 @@ def export_history_csv(
     user=Depends(verify_supabase_jwt),
     db=Depends(get_db),
 ):
-    """Export user's analysis history as CSV (Pro feature)."""
+    """Export user's analysis history as CSV."""
     import csv
     import io
 
     supabase_id = user.get("user_id")
     email = user.get("email")
     db_user = get_or_create_user(db, supabase_id, email)
-
-    effective_plan = _resolve_effective_plan(db, db_user)
-    if effective_plan == "free":
-        raise HTTPException(
-            status_code=403,
-            detail="CSV export is a Pro feature. Upgrade to export history.",
-        )
 
     records = (
         db.query(Analysis).filter(Analysis.user_id == db_user.id).order_by(Analysis.created_at.desc()).limit(500).all()
@@ -769,8 +731,6 @@ def get_benchmark(analysis_id: int, user=Depends(verify_supabase_jwt), db=Depend
     db_user = get_or_create_user(db, supabase_id, email)
 
     effective_plan = _resolve_effective_plan(db, db_user)
-    if not _is_premium_plan(effective_plan):
-        raise HTTPException(status_code=403, detail="Premium plan required")
 
     analysis_record = db.query(Analysis).filter(Analysis.id == analysis_id, Analysis.user_id == db_user.id).first()
     if not analysis_record:
