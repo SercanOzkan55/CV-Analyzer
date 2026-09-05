@@ -35,10 +35,19 @@ Item {
 
             // ── Actions ──
             AppCard {
+                id: actionsCard
                 Layout.preferredWidth: 200
-                Layout.fillHeight: true
+                // Not fillHeight: this card's content (header + 2 buttons +
+                // a short note) is much shorter than the editor/preview
+                // columns it sits beside. Forcing it to match their height
+                // left large gaps between its own children — sizing to its
+                // own content and pinning to the top of the row reads as a
+                // deliberate compact card instead.
+                Layout.alignment: Qt.AlignTop
+                Layout.preferredHeight: actionsCol.implicitHeight + actionsCard.pad * 2
                 ColumnLayout {
-                    anchors.fill: parent
+                    id: actionsCol
+                    width: parent.width
                     spacing: Theme.space3
 
                     SectionHeader { Layout.fillWidth: true; title: "Template"; subtitle: "Pick the outreach to edit." }

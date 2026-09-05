@@ -661,6 +661,7 @@ def download_worker_package(
         ("build_windows_exe.cmd", _LOCAL_WORKER_DIR / "build_windows_exe.cmd"),
         ("CV Analyzer Local Worker.spec", _LOCAL_WORKER_DIR / "CV Analyzer Local Worker.spec"),
         ("assets/cv_analyzer_worker.ico", _LOCAL_WORKER_DIR / "assets" / "cv_analyzer_worker.ico"),
+        ("assets/logo.png", _LOCAL_WORKER_DIR / "assets" / "logo.png"),
         ("VERSION", _LOCAL_WORKER_DIR / "VERSION"),
     ]
     missing = [name for name, path in package_files if not path.exists()]

@@ -10,6 +10,8 @@ import "../logic/WeightAllocator.js" as WeightAllocator
 // scrolls — there is no fixed height to fill against.
 ScrollView {
     id: page
+    Layout.fillWidth: true
+    Layout.fillHeight: true
     clip: true
 
     signal requestBrowseCv()

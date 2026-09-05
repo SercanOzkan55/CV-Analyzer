@@ -10,6 +10,8 @@ import "../components"
 // All data comes from the global `backend` context object; stays on device.
 ScrollView {
     id: page
+    Layout.fillWidth: true
+    Layout.fillHeight: true
     clip: true
 
     readonly property int gutter: Theme.space6

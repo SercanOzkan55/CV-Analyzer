@@ -9,6 +9,8 @@ import "../components"
 // no fabricated fields.
 ScrollView {
     id: page
+    Layout.fillWidth: true
+    Layout.fillHeight: true
     clip: true
 
     signal requestPage(int index)

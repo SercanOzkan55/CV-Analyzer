@@ -15,6 +15,41 @@ Item {
     property int resultsTab: 0
     readonly property bool hasData: backend.totalCandidates > 0
 
+    // Bulk email selection. Lives in QML only (row indices into
+    // backend.resultsModel / backend.compareRows) -- transient, not
+    // persisted, not a new role on the Python model.
+    property var selectedIndices: []
+    readonly property bool bulkSending: backend.bulkSendTotal > 0 && backend.bulkSendProgress < backend.bulkSendTotal
+
+    function isSelected(index) {
+        return page.selectedIndices.indexOf(index) !== -1
+    }
+
+    function toggleSelection(index) {
+        var arr = page.selectedIndices.slice()
+        var pos = arr.indexOf(index)
+        if (pos === -1) arr.push(index)
+        else arr.splice(pos, 1)
+        page.selectedIndices = arr
+    }
+
+    function clearSelection() {
+        page.selectedIndices = []
+    }
+
+    // backend.compareRows already exposes every current candidate as a
+    // plain dict (score, email, etc.) for the Compare page -- reused here
+    // as the bulk-read of scores the ResultListModel itself doesn't expose
+    // to JS, so no new backend role is needed just for this shortcut.
+    function selectBelowThreshold(threshold) {
+        var arr = []
+        var rows = backend.compareRows
+        for (var i = 0; i < rows.length; i++) {
+            if (rows[i].score < threshold) arr.push(i)
+        }
+        page.selectedIndices = arr
+    }
+
     function _chips(text) {
         if (!text) return []
         return text.split(/[,\n;]+/).map(function (s) { return s.trim() }).filter(function (s) { return s.length > 0 })
@@ -125,6 +160,104 @@ Item {
             Item { Layout.fillWidth: true }
         }
 
+        // ── Bulk email toolbar ──
+        AppCard {
+            id: bulkCard
+            Layout.fillWidth: true
+            visible: page.hasData && page.resultsTab === 0
+            pad: Theme.space3
+            Layout.preferredHeight: bulkCol.implicitHeight + bulkCard.pad * 2
+            ColumnLayout {
+                id: bulkCol
+                width: parent.width
+                spacing: Theme.space2
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.space3
+
+                    Text { text: "SELECT BELOW"; color: Theme.textMuted; font.pixelSize: Typography.captionSize; font.weight: Typography.weightSemiBold }
+                    AppTextField {
+                        id: thresholdField
+                        Layout.preferredWidth: 84
+                        text: "70"
+                        placeholder: "Score"
+                    }
+                    AppButton {
+                        text: "Select below"
+                        fill: Theme.surfaceElevated; fillHover: Theme.surfaceMuted
+                        fillPressed: Theme.surfaceMuted; stroke: Theme.border
+                        textColor: Theme.textPrimary
+                        onClicked: page.selectBelowThreshold(parseFloat(thresholdField.text) || 0)
+                    }
+                    AppButton {
+                        text: "Clear selection"
+                        visible: page.selectedIndices.length > 0
+                        fill: Theme.surfaceElevated; fillHover: Theme.surfaceMuted
+                        fillPressed: Theme.surfaceMuted; stroke: Theme.border
+                        textColor: Theme.textPrimary
+                        onClicked: page.clearSelection()
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    Text {
+                        text: page.selectedIndices.length + " selected"
+                        color: Theme.textSecondary
+                        font.pixelSize: Typography.labelSize
+                        font.weight: Typography.weightSemiBold
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.space2
+
+                    AppButton {
+                        text: "Send Accept to Selected"
+                        strong: true
+                        enabled: backend.smtpPasswordSet && page.selectedIndices.length > 0 && !page.bulkSending
+                        fill: Theme.success; fillHover: Qt.lighter(Theme.success, 1.1)
+                        fillPressed: Qt.darker(Theme.success, 1.1); stroke: Theme.success
+                        textColor: "#04130C"
+                        onClicked: {
+                            confirmAccept.message = "Send the accept email to " + page.selectedIndices.length + " candidate(s)?"
+                            confirmAccept.open()
+                        }
+                    }
+                    AppButton {
+                        text: "Send Reject to Selected"
+                        enabled: backend.smtpPasswordSet && page.selectedIndices.length > 0 && !page.bulkSending
+                        fill: Theme.surfaceElevated; fillHover: Theme.surfaceMuted
+                        fillPressed: Theme.surfaceMuted; stroke: Theme.danger
+                        textColor: Theme.danger
+                        onClicked: {
+                            confirmReject.message = "Send the reject email to " + page.selectedIndices.length + " candidate(s)?"
+                            confirmReject.open()
+                        }
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        visible: !backend.smtpPasswordSet
+                        text: "Configure SMTP in Settings before sending bulk email."
+                        color: Theme.warning
+                        font.pixelSize: Typography.captionSize
+                        wrapMode: Text.WordWrap
+                    }
+
+                    Item { Layout.fillWidth: true; visible: backend.smtpPasswordSet }
+
+                    Text {
+                        visible: page.bulkSending
+                        text: "Sending " + backend.bulkSendProgress + " / " + backend.bulkSendTotal + "…"
+                        color: Theme.textSecondary
+                        font.pixelSize: Typography.captionSize
+                    }
+                }
+            }
+        }
+
         // ── Master / detail ──
         RowLayout {
             visible: page.hasData && page.resultsTab === 0
@@ -178,6 +311,11 @@ Item {
                             anchors.leftMargin: Theme.space3
                             anchors.rightMargin: Theme.space3
                             spacing: Theme.space3
+                            CheckBox {
+                                Layout.alignment: Qt.AlignVCenter
+                                checked: page.isSelected(row.index)
+                                onToggled: page.toggleSelection(row.index)
+                            }
                             Rectangle {
                                 width: 8; height: 8; radius: 4
                                 color: row.accent
@@ -523,6 +661,26 @@ Item {
                     }
                 }
             }
+        }
+    }
+
+    ConfirmDialog {
+        id: confirmAccept
+        title: "Send accept email"
+        confirmText: "Send"
+        onConfirmed: backend.sendBulkTemplate(page.selectedIndices, "accept")
+    }
+    ConfirmDialog {
+        id: confirmReject
+        title: "Send reject email"
+        confirmText: "Send"
+        onConfirmed: backend.sendBulkTemplate(page.selectedIndices, "reject")
+    }
+
+    Connections {
+        target: backend
+        function onBulkSendDone(sent, failed) {
+            page.clearSelection()
         }
     }
 }

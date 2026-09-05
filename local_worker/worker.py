@@ -2430,7 +2430,12 @@ class LocalWorker:
         output_folder: str | None = None,
     ):
         if self.processing_mode == "local_folder":
-            if not self.access_token:
+            # Local-folder mode is free/unlimited with no account needed —
+            # only authenticate (and so only enforce quota, see
+            # _run_local_folder) when the caller actually supplied a key.
+            # This matches qml_gui.py's AnalysisWorker, which never touches
+            # login()/quota at all for the same mode.
+            if self.api_key and not self.access_token:
                 self.login()
             self._run_local_folder(job_id, local_folder, local_config, output_folder)
             return
@@ -2558,12 +2563,13 @@ class LocalWorker:
         output.mkdir(parents=True, exist_ok=True)
         files = iter_supported_local_files(folder, output)
         print(f"Found {len(files)} local file(s).")
-        if self.quota_remaining <= 0:
-            raise LocalWorkerError("No remaining CV scan quota. Renew your worker key or wait for quota reset.")
-        if len(files) > self.quota_remaining:
-            raise LocalWorkerError(
-                f"Folder has {len(files)} CV file(s), but this worker key has {self.quota_remaining} scan(s) left."
-            )
+        if self.api_key:
+            if self.quota_remaining <= 0:
+                raise LocalWorkerError("No remaining CV scan quota. Renew your worker key or wait for quota reset.")
+            if len(files) > self.quota_remaining:
+                raise LocalWorkerError(
+                    f"Folder has {len(files)} CV file(s), but this worker key has {self.quota_remaining} scan(s) left."
+                )
         ai_review_limit = int(config.get("ai_max_reviews") or os.environ.get("CV_WORKER_AI_MAX_REVIEWS", "25") or "25")
 
         def _print_row(row: dict):
@@ -2704,13 +2710,14 @@ class LocalWorker:
                 )
                 notification_count += 1
         _generate_html_report(ranked_rows, config, html_path)
-        self.quota_remaining = max(0, self.quota_remaining - len(files))
         print(f"Results saved: {json_path}")
         print(f"CSV saved: {csv_path}")
         print(f"HTML Report saved: {html_path}")
         print(f"Local workspace saved: {workspace_path}")
         print(f"Owner notifications created: {notification_count}")
-        print(f"Quota remaining locally: {self.quota_remaining}")
+        if self.api_key:
+            self.quota_remaining = max(0, self.quota_remaining - len(files))
+            print(f"Quota remaining locally: {self.quota_remaining}")
 
     def _heartbeat(self):
         try:
@@ -2820,7 +2827,10 @@ def main():
             worker.list_jobs()
         elif args.command == "run":
             if args.processing_mode == "local_folder":
-                worker.login()
+                # Free/unlimited, no account required — only log in (and so
+                # only become quota-limited) if a key was actually supplied.
+                if worker.api_key:
+                    worker.login()
                 worker.run(
                     args.job_id,
                     args.batch_size,

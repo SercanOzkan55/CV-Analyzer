@@ -130,7 +130,10 @@ def test_local_folder_mode_marks_duplicates_and_failed_files(tmp_path):
     assert any(notification["type"] == "candidate_needs_manual_review" for notification in notifications)
 
 
-def test_local_folder_mode_requires_synced_worker(tmp_path):
+def test_local_folder_mode_runs_without_any_api_key(tmp_path):
+    # Local-folder mode is free/unlimited with no account needed: a worker
+    # with no key must NOT be asked to log in or be quota-limited (matching
+    # qml_gui.py's AnalysisWorker, which never touches login()/quota either).
     cv_dir = tmp_path / "cvs"
     output_dir = tmp_path / "out"
     cv_dir.mkdir()
@@ -146,8 +149,11 @@ def test_local_folder_mode_requires_synced_worker(tmp_path):
     }
 
     worker = LocalWorker(api_key="", processing_mode="local_folder", ai_mode="none", device_name="test")
-    with pytest.raises(Exception, match="Missing API key"):
-        worker.run(1, local_folder=str(cv_dir), local_config=config, output_folder=str(output_dir))
+    worker.run(1, local_folder=str(cv_dir), local_config=config, output_folder=str(output_dir))
+
+    assert (output_dir / "local_worker_results.json").exists()
+    assert worker.access_token is None
+    assert worker.quota_remaining == 0
 
 
 def test_local_folder_mode_blocks_when_quota_is_too_low(tmp_path):

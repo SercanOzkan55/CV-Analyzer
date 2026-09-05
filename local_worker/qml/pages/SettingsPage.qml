@@ -9,6 +9,8 @@ import "../components"
 // Theme singleton follows automatically.
 ScrollView {
     id: page
+    Layout.fillWidth: true
+    Layout.fillHeight: true
     clip: true
 
     signal requestTheme(string mode)   // "light" | "dark"
@@ -210,6 +212,145 @@ ScrollView {
                         fillPressed: Theme.surfaceMuted; stroke: Theme.border
                         textColor: Theme.textPrimary
                         onClicked: backend.manualRefreshSyncQueue()
+                    }
+                    Item { Layout.fillWidth: true }
+                }
+            }
+        }
+
+        // ── Email sending ──
+        AppCard {
+            id: smtpCard
+            Layout.fillWidth: true
+            Layout.preferredHeight: smtpCol.implicitHeight + smtpCard.pad * 2
+            ColumnLayout {
+                id: smtpCol
+                width: parent.width
+                spacing: Theme.space3
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    SectionHeader {
+                        Layout.fillWidth: true
+                        title: "Email Sending"
+                        subtitle: "Send accept/reject email straight from your own SMTP account -- never a shared relay."
+                    }
+                    StatusBadge { status: backend.smtpPasswordSet ? "connected" : "disabled" }
+                }
+
+                GridLayout {
+                    Layout.fillWidth: true
+                    columns: width < 640 ? 1 : 2
+                    columnSpacing: Theme.space4
+                    rowSpacing: Theme.space3
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+                        Text { text: "SMTP HOST"; color: Theme.textMuted; font.pixelSize: Typography.captionSize; font.weight: Typography.weightSemiBold }
+                        AppTextField {
+                            id: smtpHostField
+                            Layout.fillWidth: true
+                            text: backend.smtpHost
+                            placeholder: "smtp.gmail.com"
+                            onTextChanged: if (backend.smtpHost !== text) backend.smtpHost = text
+                        }
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+                        Text { text: "PORT"; color: Theme.textMuted; font.pixelSize: Typography.captionSize; font.weight: Typography.weightSemiBold }
+                        AppTextField {
+                            id: smtpPortField
+                            Layout.fillWidth: true
+                            text: String(backend.smtpPort)
+                            placeholder: "587"
+                            onTextChanged: {
+                                var value = parseInt(text, 10)
+                                if (!isNaN(value) && value !== backend.smtpPort) backend.smtpPort = value
+                            }
+                        }
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+                        Text { text: "FROM EMAIL"; color: Theme.textMuted; font.pixelSize: Typography.captionSize; font.weight: Typography.weightSemiBold }
+                        AppTextField {
+                            id: smtpEmailField
+                            Layout.fillWidth: true
+                            text: backend.smtpEmail
+                            placeholder: "you@company.com"
+                            onTextChanged: if (backend.smtpEmail !== text) backend.smtpEmail = text
+                        }
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+                        Text { text: "APP PASSWORD"; color: Theme.textMuted; font.pixelSize: Typography.captionSize; font.weight: Typography.weightSemiBold }
+                        AppTextField {
+                            id: smtpPasswordField
+                            Layout.fillWidth: true
+                            password: true
+                            placeholder: backend.smtpPasswordSet ? "Saved -- leave blank to keep it" : "App password"
+                        }
+                    }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: smtpStatusCol.implicitHeight + 24
+                    radius: Theme.radiusMd
+                    color: Theme.surfaceMuted
+                    border.width: 1
+                    border.color: backend.smtpPasswordSet ? Theme.success : Theme.border
+                    Behavior on border.color { ColorAnimation { duration: Theme.durHover } }
+                    ColumnLayout {
+                        id: smtpStatusCol
+                        anchors.left: parent.left; anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.margins: 12
+                        spacing: 2
+                        Text {
+                            text: backend.smtpPasswordSet ? "Configured" : "Not configured"
+                            color: backend.smtpPasswordSet ? Theme.success : Theme.textPrimary
+                            font.pixelSize: Typography.labelSize
+                            font.weight: Typography.weightSemiBold
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: backend.smtpTestStatus
+                            color: Theme.textSecondary
+                            font.pixelSize: Typography.captionSize
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.space2
+                    AppButton {
+                        text: "Save"
+                        strong: true
+                        fill: Theme.primary; fillHover: Theme.primaryHover
+                        fillPressed: Qt.darker(Theme.primary, 1.15); stroke: Theme.primary
+                        textColor: "#ffffff"
+                        onClicked: {
+                            backend.saveSmtpSettings(
+                                smtpHostField.text,
+                                parseInt(smtpPortField.text, 10) || 587,
+                                smtpEmailField.text,
+                                smtpPasswordField.text
+                            )
+                            smtpPasswordField.text = ""
+                        }
+                    }
+                    AppButton {
+                        text: "Send test email"
+                        fill: Theme.surfaceElevated; fillHover: Theme.surfaceMuted
+                        fillPressed: Theme.surfaceMuted; stroke: Theme.border
+                        textColor: Theme.textPrimary
+                        onClicked: backend.sendTestEmail()
                     }
                     Item { Layout.fillWidth: true }
                 }

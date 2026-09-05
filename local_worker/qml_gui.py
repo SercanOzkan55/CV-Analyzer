@@ -2,10 +2,12 @@ import csv
 import json
 import logging
 import os
+import smtplib
 import sys
 import tempfile
 import traceback
 from datetime import UTC, datetime
+from email.mime.text import MIMEText
 from pathlib import Path
 
 logger = logging.getLogger("local_worker.gui")
@@ -41,7 +43,13 @@ except ImportError:
     sys.exit(1)
 
 import worker as worker_module
-from credentials import load_worker_api_key, save_worker_api_key
+from credentials import (
+    load_smtp_password,
+    load_worker_api_key,
+    save_smtp_password,
+    save_worker_api_key,
+)
+from smtp_settings import load_smtp_settings, save_smtp_settings
 from worker import (
     API_BASE_URL,
     LocalWorker,
@@ -701,6 +709,86 @@ class WebsiteSyncWorker(QObject):
             self.failed.emit(str(exc))
 
 
+class SmtpWorker(QObject):
+    """Sends one or more emails through the recruiter's own SMTP account.
+
+    Mirrors WebsiteSyncWorker's shape (status/done/failed signals, run() on
+    its own QThread). `messages` is a list of (row_index, to_email, subject,
+    body) tuples -- row_index is -1 for a single ad-hoc message (e.g. the
+    "send test email" path) that isn't tied to a results-list row. A
+    failure sending to one recipient is reported via `row_sent` and does
+    not stop the rest of the batch.
+    """
+
+    status = Signal(str)
+    done = Signal(str)
+    failed = Signal(str)
+    row_sent = Signal(int, bool, str)
+
+    def __init__(self, host: str, port: int, from_email: str, password: str, messages: list[tuple[int, str, str, str]]):
+        super().__init__()
+        self.host = (host or "").strip()
+        try:
+            self.port = int(port)
+        except (TypeError, ValueError):
+            self.port = 587
+        self.from_email = (from_email or "").strip()
+        self.password = password or ""
+        self.messages = list(messages or [])
+
+    def run(self):
+        server = None
+        try:
+            if not self.host:
+                raise RuntimeError("Enter an SMTP host before sending.")
+            if not self.from_email:
+                raise RuntimeError("Enter the from-email address before sending.")
+            if not self.password:
+                raise RuntimeError("Save an SMTP app password before sending.")
+            if not self.messages:
+                raise RuntimeError("Nothing to send.")
+
+            self.status.emit(f"Connecting to {self.host}:{self.port}...")
+            if self.port == 465:
+                server = smtplib.SMTP_SSL(self.host, self.port, timeout=30)
+            else:
+                server = smtplib.SMTP(self.host, self.port, timeout=30)
+                server.starttls()
+            server.login(self.from_email, self.password)
+
+            self.status.emit(f"Sending {len(self.messages)} message(s)...")
+            sent_count = 0
+            failed_count = 0
+            for row_index, to_email, subject, body in self.messages:
+                try:
+                    to_email = (to_email or "").strip()
+                    if not to_email:
+                        raise RuntimeError("Candidate has no email address on file.")
+                    message = MIMEText(body or "", "plain", "utf-8")
+                    message["Subject"] = subject or ""
+                    message["From"] = self.from_email
+                    message["To"] = to_email
+                    server.sendmail(self.from_email, [to_email], message.as_string())
+                    sent_count += 1
+                    self.row_sent.emit(row_index, True, "")
+                except Exception as exc:
+                    failed_count += 1
+                    self.row_sent.emit(row_index, False, str(exc))
+
+            summary = f"Sent {sent_count} of {len(self.messages)} message(s)."
+            if failed_count:
+                summary += f" {failed_count} failed."
+            self.done.emit(summary)
+        except Exception as exc:
+            self.failed.emit(str(exc))
+        finally:
+            if server is not None:
+                try:
+                    server.quit()
+                except Exception:
+                    pass
+
+
 class LocalWorkerBackend(QObject):
     stateChanged = Signal()
     metricsChanged = Signal()
@@ -710,6 +798,7 @@ class LocalWorkerBackend(QObject):
     syncChanged = Signal()
     inboxChanged = Signal()
     toast = Signal(str, str)
+    bulkSendDone = Signal(int, int)
 
     def __init__(self):
         super().__init__()
@@ -774,6 +863,24 @@ class LocalWorkerBackend(QObject):
         self._sync_permissions: dict = {}
         self._sync_permission_summary = "Test connection to inspect this worker key's local access scope."
         self._sync_last_synced_count = 0
+        smtp_settings = load_smtp_settings()
+        self._smtp_host = smtp_settings.get("host", "")
+        try:
+            self._smtp_port = int(smtp_settings.get("port") or 587)
+        except (TypeError, ValueError):
+            self._smtp_port = 587
+        self._smtp_email = smtp_settings.get("email", "")
+        self._smtp_test_status = "SMTP not tested"
+        self._smtp_test_running = False
+        self._smtp_thread: QThread | None = None
+        self._smtp_worker: SmtpWorker | None = None
+        self._bulk_send_running = False
+        self._bulk_thread: QThread | None = None
+        self._bulk_worker: SmtpWorker | None = None
+        self._bulk_send_progress = 0
+        self._bulk_send_total = 0
+        self._bulk_sent_count = 0
+        self._bulk_failed_count = 0
         self._mail_templates = load_mail_templates()
         self._template_mode = "accept"
         self._template_subject = ""
@@ -1425,6 +1532,56 @@ class LocalWorkerBackend(QObject):
     def templatePreviewBody(self):
         return self._render_template(self._template_body)
 
+    # ── SMTP settings / bulk email sending ──
+    @Property(str, notify=stateChanged)
+    def smtpHost(self):
+        return self._smtp_host
+
+    @smtpHost.setter
+    def smtpHost(self, value: str):
+        self._smtp_host = value or ""
+        save_smtp_settings(self._smtp_host, self._smtp_port, self._smtp_email)
+        self.stateChanged.emit()
+
+    @Property(int, notify=stateChanged)
+    def smtpPort(self):
+        return self._smtp_port
+
+    @smtpPort.setter
+    def smtpPort(self, value):
+        try:
+            self._smtp_port = int(value)
+        except (TypeError, ValueError):
+            self._smtp_port = 587
+        save_smtp_settings(self._smtp_host, self._smtp_port, self._smtp_email)
+        self.stateChanged.emit()
+
+    @Property(str, notify=stateChanged)
+    def smtpEmail(self):
+        return self._smtp_email
+
+    @smtpEmail.setter
+    def smtpEmail(self, value: str):
+        self._smtp_email = value or ""
+        save_smtp_settings(self._smtp_host, self._smtp_port, self._smtp_email)
+        self.stateChanged.emit()
+
+    @Property(bool, notify=stateChanged)
+    def smtpPasswordSet(self):
+        return bool(load_smtp_password())
+
+    @Property(str, notify=stateChanged)
+    def smtpTestStatus(self):
+        return self._smtp_test_status
+
+    @Property(int, notify=stateChanged)
+    def bulkSendProgress(self):
+        return self._bulk_send_progress
+
+    @Property(int, notify=stateChanged)
+    def bulkSendTotal(self):
+        return self._bulk_send_total
+
     def _selected_row(self) -> dict | None:
         rows = self._results_model.rows()
         if 0 <= self._selected_index < len(rows):
@@ -1452,10 +1609,9 @@ class LocalWorkerBackend(QObject):
             self._mail_templates["accept_subject"] = self._template_subject.strip()
             self._mail_templates["accept_body"] = self._template_body
 
-    def _render_template(self, value: str) -> str:
-        row = self._selected_row()
+    def _template_replacements(self, row: dict | None) -> dict:
         score = str(int(float(row.get("score") or 0))) if row else "85"
-        replacements = {
+        return {
             "{name}": candidate_name_from_row(row),
             "{email}": (row.get("email") if row else "") or "candidate@example.com",
             "{role}": self._job_name.strip() or "Software Engineer",
@@ -1463,10 +1619,42 @@ class LocalWorkerBackend(QObject):
             "{score}": score,
             "{company}": "CV Analyzer",
         }
+
+    def _render_template_for_row(self, value: str, row: dict | None) -> str:
+        replacements = self._template_replacements(row)
         rendered = value or ""
         for key, replacement in replacements.items():
             rendered = rendered.replace(key, replacement)
         return rendered
+
+    def _render_template(self, value: str) -> str:
+        return self._render_template_for_row(value, self._selected_row())
+
+    def _template_for_mode(self, mode: str) -> tuple[str, str]:
+        """Subject/body template text for a bulk-send mode ("accept"/"reject").
+
+        `self._mail_templates` holds accept_* and reject_* keys
+        simultaneously (loaded from mail_templates.json at startup); the
+        `_template_subject`/`_template_body` fields only ever mirror
+        whichever mode is currently open in the Templates page editor (see
+        `_load_template_fields`/`setTemplateMode`) and may hold edits the
+        user hasn't saved yet via `saveTemplates()`. When the requested
+        mode matches the mode currently open in the editor we use those
+        live fields so an in-progress edit is respected; otherwise we fall
+        back to the in-memory `_mail_templates` dict -- the last value
+        synced for that mode when the editor last switched away from it
+        (`_sync_template_fields`), or the on-disk value if the user hasn't
+        touched that mode this session. We deliberately avoid calling
+        load_mail_templates() fresh here since that would discard any
+        unsaved in-memory edits for either mode.
+        """
+        mode = "reject" if mode == "reject" else "accept"
+        if mode == self._template_mode:
+            return self._template_subject, self._template_body
+        return (
+            self._mail_templates.get(f"{mode}_subject", ""),
+            self._mail_templates.get(f"{mode}_body", ""),
+        )
 
     def _refresh_report_preview(self):
         rows = self._results_model.rows()
@@ -1804,6 +1992,145 @@ class LocalWorkerBackend(QObject):
         self._sync_template_fields()
         save_mail_templates(self._mail_templates)
         self.toast.emit("Email templates saved locally.", "success")
+
+    @Slot(str, int, str, str)
+    def saveSmtpSettings(self, host: str, port: int, email: str, password: str):
+        self._smtp_host = (host or "").strip()
+        try:
+            self._smtp_port = int(port)
+        except (TypeError, ValueError):
+            self._smtp_port = 587
+        self._smtp_email = (email or "").strip()
+        save_smtp_settings(self._smtp_host, self._smtp_port, self._smtp_email)
+        # Only touch the stored password when a new one was actually typed --
+        # re-saving host/port/email without retyping the password must not
+        # wipe out what's already in the OS credential store.
+        if password:
+            save_smtp_password(password)
+        self.toast.emit("SMTP settings saved.", "success")
+        self.stateChanged.emit()
+
+    @Slot()
+    def sendTestEmail(self):
+        if self._smtp_test_running:
+            return
+        if not self._smtp_host.strip() or not self._smtp_email.strip():
+            self.toast.emit("Enter an SMTP host and from-email before sending a test.", "warning")
+            return
+        if not load_smtp_password():
+            self.toast.emit("Save an SMTP app password before sending a test.", "warning")
+            return
+
+        self._smtp_test_running = True
+        self._smtp_test_status = "Sending test email..."
+        self.stateChanged.emit()
+
+        messages = [
+            (
+                -1,
+                self._smtp_email,
+                "Test email from CV Analyzer Local Worker",
+                "This is a test message confirming your SMTP settings work.",
+            )
+        ]
+        self._smtp_thread = QThread()
+        self._smtp_worker = SmtpWorker(
+            self._smtp_host, self._smtp_port, self._smtp_email, load_smtp_password() or "", messages
+        )
+        self._smtp_worker.moveToThread(self._smtp_thread)
+        self._smtp_thread.started.connect(self._smtp_worker.run)
+        self._smtp_worker.done.connect(self._on_smtp_test_done)
+        self._smtp_worker.failed.connect(self._on_smtp_test_failed)
+        self._smtp_worker.done.connect(self._smtp_thread.quit)
+        self._smtp_worker.failed.connect(self._smtp_thread.quit)
+        self._smtp_thread.finished.connect(self._smtp_worker.deleteLater)
+        self._smtp_thread.finished.connect(self._smtp_thread.deleteLater)
+        self._smtp_thread.start()
+
+    def _on_smtp_test_done(self, message: str):
+        self._smtp_test_running = False
+        self._smtp_test_status = message
+        self.stateChanged.emit()
+        self.toast.emit(message, "success")
+
+    def _on_smtp_test_failed(self, message: str):
+        self._smtp_test_running = False
+        self._smtp_test_status = f"Test failed: {message}"
+        self.stateChanged.emit()
+        self.toast.emit(self._smtp_test_status, "error")
+
+    @Slot("QVariantList", str)
+    def sendBulkTemplate(self, rowIndexes, templateMode: str):
+        if self._bulk_send_running:
+            return
+        if not self._smtp_host.strip() or not self._smtp_email.strip():
+            self.toast.emit("Configure SMTP settings before sending bulk email.", "warning")
+            return
+        if not load_smtp_password():
+            self.toast.emit("Save an SMTP app password before sending bulk email.", "warning")
+            return
+
+        subject_template, body_template = self._template_for_mode(templateMode)
+        rows = self._results_model.rows()
+        messages: list[tuple[int, str, str, str]] = []
+        for raw_index in rowIndexes or []:
+            try:
+                index = int(raw_index)
+            except (TypeError, ValueError):
+                continue
+            if not (0 <= index < len(rows)):
+                continue
+            row = rows[index]
+            to_email = (row.get("email") or "").strip()
+            subject = self._render_template_for_row(subject_template, row)
+            body = self._render_template_for_row(body_template, row)
+            messages.append((index, to_email, subject, body))
+
+        if not messages:
+            self.toast.emit("No selected candidates have an email on file.", "warning")
+            return
+
+        self._bulk_send_running = True
+        self._bulk_send_progress = 0
+        self._bulk_send_total = len(messages)
+        self._bulk_sent_count = 0
+        self._bulk_failed_count = 0
+        self.stateChanged.emit()
+
+        self._bulk_thread = QThread()
+        self._bulk_worker = SmtpWorker(
+            self._smtp_host, self._smtp_port, self._smtp_email, load_smtp_password() or "", messages
+        )
+        self._bulk_worker.moveToThread(self._bulk_thread)
+        self._bulk_thread.started.connect(self._bulk_worker.run)
+        self._bulk_worker.row_sent.connect(self._on_bulk_row_sent)
+        self._bulk_worker.done.connect(self._on_bulk_done)
+        self._bulk_worker.failed.connect(self._on_bulk_failed)
+        self._bulk_worker.done.connect(self._bulk_thread.quit)
+        self._bulk_worker.failed.connect(self._bulk_thread.quit)
+        self._bulk_thread.finished.connect(self._bulk_worker.deleteLater)
+        self._bulk_thread.finished.connect(self._bulk_thread.deleteLater)
+        self._bulk_thread.start()
+
+    def _on_bulk_row_sent(self, row_index: int, success: bool, error: str):
+        self._bulk_send_progress += 1
+        if success:
+            self._bulk_sent_count += 1
+        else:
+            self._bulk_failed_count += 1
+        self.stateChanged.emit()
+
+    def _on_bulk_done(self, message: str):
+        self._bulk_send_running = False
+        self.stateChanged.emit()
+        self.toast.emit(message, "success" if self._bulk_failed_count == 0 else "warning")
+        self.bulkSendDone.emit(self._bulk_sent_count, self._bulk_failed_count)
+
+    def _on_bulk_failed(self, message: str):
+        self._bulk_send_running = False
+        self.stateChanged.emit()
+        self.toast.emit(f"Bulk send failed: {message}", "error")
+        self.bulkSendDone.emit(self._bulk_sent_count, self._bulk_failed_count)
 
     @Slot()
     def exportCurrentCsv(self):

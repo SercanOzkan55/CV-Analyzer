@@ -5,7 +5,12 @@ a = Analysis(
     ["qml_gui.py"],
     pathex=[],
     binaries=[],
-    datas=[("assets/cv_analyzer_worker.ico", "assets"), ("qml", "qml"), ("ats_config.yaml", ".")],
+    datas=[
+        ("assets/cv_analyzer_worker.ico", "assets"),
+        ("assets/logo.png", "assets"),
+        ("qml", "qml"),
+        ("ats_config.yaml", "."),
+    ],
     hiddenimports=[
         "PySide6.QtCore",
         "PySide6.QtGui",

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Dialogs
+import QtQuick.Effects
 import QtQuick.Layouts
 import "theme"
 import "components"
@@ -154,6 +155,14 @@ ApplicationWindow {
     Popup {
         id: toastBox
         property string toastType: "info"
+        readonly property color accent: toastType === "error" ? Theme.danger
+            : toastType === "warning" ? Theme.warning
+            : toastType === "success" ? Theme.success
+            : Theme.primary
+        readonly property string glyph: toastType === "error" ? "✕"
+            : toastType === "warning" ? "!"
+            : toastType === "success" ? "✓"
+            : "i"
         x: root.width - width - 28
         y: root.height - height - 28
         width: Math.min(460, root.width - 56)
@@ -161,40 +170,59 @@ ApplicationWindow {
         focus: false
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
         padding: 0
+
         background: Rectangle {
-            id: toastBg
-            radius: 18
-            color: Theme.darkMode ? Qt.rgba(18/255, 24/255, 43/255, 0.88) : Qt.rgba(255/255, 255/255, 255/255, 0.93)
+            radius: Theme.radiusMd
+            color: Theme.surfaceElevated
             border.width: 1
-            border.color: toastBox.toastType === "error" ? Theme.danger : toastBox.toastType === "warning" ? Theme.warning : Theme.primary
-            Rectangle {
-                anchors.fill: parent
-                radius: parent.radius
-                color: "transparent"
-                border.width: 1
-                border.color: Theme.darkMode ? Qt.rgba(255, 255, 255, 0.08) : Qt.rgba(255, 255, 255, 0.3)
+            border.color: Theme.border
+
+            layer.enabled: !Theme.reducedMotion
+            layer.effect: MultiEffect {
+                shadowEnabled: true
+                shadowColor: Theme.shadowColor
+                shadowOpacity: Theme.darkMode ? 0.5 : 0.18
+                shadowBlur: 0.8
+                shadowVerticalOffset: 8
             }
         }
+
         contentItem: RowLayout {
-            spacing: 12
-            anchors.margins: 16
+            spacing: Theme.space3
 
             Rectangle {
-                Layout.preferredWidth: 10
-                Layout.fillHeight: true
-                radius: 5
-                color: toastBox.background.border.color
+                Layout.preferredWidth: 28
+                Layout.preferredHeight: 28
+                Layout.alignment: Qt.AlignTop
+                radius: 14
+                color: Qt.rgba(toastBox.accent.r, toastBox.accent.g, toastBox.accent.b, Theme.darkMode ? 0.22 : 0.14)
+                Text {
+                    anchors.centerIn: parent
+                    text: toastBox.glyph
+                    color: toastBox.accent
+                    font.pixelSize: 13
+                    font.weight: Font.Bold
+                }
             }
 
             Text {
                 id: toastMessage
                 Layout.fillWidth: true
+                Layout.alignment: Qt.AlignVCenter
                 color: Theme.textPrimary
                 wrapMode: Text.WordWrap
                 font.pixelSize: 14
                 font.weight: Font.Medium
             }
         }
+
+        // contentItem has no anchors.fill, so Popup.padding/margins is what
+        // actually insets it — the previous version set anchors.margins on
+        // a RowLayout with no anchor target, which QML silently ignores.
+        topPadding: Theme.space4
+        bottomPadding: Theme.space4
+        leftPadding: Theme.space4
+        rightPadding: Theme.space4
 
         enter: Transition {
             NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 160; easing.type: Easing.OutCubic }
@@ -233,24 +261,14 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     spacing: 12
 
-                    Rectangle {
+                    Image {
                         Layout.preferredWidth: 46
                         Layout.preferredHeight: 46
                         Layout.alignment: root.sidebarCollapsed ? Qt.AlignHCenter : Qt.AlignLeft
-                        radius: 16
-                        gradient: Gradient {
-                            GradientStop { position: 0; color: Theme.primaryHover }
-                            GradientStop { position: 1; color: Theme.primary }
-                        }
-                        border.width: 1
-                        border.color: Theme.primary
-                        Text {
-                            anchors.centerIn: parent
-                            text: "CV"
-                            color: "#ffffff"
-                            font.pixelSize: 13
-                            font.weight: Font.Black
-                        }
+                        source: "../assets/logo.png"
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                        mipmap: true
                     }
 
                     ColumnLayout {

@@ -9,6 +9,8 @@ import "../components"
 // signals so the app shell owns routing and dialogs.
 ScrollView {
     id: page
+    Layout.fillWidth: true
+    Layout.fillHeight: true
     clip: true
 
     signal requestPage(int index)
