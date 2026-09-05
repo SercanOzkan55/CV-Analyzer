@@ -88,16 +88,11 @@ function PublicRoute({ children }) {
 }
 
 function RecruiterRoute({ children }) {
-  const { user, loading, planLoading, role, isBillingAdmin } = useAuth()
-  if (loading || planLoading) return <LoadingScreen />
+  // Local Worker is a free download for any signed-in account -- no
+  // recruiter role or organization required, so this only gates on login.
+  const { user, loading } = useAuth()
+  if (loading) return <LoadingScreen />
   if (!user) return <Navigate to="/login" />
-  
-  // Lokal/Private moddaysa yetki kontrolünü esnet (Demo kolaylığı için)
-  if (PRIVATE_MODE) return children;
-
-  if (role !== "recruiter" && !isBillingAdmin) {
-    return <Navigate to="/pricing" state={{ reason: "recruiter_required" }} />
-  }
   return children
 }
 

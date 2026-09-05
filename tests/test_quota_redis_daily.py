@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import main
+from core import quota as quota_module
 
 
 class FakeRedis:
@@ -72,8 +73,11 @@ def test_user_rate_limit_key_contains_scope(monkeypatch):
 
 
 def test_resolve_daily_limit_for_plan_uses_plan_mapping(monkeypatch):
+    # _resolve_daily_limit_for_plan reads USER_PLAN_LIMITS_DAILY from its
+    # defining module's globals (core.quota), not from `main`'s re-exported
+    # name -- patching main.USER_PLAN_LIMITS_DAILY has no effect on it.
     monkeypatch.setattr(
-        main,
+        quota_module,
         "USER_PLAN_LIMITS_DAILY",
         {"free": 5, "pro": 100, "enterprise": 1000},
     )
@@ -85,7 +89,7 @@ def test_resolve_daily_limit_for_plan_uses_plan_mapping(monkeypatch):
 
 def test_resolve_daily_limit_for_free_prefers_redis_override(monkeypatch):
     monkeypatch.setattr(
-        main,
+        quota_module,
         "USER_PLAN_LIMITS_DAILY",
         {"free": 5, "pro": 100, "enterprise": 1000},
     )

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/LanguageContext'
@@ -22,7 +22,6 @@ const PLAN_ANALYTICS_META = {
 export default function PricingPage() {
   const { t, countryCode, pricing } = useLanguage()
   const { user, token, plan, refreshUsage } = useAuth()
-  const location = useLocation()
   const { addToast } = useToast()
   const [busyKey, setBusyKey] = useState('')
 
@@ -144,13 +143,6 @@ export default function PricingPage() {
     <div className="app-layout">
       <Navbar />
       <main className="main-content" id="main-content">
-        {location?.state?.reason === 'recruiter_required' && (
-          <div className="card" style={{ marginBottom: 16, borderColor: '#f59e0b' }}>
-            <h3>{t('recruiter.role_required')}</h3>
-            <p className="text-muted">{t('recruiter.role_required_desc')}</p>
-          </div>
-        )}
-
         {/* [CORPORATE DETECTION BANNER] */}
         {user?.email && !['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com'].some(d => user.email.endsWith(d)) && (
           <motion.div 

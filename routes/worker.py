@@ -38,6 +38,7 @@ from schemas.worker import (
     AnalysisResultRequest,
 )
 from routes.recruiter import recruiter_required
+from auth import verify_supabase_jwt
 from core.http_runtime import audit_log, limiter
 from services.owner_workflow_service import (
     decision_to_candidate_status,
@@ -729,9 +730,13 @@ def download_worker_package(
 @limiter.limit("10/minute")
 def download_worker_exe(
     request: Request,
-    recruiter=Depends(recruiter_required),
+    user=Depends(verify_supabase_jwt),
 ):
-    """Return the prebuilt one-file Windows Local Worker executable."""
+    """Return the prebuilt one-file Windows Local Worker executable.
+
+    Gated by login only (not recruiter_required) -- Local Worker is a free
+    download for any account, not just organizations.
+    """
     exe_path = _worker_exe_path()
     if not exe_path.exists():
         raise HTTPException(
@@ -745,8 +750,8 @@ def download_worker_exe(
 
     audit_log(
         "worker_exe_downloaded",
-        organization_id=recruiter.organization_id,
-        user_id=recruiter.id,
+        user_id=user.get("user_id"),
+        email=user.get("email"),
     )
     return FileResponse(
         exe_path,
@@ -763,9 +768,13 @@ def download_worker_exe(
 @limiter.limit("10/minute")
 def download_worker_macos(
     request: Request,
-    recruiter=Depends(recruiter_required),
+    user=Depends(verify_supabase_jwt),
 ):
-    """Return the prebuilt macOS Local Worker .app, zipped."""
+    """Return the prebuilt macOS Local Worker .app, zipped.
+
+    Gated by login only (not recruiter_required) -- Local Worker is a free
+    download for any account, not just organizations.
+    """
     macos_path = _worker_macos_path()
     if not macos_path.exists():
         raise HTTPException(
@@ -779,8 +788,8 @@ def download_worker_macos(
 
     audit_log(
         "worker_macos_downloaded",
-        organization_id=recruiter.organization_id,
-        user_id=recruiter.id,
+        user_id=user.get("user_id"),
+        email=user.get("email"),
     )
     return FileResponse(
         macos_path,
@@ -797,9 +806,13 @@ def download_worker_macos(
 @limiter.limit("10/minute")
 def download_worker_linux(
     request: Request,
-    recruiter=Depends(recruiter_required),
+    user=Depends(verify_supabase_jwt),
 ):
-    """Return the prebuilt Linux Local Worker binary."""
+    """Return the prebuilt Linux Local Worker binary.
+
+    Gated by login only (not recruiter_required) -- Local Worker is a free
+    download for any account, not just organizations.
+    """
     linux_path = _worker_linux_path()
     if not linux_path.exists():
         raise HTTPException(
@@ -813,8 +826,8 @@ def download_worker_linux(
 
     audit_log(
         "worker_linux_downloaded",
-        organization_id=recruiter.organization_id,
-        user_id=recruiter.id,
+        user_id=user.get("user_id"),
+        email=user.get("email"),
     )
     return FileResponse(
         linux_path,

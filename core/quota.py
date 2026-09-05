@@ -173,7 +173,7 @@ def _is_premium_plan(plan_type: str | None) -> bool:
 
 # ── Plan-based quota mappings ────────────────────────────────────────────
 USER_PLAN_LIMITS_DAILY = {
-    "free": int(os.getenv("USER_FREE_DAILY", "5")),
+    "free": int(os.getenv("USER_FREE_DAILY", "3")),
     "pro": int(os.getenv("USER_PRO_DAILY", "100")),
     "enterprise": int(os.getenv("USER_ENTERPRISE_DAILY", "1000")),
 }

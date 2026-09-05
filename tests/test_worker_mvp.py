@@ -226,6 +226,47 @@ def test_worker_executable_download_returns_single_exe(client, recruiter_user, t
     assert "CV%20Analyzer%20Local%20Worker.exe" in content_disposition
 
 
+def test_worker_downloads_available_to_any_logged_in_user(client, tmp_path, monkeypatch):
+    """Local Worker is a free download -- it must not require an
+    organization or recruiter role, unlike the rest of the worker.py
+    endpoints. No recruiter_user fixture here on purpose: this simulates a
+    plain account with no organization at all.
+    """
+    import routes.worker as worker_routes
+
+    dist_dir = tmp_path / "dist"
+    dist_dir.mkdir()
+    (dist_dir / "CV Analyzer Local Worker.exe").write_bytes(b"exe-bytes")
+    (dist_dir / "CV Analyzer Local Worker-macOS.zip").write_bytes(b"zip-bytes")
+    (dist_dir / "CV Analyzer Local Worker-linux").write_bytes(b"elf-bytes")
+
+    monkeypatch.setattr(worker_routes, "_LOCAL_WORKER_DIR", tmp_path)
+
+    assert client.get("/api/worker/download-exe").status_code == 200
+    assert client.get("/api/worker/download-macos").status_code == 200
+    assert client.get("/api/worker/download-linux").status_code == 200
+
+
+def test_worker_downloads_still_require_login(client, tmp_path, monkeypatch):
+    import routes.worker as worker_routes
+    from auth import verify_supabase_jwt
+    from main import app
+
+    dist_dir = tmp_path / "dist"
+    dist_dir.mkdir()
+    (dist_dir / "CV Analyzer Local Worker.exe").write_bytes(b"exe-bytes")
+    monkeypatch.setattr(worker_routes, "_LOCAL_WORKER_DIR", tmp_path)
+
+    original_override = app.dependency_overrides.pop(verify_supabase_jwt, None)
+    try:
+        response = client.get("/api/worker/download-exe")
+    finally:
+        if original_override is not None:
+            app.dependency_overrides[verify_supabase_jwt] = original_override
+
+    assert response.status_code == 401
+
+
 def test_worker_auth_success_fail_revoked_and_expired(client, db_session, recruiter_user, test_job):
     created = _create_worker_key(client, job_id=test_job.id)
     assert client.post("/api/worker/auth", json={"api_key": created["api_key"]}).status_code == 200
