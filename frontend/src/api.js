@@ -1390,11 +1390,11 @@ export async function downloadWorkerPackage(token) {
   return res.blob()
 }
 
-export async function downloadWorkerExecutable(token) {
+async function _downloadWorkerBinary(token, path) {
   const headers = {}
   const auth = authHeaderFrom(token)
   if (auth) headers['Authorization'] = auth
-  const res = await fetch(`${BASE}/api/worker/download-exe`, { headers })
+  const res = await fetch(`${BASE}${path}`, { headers })
   if (!res.ok) {
     const text = await res.text().catch(() => '')
     let detail = ''
@@ -1404,9 +1404,21 @@ export async function downloadWorkerExecutable(token) {
     } catch {
       detail = text
     }
-    throw new Error(detail || `Worker executable download failed: ${res.status}`)
+    throw new Error(detail || `Worker download failed: ${res.status}`)
   }
   return res.blob()
+}
+
+export function downloadWorkerExecutable(token) {
+  return _downloadWorkerBinary(token, '/api/worker/download-exe')
+}
+
+export function downloadWorkerMacos(token) {
+  return _downloadWorkerBinary(token, '/api/worker/download-macos')
+}
+
+export function downloadWorkerLinux(token) {
+  return _downloadWorkerBinary(token, '/api/worker/download-linux')
 }
 
 export function revokeWorkerKey(token, keyId) {

@@ -339,6 +339,24 @@ def _worker_exe_path() -> Path:
     return _LOCAL_WORKER_DIR / "dist" / "CV Analyzer Local Worker.exe"
 
 
+def _worker_macos_path() -> Path:
+    configured = os.getenv("WORKER_MACOS_PATH")
+    if configured:
+        return Path(configured)
+    # The .app is a directory tree, not a single file -- it's published as
+    # a zip (built by re-zipping the GitHub Actions macOS artifact, see
+    # .github/workflows/build-local-worker.yml) rather than zipped on every
+    # request.
+    return _LOCAL_WORKER_DIR / "dist" / "CV Analyzer Local Worker-macOS.zip"
+
+
+def _worker_linux_path() -> Path:
+    configured = os.getenv("WORKER_LINUX_PATH")
+    if configured:
+        return Path(configured)
+    return _LOCAL_WORKER_DIR / "dist" / "CV Analyzer Local Worker-linux"
+
+
 def _worker_package_readme(api_base_url: str) -> str:
     return f"""# CV Analyzer Local Worker
 
@@ -737,6 +755,75 @@ def download_worker_exe(
         headers={
             "Cache-Control": "no-store",
             "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get("/worker/download-macos")
+@limiter.limit("10/minute")
+def download_worker_macos(
+    request: Request,
+    recruiter=Depends(recruiter_required),
+):
+    """Return the prebuilt macOS Local Worker .app, zipped."""
+    macos_path = _worker_macos_path()
+    if not macos_path.exists():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "The macOS Local Worker build has not been published on this server yet. "
+                "Run the 'Build Local Worker' GitHub Actions workflow, download the "
+                "local-worker-macos artifact, zip it, and publish it, or set WORKER_MACOS_PATH."
+            ),
+        )
+
+    audit_log(
+        "worker_macos_downloaded",
+        organization_id=recruiter.organization_id,
+        user_id=recruiter.id,
+    )
+    return FileResponse(
+        macos_path,
+        media_type="application/zip",
+        filename="CV Analyzer Local Worker-macOS.zip",
+        headers={
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get("/worker/download-linux")
+@limiter.limit("10/minute")
+def download_worker_linux(
+    request: Request,
+    recruiter=Depends(recruiter_required),
+):
+    """Return the prebuilt Linux Local Worker binary."""
+    linux_path = _worker_linux_path()
+    if not linux_path.exists():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "The Linux Local Worker build has not been published on this server yet. "
+                "Run the 'Build Local Worker' GitHub Actions workflow, download the "
+                "local-worker-linux artifact, and publish it, or set WORKER_LINUX_PATH."
+            ),
+        )
+
+    audit_log(
+        "worker_linux_downloaded",
+        organization_id=recruiter.organization_id,
+        user_id=recruiter.id,
+    )
+    return FileResponse(
+        linux_path,
+        media_type="application/octet-stream",
+        filename="CV Analyzer Local Worker",
+        headers={
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Disposition": 'attachment; filename="CV Analyzer Local Worker"',
         },
     )
 

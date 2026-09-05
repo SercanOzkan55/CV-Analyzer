@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Activity, Download } from 'lucide-react'
+import { Activity, Download, Laptop, Monitor, Terminal } from 'lucide-react'
 import {
   anonymizeOwnerCandidateAction,
   assignOwnerCandidateAction,
@@ -7,6 +7,8 @@ import {
   createOwnerUser,
   deleteOwnerCandidateAction,
   downloadWorkerExecutable,
+  downloadWorkerLinux,
+  downloadWorkerMacos,
   fetchOwnerCandidateComments,
   fetchOwnerCandidateActions,
   fetchOwnerAuditLogs,
@@ -42,7 +44,7 @@ export default function LocalWorkerPanel() {
   const [candidateCommentsByAction, setCandidateCommentsByAction] = useState({})
   const [candidateCommentsLoading, setCandidateCommentsLoading] = useState({})
   const [showDeletedCandidates, setShowDeletedCandidates] = useState(false)
-  const [downloading, setDownloading] = useState(false)
+  const [downloadingPlatform, setDownloadingPlatform] = useState(null)
   const [newMemberEmail, setNewMemberEmail] = useState('')
   const [newMemberRole, setNewMemberRole] = useState('hr')
   const [permissionRole, setPermissionRole] = useState('hr')
@@ -300,14 +302,41 @@ export default function LocalWorkerPanel() {
     }
   }
 
-  async function handleDownloadWorker() {
+  const WORKER_DOWNLOADS = [
+    {
+      platform: 'windows',
+      label: 'Windows',
+      detail: '.exe -- Windows 10/11 (64-bit)',
+      icon: Monitor,
+      fetcher: downloadWorkerExecutable,
+      filename: 'CV Analyzer Local Worker.exe',
+    },
+    {
+      platform: 'macos',
+      label: 'macOS',
+      detail: '.zip -- Apple Silicon & Intel',
+      icon: Laptop,
+      fetcher: downloadWorkerMacos,
+      filename: 'CV Analyzer Local Worker-macOS.zip',
+    },
+    {
+      platform: 'linux',
+      label: 'Linux',
+      detail: 'binary -- most x86_64 distros',
+      icon: Terminal,
+      fetcher: downloadWorkerLinux,
+      filename: 'CV Analyzer Local Worker-linux',
+    },
+  ]
+
+  async function handleDownloadWorker(entry) {
     try {
-      setDownloading(true)
-      const blob = await downloadWorkerExecutable(token)
+      setDownloadingPlatform(entry.platform)
+      const blob = await entry.fetcher(token)
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = 'CV Analyzer Local Worker.exe'
+      link.download = entry.filename
       document.body.appendChild(link)
       link.click()
       link.remove()
@@ -316,7 +345,7 @@ export default function LocalWorkerPanel() {
       console.error('Error downloading worker app:', error)
       window.alert(error.message || 'Failed to download worker app')
     } finally {
-      setDownloading(false)
+      setDownloadingPlatform(null)
     }
   }
 
@@ -342,21 +371,39 @@ export default function LocalWorkerPanel() {
     <div className="worker-panel worker-workspace">
       <section className="worker-command-hero">
         <div className="worker-hero-copy">
+          <img src="/local-worker-logo.png" alt="" className="worker-hero-logo" width={56} height={56} />
           <span className="product-page-kicker">Local Worker</span>
-          <h2>Local Worker for Windows</h2>
+          <h2>Local Worker</h2>
           <p>
             Run CV processing on your own machine and keep sensitive files local -- no account key or quota required.
           </p>
         </div>
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={handleDownloadWorker}
-          disabled={downloading || !token}
-        >
-          <Download size={16} />
-          {downloading ? 'Preparing download...' : 'Download Local Worker'}
-        </button>
+        <div className="worker-download-grid">
+          {WORKER_DOWNLOADS.map((entry) => {
+            const Icon = entry.icon
+            const isDownloading = downloadingPlatform === entry.platform
+            return (
+              <button
+                key={entry.platform}
+                type="button"
+                className="worker-download-card"
+                onClick={() => handleDownloadWorker(entry)}
+                disabled={Boolean(downloadingPlatform) || !token}
+              >
+                <span className="worker-download-icon">
+                  <Icon size={22} />
+                </span>
+                <span className="worker-download-copy">
+                  <strong>{entry.label}</strong>
+                  <small>{isDownloading ? 'Preparing download...' : entry.detail}</small>
+                </span>
+                <span className="worker-download-meta">
+                  <Download size={14} />
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </section>
 
       {canViewOwnerWorkflow && (
