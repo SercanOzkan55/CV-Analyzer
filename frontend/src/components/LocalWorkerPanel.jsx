@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Activity, Download, Laptop, Monitor, Terminal } from 'lucide-react'
+import { Activity, Check, Clipboard, Download, Laptop, Monitor, Terminal } from 'lucide-react'
 import {
   anonymizeOwnerCandidateAction,
   assignOwnerCandidateAction,
@@ -45,6 +45,7 @@ export default function LocalWorkerPanel() {
   const [candidateCommentsLoading, setCandidateCommentsLoading] = useState({})
   const [showDeletedCandidates, setShowDeletedCandidates] = useState(false)
   const [downloadingPlatform, setDownloadingPlatform] = useState(null)
+  const [copiedPlatform, setCopiedPlatform] = useState(null)
   const [newMemberEmail, setNewMemberEmail] = useState('')
   const [newMemberRole, setNewMemberRole] = useState('hr')
   const [permissionRole, setPermissionRole] = useState('hr')
@@ -329,6 +330,45 @@ export default function LocalWorkerPanel() {
     },
   ]
 
+  const WORKER_RUN_GUIDE = [
+    {
+      platform: 'windows',
+      label: 'Windows',
+      icon: Monitor,
+      steps: [
+        'Double-click the downloaded .exe -- no installation or terminal step needed.',
+        'If SmartScreen warns you, click "More info" then "Run anyway" (the app isn\'t code-signed yet).',
+      ],
+      command: null,
+    },
+    {
+      platform: 'macos',
+      label: 'macOS',
+      icon: Laptop,
+      steps: [
+        'Unzip the download, then run these from Terminal in that folder -- the app is unsigned, so macOS blocks it until the quarantine flag is cleared:',
+      ],
+      command: 'unzip "CV Analyzer Local Worker-macOS.zip"\nxattr -cr "CV Analyzer Local Worker.app"\nopen "CV Analyzer Local Worker.app"',
+    },
+    {
+      platform: 'linux',
+      label: 'Linux',
+      icon: Terminal,
+      steps: ['Make the binary executable, then run it from Terminal:'],
+      command: 'chmod +x "CV Analyzer Local Worker"\n./"CV Analyzer Local Worker"',
+    },
+  ]
+
+  async function handleCopyCommand(platform, command) {
+    try {
+      await navigator.clipboard.writeText(command)
+      setCopiedPlatform(platform)
+      setTimeout(() => setCopiedPlatform(null), 2000)
+    } catch (error) {
+      console.error('Error copying command:', error)
+    }
+  }
+
   async function handleDownloadWorker(entry) {
     try {
       setDownloadingPlatform(entry.platform)
@@ -401,6 +441,49 @@ export default function LocalWorkerPanel() {
                   <Download size={14} />
                 </span>
               </button>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className="worker-guide-panel">
+        <div className="worker-guide-intro">
+          <span className="product-page-kicker">How it works</span>
+          <p>
+            Local Worker scores every CV against your job description across 12 criteria --
+            skills, experience, education, language, ATS formatting and more -- entirely on
+            your own machine. No CV ever leaves your computer. It can process a whole folder
+            at once, and if you connect your own SMTP account in Settings, it can send
+            accept/reject emails that you review and confirm before anything goes out.
+          </p>
+        </div>
+        <div className="worker-guide-steps">
+          {WORKER_RUN_GUIDE.map((entry) => {
+            const Icon = entry.icon
+            const isCopied = copiedPlatform === entry.platform
+            return (
+              <div key={entry.platform} className="worker-guide-step">
+                <div className="worker-guide-step-header">
+                  <Icon size={16} />
+                  <strong>{entry.label}</strong>
+                </div>
+                {entry.steps.map((step, i) => (
+                  <p key={i} className="worker-guide-step-text">{step}</p>
+                ))}
+                {entry.command && (
+                  <div className="worker-code-block">
+                    <pre><code>{entry.command}</code></pre>
+                    <button
+                      type="button"
+                      className="worker-code-copy"
+                      onClick={() => handleCopyCommand(entry.platform, entry.command)}
+                      aria-label={`Copy ${entry.label} command`}
+                    >
+                      {isCopied ? <Check size={14} /> : <Clipboard size={14} />}
+                    </button>
+                  </div>
+                )}
+              </div>
             )
           })}
         </div>

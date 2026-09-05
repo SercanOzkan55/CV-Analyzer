@@ -403,6 +403,7 @@
 .worker-form,
 .worker-list,
 .worker-progress-section,
+.worker-guide-panel,
 .owner-workflow-panel {
   border: 1px solid color-mix(in srgb, var(--color-accent) 14%, var(--color-border));
   border-radius: var(--radius-lg);
@@ -463,6 +464,101 @@
   align-self: stretch;
   align-content: center;
   gap: 12px;
+}
+
+.worker-guide-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+  gap: 24px;
+  padding: 22px;
+}
+
+.worker-guide-intro .product-page-kicker {
+  margin-bottom: 10px;
+}
+
+.worker-guide-intro p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.worker-guide-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.worker-guide-step {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 16%, var(--color-border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-card-solid) 78%, transparent);
+}
+
+.worker-guide-step-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--color-accent);
+}
+
+.worker-guide-step-header strong {
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+
+.worker-guide-step-text {
+  margin: 0 0 8px;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.worker-code-block {
+  position: relative;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-app, #0b0f14) 88%, black 12%);
+  overflow: hidden;
+}
+
+.worker-code-block pre {
+  margin: 0;
+  padding: 10px 36px 10px 12px;
+  overflow-x: auto;
+}
+
+.worker-code-block code {
+  color: var(--color-text-secondary);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.76rem;
+  line-height: 1.6;
+  white-space: pre;
+}
+
+.worker-code-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--bg-card-solid) 85%, transparent);
+  cursor: pointer;
+  transition: color var(--motion-base) var(--transition-smooth), border-color var(--motion-base) var(--transition-smooth);
+}
+
+.worker-code-copy:hover {
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
 }
 
 .worker-download-grid .worker-download-meta {
@@ -1082,11 +1178,20 @@
   .worker-form,
   .worker-list,
   .worker-progress-section,
+  .worker-guide-panel,
   .owner-workflow-panel {
     padding: 16px;
   }
 
   .worker-metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .worker-guide-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .worker-guide-steps {
     grid-template-columns: 1fr;
   }
 
