@@ -1,22 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import {
-  Activity,
-  CheckCircle2,
-  Cpu,
-  Download,
-  HardDriveDownload,
-  KeyRound,
-  Laptop,
-  LockKeyhole,
-  PlugZap,
-  ServerCog,
-  ShieldCheck,
-} from 'lucide-react'
+import { Activity, Download } from 'lucide-react'
 import {
   anonymizeOwnerCandidateAction,
   assignOwnerCandidateAction,
   createOwnerCandidateComment,
-  createWorkerKey,
   createOwnerUser,
   deleteOwnerCandidateAction,
   downloadWorkerExecutable,
@@ -29,12 +16,8 @@ import {
   fetchOwnerRolePermissions,
   fetchOwnerUsers,
   fetchWorkerProgress,
-  fetchWorkerQuota,
-  fetchWorkerSessions,
-  listWorkerKeys,
   markOwnerNotificationRead,
   recruiterListJobs,
-  revokeWorkerKey,
   updateOwnerCandidateScore,
   updateOwnerNotificationRule,
   updateOwnerRolePermission,
@@ -42,55 +25,10 @@ import {
 } from '../api'
 import { useAuth } from '../context/AuthContext'
 
-function WorkerSetupStep({ step, icon: Icon, title, children }) {
-  return (
-    <div className="worker-setup-step">
-      <span className="worker-setup-number">{step}</span>
-      <span className="worker-setup-icon" aria-hidden="true">
-        <Icon size={17} />
-      </span>
-      <span>
-        <strong>{title}</strong>
-        <small>{children}</small>
-      </span>
-    </div>
-  )
-}
-
-function WorkerEmptyState({ title, children }) {
-  return (
-    <div className="worker-empty-state">
-      <span className="worker-empty-icon" aria-hidden="true">
-        <ShieldCheck size={18} />
-      </span>
-      <h3>{title}</h3>
-      <p>{children}</p>
-    </div>
-  )
-}
-
-function WorkerMetricCard({ icon: Icon, label, value, detail, tone = 'accent' }) {
-  return (
-    <div className={`worker-metric-card worker-metric-${tone}`}>
-      <span className="worker-metric-icon" aria-hidden="true">
-        <Icon size={18} />
-      </span>
-      <span className="worker-metric-copy">
-        <strong>{value}</strong>
-        <small>{label}</small>
-        {detail && <em>{detail}</em>}
-      </span>
-    </div>
-  )
-}
-
-export default function LocalWorkerPanel({ organizationId }) {
+export default function LocalWorkerPanel() {
   const { token } = useAuth()
-  const [keys, setKeys] = useState([])
   const [jobs, setJobs] = useState([])
   const [progressByJob, setProgressByJob] = useState({})
-  const [sessions, setSessions] = useState([])
-  const [quotaSummary, setQuotaSummary] = useState(null)
   const [ownerPermissions, setOwnerPermissions] = useState(null)
   const [ownerNotifications, setOwnerNotifications] = useState([])
   const [ownerAuditLogs, setOwnerAuditLogs] = useState([])
@@ -104,61 +42,18 @@ export default function LocalWorkerPanel({ organizationId }) {
   const [candidateCommentsByAction, setCandidateCommentsByAction] = useState({})
   const [candidateCommentsLoading, setCandidateCommentsLoading] = useState({})
   const [showDeletedCandidates, setShowDeletedCandidates] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [newKeyName, setNewKeyName] = useState('')
-  const [newKeyJobId, setNewKeyJobId] = useState('')
-  const [newKeyQuota, setNewKeyQuota] = useState(1000)
+  const [downloading, setDownloading] = useState(false)
   const [newMemberEmail, setNewMemberEmail] = useState('')
   const [newMemberRole, setNewMemberRole] = useState('hr')
   const [permissionRole, setPermissionRole] = useState('hr')
   const [permissionKey, setPermissionKey] = useState('candidates.view')
   const [permissionAllowed, setPermissionAllowed] = useState(true)
-  const [createdKeyData, setCreatedKeyData] = useState(null)
 
   useEffect(() => {
     if (!token) return
-    fetchKeys()
-    fetchQuota()
     fetchJobs()
-    fetchSessions()
     fetchOwnerWorkflow()
   }, [token, showDeletedCandidates])
-
-  async function fetchKeys() {
-    try {
-      setLoading(true)
-      const data = await listWorkerKeys(token)
-      setKeys(data || [])
-    } catch (error) {
-      console.error('Error fetching worker keys:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function fetchQuota() {
-    try {
-      const data = await fetchWorkerQuota(token)
-      setQuotaSummary(data)
-      const remaining = Number(data?.quota_remaining ?? 0)
-      if (remaining > 0) {
-        setNewKeyQuota((value) => Math.min(Number(value) || 1000, remaining))
-      }
-    } catch (error) {
-      console.warn('Worker quota unavailable', error)
-      setQuotaSummary(null)
-    }
-  }
-
-  async function fetchSessions() {
-    try {
-      const data = await fetchWorkerSessions(token)
-      setSessions(data.sessions || [])
-    } catch (error) {
-      console.warn('Worker sessions unavailable', error)
-      setSessions([])
-    }
-  }
 
   async function fetchOwnerWorkflow() {
     try {
@@ -238,50 +133,6 @@ export default function LocalWorkerPanel({ organizationId }) {
       setProgressByJob(Object.fromEntries(progressEntries))
     } catch (error) {
       console.error('Error fetching recruiter jobs:', error)
-    }
-  }
-
-  async function handleCreateKey(event) {
-    event.preventDefault()
-    if (!newKeyName || !newKeyQuota) return
-    try {
-      setLoading(true)
-      const data = await createWorkerKey(token, {
-        name: newKeyName,
-        job_id: newKeyJobId ? Number(newKeyJobId) : null,
-        quota_limit: Number(newKeyQuota),
-        company_id: organizationId || undefined,
-      })
-      setCreatedKeyData(data)
-      setNewKeyName('')
-      setNewKeyJobId('')
-      setNewKeyQuota(1000)
-      try {
-        await Promise.all([fetchKeys(), fetchQuota()])
-      } catch (refreshError) {
-        console.warn('Worker key was created, but refresh failed:', refreshError)
-      }
-    } catch (error) {
-      console.error('Error creating worker key:', error)
-      window.alert(error.message || 'Failed to create worker key')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleRevokeKey(id) {
-    if (!window.confirm('Revoke this worker key? Active sessions will stop working.')) return
-    try {
-      setLoading(true)
-      await revokeWorkerKey(token, id)
-      await fetchKeys()
-      await fetchQuota()
-      await fetchSessions()
-    } catch (error) {
-      console.error('Error revoking worker key:', error)
-      window.alert(error.message || 'Failed to revoke worker key')
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -449,9 +300,9 @@ export default function LocalWorkerPanel({ organizationId }) {
     }
   }
 
-  async function handleDownloadPackage() {
+  async function handleDownloadWorker() {
     try {
-      setLoading(true)
+      setDownloading(true)
       const blob = await downloadWorkerExecutable(token)
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
@@ -462,19 +313,13 @@ export default function LocalWorkerPanel({ organizationId }) {
       link.remove()
       window.URL.revokeObjectURL(url)
     } catch (error) {
-      console.error('Error downloading worker package:', error)
+      console.error('Error downloading worker app:', error)
       window.alert(error.message || 'Failed to download worker app')
     } finally {
-      setLoading(false)
+      setDownloading(false)
     }
   }
 
-  const monthlyLimit = Number(quotaSummary?.monthly_limit ?? 4000)
-  const quotaAllocated = Number(quotaSummary?.quota_allocated ?? 0)
-  const quotaUsedReserved = Number(quotaSummary?.quota_used_reserved ?? 0)
-  const quotaRemaining = Math.max(0, Number(quotaSummary?.quota_remaining ?? monthlyLimit))
-  const quotaPercent = monthlyLimit ? Math.min(100, Math.round((quotaAllocated / monthlyLimit) * 100)) : 0
-  const isQuotaBlocked = Boolean(quotaSummary && quotaRemaining <= 0)
   const canViewOwnerWorkflow = Boolean(
     ownerPermissions?.permissions?.['notifications.view'] ||
     ownerPermissions?.permissions?.['audit.view'] ||
@@ -492,14 +337,6 @@ export default function LocalWorkerPanel({ organizationId }) {
   const permissionOptions = Object.entries(ownerRolePermissions?.permissions || ownerPermissions?.available_permissions || {})
   const permissionOverrides = ownerRolePermissions?.overrides || []
   const assignableUsers = ownerUsers.filter((member) => !member.deleted_at)
-  const activeKeys = keys.filter((key) => !key.revoked_at).length
-  const activeSessions = sessions.filter((session) => !session.revoked_at && !session.is_expired).length
-  const quotaUsedPercent = monthlyLimit ? Math.min(100, Math.round((quotaUsedReserved / monthlyLimit) * 100)) : 0
-  const quotaRemainingPercent = monthlyLimit ? Math.max(0, Math.round((quotaRemaining / monthlyLimit) * 100)) : 0
-  const latestSession = sessions
-    .filter((session) => session.last_seen_at)
-    .sort((a, b) => new Date(b.last_seen_at) - new Date(a.last_seen_at))[0]
-  const lastSeenLabel = latestSession?.last_seen_at ? new Date(latestSession.last_seen_at).toLocaleString() : 'No sessions yet'
 
   return (
     <div className="worker-panel worker-workspace">
@@ -508,93 +345,19 @@ export default function LocalWorkerPanel({ organizationId }) {
           <span className="product-page-kicker">Local Worker</span>
           <h2>Local Worker for Windows</h2>
           <p>
-            Run CV processing on your own machine, keep sensitive files local, and control every device with scoped keys.
+            Run CV processing on your own machine and keep sensitive files local -- no account key or quota required.
           </p>
-          <div className="worker-panel-trust-row" aria-label="Local Worker security details">
-            <span><ShieldCheck size={14} /> Local processing</span>
-            <span><LockKeyhole size={14} /> Scoped keys</span>
-            <span><Laptop size={14} /> Windows 10+</span>
-            <span><CheckCircle2 size={14} /> Signed installer</span>
-          </div>
         </div>
-
         <button
           type="button"
-          className="worker-download-card worker-download-primary"
-          onClick={handleDownloadPackage}
-          disabled={loading || !token}
+          className="btn-primary"
+          onClick={handleDownloadWorker}
+          disabled={downloading || !token}
         >
-          <span className="worker-download-icon" aria-hidden="true">
-            <HardDriveDownload size={24} />
-          </span>
-          <span className="worker-download-copy">
-            <strong>Download Windows Worker</strong>
-            <small>Install the local processing app and pair it with a scoped key.</small>
-            <em>{loading ? 'Preparing download...' : 'Download .exe'}</em>
-          </span>
-          <span className="worker-download-meta">.exe</span>
+          <Download size={16} />
+          {downloading ? 'Preparing download...' : 'Download Local Worker'}
         </button>
       </section>
-
-      <section className="worker-metric-grid" aria-label="Local Worker overview">
-        <WorkerMetricCard icon={KeyRound} value={activeKeys} label="Active keys" detail={`${keys.length} total`} />
-        <WorkerMetricCard icon={PlugZap} value={activeSessions} label="Connected devices" detail={lastSeenLabel} tone="success" />
-        <WorkerMetricCard icon={Cpu} value={`${quotaRemainingPercent}%`} label="Quota remaining" detail={`${quotaRemaining}/${monthlyLimit} CV left`} />
-        <WorkerMetricCard icon={ServerCog} value={jobs.length} label="Tracked jobs" detail="Progress-aware processing" />
-      </section>
-
-      <section className="worker-core-grid">
-        <div className={`worker-quota-summary worker-quota-card ${isQuotaBlocked ? 'is-exhausted' : ''}`}>
-          <div className="worker-card-heading">
-            <span className="product-page-kicker">Monthly quota</span>
-            <strong>{quotaRemaining}/{monthlyLimit} CV left</strong>
-            <p className="text-muted">
-              Premium Local Worker keys can allocate up to {monthlyLimit} CVs per month.
-            </p>
-          </div>
-          <div className="worker-quota-meter" aria-label={`Local Worker quota ${quotaPercent}% allocated`}>
-            <span style={{ width: `${quotaPercent}%` }} />
-          </div>
-          <div className="worker-quota-split" aria-hidden="true">
-            <span style={{ width: `${quotaUsedPercent}%` }} />
-          </div>
-          <dl>
-            <dt>Allocated</dt><dd>{quotaAllocated}</dd>
-            <dt>Used + reserved</dt><dd>{quotaUsedReserved}</dd>
-            <dt>Plan</dt><dd>{quotaSummary?.plan || 'pro'}</dd>
-          </dl>
-        </div>
-
-        <div className="worker-setup-card">
-          <div className="worker-card-heading">
-            <span className="product-page-kicker">Setup flow</span>
-            <strong>Pair a device in three steps</strong>
-            <p className="text-muted">Download, scope, and connect without moving CV files into the cloud.</p>
-          </div>
-          <div className="worker-setup-steps" aria-label="Local Worker setup steps">
-            <WorkerSetupStep step="1" icon={Download} title="Download worker">
-              Install the Windows app on the machine that will process CV files.
-            </WorkerSetupStep>
-            <WorkerSetupStep step="2" icon={KeyRound} title="Generate scoped key">
-              Limit the key by job and quota before sharing it with the device.
-            </WorkerSetupStep>
-            <WorkerSetupStep step="3" icon={ShieldCheck} title="Connect device">
-              Paste the key into the worker app and keep sensitive files local.
-            </WorkerSetupStep>
-          </div>
-        </div>
-      </section>
-
-      {createdKeyData && (
-        <div className="worker-secret-box" role="status">
-          <h3>Worker key created</h3>
-          <p>Copy this API key now. It will not be shown again.</p>
-          <code className="worker-secret-value">{createdKeyData.api_key}</code>
-          <button type="button" className="btn-outline btn-sm" onClick={() => setCreatedKeyData(null)}>
-            I have saved the key
-          </button>
-        </div>
-      )}
 
       {canViewOwnerWorkflow && (
         <div className="owner-workflow-panel">
@@ -948,114 +711,6 @@ export default function LocalWorkerPanel({ organizationId }) {
         </div>
       )}
 
-      <div className="worker-control-grid">
-        <form onSubmit={handleCreateKey} className="worker-form">
-          <div className="worker-section-heading">
-            <span className="worker-section-icon" aria-hidden="true"><KeyRound size={16} /></span>
-            <span>
-              <h3>Create New Key</h3>
-              <small>Scope access by device, job, and monthly quota.</small>
-            </span>
-          </div>
-          <div className="settings-field">
-            <label>Key name / device</label>
-            <input value={newKeyName} onChange={(e) => setNewKeyName(e.target.value)} placeholder="Office laptop worker" required />
-          </div>
-          <div className="settings-field">
-            <label>Restricted job</label>
-            <select value={newKeyJobId} onChange={(e) => setNewKeyJobId(e.target.value)}>
-              <option value="">All active jobs</option>
-              {jobs.map((job) => (
-                <option key={job.id} value={job.id}>{job.title}</option>
-              ))}
-            </select>
-          </div>
-          <div className="settings-field">
-            <label>CV quota limit</label>
-            <input
-              type="number"
-              value={newKeyQuota}
-              min="1"
-              max={quotaRemaining || monthlyLimit}
-              onChange={(e) => setNewKeyQuota(e.target.value)}
-              required
-            />
-            <small className={isQuotaBlocked ? 'text-danger' : 'text-muted'}>
-              {isQuotaBlocked
-                ? 'Monthly Local Worker quota is full. Revoke unused keys or wait for renewal.'
-                : `${quotaRemaining} CV allocation remaining this month.`}
-            </small>
-          </div>
-          <button type="submit" className="btn-primary" disabled={loading || isQuotaBlocked}>
-            {loading ? 'Processing...' : 'Generate key'}
-          </button>
-        </form>
-
-        <div className="worker-list">
-          <div className="worker-section-heading">
-            <span className="worker-section-icon" aria-hidden="true"><LockKeyhole size={16} /></span>
-            <span>
-              <h3>Worker Keys</h3>
-              <small>{activeKeys} active key{activeKeys === 1 ? '' : 's'} available for pairing.</small>
-            </span>
-          </div>
-          {loading && keys.length === 0 ? (
-            <p className="text-muted">Loading keys...</p>
-          ) : keys.length === 0 ? (
-            <WorkerEmptyState title="No worker keys yet">
-              Generate a scoped key to connect your first local worker device.
-            </WorkerEmptyState>
-          ) : (
-            <div className="table-wrapper">
-              <table className="data-table worker-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Usage</th>
-                    <th>Job</th>
-                    <th>Status</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {keys.map((key) => {
-                    const totalUsed = (key.quota_used || 0) + (key.quota_reserved || 0)
-                    const percentUsed = key.quota_limit ? Math.min(100, Math.round((totalUsed / key.quota_limit) * 100)) : 0
-                    return (
-                      <tr key={key.id} className={key.revoked_at ? 'is-muted' : ''}>
-                        <td>
-                          <strong>{key.name}</strong>
-                          <span className="worker-key-prefix">{key.key_prefix}</span>
-                        </td>
-                        <td>
-                          <div className="worker-usage">
-                            <span>{totalUsed}/{key.quota_limit}</span>
-                            <div className="worker-usage-bar"><span style={{ width: `${percentUsed}%` }} /></div>
-                          </div>
-                        </td>
-                        <td>{key.job_id ? (jobs.find((job) => job.id === key.job_id)?.title || `Job #${key.job_id}`) : 'All jobs'}</td>
-                        <td>
-                          <span className={`status-pill ${key.revoked_at ? 'status-pill-danger' : 'status-pill-success'}`}>
-                            {key.revoked_at ? 'Revoked' : 'Active'}
-                          </span>
-                        </td>
-                        <td>
-                          {!key.revoked_at && (
-                            <button type="button" className="btn-danger btn-sm" onClick={() => handleRevokeKey(key.id)}>
-                              Revoke
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-
       {jobs.length > 0 && (
         <section className="worker-progress-section">
           <div className="worker-section-heading">
@@ -1083,7 +738,6 @@ export default function LocalWorkerPanel({ organizationId }) {
                       <dt>Accept</dt><dd>{progress.recommended_accept ?? 0}</dd>
                       <dt>Review</dt><dd>{progress.recommended_review ?? 0}</dd>
                       <dt>Reject</dt><dd>{progress.recommended_reject ?? 0}</dd>
-                      <dt>Quota left</dt><dd>{progress.quota_remaining ?? 0}</dd>
                     </dl>
                   ) : (
                     <p className="text-muted">Progress not available yet.</p>
@@ -1094,50 +748,6 @@ export default function LocalWorkerPanel({ organizationId }) {
           </div>
         </section>
       )}
-
-      <div className="worker-list worker-session-list">
-        <div className="worker-section-heading">
-          <span className="worker-section-icon" aria-hidden="true"><Laptop size={16} /></span>
-          <span>
-            <h3>Connected Devices</h3>
-            <small>{activeSessions} active session{activeSessions === 1 ? '' : 's'} currently trusted.</small>
-          </span>
-        </div>
-        {sessions.length === 0 ? (
-          <WorkerEmptyState title="No connected devices">
-            Worker sessions will appear here after the Windows app pairs successfully.
-          </WorkerEmptyState>
-        ) : (
-          <div className="table-wrapper">
-            <table className="data-table worker-table">
-              <thead>
-                <tr>
-                  <th>Device</th>
-                  <th>Version</th>
-                  <th>Key</th>
-                  <th>Last seen</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sessions.map((session) => (
-                  <tr key={session.id} className={session.revoked_at ? 'is-muted' : ''}>
-                    <td>{session.device_name || 'Unknown device'}</td>
-                    <td>{session.worker_version || '-'}</td>
-                    <td>{session.key_name || `Key #${session.worker_key_id}`}</td>
-                    <td>{session.last_seen_at ? new Date(session.last_seen_at).toLocaleString() : '-'}</td>
-                    <td>
-                      <span className={`status-pill ${session.revoked_at || session.is_expired ? 'status-pill-danger' : 'status-pill-success'}`}>
-                        {session.revoked_at ? 'Revoked' : session.is_expired ? 'Expired' : 'Active'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
     </div>
   )
 }
