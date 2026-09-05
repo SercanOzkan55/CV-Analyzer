@@ -501,14 +501,14 @@ export default function LandingPage() {
   ]
 
   const tools = [
-    { title: 'Career Studio', href: '/career-studio' },
-    { title: 'AI Agent Hub', href: '/agents' },
-    { title: t('nav.cv_builder'), href: '/cv-builder' },
-    { title: 'Templates', href: '/template-marketplace' },
-    { title: t('nav.cover_letter'), href: '/cover-letter' },
-    { title: t('nav.interview'), href: '/interview-simulator' },
-    { title: t('nav.job_tracker'), href: '/job-tracker' },
-    { title: 'Data Center', href: '/data-center' },
+    { title: 'Career Studio', desc: t('landing.tool_career_desc'), href: '/career-studio' },
+    { title: 'AI Agent Hub', desc: t('landing.tool_agent_desc'), href: '/agents' },
+    { title: t('nav.cv_builder'), desc: t('landing.tool_builder_desc'), href: '/cv-builder' },
+    { title: 'Templates', desc: t('landing.tool_templates_desc'), href: '/template-marketplace' },
+    { title: t('nav.cover_letter'), desc: t('landing.tool_cover_desc'), href: '/cover-letter' },
+    { title: t('nav.interview'), desc: t('landing.tool_interview_desc'), href: '/interview-simulator' },
+    { title: t('nav.job_tracker'), desc: t('landing.tool_tracker_desc'), href: '/job-tracker' },
+    { title: 'Data Center', desc: t('landing.tool_data_desc'), href: '/data-center' },
   ]
 
   const steps = [
@@ -733,6 +733,7 @@ export default function LandingPage() {
                     <Icon size={22} strokeWidth={1.8} />
                   </div>
                   <h3>{tool.title}</h3>
+                  <p>{tool.desc}</p>
                 </Link>
               </motion.div>
             )
