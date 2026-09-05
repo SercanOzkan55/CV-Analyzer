@@ -5,6 +5,7 @@ import {
   Brain, FileCheck, Target, Globe2, LayoutGrid, Users,
   Upload, FileText, CheckCircle2, ArrowRight,
   Shield, Sparkles, Zap,
+  GraduationCap, Bot, LayoutTemplate, Mail, Mic, Briefcase, Database,
 } from 'lucide-react'
 import { useLanguage } from '../i18n/LanguageContext'
 import { useAuth } from '../context/AuthContext'
@@ -69,6 +70,9 @@ const gridViewport = { once: true, amount: 0.14, margin: '0px 0px -64px 0px' }
 // ─── Feature accent colors ───────────────────────────────────────
 const FEATURE_COLORS = ['#5b6cff', '#d4a94f', '#0e7490', '#b65d52', '#7c3aed', '#2563eb']
 const FEATURE_ICONS  = [Brain, FileCheck, Target, Globe2, LayoutGrid, Users]
+
+const TOOL_COLORS = ['#5b6cff', '#7c3aed', '#0e7490', '#d4a94f', '#2563eb', '#b65d52', '#059669', '#dc2626']
+const TOOL_ICONS   = [GraduationCap, Bot, FileText, LayoutTemplate, Mail, Mic, Briefcase, Database]
 const STEP_ICONS     = [Upload, FileText, CheckCircle2]
 const STEP_TIMES     = ['< 1 min', '2 min', 'Instant']
 const HERO_HOLOGRAM_PARTICLES = [
@@ -496,6 +500,17 @@ export default function LandingPage() {
     { title: t('landing.feature_recruiter_title'),desc: t('landing.feature_recruiter_desc') },
   ]
 
+  const tools = [
+    { title: 'Career Studio', href: '/career-studio' },
+    { title: 'AI Agent Hub', href: '/agents' },
+    { title: t('nav.cv_builder'), href: '/cv-builder' },
+    { title: 'Templates', href: '/template-marketplace' },
+    { title: t('nav.cover_letter'), href: '/cover-letter' },
+    { title: t('nav.interview'), href: '/interview-simulator' },
+    { title: t('nav.job_tracker'), href: '/job-tracker' },
+    { title: 'Data Center', href: '/data-center' },
+  ]
+
   const steps = [
     { num: '01', title: t('landing.how_step1_title'), desc: t('landing.how_step1_desc'), time: STEP_TIMES[0] },
     { num: '02', title: t('landing.how_step2_title'), desc: t('landing.how_step2_desc'), time: STEP_TIMES[1] },
@@ -543,7 +558,7 @@ export default function LandingPage() {
                   {t('landing.try_now')}
                 </Link>
               </motion.div>
-              <a href="#pricing" className="btn-ghost btn-lg">{t('landing.view_pricing')}</a>
+              <Link to="/pricing" className="btn-ghost btn-lg">{t('landing.view_pricing')}</Link>
             </motion.div>
 
             <motion.p className="hero-note" variants={fadeUp}>{t('landing.trust_note')}</motion.p>
@@ -694,26 +709,34 @@ export default function LandingPage() {
         </motion.div>
       </motion.section>
 
-      {/* ── Pricing ──────────────────────────────────────── */}
-      <motion.section id="pricing" className="section" {...revealSectionProps}>
-        <SectionTitle title={t('landing.pricing_title')} subtitle={t('landing.pricing_subtitle')} />
+      {/* ── Tools ────────────────────────────────────────── */}
+      <motion.section id="tools" className="section" {...revealSectionProps}>
+        <SectionTitle title={t('landing.tools_title')} subtitle={t('landing.tools_subtitle')} />
         <motion.div
-          className="pricing-grid"
-          style={{ gridTemplateColumns: 'minmax(0, 480px)', justifyContent: 'center' }}
+          className="features-grid"
           {...revealGridProps}
         >
-          <motion.div className="pricing-card popular" variants={scrollScaleItem} whileHover={{ y: -2 }}>
-            <h3>{t('pricing.free_name')}</h3>
-            <div className="pricing-price">{t('pricing.zero_price')}<span>/{t('pricing.forever')}</span></div>
-            <ul>
-              <li>{t('pricing.f1')}</li>
-              <li>{t('pricing.f2')}</li>
-              <li>{t('pricing.f3')}</li>
-              <li>{t('pricing.f4')}</li>
-              <li>{t('pricing.f5')}</li>
-            </ul>
-            <Link to="/register" className="btn-primary btn-full">{t('pricing.free_cta')}</Link>
-          </motion.div>
+          {tools.map((tool, i) => {
+            const Icon = TOOL_ICONS[i]
+            const color = TOOL_COLORS[i]
+            return (
+              <motion.div key={tool.href} variants={scrollItem}>
+                <Link
+                  to={tool.href}
+                  className="feature-card"
+                  style={{ display: 'block', height: '100%' }}
+                >
+                  <div
+                    className="feature-icon"
+                    style={{ background: `${color}15`, border: `1px solid ${color}25`, color }}
+                  >
+                    <Icon size={22} strokeWidth={1.8} />
+                  </div>
+                  <h3>{tool.title}</h3>
+                </Link>
+              </motion.div>
+            )
+          })}
         </motion.div>
       </motion.section>
 

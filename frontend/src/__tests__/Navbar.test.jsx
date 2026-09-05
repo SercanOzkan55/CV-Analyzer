@@ -66,7 +66,7 @@ describe('Navbar', () => {
       renderNavbar()
 
       expect(screen.getByText('nav.features')).toBeInTheDocument()
-      expect(screen.getByText('nav.pricing')).toBeInTheDocument()
+      expect(screen.getByText('nav.tools')).toBeInTheDocument()
       expect(screen.getByText('nav.faq')).toBeInTheDocument()
       expect(screen.getByText('CV writing and ATS guides')).toBeInTheDocument()
     })

@@ -114,7 +114,7 @@ export default function Navbar() {
           {isLanding ? (
             <>
               <a href="/#features" className="nav-link">{t('nav.features')}</a>
-              <a href="/#pricing" className="nav-link">{t('nav.pricing')}</a>
+              <a href="/#tools" className="nav-link">{t('nav.tools') || 'Tools'}</a>
               <a href="/#faq" className="nav-link">{t('nav.faq')}</a>
               <NavLink to={fixedEnglishRoute ? '/en/' : '/rehber/'} active={isGuideRoute || fixedEnglishRoute}>{guideUi.hubTitle}</NavLink>
               {BLOG_ENABLED && <NavLink to="/blog" active={location.pathname === '/blog'}>Blog</NavLink>}
