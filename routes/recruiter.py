@@ -48,6 +48,7 @@ from services.owner_workflow_service import (
     candidate_event_message,
     create_audit_log,
     create_owner_notification,
+    normalize_role,
     record_candidate_status_event,
     stage_to_candidate_status,
 )
@@ -453,6 +454,19 @@ class RecruiterReminderUpdateRequest(BaseModel):
     is_active: bool | None = None
 
 
+# Every organizational role the Owner Workflow permission system
+# recognizes (routes/owner_workflow.py's OWNER_WORKFLOW_ROLES). This used
+# to be just {"recruiter", "admin"}, which silently 403'd org owners/hr/
+# limited members on every recruiter.py endpoint (job listing, candidate
+# actions, etc.) even though the exact same accounts pass
+# owner_workflow_user's check for the Owner Workflow panel -- the two
+# gates had drifted out of sync. Fine-grained capability checks for what
+# a given role can actually do are layered on top of this via
+# _require_permission/ownerPermissions elsewhere; this is only the coarse
+# "is this account part of an org's recruiting team at all" gate.
+RECRUITER_REQUIRED_ROLES = {"admin", "owner", "recruiter", "hr", "limited"}
+
+
 def recruiter_required(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
     supabase_id = user.get("user_id")
     email = user.get("email", "")
@@ -463,16 +477,16 @@ def recruiter_required(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
 
     _mock = os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes")
     _env = os.getenv("ENV", "development").lower()
-    if _mock and _env not in ("production", "prod") and db_user and db_user.role not in ("recruiter", "admin"):
+    if _mock and _env not in ("production", "prod") and db_user and normalize_role(db_user.role) not in RECRUITER_REQUIRED_ROLES:
         db_user.role = "recruiter"
         db.add(db_user)
         db.commit()
         db.refresh(db_user)
 
-    if not db_user or db_user.role not in ("recruiter", "admin"):
+    if not db_user or normalize_role(db_user.role) not in RECRUITER_REQUIRED_ROLES:
         raise HTTPException(status_code=403, detail="Recruiter role required")
 
-    if db_user.role in ("admin", "recruiter") and not db_user.organization_id:
+    if normalize_role(db_user.role) != "admin" and not db_user.organization_id:
         # CRITICAL FIX: Never auto-provision organization
         # Require explicit invite instead
         raise HTTPException(

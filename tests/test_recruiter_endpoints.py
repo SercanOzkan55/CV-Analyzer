@@ -101,6 +101,37 @@ def test_recruiter_sees_own_org_candidates(client, db_session):
     assert cand_b.id not in ids
 
 
+def test_owner_role_can_use_recruiter_required_endpoints(client, db_session):
+    """Regression test: recruiter_required used to only accept
+    role in ("recruiter", "admin"), silently 403'ing org owners/hr/limited
+    members even though those are valid roles the Owner Workflow panel
+    itself already recognizes (OWNER_WORKFLOW_ROLES) -- an org "owner" saw
+    their own Owner Workflow dashboard load fine while GET
+    /api/v1/recruiter/jobs 403'd for the exact same account.
+    """
+    org = Organization(name="Owner Co", domain="ownerco.test")
+    db_session.add(org)
+    db_session.commit()
+    db_session.refresh(org)
+
+    owner = User(
+        supabase_id="owner-user",
+        email="owner@ownerco.test",
+        role="owner",
+        organization_id=org.id,
+    )
+    db_session.add(owner)
+    db_session.commit()
+    db_session.refresh(owner)
+
+    client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
+        "user_id": owner.supabase_id,
+        "email": owner.email,
+    }
+    resp = client.get("/api/v1/recruiter/jobs")
+    assert resp.status_code == 200, resp.text
+
+
 def test_recruiter_cannot_access_other_org_analysis(client, db_session):
     org_a, org_b, recruiter, cand_a, cand_b = _setup_two_orgs(db_session)
 
