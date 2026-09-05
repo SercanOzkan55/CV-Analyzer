@@ -109,6 +109,8 @@ class WorkspaceStore:
             self._ensure_column(
                 conn, "analysis_results", "candidate_status", "candidate_status TEXT NOT NULL DEFAULT 'pending_review'"
             )
+            self._ensure_column(conn, "analysis_results", "email_sent_at", "email_sent_at TEXT")
+            self._ensure_column(conn, "analysis_results", "email_sent_mode", "email_sent_mode TEXT")
             self._purge_sensitive_result_json(conn)
             conn.execute(
                 """
@@ -324,6 +326,18 @@ class WorkspaceStore:
                 (status, error, result_id),
             )
 
+    def mark_email_sent(self, result_id: int, mode: str) -> None:
+        """Records that an accept/reject email was actually sent for this
+        candidate, so re-opening the app or the same run later still shows
+        it -- the bulk-send confirm dialog is the safety net against
+        sending twice in one sitting, this is the safety net against doing
+        it again after a restart."""
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE analysis_results SET email_sent_at = ?, email_sent_mode = ? WHERE id = ?",
+                (_now(), mode, result_id),
+            )
+
     def update_result_decision_by_file(self, run_id: int, file_path: str, decision: str):
         with self._connect() as conn:
             existing_row = conn.execute(
@@ -387,7 +401,7 @@ class WorkspaceStore:
         with self._connect() as conn:
             rows = conn.execute(
                 """
-                SELECT result_json, sync_status, id
+                SELECT result_json, sync_status, id, email_sent_at, email_sent_mode
                 FROM analysis_results
                 WHERE run_id = ?
                 ORDER BY score DESC, id ASC
@@ -399,6 +413,9 @@ class WorkspaceStore:
             payload = json.loads(row[0])
             payload["sync_status"] = row[1]
             payload["local_result_id"] = row[2]
+            payload["result_id"] = row[2]
+            payload["email_sent_at"] = row[3] or ""
+            payload["email_sent_mode"] = row[4] or ""
             results.append(payload)
         return results
 

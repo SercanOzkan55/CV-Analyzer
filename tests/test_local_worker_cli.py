@@ -90,6 +90,19 @@ def test_local_folder_mode_writes_ranked_outputs(tmp_path):
     pending_rows = store.list_pending_sync_results()
     assert any(row["sync_error"] == "network unavailable" for row in pending_rows)
 
+    # Email-sent status must survive a fresh WorkspaceStore instance opening
+    # the same file -- this is what makes a bulk send's "already emailed"
+    # marker persist across app restarts, not just within one GUI session.
+    target_result_id = saved_rows[0]["local_result_id"]
+    store.mark_email_sent(target_result_id, "accept")
+    reopened_store = WorkspaceStore(output_dir / "local_worker_workspace.sqlite3")
+    reloaded_rows = reopened_store.get_run_results(runs[0]["id"])
+    sent_row = next(row for row in reloaded_rows if row["local_result_id"] == target_result_id)
+    other_row = next(row for row in reloaded_rows if row["local_result_id"] != target_result_id)
+    assert sent_row["email_sent_mode"] == "accept"
+    assert sent_row["email_sent_at"] != ""
+    assert other_row["email_sent_at"] == ""
+
 
 def test_local_folder_mode_marks_duplicates_and_failed_files(tmp_path):
     cv_dir = tmp_path / "cvs"

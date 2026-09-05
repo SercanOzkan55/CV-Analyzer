@@ -883,7 +883,16 @@ def worker_job_config(jobId: int, worker=Depends(get_current_worker), db: Sessio
         required_skills=_extract_job_skills(job.description),
         nice_to_have_skills=[],
         hard_reject_criteria=[],
-        scoring_weights={"required_skills": 0.7, "nice_to_have_skills": 0.2, "hard_reject": 0.1},
+        # Matches score_cv()'s own built-in fallback exactly (local_worker/
+        # worker.py: weights.get("required_skills", 70.0) etc.) — these must
+        # be absolute values summing to ~100, not fractions, and
+        # "hard_reject" isn't a scoring weight at all: hard-reject criteria
+        # are handled separately via a risk-flag penalty, not a weighted
+        # score component, so including it here was silently ignored by
+        # score_cv (content_weight fell back to its 10.0 default and the
+        # 0.1 "hard_reject" entry did nothing) while making the true total
+        # weight only 0.9 of what score_cv assumed.
+        scoring_weights={"required_skills": 70.0, "nice_to_have_skills": 20.0, "content_quality": 10.0},
     )
 
 

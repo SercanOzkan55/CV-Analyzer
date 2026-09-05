@@ -257,49 +257,58 @@ RESERVED_CRITERIA: tuple[str, ...] = ()
 # education/language/recruiter_score are implemented.
 
 PRESETS: dict[str, dict[str, float]] = {
+    # Each preset carves a 10-point Background share (education/language/
+    # recruiter_score, matching CATEGORIES["background"]["default_weight"])
+    # out of what was previously a 100-point split across only the other 9
+    # criteria, by scaling those 9 down by 0.9. Background's 3 members were
+    # reserved (scorer=None) when these presets were first written, hence
+    # 0.0; Phase 4 gave them real scorers, so presets should actually be
+    # able to reach them too, not just a manual per-slider drag.
     "balanced": {
-        "required_skills": 25.0,
-        "nice_to_have_skills": 10.0,
-        "skills_coverage": 15.0,
-        "experience_match": 12.0,
-        "role_title_match": 8.0,
-        "keyword_match": 10.0,
-        "ats_format": 8.0,
-        "content_quality": 7.0,
-        "soft_skills": 5.0,
-        "education": 0.0,
-        "language": 0.0,
-        "recruiter_score": 0.0,
+        "required_skills": 22.5,
+        "nice_to_have_skills": 9.0,
+        "skills_coverage": 13.5,
+        "experience_match": 10.8,
+        "role_title_match": 7.2,
+        "keyword_match": 9.0,
+        "ats_format": 7.2,
+        "content_quality": 6.3,
+        "soft_skills": 4.5,
+        "education": 3.3,
+        "language": 3.3,
+        "recruiter_score": 3.4,
     },
     "skills_focused": {
-        # Skills Match -> ~60, Job Fit and CV Quality scaled down by 0.8.
-        "required_skills": 30.0,
-        "nice_to_have_skills": 12.0,
-        "skills_coverage": 18.0,
-        "experience_match": 10.0,
-        "role_title_match": 6.0,
-        "keyword_match": 8.0,
-        "ats_format": 6.0,
-        "content_quality": 6.0,
-        "soft_skills": 4.0,
-        "education": 0.0,
-        "language": 0.0,
-        "recruiter_score": 0.0,
+        # Skills Match -> ~54 (was ~60 of 100; now ~60 of the 90 left after
+        # Background's 10), Job Fit and CV Quality scaled down to match.
+        "required_skills": 27.0,
+        "nice_to_have_skills": 10.8,
+        "skills_coverage": 16.2,
+        "experience_match": 9.0,
+        "role_title_match": 5.4,
+        "keyword_match": 7.2,
+        "ats_format": 5.4,
+        "content_quality": 5.4,
+        "soft_skills": 3.6,
+        "education": 3.3,
+        "language": 3.3,
+        "recruiter_score": 3.4,
     },
     "ats_focused": {
-        # CV Quality -> ~35, Skills Match and Job Fit scaled down by ~0.8125.
-        "required_skills": 20.0,
-        "nice_to_have_skills": 8.0,
-        "skills_coverage": 13.0,
-        "experience_match": 10.0,
-        "role_title_match": 6.0,
-        "keyword_match": 8.0,
-        "ats_format": 14.0,
-        "content_quality": 12.0,
-        "soft_skills": 9.0,
-        "education": 0.0,
-        "language": 0.0,
-        "recruiter_score": 0.0,
+        # CV Quality -> ~31.5 (was ~35 of 100), Skills Match and Job Fit
+        # scaled down to match.
+        "required_skills": 18.0,
+        "nice_to_have_skills": 7.2,
+        "skills_coverage": 11.7,
+        "experience_match": 9.0,
+        "role_title_match": 5.4,
+        "keyword_match": 7.2,
+        "ats_format": 12.6,
+        "content_quality": 10.8,
+        "soft_skills": 8.1,
+        "education": 3.3,
+        "language": 3.3,
+        "recruiter_score": 3.4,
     },
 }
 

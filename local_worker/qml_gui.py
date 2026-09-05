@@ -213,7 +213,10 @@ class AnalysisWorker(QObject):
         self.progress_max.emit(len(files))
 
         def _on_row(row: dict):
-            self.store.add_result(run_id, row)
+            # Keep the DB row id on the in-memory row so a later bulk send
+            # can record which candidate an email actually went to (see
+            # LocalWorkerBackend.sendBulkTemplate / WorkspaceStore.mark_email_sent).
+            row["result_id"] = self.store.add_result(run_id, row)
             self.row.emit(row)
 
         def _on_progress(index: int, total: int, path: Path):
@@ -348,6 +351,8 @@ class ResultListModel(QAbstractListModel):
     AccentRole = Qt.UserRole + 13
     SyncRole = Qt.UserRole + 14
     ScoreBreakdownRole = Qt.UserRole + 15
+    EmailSentAtRole = Qt.UserRole + 16
+    EmailSentModeRole = Qt.UserRole + 17
 
     def __init__(self):
         super().__init__()
@@ -390,6 +395,10 @@ class ResultListModel(QAbstractListModel):
             return row.get("sync_status", "offline_ready")
         if role == self.ScoreBreakdownRole:
             return row.get("score_breakdown", {})
+        if role == self.EmailSentAtRole:
+            return row.get("email_sent_at", "") or ""
+        if role == self.EmailSentModeRole:
+            return row.get("email_sent_mode", "") or ""
         return None
 
     def roleNames(self):
@@ -409,6 +418,8 @@ class ResultListModel(QAbstractListModel):
             self.AccentRole: QByteArray(b"accent"),
             self.SyncRole: QByteArray(b"syncStatus"),
             self.ScoreBreakdownRole: QByteArray(b"scoreBreakdown"),
+            self.EmailSentAtRole: QByteArray(b"emailSentAt"),
+            self.EmailSentModeRole: QByteArray(b"emailSentMode"),
         }
 
     def rows(self) -> list[dict]:
@@ -437,6 +448,13 @@ class ResultListModel(QAbstractListModel):
             self.dataChanged.emit(
                 model_index, model_index, [self.DecisionRole, self.DecisionLabelRole, self.AccentRole]
             )
+
+    def update_email_sent(self, row_index: int, sent_at: str, mode: str):
+        if 0 <= row_index < len(self._rows):
+            self._rows[row_index]["email_sent_at"] = sent_at
+            self._rows[row_index]["email_sent_mode"] = mode
+            model_index = self.index(row_index, 0)
+            self.dataChanged.emit(model_index, model_index, [self.EmailSentAtRole, self.EmailSentModeRole])
 
 
 class HistoryListModel(QAbstractListModel):
@@ -881,6 +899,7 @@ class LocalWorkerBackend(QObject):
         self._bulk_send_total = 0
         self._bulk_sent_count = 0
         self._bulk_failed_count = 0
+        self._bulk_send_mode = ""
         self._mail_templates = load_mail_templates()
         self._template_mode = "accept"
         self._template_subject = ""
@@ -2095,6 +2114,7 @@ class LocalWorkerBackend(QObject):
         self._bulk_send_total = len(messages)
         self._bulk_sent_count = 0
         self._bulk_failed_count = 0
+        self._bulk_send_mode = templateMode
         self.stateChanged.emit()
 
         self._bulk_thread = QThread()
@@ -2116,6 +2136,21 @@ class LocalWorkerBackend(QObject):
         self._bulk_send_progress += 1
         if success:
             self._bulk_sent_count += 1
+            # Persist so this survives an app restart, not just this
+            # session's confirm-dialog safety net. Look up the row's real
+            # DB id rather than trusting row_index to still be stable if
+            # rows were reordered/reloaded between send and this callback.
+            rows = self._results_model.rows()
+            if 0 <= row_index < len(rows):
+                result_id = rows[row_index].get("result_id") or rows[row_index].get("local_result_id")
+                sent_at = ""
+                if result_id:
+                    try:
+                        self.store.mark_email_sent(int(result_id), self._bulk_send_mode)
+                        sent_at = datetime.now(UTC).isoformat()
+                    except Exception as exc:
+                        logger.warning("mark_email_sent failed for result_id=%s: %s", result_id, exc)
+                self._results_model.update_email_sent(row_index, sent_at, self._bulk_send_mode)
         else:
             self._bulk_failed_count += 1
         self.stateChanged.emit()

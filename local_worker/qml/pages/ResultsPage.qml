@@ -288,6 +288,8 @@ Item {
                         required property string decisionLabel
                         required property color accent
                         required property string syncStatus
+                        required property string emailSentAt
+                        required property string emailSentMode
 
                         readonly property bool matches: page.query === ""
                             || fileName.toLowerCase().indexOf(page.query.toLowerCase()) !== -1
@@ -337,6 +339,11 @@ Item {
                                     color: Theme.textMuted
                                     font.pixelSize: Typography.captionSize
                                 }
+                            }
+                            AppBadge {
+                                visible: row.emailSentAt !== ""
+                                text: (row.emailSentMode === "reject" ? "Reject" : "Accept") + " email sent"
+                                tint: Theme.success
                             }
                             Text {
                                 text: row.score + "%"
