@@ -46,6 +46,11 @@ services:
       - backups:/app/backups
       - ./resume_model.pkl:/app/resume_model.pkl:ro
       - ./models/score_calibrator.pkl:/app/models/score_calibrator.pkl:ro
+      # Local Worker installers are large per-OS binaries (100-200MB+),
+      # excluded from the image via .dockerignore -- bind-mounted instead so
+      # /worker/download-exe|macos|linux can serve them without bloating
+      # every image rebuild.
+      - ./local_worker/dist:/app/local_worker/dist:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=3).read()"]
       interval: 30s
