@@ -10,6 +10,8 @@ import re
 import zipfile
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
@@ -39,6 +41,7 @@ from schemas.worker import (
 )
 from routes.recruiter import recruiter_required
 from auth import verify_supabase_jwt
+from services.user_service import get_or_create_user
 from core.http_runtime import audit_log, limiter
 from services.owner_workflow_service import (
     decision_to_candidate_status,
@@ -891,19 +894,15 @@ def list_worker_sessions(
     }
 
 
-@router.post("/worker/auth", response_model=WorkerAuthResponse)
-@limiter.limit("10/minute")
-def worker_auth(request: Request, req: WorkerAuthRequest, db: Session = Depends(get_db)):
-    key_hash = hash_key(req.api_key)
-    wk = db.query(WorkerKey).filter(WorkerKey.key_hash == key_hash).first()
-
-    if not wk or wk.revoked_at:
-        audit_log("worker_auth_failed", reason="invalid_or_revoked", key_hash_prefix=key_hash[:12])
-        raise HTTPException(status_code=401, detail="Invalid or revoked key")
-    if wk.expires_at and wk.expires_at < utcnow():
-        audit_log("worker_auth_failed", reason="expired", worker_key_id=wk.id, organization_id=wk.organization_id)
-        raise HTTPException(status_code=401, detail="Key expired")
-
+def _create_worker_session_response(
+    db: Session, wk: WorkerKey, device_name: str | None, worker_version: str | None
+) -> WorkerAuthResponse:
+    """Mint a WorkerSession for an already-resolved WorkerKey and build the
+    WorkerAuthResponse. Shared by the key-based /worker/auth and the
+    account-based /worker/login -- everything downstream of this (job
+    listing, claim, results, quota) works off the WorkerSession/WorkerKey
+    pair unchanged, regardless of which login path produced it.
+    """
     session_token = "sess_" + secrets.token_urlsafe(32)
     session_hash = hash_key(session_token)
     expires_in = 3600
@@ -912,8 +911,8 @@ def worker_auth(request: Request, req: WorkerAuthRequest, db: Session = Depends(
     ws = WorkerSession(
         worker_key_id=wk.id,
         organization_id=wk.organization_id,
-        device_name=req.device_name,
-        worker_version=req.worker_version,
+        device_name=device_name,
+        worker_version=worker_version,
         access_token_hash=session_hash,
         expires_at=expires_at,
     )
@@ -925,7 +924,7 @@ def worker_auth(request: Request, req: WorkerAuthRequest, db: Session = Depends(
         worker_key_id=wk.id,
         organization_id=wk.organization_id,
         session_id=ws.id,
-        worker_version=req.worker_version,
+        worker_version=worker_version,
     )
 
     allowed_jobs = (
@@ -948,6 +947,87 @@ def worker_auth(request: Request, req: WorkerAuthRequest, db: Session = Depends(
         quota_remaining=quota_remaining,
         permissions=_safe_permissions(wk.permissions),
     )
+
+
+AUTO_WORKER_KEY_NAME = "Website Sync (auto)"
+
+
+def _get_or_create_auto_worker_key(db: Session, db_user) -> WorkerKey:
+    """Get-or-create the standing WorkerKey behind account-based Website
+    Sync logins for this organization, so /worker/login can mint sessions
+    without anyone having to manually create a key from the website (that
+    UI no longer exists). job_id=None means every active job in the org is
+    allowed, not just one -- there's no more per-key job scoping here.
+    """
+    wk = (
+        db.query(WorkerKey)
+        .filter(WorkerKey.organization_id == db_user.organization_id, WorkerKey.name == AUTO_WORKER_KEY_NAME)
+        .first()
+    )
+    if wk and not wk.revoked_at:
+        return wk
+
+    raw_key = "sk_worker_auto_" + secrets.token_urlsafe(32)
+    wk = WorkerKey(
+        name=AUTO_WORKER_KEY_NAME,
+        organization_id=db_user.organization_id,
+        job_id=None,
+        key_prefix=raw_key[:20],
+        key_hash=hash_key(raw_key),
+        quota_limit=100000,
+        quota_used=0,
+        quota_reserved=0,
+        permissions={"claim": True, "submit_results": True},
+    )
+    db.add(wk)
+    db.commit()
+    db.refresh(wk)
+    return wk
+
+
+@router.post("/worker/auth", response_model=WorkerAuthResponse)
+@limiter.limit("10/minute")
+def worker_auth(request: Request, req: WorkerAuthRequest, db: Session = Depends(get_db)):
+    key_hash = hash_key(req.api_key)
+    wk = db.query(WorkerKey).filter(WorkerKey.key_hash == key_hash).first()
+
+    if not wk or wk.revoked_at:
+        audit_log("worker_auth_failed", reason="invalid_or_revoked", key_hash_prefix=key_hash[:12])
+        raise HTTPException(status_code=401, detail="Invalid or revoked key")
+    if wk.expires_at and wk.expires_at < utcnow():
+        audit_log("worker_auth_failed", reason="expired", worker_key_id=wk.id, organization_id=wk.organization_id)
+        raise HTTPException(status_code=401, detail="Key expired")
+
+    return _create_worker_session_response(db, wk, req.device_name, req.worker_version)
+
+
+class WorkerAccountLoginRequest(BaseModel):
+    device_name: Optional[str] = "unknown"
+    worker_version: Optional[str] = "1.0.0"
+
+
+@router.post("/worker/login", response_model=WorkerAuthResponse)
+@limiter.limit("10/minute")
+def worker_login_with_account(
+    request: Request,
+    req: WorkerAccountLoginRequest,
+    user=Depends(verify_supabase_jwt),
+    db: Session = Depends(get_db),
+):
+    """Website Sync login for Local Worker using the recruiter's normal
+    account (email/password verified against Supabase by the caller,
+    presented here as a JWT) instead of a manually pasted Worker Key --
+    there is no website UI left to create one of those by hand.
+    """
+    supabase_id = user.get("user_id")
+    email = user.get("email")
+    db_user = get_or_create_user(db, supabase_id, email)
+
+    if db_user.role not in ("recruiter", "admin") or not db_user.organization_id:
+        raise HTTPException(status_code=403, detail="Recruiter access required")
+
+    wk = _get_or_create_auto_worker_key(db, db_user)
+    return _create_worker_session_response(db, wk, req.device_name, req.worker_version)
 
 
 @router.get("/worker/jobs")

@@ -52,11 +52,12 @@ except ImportError:
 import worker as worker_module
 from credentials import (
     load_smtp_password,
-    load_worker_api_key,
+    load_website_refresh_token,
     save_smtp_password,
-    save_worker_api_key,
+    save_website_refresh_token,
 )
 from smtp_settings import load_smtp_settings, save_smtp_settings
+from website_account_settings import load_website_account_settings, save_website_account_settings
 from worker import (
     API_BASE_URL,
     LocalWorker,
@@ -627,27 +628,39 @@ class WebsiteSyncWorker(QObject):
     done = Signal(dict)
     failed = Signal(str)
 
-    def __init__(self, mode: str, api_url: str, api_key: str, job_id: str, pending_results: list[dict]):
+    def __init__(
+        self,
+        mode: str,
+        api_url: str,
+        job_id: str,
+        pending_results: list[dict],
+        email: str | None = None,
+        password: str | None = None,
+        refresh_token: str | None = None,
+    ):
         super().__init__()
         self.mode = mode
         self.api_url = (api_url or API_BASE_URL).strip().rstrip("/")
-        self.api_key = api_key.strip()
+        self.email = (email or "").strip()
+        self.password = password or ""
+        self.refresh_token = refresh_token or ""
         self.job_id = (job_id or "").strip()
         self.pending_results = list(pending_results or [])
 
     def run(self):
         try:
-            if not self.api_key:
-                raise RuntimeError("Paste a worker key before connecting.")
-            self.status.emit("Connecting to website worker API...")
+            if not self.password and not self.refresh_token:
+                raise RuntimeError("Sign in with your email and password first.")
+            self.status.emit("Signing in to your CV Analyzer account...")
             worker = LocalWorker(
-                self.api_key,
+                "",
                 "server_files",
                 "none",
                 os.environ.get("COMPUTERNAME", "QML Local Worker"),
                 api_base_url=self.api_url or API_BASE_URL,
+                account_refresh_token=self.refresh_token,
             )
-            worker.login()
+            worker.login_with_account(self.email, self.password)
 
             self.status.emit("Fetching allowed website jobs...")
             jobs_resp = worker._request("GET", "/jobs")
@@ -682,9 +695,9 @@ class WebsiteSyncWorker(QObject):
 
             target_job_id = int(self.job_id) if self.job_id else (int(jobs[0]) if len(jobs) == 1 else 0)
             if not target_job_id:
-                raise RuntimeError("Enter a Website job id or use a worker key scoped to one job.")
+                raise RuntimeError("Enter a Website job id -- your account has more than one active job.")
             if jobs and target_job_id not in [int(job) for job in jobs]:
-                raise RuntimeError(f"Worker key is not allowed for Website job #{target_job_id}.")
+                raise RuntimeError(f"Your account doesn't have access to Website job #{target_job_id}.")
 
             results_payload = []
             synced_files = []
@@ -883,17 +896,19 @@ class LocalWorkerBackend(QObject):
         self._progress_maximum = 1
         self._motion_enabled = os.environ.get("CV_WORKER_DISABLE_MOTION", "").lower() not in {"1", "true", "yes"}
         self._sync_api_url = os.environ.get("CV_ANALYZER_API_URL", API_BASE_URL)
-        self._sync_api_key = load_worker_api_key() or os.environ.get("CV_WORKER_API_KEY", "")
+        self._sync_email = load_website_account_settings().get("email", "")
+        self._sync_password = ""
+        self._sync_has_saved_session = bool(load_website_refresh_token())
         self._sync_job_id = ""
         self._sync_status = "Website sync not tested"
-        self._sync_detail = "Connect a worker key to upload selected local results back to the website."
+        self._sync_detail = "Sign in with your CV Analyzer account to upload selected local results back to the website."
         self._sync_connected = False
         self._sync_running = False
         self._sync_company_id = ""
         self._sync_quota_remaining = 0
         self._sync_allowed_jobs: list[int] = []
         self._sync_permissions: dict = {}
-        self._sync_permission_summary = "Test connection to inspect this worker key's local access scope."
+        self._sync_permission_summary = "Sign in to inspect your organization's local access scope."
         self._sync_last_synced_count = 0
         smtp_settings = load_smtp_settings()
         self._smtp_host = smtp_settings.get("host", "")
@@ -1215,21 +1230,32 @@ class LocalWorkerBackend(QObject):
         self._sync_connected = False
         self._sync_status = "Website sync changed"
         self._sync_permissions = {}
-        self._sync_permission_summary = "Test connection to inspect this worker key's local access scope."
+        self._sync_permission_summary = "Test connection to inspect your organization's local access scope."
         self.syncChanged.emit()
 
     @Property(str, notify=syncChanged)
-    def syncApiKey(self):
-        return self._sync_api_key
+    def syncEmail(self):
+        return self._sync_email
 
-    @syncApiKey.setter
-    def syncApiKey(self, value: str):
-        self._sync_api_key = value
-        self._sync_connected = False
-        self._sync_status = "Worker key changed"
-        self._sync_permissions = {}
-        self._sync_permission_summary = "Test connection to inspect this worker key's local access scope."
+    @syncEmail.setter
+    def syncEmail(self, value: str):
+        self._sync_email = value
         self.syncChanged.emit()
+
+    @Property(str, notify=syncChanged)
+    def syncPassword(self):
+        return self._sync_password
+
+    @syncPassword.setter
+    def syncPassword(self, value: str):
+        self._sync_password = value
+        self.syncChanged.emit()
+
+    @Property(bool, notify=syncChanged)
+    def syncHasSavedSession(self):
+        """Whether a previous sign-in is remembered, so the QML side can
+        offer 'Sign in again' without requiring the password every time."""
+        return self._sync_has_saved_session
 
     @Property(str, notify=syncChanged)
     def syncJobId(self):
@@ -1868,14 +1894,14 @@ class LocalWorkerBackend(QObject):
         self.toast.emit(f"Sync queue refreshed — {self.syncPendingCount} pending.", "info")
 
     @Slot()
-    def saveWorkerKey(self):
-        if not self._sync_api_key.strip():
-            self.toast.emit("Paste a worker key first.", "warning")
+    def signInWebsite(self):
+        email = self._sync_email.strip()
+        password = self._sync_password
+        if not email or not password:
+            self.toast.emit("Enter your email and password.", "warning")
             return
-        if save_worker_api_key(self._sync_api_key.strip()):
-            self.toast.emit("Worker key saved to the OS credential store.", "success")
-        else:
-            self.toast.emit("Worker key could not be saved by the OS credential store.", "warning")
+        save_website_account_settings(email)
+        self._start_website_sync("test", email=email, password=password)
 
     @Slot()
     def testWebsiteSync(self):
@@ -1885,14 +1911,15 @@ class LocalWorkerBackend(QObject):
     def syncPendingResults(self):
         self._start_website_sync("sync")
 
-    def _start_website_sync(self, mode: str):
+    def _start_website_sync(self, mode: str, email: str | None = None, password: str | None = None):
         if self._sync_running:
             return
         if not self._sync_api_url.strip():
             self.toast.emit("Enter the Website worker API URL.", "warning")
             return
-        if not self._sync_api_key.strip():
-            self.toast.emit("Paste a worker key first.", "warning")
+        refresh_token = load_website_refresh_token()
+        if not password and not refresh_token:
+            self.toast.emit("Sign in with your email and password first.", "warning")
             return
         pending = self.store.list_pending_sync_results(limit=500)
         if mode == "sync" and not pending:
@@ -1908,7 +1935,15 @@ class LocalWorkerBackend(QObject):
         self.syncChanged.emit()
 
         self._sync_thread = QThread()
-        self._sync_worker = WebsiteSyncWorker(mode, self._sync_api_url, self._sync_api_key, self._sync_job_id, pending)
+        self._sync_worker = WebsiteSyncWorker(
+            mode,
+            self._sync_api_url,
+            self._sync_job_id,
+            pending,
+            email=email or self._sync_email.strip(),
+            password=password,
+            refresh_token=refresh_token,
+        )
         self._sync_worker.moveToThread(self._sync_thread)
         self._sync_thread.started.connect(self._sync_worker.run)
         self._sync_worker.status.connect(self._on_sync_status)
@@ -1929,6 +1964,10 @@ class LocalWorkerBackend(QObject):
         mode = payload.get("mode", "test")
         self._sync_running = False
         self._sync_connected = True
+        # The password (if any was used for this run) has done its job --
+        # never keep it in memory longer than the login call that needed it.
+        self._sync_password = ""
+        self._sync_has_saved_session = bool(load_website_refresh_token())
         self._sync_company_id = str(payload.get("company_id") or "")
         self._sync_quota_remaining = int(payload.get("quota_remaining") or 0)
         self._sync_allowed_jobs = [int(job) for job in (payload.get("allowed_jobs") or [])]
@@ -1968,6 +2007,8 @@ class LocalWorkerBackend(QObject):
     def _on_sync_failed(self, message: str):
         self._sync_running = False
         self._sync_connected = False
+        self._sync_password = ""
+        self._sync_has_saved_session = bool(load_website_refresh_token())
         self._sync_status = "Website sync failed"
         self._sync_detail = message
         self.syncChanged.emit()

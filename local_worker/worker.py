@@ -2342,8 +2342,13 @@ class LocalWorker:
         device_name: str,
         verify_ssl: bool | None = None,
         api_base_url: str | None = None,
+        account_refresh_token: str | None = None,
     ):
         self.api_key = api_key
+        # When set (with no api_key), 401s are recovered by refreshing this
+        # Supabase session instead of re-sending a Worker Key -- see
+        # login_with_account().
+        self.account_refresh_token = account_refresh_token
         self.processing_mode = processing_mode
         self.ai_mode = ai_mode
         self.device_name = device_name
@@ -2371,10 +2376,13 @@ class LocalWorker:
                     resp.status_code == 401
                     and allow_reauth
                     and not absolute
-                    and path_or_url != "/auth"
-                    and self.api_key
+                    and path_or_url not in ("/auth", "/login")
+                    and (self.api_key or self.account_refresh_token)
                 ):
-                    self.login()
+                    if self.api_key:
+                        self.login()
+                    else:
+                        self.login_with_account()
                     resp = self.session.request(method, url, timeout=timeout, **kwargs)
                 if resp.status_code in {429, 500, 502, 503, 504} and attempt < 3:
                     time.sleep(2**attempt)
@@ -2386,6 +2394,16 @@ class LocalWorker:
                     time.sleep(2**attempt)
                     continue
         raise LocalWorkerError(f"Request failed: {last_error}")
+
+    def _apply_session(self, data: dict):
+        self.access_token = data["access_token"]
+        self.company_id = data["company_id"]
+        self.allowed_jobs = data["allowed_jobs"]
+        self.quota_remaining = data["quota_remaining"]
+        self.permissions = data.get("permissions") or {}
+        self.session.headers.update({"Authorization": f"Bearer {self.access_token}"})
+        _log_progress("login", company_id=self.company_id, quota_remaining=self.quota_remaining)
+        print(f"Login successful. Company={self.company_id} Quota remaining={self.quota_remaining}")
 
     def login(self):
         if not self.api_key:
@@ -2402,16 +2420,47 @@ class LocalWorker:
         )
         if resp.status_code != 200:
             raise LocalWorkerError(f"Login failed: {resp.text}")
+        self._apply_session(resp.json())
 
-        data = resp.json()
-        self.access_token = data["access_token"]
-        self.company_id = data["company_id"]
-        self.allowed_jobs = data["allowed_jobs"]
-        self.quota_remaining = data["quota_remaining"]
-        self.permissions = data.get("permissions") or {}
-        self.session.headers.update({"Authorization": f"Bearer {self.access_token}"})
-        _log_progress("login", company_id=self.company_id, quota_remaining=self.quota_remaining)
-        print(f"Login successful. Company={self.company_id} Quota remaining={self.quota_remaining}")
+    def login_with_account(self, email: str | None = None, password: str | None = None):
+        """Website Sync login using the recruiter's normal CV Analyzer
+        account instead of a pasted Worker Key. On first call, pass
+        email+password; on later 401-triggered re-auth, called with
+        neither -- it silently refreshes using the stored Supabase
+        refresh token instead of asking for the password again.
+        """
+        from supabase_auth import login_with_password, refresh_session
+        from credentials import save_website_refresh_token, clear_website_refresh_token
+
+        try:
+            if password:
+                session = login_with_password(email, password)
+            elif self.account_refresh_token:
+                session = refresh_session(self.account_refresh_token)
+            else:
+                raise LocalWorkerError("Sign in with your email and password first.")
+        except Exception as exc:
+            if not password:
+                # A dead refresh token should not be retried forever.
+                self.account_refresh_token = None
+                clear_website_refresh_token()
+            raise LocalWorkerError(str(exc)) from exc
+
+        supabase_token = session["access_token"]
+        self.account_refresh_token = session.get("refresh_token") or self.account_refresh_token
+        if self.account_refresh_token:
+            save_website_refresh_token(self.account_refresh_token)
+
+        resp = self._request(
+            "POST",
+            "/login",
+            allow_reauth=False,
+            headers={"Authorization": f"Bearer {supabase_token}"},
+            json={"device_name": self.device_name, "worker_version": WORKER_VERSION},
+        )
+        if resp.status_code != 200:
+            raise LocalWorkerError(f"Login failed: {resp.text}")
+        self._apply_session(resp.json())
 
     def list_jobs(self):
         resp = self._request("GET", "/jobs")

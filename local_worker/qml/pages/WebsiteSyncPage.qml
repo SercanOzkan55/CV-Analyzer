@@ -131,7 +131,7 @@ ScrollView {
                     width: parent.width
                     spacing: Theme.space3
 
-                    SectionHeader { Layout.fillWidth: true; title: "Connection"; subtitle: "Paste the worker key issued by your Website workspace." }
+                    SectionHeader { Layout.fillWidth: true; title: "Connection"; subtitle: "Sign in with your CV Analyzer account." }
 
                     Text { text: "WORKER API URL"; color: Theme.textMuted; font.pixelSize: Typography.captionSize; font.weight: Typography.weightSemiBold }
                     AppTextField {
@@ -141,13 +141,21 @@ ScrollView {
                         onTextChanged: if (backend.syncApiUrl !== text) backend.syncApiUrl = text
                     }
 
-                    Text { text: "WORKER KEY"; color: Theme.textMuted; font.pixelSize: Typography.captionSize; font.weight: Typography.weightSemiBold; Layout.topMargin: 4 }
+                    Text { text: "EMAIL"; color: Theme.textMuted; font.pixelSize: Typography.captionSize; font.weight: Typography.weightSemiBold; Layout.topMargin: 4 }
+                    AppTextField {
+                        Layout.fillWidth: true
+                        text: backend.syncEmail
+                        placeholder: "you@company.com"
+                        onTextChanged: if (backend.syncEmail !== text) backend.syncEmail = text
+                    }
+
+                    Text { text: "PASSWORD"; color: Theme.textMuted; font.pixelSize: Typography.captionSize; font.weight: Typography.weightSemiBold; Layout.topMargin: 4 }
                     AppTextField {
                         Layout.fillWidth: true
                         password: true
-                        text: backend.syncApiKey
-                        placeholder: "Paste worker key from Website"
-                        onTextChanged: if (backend.syncApiKey !== text) backend.syncApiKey = text
+                        text: backend.syncPassword
+                        placeholder: backend.syncHasSavedSession ? "Leave blank to keep using your saved sign-in" : "Your account password"
+                        onTextChanged: if (backend.syncPassword !== text) backend.syncPassword = text
                     }
 
                     Text { text: "TARGET WEBSITE JOB ID"; color: Theme.textMuted; font.pixelSize: Typography.captionSize; font.weight: Typography.weightSemiBold; Layout.topMargin: 4 }
@@ -164,20 +172,21 @@ ScrollView {
                         spacing: Theme.space2
                         AppButton {
                             Layout.fillWidth: true
-                            text: "Save key"
-                            fill: Theme.surfaceElevated; fillHover: Theme.surfaceMuted
-                            fillPressed: Theme.surfaceMuted; stroke: Theme.border
-                            textColor: Theme.textPrimary
-                            onClicked: backend.saveWorkerKey()
-                        }
-                        AppButton {
-                            Layout.fillWidth: true
-                            text: backend.syncRunning ? "Testing…" : "Test connection"
+                            text: backend.syncRunning ? "Signing in…" : "Sign in"
                             strong: true
                             enabled: !backend.syncRunning
                             fill: Theme.primary; fillHover: Theme.primaryHover
                             fillPressed: Qt.darker(Theme.primary, 1.15); stroke: Theme.primary
                             textColor: "#ffffff"
+                            onClicked: backend.signInWebsite()
+                        }
+                        AppButton {
+                            Layout.fillWidth: true
+                            text: backend.syncRunning ? "Testing…" : "Test connection"
+                            enabled: !backend.syncRunning && backend.syncHasSavedSession
+                            fill: Theme.surfaceElevated; fillHover: Theme.surfaceMuted
+                            fillPressed: Theme.surfaceMuted; stroke: Theme.border
+                            textColor: Theme.textPrimary
                             onClicked: backend.testWebsiteSync()
                         }
                     }

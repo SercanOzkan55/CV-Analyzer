@@ -283,6 +283,39 @@ def test_worker_auth_success_fail_revoked_and_expired(client, db_session, recrui
     assert client.post("/api/worker/auth", json={"api_key": expired["api_key"]}).status_code == 401
 
 
+def test_worker_login_auto_provisions_key_for_recruiter(client, db_session, recruiter_user):
+    """/worker/login is Website Sync's account-based replacement for the
+    old paste-a-key flow -- no website UI creates a WorkerKey by hand any
+    more, so the first login for an org must mint one automatically."""
+    assert db_session.query(WorkerKey).filter(WorkerKey.organization_id == recruiter_user["organization_id"]).count() == 0
+
+    resp = client.post("/api/worker/login", json={"device_name": "pytest", "worker_version": "1.0.0"})
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["company_id"] == recruiter_user["organization_id"]
+    assert data["access_token"]
+
+    keys = db_session.query(WorkerKey).filter(WorkerKey.organization_id == recruiter_user["organization_id"]).all()
+    assert len(keys) == 1
+    assert keys[0].name == "Website Sync (auto)"
+    assert keys[0].job_id is None
+
+    # A second login must reuse the same key, not mint another one.
+    resp2 = client.post("/api/worker/login", json={"device_name": "pytest", "worker_version": "1.0.0"})
+    assert resp2.status_code == 200
+    keys_after = db_session.query(WorkerKey).filter(WorkerKey.organization_id == recruiter_user["organization_id"]).all()
+    assert len(keys_after) == 1
+    assert keys_after[0].id == keys[0].id
+
+
+def test_worker_login_rejects_non_recruiter(client, db_session):
+    # No recruiter_user fixture here on purpose: get_or_create_user will
+    # create a bare "individual" account with no organization.
+    resp = client.post("/api/worker/login", json={})
+    assert resp.status_code == 403
+    assert "Recruiter" in resp.json()["detail"]
+
+
 def test_worker_cannot_use_other_company_job(client, db_session, recruiter_user, test_job):
     other_org = Organization(name="Other Org", domain="other-worker.example.com")
     db_session.add(other_org)
