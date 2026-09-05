@@ -7,6 +7,8 @@ import {
   Shield, Sparkles, Zap,
 } from 'lucide-react'
 import { useLanguage } from '../i18n/LanguageContext'
+import { useAuth } from '../context/AuthContext'
+import { getHistory } from '../utils/historyStorage'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import AnimatedBackground from '../components/AnimatedBackground'
@@ -98,9 +100,39 @@ function ProofStat({ value, suffix, label }) {
 }
 
 // ─── Demo Card with animated score ──────────────────────────────
+// Signed-in visitors who have already analyzed a CV on this device see
+// their own last real result here instead of the static illustrative
+// mock -- getHistory() is per-browser localStorage (see utils/historyStorage.js),
+// so this is empty for anonymous visitors and during SEO prerendering,
+// which keeps the always-crawlable fallback exactly as illustrative as
+// before (see project_adsense-rejection memory on why that labeling
+// matters: a fabricated specific score reads as a false claim, a
+// generic "Sample" doesn't).
 function DemoCard({ t }) {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: true, amount: 0.3 })
+  const { user } = useAuth()
+
+  const lastReal = user ? getHistory(user)[0]?.result : null
+  const isReal = Boolean(lastReal && typeof lastReal.final_score === 'number')
+
+  const scoreValue = isReal ? Math.round(lastReal.final_score) : 100
+  const scoreDisplay = isReal ? String(scoreValue) : t('landing.demo_badge')
+  const interpretationLabel = isReal
+    ? (lastReal.interpretation || t('landing.demo_interpretation'))
+    : t('landing.demo_interpretation')
+  const detectedSkills = isReal && lastReal.detected_skills?.length
+    ? lastReal.detected_skills.slice(0, 4)
+    : ['Python', 'React', 'Docker', 'SQL']
+  const missingSkillsList = isReal && lastReal.missing_skills?.length
+    ? lastReal.missing_skills.slice(0, 2)
+    : ['Kubernetes', 'GraphQL']
+  const atsPercent = isReal && typeof lastReal.ats_score === 'number' ? Math.round(lastReal.ats_score) : 72
+  // These two floating badges were already plain hardcoded English in the
+  // original (not run through t()), so the "real" variants stay consistent
+  // with that rather than introducing new translation keys for one string.
+  const bottomBadgeLabel = isReal ? 'Your last scan' : 'Illustrative check'
+  const previewAriaLabel = isReal ? 'Your last analysis result' : 'Illustrative result preview'
 
   return (
     <div ref={ref} className="lp-demo-wrapper">
@@ -119,7 +151,7 @@ function DemoCard({ t }) {
         transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut', delay: 0.8 }}
       >
         <Shield size={12} style={{ color: 'var(--color-success)' }} />
-        Illustrative check
+        {bottomBadgeLabel}
       </motion.div>
 
       {/* Main demo card */}
@@ -150,28 +182,28 @@ function DemoCard({ t }) {
         <div className="demo-body">
           <div className="demo-score-section">
             <CircularProgress
-              value={100}
+              value={scoreValue}
               size={104}
               strokeWidth={8}
               color="var(--color-success)"
               trackColor="var(--landing-progress-track, color-mix(in srgb, var(--color-success) 14%, var(--color-border)))"
               glow="color-mix(in srgb, var(--color-success) 28%, transparent)"
               className="demo-ring lp-demo-circle"
-              label="Illustrative result preview"
+              label={previewAriaLabel}
             >
               <span className="demo-score-value">
                 <span className="demo-num" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                  {t('landing.demo_badge')}
+                  {scoreDisplay}{isReal ? '%' : ''}
                 </span>
               </span>
             </CircularProgress>
-            <span className="demo-label">{t('landing.demo_interpretation')}</span>
+            <span className="demo-label">{interpretationLabel}</span>
           </div>
           <div className="demo-details">
             <div className="demo-row">
               <span>{t('landing.demo_skills_found')}</span>
               <div className="demo-tags">
-                {['Python', 'React', 'Docker', 'SQL'].map((s, i) => (
+                {detectedSkills.map((s, i) => (
                   <motion.span
                     key={s}
                     className="tag tag-green"
@@ -187,7 +219,7 @@ function DemoCard({ t }) {
             <div className="demo-row">
               <span>{t('landing.demo_skills_missing')}</span>
               <div className="demo-tags">
-                {['Kubernetes', 'GraphQL'].map((s, i) => (
+                {missingSkillsList.map((s, i) => (
                   <motion.span
                     key={s}
                     className="tag tag-red"
@@ -208,7 +240,7 @@ function DemoCard({ t }) {
                     className="bar-fill"
                     style={{ background: 'var(--gradient-accent)' }}
                     initial={{ width: 0 }}
-                    animate={isInView ? { width: '72%' } : {}}
+                    animate={isInView ? { width: `${atsPercent}%` } : {}}
                     transition={{ delay: 0.6, duration: 1.2, ease: 'easeOut' }}
                   />
                 </div>
