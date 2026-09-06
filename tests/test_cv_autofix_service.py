@@ -376,6 +376,32 @@ def test_export_safety_rejects_unmapped_pdf_glyphs():
     assert "unmapped_pdf_glyphs" in report["hard_fails"]
 
 
+def test_parse_project_entries_handles_lettered_bullets_across_two_projects():
+    # Same bug shape as the experience parser, in _parse_project_entries's
+    # own independent copy of the bullet/continuation logic: lettered
+    # markers ("a) b) c)") weren't recognized as bullets, and the
+    # continuation-merge check here was unconditional (no role-keyword
+    # exception like the job parser has), so the second project's NAME
+    # would get swallowed into the first project's last bullet whenever
+    # that bullet had no terminal punctuation.
+    lines = [
+        "CV Analyzer Platform",
+        "a) Built an ATS pipeline that parses PDF documents",
+        "b) Implemented deterministic-first scoring with an AI fallback",
+        "Realtime Chat Widget",
+        "a) Implemented presence and message delivery over WebSocket",
+    ]
+    projects = _parse_project_entries(lines)
+    assert len(projects) == 2
+    assert projects[0]["name"] == "CV Analyzer Platform"
+    assert projects[0]["bullets"] == [
+        "Built an ATS pipeline that parses PDF documents",
+        "Implemented deterministic-first scoring with an AI fallback",
+    ]
+    assert projects[1]["name"] == "Realtime Chat Widget"
+    assert projects[1]["bullets"] == ["Implemented presence and message delivery over WebSocket"]
+
+
 def test_reference_style_structures_survive_pdf_text_artifacts():
     project_lines = _clean_lines(
         "\n".join(

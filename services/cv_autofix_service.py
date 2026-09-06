@@ -3105,22 +3105,47 @@ def _parse_project_entries(lines: list[str]) -> list[dict]:
     )
     _URL_LINE = re.compile(r"^\s*(?:https?://\S+|www\.\S+)\s*$", re.I)
     _BULLET_RE_PROJ = re.compile(r"^\s*[-*•\u2013\u2014\u2023\u25aa\u25a0\u25cf\u25cb\u25e6►]\s+")
+    # Lettered/numbered markers ("a) ", "1) ", "a. ", "1. "), mirroring
+    # the same fix in _parse_experience_entries and the earlier fix in
+    # agents/extract_agent.py::_merge_wrapped_lines. This parser had its own,
+    # independent copy of the symbol-only bullet check, so it needed the
+    # same addition separately.
+    _LETTERED_BULLET_RE_PROJ = re.compile(r"^\s*(?:[a-zA-Z]|\d{1,2})[).]\s+")
 
     _PROJECT_CONTINUATION_RE = re.compile(
         r"^(?:and|or|with|to|for|in|on|of|by|as|using|between|while|through|that|which|ve|ile|i[cç]in|olarak)\b",
         re.I,
     )
 
+    def _looks_like_project_entry_header(text: str) -> bool:
+        """A short phrase where every word starts with a capital letter reads
+        as a proper-noun header line (a new project's name) rather than a
+        hard-wrapped prose continuation. See the identical helper in
+        _parse_experience_entries for the full rationale and the real
+        cross-entry bug it guards against (a bullet with no terminal
+        punctuation otherwise swallows the very next line unconditionally
+        in this function -- there is no role-keyword exception here like
+        there is for jobs).
+        """
+        words = text.split()
+        if len(words) < 2 or len(words) > 6:
+            return False
+        return all(w[0].isupper() for w in words if w[0].isalpha())
+
     def _looks_like_project_continuation(value: str, current_entry: dict | None = None) -> bool:
         text = (value or "").strip()
-        if not text or _BULLET_RE_PROJ.match(text):
+        if not text or _BULLET_RE_PROJ.match(text) or _LETTERED_BULLET_RE_PROJ.match(text):
             return False
 
         is_continuation_word = bool(_PROJECT_CONTINUATION_RE.match(text))
 
         if current_entry and current_entry.get("bullets"):
             previous_bullet = current_entry["bullets"][-1].rstrip()
-            if previous_bullet and previous_bullet[-1] not in ".!?:;":
+            if (
+                previous_bullet
+                and previous_bullet[-1] not in ".!?:;"
+                and not _looks_like_project_entry_header(text)
+            ):
                 return True
 
         first_char = text[0] if text else ""
@@ -3169,7 +3194,7 @@ def _parse_project_entries(lines: list[str]) -> list[dict]:
             }
             continue
 
-        m_bullet = _BULLET_RE_PROJ.match(line)
+        m_bullet = _BULLET_RE_PROJ.match(line) or _LETTERED_BULLET_RE_PROJ.match(line)
         if m_bullet:
             if current is None:
                 current = {"name": "", "description": "", "bullets": []}
