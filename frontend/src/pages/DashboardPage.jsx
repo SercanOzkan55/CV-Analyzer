@@ -39,6 +39,17 @@ const scaleVariants = {
   show: { opacity: 1, scale: 1, transition: { duration: 0.38, ease: [0.34, 1.56, 0.64, 1] } },
 }
 
+/**
+ * "Son Analizler" listesinde tutulan kayit sayisi.
+ *
+ * Liste artik kendi icinde kayiyor (.db-analyses-list, max-height: 400px) ve
+ * bir seferde ~4.5 satir gorunuyor. Onceki deger 6 idi; kaydirilacak yer
+ * neredeyse kalmadigi icin kaydirma anlamsiz olurdu. Tamamini gostermek de
+ * dogru degil — bolumun adi "son analizler" ve yaninda "Tumunu gor" baglantisi
+ * duruyor.
+ */
+const RECENT_ANALYSES_LIMIT = 12
+
 // ─── Stat Card ──────────────────────────────────────────────────
 function DBStatCard({ icon: Icon, iconColor, value, label, progress, children }) {
   const animatedValue = useAnimatedCounter(typeof value === 'number' ? value : 0, 1000)
@@ -542,7 +553,7 @@ export default function DashboardPage() {
                 whileInView="show"
                 viewport={{ once: true }}
               >
-                {history.slice(0, 6).map((item, i) => (
+                {history.slice(0, RECENT_ANALYSES_LIMIT).map((item, i) => (
                   <AnalysisCard key={i} item={item} index={i} />
                 ))}
               </motion.div>

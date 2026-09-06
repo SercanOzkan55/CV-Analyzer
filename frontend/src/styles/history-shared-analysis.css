@@ -514,6 +514,22 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+
+  /* ~4.5 satir: yarim gorunen satir, altta devami oldugunu kendiliginden
+     soyler — ayri bir "daha var" isareti gerekmez. */
+  max-height: 400px;
+  overflow-y: auto;
+  /* .db-analysis-card:hover translateX(4px) yapiyor. overflow-y: auto
+     verildiginde tarayici yatay ekseni de auto'ya cevirir, yani hover'da
+     altta yatay kaydirma cubugu belirirdi. Sag padding kaymaya pay verir,
+     overflow-x kapali olmasi da geri kalani garantiler. */
+  overflow-x: hidden;
+  /* Liste bitince kaydirma sayfaya devretmesin. */
+  overscroll-behavior: contain;
+  /* Negatif margin, kaydirma cubugunu kartin kendi bosluguna tasir; satirlar
+     bolum basligiyla hizali kalir. */
+  padding-right: 10px;
+  margin-right: -10px;
 }
 
 .db-analysis-card {
@@ -733,6 +749,8 @@
   .db-hero-score { display: none; }
   .db-stats-grid { grid-template-columns: 1fr 1fr; }
   .db-stat-value { font-size: 1.3rem; }
+  /* Telefonda 400px kaydirma alani ekranin cogunu yer; kisa tutuluyor. */
+  .db-analyses-list { max-height: 320px; }
   .db-trend-svg { min-height: 120px; }
   .db-analysis-card { gap: 10px; padding: 10px 12px; }
 }
