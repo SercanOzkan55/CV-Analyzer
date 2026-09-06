@@ -42,6 +42,72 @@ def test_parse_experience_entries_splits_multiple_bullet_jobs():
     assert all(e["bullets"] for e in entries)
 
 
+def test_parse_experience_entries_strips_generic_label_prefix():
+    # "ORGANIZATION:" is a section-style label, not part of the company
+    # name — it must not ride along into the parsed value.
+    lines = [
+        "ORGANIZATION: Bright Future Foundation",
+        "Program Coordinator",
+        "Jan 2021 - Present",
+        "- Managed a portfolio of community health projects",
+    ]
+    entries = _parse_experience_entries(lines)
+    assert len(entries) == 1
+    assert entries[0]["company"] == "Bright Future Foundation"
+    assert entries[0]["title"] == "Program Coordinator"
+
+
+def test_parse_sections_drops_key_responsibilities_heading():
+    # A bare "KEY RESPONSIBILITIES" line inside the experience section is a
+    # sub-heading, not content, and must not reach the entry parser — it
+    # used to become its own fake job there. This is an end-to-end
+    # reproduction of a real two-job CV that came out as four experience
+    # entries before this guard existed: _parse_sections is the actual
+    # fix point, so the test goes through it rather than calling
+    # _parse_experience_entries directly with a hand-trimmed line list.
+    #
+    # Bullets use real "a) b) c)" lettered markers with no terminal
+    # punctuation — the exact shape that used to (a) not be recognized as
+    # bullets at all, gluing every line after the first into one, and
+    # (b) swallow the start of the SECOND job ("Sunrise Relief Trust")
+    # into the first job's last bullet once no line in the run ended with
+    # terminal punctuation to stop the merge.
+    cv_text = """Jane Doe
+jane@example.com
+
+EXPERIENCE
+ORGANIZATION: Bright Future Foundation
+Program Coordinator
+Jan 2021 - Present
+
+KEY RESPONSIBILITIES
+a) Managed a portfolio of community health projects
+b) Coordinated with government liaison offices for permit approvals
+
+ORGANIZATION: Sunrise Relief Trust
+Field Officer
+Jun 2018 - Dec 2020
+
+KEY RESPONSIBILITIES
+a) Conducted household surveys for beneficiary selection
+"""
+    _, sections, _ = _parse_sections(cv_text)
+    assert not any(
+        line.strip().upper() == "KEY RESPONSIBILITIES" for line in sections["experience"]
+    )
+
+    entries = _parse_experience_entries(sections["experience"])
+    assert len(entries) == 2
+    assert entries[0]["bullets"] == [
+        "Managed a portfolio of community health projects",
+        "Coordinated with government liaison offices for permit approvals",
+    ]
+    assert entries[1]["bullets"] == ["Conducted household surveys for beneficiary selection"]
+    assert all(e["title"] != "KEY RESPONSIBILITIES" for e in entries)
+    assert entries[0]["company"] == "Bright Future Foundation"
+    assert entries[1]["company"] == "Sunrise Relief Trust"
+
+
 def test_clean_lines():
     text = "Line 1 \n  \nLine 2\n\n\nLine 3"
     lines = _clean_lines(text)

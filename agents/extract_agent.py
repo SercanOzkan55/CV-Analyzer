@@ -327,6 +327,19 @@ def _merge_wrapped_lines(text: str) -> str:
 
     # Bullet markers including en-dash and triangular bullet
     _BULLET_RE = re.compile(r"^\s*[-\u2022\u2023\u2013\u2014\u25aa\u25a0*]\s")
+    # Lettered/numbered list markers: "a) ", "1) ", "a. ", "1. ".
+    #
+    # Without this, "b)", "c)", "d)" (single lowercase letters) hit the
+    # generic continuation-merge fallback near the end of this loop, which
+    # treats any lowercase-starting line as a wrapped sentence continuation
+    # and glues it onto the previous line. An "a) ... b) ... c) ..." list
+    # (common under a "KEY RESPONSIBILITIES" heading) collapsed into one
+    # fused sentence before it ever reached section splitting, let alone
+    # _parse_experience_entries's own bullet handling -- fixing the bullet
+    # regex there alone did not help, because by the time that code runs
+    # the damage is already done here, upstream, on the raw text.
+    _LETTERED_BULLET_RE = re.compile(r"^\s*(?:[a-zA-Z]|\d{1,2})[).]\s")
+
 
     for line in lines:
         line = line.strip()
@@ -340,7 +353,7 @@ def _merge_wrapped_lines(text: str) -> str:
             continue
 
         # Bullet lines are never merged
-        if _BULLET_RE.match(line) or line.startswith(
+        if _BULLET_RE.match(line) or _LETTERED_BULLET_RE.match(line) or line.startswith(
             ("-", "\u2022", "*", "\u2023", "\u2013 ", "\u2014 ", "\u25aa", "\u25a0")
         ):
             if buffer:

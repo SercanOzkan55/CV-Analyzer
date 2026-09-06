@@ -81,6 +81,27 @@ _SKILL_LANGUAGE_SUBLABEL_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Bare sub-headings inside an experience entry ("KEY RESPONSIBILITIES",
+# "DUTIES", "ROLES AND RESPONSIBILITIES", ...) carry no content of their
+# own — they only introduce the bullet list that follows. The modern
+# classifier (services/section_classifier.py) already routes these away
+# from the experience section. This deterministic parser did not, so on
+# CVs where its output is longer it would win the "prefer the richer
+# result" override in agents/extract_agent.py::extract_structured and
+# reintroduce the line as body content. _parse_experience_entries then had
+# no bullet-marker match for the following "a) ... b) ..." lines (only
+# dash/bullet-glyph markers are recognized there) and turned the bare
+# label into its own fake job entry, with the unmatched lines dumped into
+# that entry's company field. Reproduced with a synthetic two-job CV using
+# this exact heading: 2 real jobs became 4 experience entries.
+_RESPONSIBILITIES_SUBHEADING_RE = re.compile(
+    r"^\s*(?:key\s+|main\s+|primary\s+|core\s+)?"
+    r"(?:responsibilities|duties)"
+    r"(?:\s+and\s+(?:responsibilities|duties))?"
+    r"\s*:?\s*$",
+    re.IGNORECASE,
+)
+
 # Multilingual section titles — used when CV language is known
 SECTION_TITLES_I18N: dict[str, dict[str, str]] = {
     "summary": {
@@ -574,6 +595,14 @@ def _parse_sections(cv_text: str) -> tuple[list[str], dict[str, list[str]], list
 
         if dropping:
             continue
+
+        # A bare "KEY RESPONSIBILITIES" / "DUTIES" line inside an experience
+        # entry is a sub-heading, not content — drop it silently rather than
+        # letting it become a fake job title downstream (see the comment on
+        # _RESPONSIBILITIES_SUBHEADING_RE for the full failure chain).
+        if current == "experience" and _RESPONSIBILITIES_SUBHEADING_RE.match(raw_line):
+            continue
+
         if current is None:
             header_lines.append(raw_line)
         else:
@@ -1998,6 +2027,21 @@ def _parse_experience_entries(lines: list[str]) -> list[dict]:
     entries: list[dict] = []
     current: dict | None = None
 
+    # A generic "ORGANIZATION:" / "COMPANY:" / "EMPLOYER:" label rides along
+    # verbatim into the company field if not stripped here — every downstream
+    # branch below (new-entry, pipe-header, dash-split, plain fallback) treats
+    # the line as-is, so this has to run before any of them see it.
+    _generic_label_prefix_re = re.compile(
+        r"^\s*(?:organi[sz]ation|company|employer)\s*:\s*",
+        re.IGNORECASE,
+    )
+
+    # Lettered/numbered list markers ("a) b) c)", "1) 2) 3)", "a. b. c.").
+    # A trailing space is required (unlike the symbol-bullet regex below,
+    # which allows the marker to be glued straight to the text): without it
+    # "3.5" or "B.Sc" would themselves start matching.
+    _LETTERED_BULLET_RE = re.compile(r"(?:[a-zA-Z]|\d{1,2})[).]\s+")
+
     _date_token = (
         r"(?:\d{1,2}[/.]\s*)?(?:19|20)\d{2}"
         r"|[A-Za-z\u00C0-\u024F\u0400-\u04FF]{2,12}\.?\s+(?:19|20)\d{2}"
@@ -2166,6 +2210,29 @@ def _parse_experience_entries(lines: list[str]) -> list[dict]:
         words = set(re.split(r"[\s/,.-]+", text.lower()))
         return bool(words & _ROLE_KEYWORDS)
 
+    def _looks_like_entry_header(text: str) -> bool:
+        """A short phrase where every word starts with a capital letter reads
+        as a proper-noun header line (a company/organization name, a job
+        title) rather than a hard-wrapped prose continuation.
+
+        Genuine wrapped continuations are either lowercase prose or a lone
+        acronym ("AWS"), never several capitalized words in a row -- "TCP vs
+        UDP" fails this check too, because "vs" is lowercase. The 2-6 word
+        window matches typical company/title line lengths; longer spans are
+        left to the length/action-verb checks around this helper's call site.
+
+        Without this guard, a bullet ending mid-sentence with no terminal
+        punctuation swallows the very next line -- even when that line
+        starts an entirely new job. Reproduced live: "Sunrise Relief Trust"
+        (a second job's company name) got appended onto the first job's
+        last bullet, and the second job ended up with an empty company
+        field.
+        """
+        words = text.split()
+        if len(words) < 2 or len(words) > 6:
+            return False
+        return all(w[0].isupper() for w in words if w[0].isalpha())
+
     def _try_split_pipe_header(line: str) -> dict | None:
         """Try to parse pipe-delimited experience header.
 
@@ -2231,11 +2298,44 @@ def _parse_experience_entries(lines: list[str]) -> list[dict]:
         if not line:
             continue
 
+        stripped_label = _generic_label_prefix_re.sub("", line).strip()
+        if stripped_label != line:
+            line = stripped_label
+        if not line:
+            continue
+
         # Bullet item → add to current entry.
         # A line starting with a bullet marker (-, •, *, –, …) is a bullet
         # UNLESS it has no content after the marker, is purely a date,
         # or is a very short role-like phrase (≤3 words after marker).
+        # Bullet item -> add to current entry.
+        # A line starting with a bullet marker is a bullet UNLESS it has no
+        # content after the marker, is purely a date, or is a very short
+        # role-like phrase (<=3 words after marker).
+        #
+        # Two marker families are checked. Symbol bullets (dash, dot,
+        # en/em-dash, ...) are matched first, by the original regex below --
+        # left untouched here on purpose, since it mixes a literal glyph with
+        # unicode codepoint escapes, and retyping it by hand is exactly how
+        # this got broken once already while writing this fix. If that
+        # doesn't match, a second, ASCII-only regex checks for lettered or
+        # numbered markers instead: a) b) c)   1) 2) 3)   a. b. c.
+        #
+        # The lettered form REQUIRES a following space, unlike the symbol
+        # bullets (which may be glued straight to the text). Without that
+        # requirement "3.5" (a version number, a GPA) or "B.Sc" would
+        # themselves start matching.
+        #
+        # Before this fallback existed, "a) b) c) d)" style lists (common
+        # under a "KEY RESPONSIBILITIES" sub-heading) matched neither
+        # pattern, so every line after the first bullet fell through to the
+        # "unfinished bullet" merge branch further down and got glued onto
+        # one line -- losing the list structure entirely, and in the worst
+        # case swallowing the start of the NEXT job when the merged bullet
+        # never picked up terminal punctuation.
         _bullet_m = re.match(r"^\s*[-*•\u2013\u2014\u2023\u25aa\u25a0\u25cf\u25cb\u25e6\uf0b7]\s*", line)
+        if not _bullet_m:
+            _bullet_m = _LETTERED_BULLET_RE.match(line)
         if _bullet_m and not _is_date_like(line):
             bullet_text = line[_bullet_m.end() :].strip()
             # Only reject as "role title" if the after-marker text is very
@@ -2339,6 +2439,7 @@ def _parse_experience_entries(lines: list[str]) -> list[dict]:
                 previous_bullet
                 and previous_bullet[-1] not in ".!?:;"
                 and not (len(line.split()) <= 8 and _looks_like_role(line))
+                and not _looks_like_entry_header(line)
             ):
                 current["bullets"][-1] = f"{previous_bullet} {line}".strip()
                 continue

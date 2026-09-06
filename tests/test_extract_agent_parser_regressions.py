@@ -10,6 +10,25 @@ def test_wrapped_pdf_word_is_dehyphenated():
     assert "devel- opment" not in merged
 
 
+def test_lettered_bullets_are_not_fused_into_one_line():
+    # Single lowercase letters ("b)", "c)", "d)") satisfy the generic
+    # "starts lowercase -> wrapped continuation" heuristic used elsewhere in
+    # this function, so without an explicit exception a lettered list
+    # collapses into one fused sentence before section splitting ever runs.
+    text = (
+        "KEY RESPONSIBILITIES\n"
+        "a) Managed a portfolio of community health projects\n"
+        "b) Coordinated with government liaison offices\n"
+        "c) Prepared quarterly donor reports\n"
+        "d) Supervised a team of field officers\n"
+    )
+    merged_lines = _merge_wrapped_lines(text).split("\n")
+
+    bullet_lines = [line for line in merged_lines if line.strip()[:2] in ("a)", "b)", "c)", "d)")]
+    assert len(bullet_lines) == 4
+    assert not any("b)" in line and not line.strip().startswith("b)") for line in bullet_lines)
+
+
 def test_multi_column_name_rescue_accepts_engineering_title():
     result = extract_structured(
         """multi_col_fixed
