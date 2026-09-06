@@ -486,9 +486,21 @@ def recruiter_required(user=Depends(verify_supabase_jwt), db=Depends(get_db)):
     if not db_user or normalize_role(db_user.role) not in RECRUITER_REQUIRED_ROLES:
         raise HTTPException(status_code=403, detail="Recruiter role required")
 
-    if normalize_role(db_user.role) != "admin" and not db_user.organization_id:
+    if not db_user.organization_id:
         # CRITICAL FIX: Never auto-provision organization
         # Require explicit invite instead
+        #
+        # This used to exempt "admin" from needing an organization, but
+        # every recruiter.py/worker.py endpoint scopes its queries to
+        # `recruiter.organization_id` -- an admin account with no
+        # organization (organization_id=None) turns those into `... IS
+        # NULL` filters, which match every *other* org-less user in the
+        # system instead of "no one" (see owner_workflow_user for the same
+        # bug, already fixed there). The exemption never enabled any real
+        # cross-org capability since every query is still scoped to one
+        # organization_id either way -- it only created this leak.
+        # AdminBillingPage/OpsCenterPage (the tools that genuinely don't
+        # need an organization) authenticate separately, not through here.
         raise HTTPException(
             status_code=403,
             detail="Recruiter account is not assigned to an organization. Contact your admin to request an invite.",

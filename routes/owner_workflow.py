@@ -79,7 +79,19 @@ def owner_workflow_user(user=Depends(verify_supabase_jwt), db: Session = Depends
     role = str(db_user.role or "individual").strip().lower()
     if role not in OWNER_WORKFLOW_ROLES:
         raise HTTPException(status_code=403, detail="Owner workflow role required")
-    if role != "admin" and not db_user.organization_id:
+    if not db_user.organization_id:
+        # Every query below this dependency filters by
+        # `X.organization_id == recruiter.organization_id`. Admin used to be
+        # exempt from this check, but that gave admin accounts with no
+        # organization (e.g. the platform owner's own account, used for
+        # site-wide admin tools that genuinely don't need one) a
+        # organization_id of None -- and SQLAlchemy turns `column == None`
+        # into `IS NULL`, which matches *every other org-less user* in the
+        # system, not "no one". That leaked other users' emails into this
+        # admin's own "Team Members" list. Owner Workflow is inherently
+        # per-organization (there's no cross-org view here even for admin,
+        # since every query is scoped to this one organization_id), so the
+        # exemption never enabled any real capability -- just this bug.
         raise HTTPException(status_code=400, detail="Organization profile is incomplete")
     return db_user
 

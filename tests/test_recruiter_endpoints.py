@@ -101,6 +101,33 @@ def test_recruiter_sees_own_org_candidates(client, db_session):
     assert cand_b.id not in ids
 
 
+def test_orgless_admin_rejected_by_recruiter_required(client, db_session):
+    """Regression test: recruiter_required used to exempt role="admin"
+    from needing an organization_id. Every recruiter.py/worker.py endpoint
+    scopes its queries to `recruiter.organization_id`, so an admin with
+    organization_id=None turned those into `... IS NULL` filters -- the
+    same data-leak class already fixed in owner_workflow_user. There is
+    no legitimate endpoint here that needs an org-less admin to pass, so
+    this should now be a clean 403 instead of silently proceeding with
+    organization_id=None.
+    """
+    admin = User(
+        supabase_id="orgless-admin-2",
+        email="orgless-admin-2@example.com",
+        role="admin",
+        organization_id=None,
+    )
+    db_session.add(admin)
+    db_session.commit()
+
+    client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
+        "user_id": admin.supabase_id,
+        "email": admin.email,
+    }
+    resp = client.get("/api/v1/recruiter/jobs")
+    assert resp.status_code == 403
+
+
 def test_owner_role_can_use_recruiter_required_endpoints(client, db_session):
     """Regression test: recruiter_required used to only accept
     role in ("recruiter", "admin"), silently 403'ing org owners/hr/limited

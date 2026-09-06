@@ -4,6 +4,40 @@ from services.owner_workflow_service import check_permission, decision_to_candid
 from tests.test_worker_mvp import _claim_one, _create_action, _create_worker_key, _submit_result, _worker_headers
 
 
+def test_orgless_admin_cannot_list_owner_users(client, db_session):
+    """Regression test for a real data leak: owner_workflow_user used to
+    exempt role="admin" from needing an organization_id. Every query in
+    this router filters by `X.organization_id == recruiter.organization_id`,
+    so an admin account with organization_id=None turned that into
+    `... IS NULL` -- matching every *other* org-less individual user in
+    the system and returning their emails as this admin's own "Team
+    Members", instead of matching no one.
+    """
+    admin = User(
+        supabase_id="orgless-admin",
+        email="orgless-admin@example.com",
+        role="admin",
+        organization_id=None,
+    )
+    other_orgless_user = User(
+        supabase_id="unrelated-orgless-user",
+        email="unrelated@example.com",
+        role="individual",
+        organization_id=None,
+    )
+    db_session.add_all([admin, other_orgless_user])
+    db_session.commit()
+
+    client.app.dependency_overrides[verify_supabase_jwt] = lambda: {
+        "user_id": admin.supabase_id,
+        "email": admin.email,
+    }
+    resp = client.get("/api/v1/owner/users")
+    assert resp.status_code == 400
+    emails = [item.get("email") for item in resp.json().get("items", [])] if resp.status_code == 200 else []
+    assert "unrelated@example.com" not in emails
+
+
 def test_decision_status_mapping_defaults_to_manual_review():
     assert decision_to_candidate_status("recommended_accept") == "accepted"
     assert decision_to_candidate_status("recommended_reject") == "rejected"
