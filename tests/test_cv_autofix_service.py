@@ -57,6 +57,48 @@ def test_parse_experience_entries_strips_generic_label_prefix():
     assert entries[0]["title"] == "Program Coordinator"
 
 
+def test_parse_experience_entries_ignores_bare_date_fragment_as_header():
+    # A stray "2009 )" fragment (leaked from a hard-wrapped education line
+    # like "... ( July," / "2009 )") has zero alphabetic words. all() over
+    # an empty sequence is vacuously True, so without an explicit
+    # alpha_words guard in the entry-header check this line was wrongly
+    # read as a new job's title, splitting one real entry into two.
+    # Reproduces the exact line sequence from a real CV that triggered it.
+    lines = [
+        "Electrical maintenance engineer",
+        "Said abv company Doha al jabor company - Doha - February 2007 to July 2010",
+        "Indian experience: 3years worked in electrical engineering (panel board maintenance MDB.DB. circuit",
+        "breaker, cable, etc.) in Larsen & Turbo Ltd. (Surat)",
+        "PLACE:",
+        "DATE: MOHAMMAD FAHIMUDDIN",
+        "",
+        "Electrical maintenance engineer",
+        "Said abv company Doha al jabor company - Doha - February 2007 to July 2010",
+        "Graduate Diploma in Electrical Engineering from Institute of Management and Engineering, Delhi ( July,",
+        "2009 )",
+    ]
+    entries = _parse_experience_entries(lines)
+    assert not any(e["title"] == "2009 )" for e in entries)
+
+
+def test_parse_experience_entries_keeps_undated_bullet_dump_merged():
+    # An undated, companyless "Experience" section is a single unstructured
+    # dump: hard PDF line-wrap produces short Title-Case-looking fragments
+    # ("Power Plant Maintenance /Transformers Factory", "International
+    # Standards") that are pure line-wrap noise, not new job headers. The
+    # entry-header guard must stay off until the entry already carries a
+    # company or a date -- otherwise it treats every wrapped fragment as a
+    # new job and shreds one entry into several.
+    lines = [
+        "Experience",
+        "- Worked across Power Plant Maintenance /Transformers Factory",
+        "Construction Field",
+        "International Standards",
+    ]
+    entries = _parse_experience_entries(lines)
+    assert len(entries) == 1
+
+
 def test_parse_sections_drops_key_responsibilities_heading():
     # A bare "KEY RESPONSIBILITIES" line inside the experience section is a
     # sub-heading, not content, and must not reach the entry parser — it
@@ -400,6 +442,21 @@ def test_parse_project_entries_handles_lettered_bullets_across_two_projects():
     ]
     assert projects[1]["name"] == "Realtime Chat Widget"
     assert projects[1]["bullets"] == ["Implemented presence and message delivery over WebSocket"]
+
+
+def test_parse_project_entries_ignores_bare_date_fragment_as_header():
+    # Same vacuous-truth bug as the experience parser: a bare "2009 )"
+    # fragment has zero alphabetic words, so all() over that empty sequence
+    # was vacuously True and the fragment was wrongly read as a new
+    # project's name, splitting one project's bullet in two.
+    lines = [
+        "CV Analyzer Platform",
+        "a) Built an ATS pipeline that parses PDF documents",
+        "Delivered in Q3 ( 2009",
+        "2009 )",
+    ]
+    projects = _parse_project_entries(lines)
+    assert not any(p["name"] == "2009 )" for p in projects)
 
 
 def test_reference_style_structures_survive_pdf_text_artifacts():

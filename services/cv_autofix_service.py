@@ -2227,11 +2227,23 @@ def _parse_experience_entries(lines: list[str]) -> list[dict]:
         (a second job's company name) got appended onto the first job's
         last bullet, and the second job ended up with an empty company
         field.
+
+        A fragment with no alphabetic word at all (a stray date remnant
+        like "2009 )") must not count as "header-like": every element of
+        an empty sequence satisfies `all()` vacuously, so without the
+        explicit alpha_words check below a bare "2009 )" was wrongly
+        treated as a new job's title. Reproduced live on a real CV: it
+        cut a garbled, run-on experience entry in two right after a
+        stray education-section date leaked into it, adding a fake
+        fourth job with title "2009 )".
         """
         words = text.split()
         if len(words) < 2 or len(words) > 6:
             return False
-        return all(w[0].isupper() for w in words if w[0].isalpha())
+        alpha_words = [w for w in words if w[0].isalpha()]
+        if not alpha_words:
+            return False
+        return all(w[0].isupper() for w in alpha_words)
 
     def _try_split_pipe_header(line: str) -> dict | None:
         """Try to parse pipe-delimited experience header.
@@ -2435,11 +2447,26 @@ def _parse_experience_entries(lines: list[str]) -> list[dict]:
         # above; an unfinished prior bullet owns this continuation.
         if current.get("bullets"):
             previous_bullet = current["bullets"][-1].rstrip()
+            # The entry-header guard is trusted only once the CURRENT entry
+            # already carries a company or a date -- i.e. once we're
+            # confident this is a real, structured job, not a loose,
+            # unstructured bullet dump under a generic "Experience" heading.
+            # A real CV with no bullet markers at all, whose lines get hard-
+            # wrapped mid-sentence, produces short Title-Case-looking
+            # fragments purely as PDF line-wrap noise (e.g. "...Such as" /
+            # "Power Plant Maintenance /Transformers Factory/Construction
+            # Field" / "(MEP)." split across three lines): the guard fired
+            # on those and fragmented one entry into six. When the entry is
+            # undated and companyless, the older, more permissive "always
+            # merge if no terminal punctuation" behavior scored better.
+            entry_is_established = bool(
+                current.get("company") or current.get("start_date") or current.get("end_date")
+            )
             if (
                 previous_bullet
                 and previous_bullet[-1] not in ".!?:;"
                 and not (len(line.split()) <= 8 and _looks_like_role(line))
-                and not _looks_like_entry_header(line)
+                and not (entry_is_established and _looks_like_entry_header(line))
             ):
                 current["bullets"][-1] = f"{previous_bullet} {line}".strip()
                 continue
@@ -3126,11 +3153,21 @@ def _parse_project_entries(lines: list[str]) -> list[dict]:
         punctuation otherwise swallows the very next line unconditionally
         in this function -- there is no role-keyword exception here like
         there is for jobs).
+
+        A fragment with no alphabetic word at all (a stray date remnant like
+        "2009 )") must not count as "header-like": `all()` over an empty
+        sequence is vacuously true, so without the explicit alpha_words
+        check a bare punctuation/digit fragment would wrongly read as a new
+        project's name. Fixed after the identical bug was found live in
+        _looks_like_entry_header (see that function's docstring).
         """
         words = text.split()
         if len(words) < 2 or len(words) > 6:
             return False
-        return all(w[0].isupper() for w in words if w[0].isalpha())
+        alpha_words = [w for w in words if w[0].isalpha()]
+        if not alpha_words:
+            return False
+        return all(w[0].isupper() for w in alpha_words)
 
     def _looks_like_project_continuation(value: str, current_entry: dict | None = None) -> bool:
         text = (value or "").strip()
@@ -3141,10 +3178,16 @@ def _parse_project_entries(lines: list[str]) -> list[dict]:
 
         if current_entry and current_entry.get("bullets"):
             previous_bullet = current_entry["bullets"][-1].rstrip()
+            # Trust the entry-header guard only once the current entry has a
+            # real name -- not while it's still an unnamed placeholder
+            # ({"name": "", ...}, created when a bullet/tech-header/link
+            # line arrives before any project-name line). See the matching
+            # gate and its rationale in _parse_experience_entries.
+            entry_is_established = bool(current_entry.get("name"))
             if (
                 previous_bullet
                 and previous_bullet[-1] not in ".!?:;"
-                and not _looks_like_project_entry_header(text)
+                and not (entry_is_established and _looks_like_project_entry_header(text))
             ):
                 return True
 
