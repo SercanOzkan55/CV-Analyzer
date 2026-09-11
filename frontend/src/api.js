@@ -1349,12 +1349,12 @@ export function downloadWorkerExecutable(token) {
   return _downloadWorkerBinary(token, '/api/worker/download-exe')
 }
 
-export function downloadWorkerMacos(token) {
-  return _downloadWorkerBinary(token, '/api/worker/download-macos')
+export function downloadWorkerMacos(token, arch = 'arm64') {
+  return _downloadWorkerBinary(token, `/api/worker/download-macos?arch=${encodeURIComponent(arch)}`)
 }
 
-export function downloadWorkerLinux(token) {
-  return _downloadWorkerBinary(token, '/api/worker/download-linux')
+export function downloadWorkerLinux(token, arch = 'x64') {
+  return _downloadWorkerBinary(token, `/api/worker/download-linux?arch=${encodeURIComponent(arch)}`)
 }
 
 export function revokeWorkerKey(token, keyId) {

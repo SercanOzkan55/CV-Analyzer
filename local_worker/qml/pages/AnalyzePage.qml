@@ -30,6 +30,7 @@ ScrollView {
         // ── Setup flow ──
         AppCard {
             id: setupCard
+            elevation: "card"
             Layout.fillWidth: true
             Layout.preferredHeight: setupCol.implicitHeight + setupCard.pad * 2
             ColumnLayout {
@@ -85,6 +86,7 @@ ScrollView {
             // Local job setup
             AppCard {
                 id: jobCard
+                elevation: "card"
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignTop
                 Layout.preferredHeight: jobCol.implicitHeight + jobCard.pad * 2
@@ -190,6 +192,7 @@ ScrollView {
             // Scoring criteria
             AppCard {
                 id: scoreCard
+                elevation: "card"
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignTop
                 Layout.preferredHeight: scoreCol.implicitHeight + scoreCard.pad * 2
@@ -584,6 +587,7 @@ ScrollView {
             id: actionCard
             Layout.fillWidth: true
             elevated: true
+            elevation: "raised"
             Layout.preferredHeight: actionCol.implicitHeight + actionCard.pad * 2
             ColumnLayout {
                 id: actionCol

@@ -32,13 +32,13 @@ class TestGetEntitlements:
         assert ent["ai_rewrite"] is True
         assert ent["ai_daily_limit"] == 2
         assert ent["daily_cv_limit"] >= 1
-        assert ent["recruiter_dashboard"] is False
+        assert ent["recruiter_dashboard"] is True
 
     def test_pro_plan(self):
         ent = get_entitlements("pro")
         assert ent["plan"] == "pro"
         assert ent["ai_rewrite"] is True
-        assert ent["recruiter_dashboard"] is False
+        assert ent["recruiter_dashboard"] is True
 
     def test_enterprise_plan(self):
         ent = get_entitlements("enterprise")
@@ -64,8 +64,8 @@ class TestIsFeatureEnabled:
     def test_ai_rewrite_enabled_for_pro(self):
         assert is_feature_enabled("pro", "ai_rewrite") is True
 
-    def test_recruiter_dashboard_still_gated_for_free(self):
-        assert is_feature_enabled("free", "recruiter_dashboard") is False
+    def test_recruiter_dashboard_is_available_for_free(self):
+        assert is_feature_enabled("free", "recruiter_dashboard") is True
 
     def test_recruiter_dashboard_enterprise(self):
         assert is_feature_enabled("enterprise", "recruiter_dashboard") is True

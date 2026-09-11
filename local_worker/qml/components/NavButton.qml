@@ -1,21 +1,27 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Effects
+import "../theme"
 
 Button {
     id: control
 
+    // Defaults now follow the current "Ledger" teal theme instead of a
+    // leftover purple/blue palette from an earlier design — every call site
+    // already overrides these explicitly, so this only changes the
+    // (previously dead) fallback look.
     property bool active: false
     property bool collapsed: false
     property string glyph: ""
-    property color activeColor: "#7c5cff"
-    property color activeText: "#ffffff"
-    property color textColor: "#9aa8c7"
-    property color hoverText: "#f4f7ff"
-    property color activeBg: "#18152f"
-    property color hoverBg: "#111827"
-    property color activeIcon: "#a78bfa"
-    property color mutedIcon: "#8e9abf"
-    readonly property bool motionOn: typeof backend === "undefined" || backend.motionEnabled
+    property color activeColor: Theme.primary
+    property color activeText: Theme.textPrimary
+    property color textColor: Theme.textSecondary
+    property color hoverText: Theme.textPrimary
+    property color activeBg: Theme.primarySoft
+    property color hoverBg: Theme.surfaceMuted
+    property color activeIcon: Theme.primary
+    property color mutedIcon: Theme.textSecondary
+    readonly property bool motionOn: !Theme.reducedMotion && (typeof backend === "undefined" || backend.motionEnabled)
     signal navClicked()
 
     height: 44
@@ -29,8 +35,8 @@ Button {
     ToolTip.delay: 350
 
     // Press contracts the whole item ("kapanma"); hover lifts it slightly.
-    scale: down ? 0.95 : (hovered ? 1.015 : 1)
-    Behavior on scale { NumberAnimation { duration: down ? 110 : 200; easing.type: Easing.OutCubic } }
+    scale: motionOn ? (down ? 0.95 : (hovered ? 1.015 : 1)) : 1
+    Behavior on scale { NumberAnimation { duration: motionOn ? (down ? 110 : 200) : 0; easing.type: Easing.OutCubic } }
 
     contentItem: Row {
         spacing: 12
@@ -59,8 +65,21 @@ Button {
         color: control.active ? control.activeBg : (control.hovered ? control.hoverBg : "transparent")
         border.width: control.active ? 1 : 0
         border.color: control.active ? Qt.rgba(control.activeColor.r, control.activeColor.g, control.activeColor.b, 0.45) : "transparent"
-        Behavior on color { ColorAnimation { duration: 180 } }
-        Behavior on border.color { ColorAnimation { duration: 180 } }
+        Behavior on color { ColorAnimation { duration: Theme.durHover } }
+        Behavior on border.color { ColorAnimation { duration: Theme.durHover } }
+
+        // Signature colored glow on the active item — mirrors AppButton's
+        // primary-CTA glow so "this is the important/selected one" reads
+        // the same way across the app.
+        layer.enabled: control.active && control.motionOn
+        layer.effect: MultiEffect {
+            shadowEnabled: true
+            shadowColor: control.activeColor
+            shadowOpacity: Theme.glowOpacityActive
+            shadowBlur: Theme.glowBlur
+            shadowVerticalOffset: 0
+            shadowHorizontalOffset: 0
+        }
 
         // Hover "hallucination": a soft accent glow blooms over the item on
         // hover (a preview, distinct from the solid active state), contracts on
@@ -82,8 +101,8 @@ Button {
                 GradientStop { position: 0.55; color: Qt.rgba(control.activeColor.r, control.activeColor.g, control.activeColor.b, 0.22) }
                 GradientStop { position: 1.0; color: Qt.rgba(control.activeColor.r, control.activeColor.g, control.activeColor.b, 0.0) }
             }
-            Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-            Behavior on scale { NumberAnimation { duration: 280; easing.type: Easing.OutBack; easing.overshoot: 0.7 } }
+            Behavior on opacity { NumberAnimation { duration: control.motionOn ? 220 : 0; easing.type: Easing.OutCubic } }
+            Behavior on scale { NumberAnimation { duration: control.motionOn ? 280 : 0; easing.type: Easing.OutBack; easing.overshoot: 0.7 } }
         }
 
         // Animated active accent bar on the left edge — grows in with a small
@@ -97,8 +116,8 @@ Button {
             color: control.activeColor
             height: control.active ? parent.height * 0.52 : 0
             opacity: control.active ? 1 : 0
-            Behavior on height { NumberAnimation { duration: 240; easing.type: Easing.OutBack; easing.overshoot: 1.2 } }
-            Behavior on opacity { NumberAnimation { duration: 160 } }
+            Behavior on height { NumberAnimation { duration: control.motionOn ? 240 : 0; easing.type: Easing.OutBack; easing.overshoot: 1.2 } }
+            Behavior on opacity { NumberAnimation { duration: control.motionOn ? 160 : 0 } }
         }
     }
 }

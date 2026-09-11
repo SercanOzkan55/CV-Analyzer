@@ -13,7 +13,7 @@ Item {
     Layout.fillWidth: true
     Layout.fillHeight: true
 
-    readonly property int gutter: Theme.space6
+    readonly property int gutter: width < 1100 ? Theme.space4 : Theme.space6
     readonly property int maxWidth: 1500
 
     function softFill(c) { return Qt.rgba(c.r, c.g, c.b, Theme.darkMode ? 0.18 : 0.12) }
@@ -36,7 +36,8 @@ Item {
             // ── Actions ──
             AppCard {
                 id: actionsCard
-                Layout.preferredWidth: 200
+                elevation: "card"
+                Layout.preferredWidth: page.width < 1100 ? 160 : 200
                 // Not fillHeight: this card's content (header + 2 buttons +
                 // a short note) is much shorter than the editor/preview
                 // columns it sits beside. Forcing it to match their height
@@ -102,9 +103,10 @@ Item {
 
             // ── Editor ──
             AppCard {
+                elevation: "card"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.minimumWidth: 380
+                Layout.minimumWidth: page.width < 1100 ? 320 : 380
                 ColumnLayout {
                     anchors.fill: parent
                     spacing: Theme.space3
@@ -173,7 +175,8 @@ Item {
 
             // ── Live preview ──
             AppCard {
-                Layout.preferredWidth: 340
+                elevation: "card"
+                Layout.preferredWidth: page.width < 1100 ? 280 : 340
                 Layout.fillHeight: true
                 ColumnLayout {
                     anchors.fill: parent

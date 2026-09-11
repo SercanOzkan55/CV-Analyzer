@@ -163,6 +163,7 @@ Item {
         // ── Bulk email toolbar ──
         AppCard {
             id: bulkCard
+            elevation: "card"
             Layout.fillWidth: true
             visible: page.hasData && page.resultsTab === 0
             pad: Theme.space3
@@ -267,8 +268,9 @@ Item {
 
             // Candidate list
             AppCard {
-                Layout.preferredWidth: 380
-                Layout.minimumWidth: 300
+                elevation: "card"
+                Layout.preferredWidth: page.width < 1050 ? 300 : 380
+                Layout.minimumWidth: 260
                 Layout.fillHeight: true
                 pad: Theme.space3
                 ListView {
@@ -358,6 +360,7 @@ Item {
 
             // Detail panel
             AppCard {
+                elevation: "card"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
 
@@ -609,6 +612,7 @@ Item {
 
             AppCard {
                 id: reportCard
+                elevation: "card"
                 width: reportScroll.availableWidth
                 ColumnLayout {
                     id: reportCol

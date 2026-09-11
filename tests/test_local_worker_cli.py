@@ -169,7 +169,7 @@ def test_local_folder_mode_runs_without_any_api_key(tmp_path):
     assert worker.quota_remaining == 0
 
 
-def test_local_folder_mode_blocks_when_quota_is_too_low(tmp_path):
+def test_local_folder_mode_ignores_server_quota_even_when_key_is_present(tmp_path):
     cv_dir = tmp_path / "cvs"
     output_dir = tmp_path / "out"
     cv_dir.mkdir()
@@ -186,8 +186,10 @@ def test_local_folder_mode_blocks_when_quota_is_too_low(tmp_path):
     }
 
     worker = _synced_local_worker(quota_remaining=1)
-    with pytest.raises(Exception, match="has 1 scan"):
-        worker.run(1, local_folder=str(cv_dir), local_config=config, output_folder=str(output_dir))
+    worker.run(1, local_folder=str(cv_dir), local_config=config, output_folder=str(output_dir))
+
+    assert (output_dir / "local_worker_results.json").exists()
+    assert worker.quota_remaining == 1
 
 
 def test_score_cv_honors_custom_scoring_weights():
@@ -351,7 +353,9 @@ def test_score_cv_ats_format_criterion_responds_to_structure():
 
 
 def test_score_cv_soft_skills_criterion_responds_to_soft_skill_terms():
-    good_cv = "Strong leadership, teamwork, communication, and problem solving skills, with a track record of mentoring."
+    good_cv = (
+        "Strong leadership, teamwork, communication, and problem solving skills, with a track record of mentoring."
+    )
     bad_cv = "Python, Docker, Kubernetes, SQL, REST APIs."
     config = {
         "required_skills": [],

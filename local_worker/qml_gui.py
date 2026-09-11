@@ -21,13 +21,15 @@ try:
         QObject,
         Property,
         QCoreApplication,
+        QSettings,
         QThread,
+        QTimer,
         QUrl,
         Qt,
         Signal,
         Slot,
     )
-    from PySide6.QtGui import QGuiApplication, QIcon
+    from PySide6.QtGui import QFont, QFontDatabase, QGuiApplication, QIcon
     from PySide6.QtQml import QQmlApplicationEngine
     from PySide6.QtQuickControls2 import QQuickStyle
 except ImportError:
@@ -894,14 +896,18 @@ class LocalWorkerBackend(QObject):
         self._is_running = False
         self._progress_value = 0
         self._progress_maximum = 1
-        self._motion_enabled = os.environ.get("CV_WORKER_DISABLE_MOTION", "").lower() not in {"1", "true", "yes"}
+        motion_disabled_by_env = os.environ.get("CV_WORKER_DISABLE_MOTION", "").lower() in {"1", "true", "yes"}
+        saved_motion_enabled = QSettings().value("appearance/motionEnabled", True, type=bool)
+        self._motion_enabled = False if motion_disabled_by_env else bool(saved_motion_enabled)
         self._sync_api_url = os.environ.get("CV_ANALYZER_API_URL", API_BASE_URL)
         self._sync_email = load_website_account_settings().get("email", "")
         self._sync_password = ""
         self._sync_has_saved_session = bool(load_website_refresh_token())
         self._sync_job_id = ""
         self._sync_status = "Website sync not tested"
-        self._sync_detail = "Sign in with your CV Analyzer account to upload selected local results back to the website."
+        self._sync_detail = (
+            "Sign in with your CV Analyzer account to upload selected local results back to the website."
+        )
         self._sync_connected = False
         self._sync_running = False
         self._sync_company_id = ""
@@ -1218,6 +1224,7 @@ class LocalWorkerBackend(QObject):
     @motionEnabled.setter
     def motionEnabled(self, value: bool):
         self._motion_enabled = bool(value)
+        QSettings().setValue("appearance/motionEnabled", self._motion_enabled)
         self.stateChanged.emit()
 
     @Property(str, notify=syncChanged)
@@ -2087,7 +2094,13 @@ class LocalWorkerBackend(QObject):
         # re-saving host/port/email without retyping the password must not
         # wipe out what's already in the OS credential store.
         if password:
-            save_smtp_password(password)
+            if not save_smtp_password(password):
+                self.toast.emit(
+                    "Secure credential storage is unavailable. SMTP password was not saved.",
+                    "warning",
+                )
+                self.stateChanged.emit()
+                return
         self.toast.emit("SMTP settings saved.", "success")
         self.stateChanged.emit()
 
@@ -2318,9 +2331,21 @@ def main() -> int:
     QCoreApplication.setApplicationName("CV Analyzer Local Worker")
     QQuickStyle.setStyle("Basic")
     app = QGuiApplication(sys.argv)
-    icon_path = resource_path("assets/cv_analyzer_worker.ico")
+    icon_name = "cv_analyzer_worker.ico" if sys.platform == "win32" else "logo.png"
+    icon_path = resource_path(f"assets/{icon_name}")
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
+
+    # Bundled body font (IBM Plex Sans) becomes the app-wide default so every
+    # Text/Control that doesn't set its own font.family picks it up — Sora
+    # (the display face, loaded separately in Typography.qml/QML) is applied
+    # only to a handful of headline spots, not globally.
+    body_font_path = resource_path("assets/fonts/IBMPlexSans-Variable.ttf")
+    if body_font_path.exists():
+        font_id = QFontDatabase.addApplicationFont(str(body_font_path))
+        families = QFontDatabase.applicationFontFamilies(font_id)
+        if families:
+            app.setFont(QFont(families[0]))
 
     backend = LocalWorkerBackend()
     engine = QQmlApplicationEngine()
@@ -2328,6 +2353,9 @@ def main() -> int:
     engine.load(QUrl.fromLocalFile(str(resource_path("qml/Main.qml"))))
     if not engine.rootObjects():
         return 1
+    if "--smoke-test" in sys.argv:
+        print("LOCAL_WORKER_SMOKE_OK", flush=True)
+        QTimer.singleShot(0, app.quit)
     return app.exec()
 
 

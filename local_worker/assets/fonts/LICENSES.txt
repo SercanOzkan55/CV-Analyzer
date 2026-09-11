@@ -1,0 +1,19 @@
+Bundled font notices
+====================
+
+IBM Plex Sans
+Copyright (c) 2017 IBM Corp. with Reserved Font Name "Plex".
+Licensed under the SIL Open Font License, Version 1.1.
+https://openfontlicense.org
+
+Sora
+Copyright (c) 2019 The Sora Project Authors.
+Licensed under the SIL Open Font License, Version 1.1.
+https://openfontlicense.org
+
+The SIL Open Font License 1.1 permits these fonts to be used, studied,
+modified, and redistributed, provided that they are not sold by themselves,
+copyright and license notices remain with redistributed copies, reserved font
+names are respected, and modified versions remain under the same license.
+The official license text is available at:
+https://openfontlicense.org/open-font-license-official-text/

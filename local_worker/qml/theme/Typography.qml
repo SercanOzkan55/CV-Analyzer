@@ -2,10 +2,18 @@ pragma Singleton
 import QtQuick
 
 // Typographic scale tokens. Keeps font sizing/weight consistent across the app
-// instead of scattering magic pixel sizes. Family falls back to the platform
-// default sans (Qt no longer ships fonts) so it looks native on each OS.
+// instead of scattering magic pixel sizes. Bundles two variable fonts (Sora
+// for display/headings, IBM Plex Sans for body/UI text) so the "Vivid"
+// identity doesn't depend on whatever sans the OS happens to ship — falls
+// back to the platform default only if a font file fails to load.
 QtObject {
-    readonly property string family: Qt.application.font.family
+    id: typography
+
+    property FontLoader displayLoader: FontLoader { source: "../../assets/fonts/Sora-Variable.ttf" }
+    property FontLoader bodyLoader: FontLoader { source: "../../assets/fonts/IBMPlexSans-Variable.ttf" }
+
+    readonly property string displayFamily: displayLoader.status === FontLoader.Ready ? displayLoader.name : Qt.application.font.family
+    readonly property string family: bodyLoader.status === FontLoader.Ready ? bodyLoader.name : Qt.application.font.family
 
     // Sizes
     readonly property int displaySize: 28

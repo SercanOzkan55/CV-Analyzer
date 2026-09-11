@@ -137,7 +137,7 @@
     "faq3_q": "Is my data secure?",
     "faq3_a": "Your CV files are processed over a secure connection. Analysis results and saved CV versions linked to your account may remain stored so you can revisit your history until you delete them. You can remove records from the Data Center or delete your account.",
     "faq4_q": "Can I use it for free?",
-    "faq4_a": "Yes! Our Free plan includes 3 analyses per day. Upgrade to Pro for unlimited access.",
+    "faq4_a": "Yes. All features are free. Online analysis includes 3 CVs per day, while Local Worker processes folders offline without a quota.",
     "faq5_q": "Which CV languages are supported?",
     "faq5_a": "The interface supports English, Turkish, and other listed languages. Text detection can vary by language and file structure, so always verify the extracted text.",
     "footer_description": "Review CV readability, document structure and job relevance with explainable checks and practical guidance.",

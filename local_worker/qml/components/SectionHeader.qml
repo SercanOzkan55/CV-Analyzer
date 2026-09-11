@@ -19,6 +19,7 @@ RowLayout {
             Layout.fillWidth: true
             text: root.title
             color: Theme.textPrimary
+            font.family: Typography.displayFamily
             font.pixelSize: Typography.headingSize
             font.weight: Typography.weightBold
             elide: Text.ElideRight

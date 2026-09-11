@@ -237,14 +237,20 @@ def test_worker_downloads_available_to_any_logged_in_user(client, tmp_path, monk
     dist_dir = tmp_path / "dist"
     dist_dir.mkdir()
     (dist_dir / "CV Analyzer Local Worker.exe").write_bytes(b"exe-bytes")
-    (dist_dir / "CV Analyzer Local Worker-macOS.zip").write_bytes(b"zip-bytes")
-    (dist_dir / "CV Analyzer Local Worker-linux").write_bytes(b"elf-bytes")
+    (dist_dir / "CV Analyzer Local Worker-macOS-arm64.zip").write_bytes(b"arm-zip-bytes")
+    (dist_dir / "CV Analyzer Local Worker-macOS-x64.zip").write_bytes(b"x64-zip-bytes")
+    (dist_dir / "CV Analyzer Local Worker-linux-x64").write_bytes(b"x64-elf-bytes")
+    (dist_dir / "CV Analyzer Local Worker-linux-arm64").write_bytes(b"arm-elf-bytes")
 
     monkeypatch.setattr(worker_routes, "_LOCAL_WORKER_DIR", tmp_path)
 
     assert client.get("/api/worker/download-exe").status_code == 200
-    assert client.get("/api/worker/download-macos").status_code == 200
-    assert client.get("/api/worker/download-linux").status_code == 200
+    assert client.get("/api/worker/download-macos?arch=arm64").content == b"arm-zip-bytes"
+    assert client.get("/api/worker/download-macos?arch=x64").content == b"x64-zip-bytes"
+    assert client.get("/api/worker/download-linux?arch=x64").content == b"x64-elf-bytes"
+    assert client.get("/api/worker/download-linux?arch=arm64").content == b"arm-elf-bytes"
+    assert client.get("/api/worker/download-macos?arch=powerpc").status_code == 400
+    assert client.get("/api/worker/download-linux?arch=riscv").status_code == 400
 
 
 def test_worker_downloads_still_require_login(client, tmp_path, monkeypatch):
@@ -287,7 +293,9 @@ def test_worker_login_auto_provisions_key_for_recruiter(client, db_session, recr
     """/worker/login is Website Sync's account-based replacement for the
     old paste-a-key flow -- no website UI creates a WorkerKey by hand any
     more, so the first login for an org must mint one automatically."""
-    assert db_session.query(WorkerKey).filter(WorkerKey.organization_id == recruiter_user["organization_id"]).count() == 0
+    assert (
+        db_session.query(WorkerKey).filter(WorkerKey.organization_id == recruiter_user["organization_id"]).count() == 0
+    )
 
     resp = client.post("/api/worker/login", json={"device_name": "pytest", "worker_version": "1.0.0"})
     assert resp.status_code == 200, resp.text
@@ -303,9 +311,77 @@ def test_worker_login_auto_provisions_key_for_recruiter(client, db_session, recr
     # A second login must reuse the same key, not mint another one.
     resp2 = client.post("/api/worker/login", json={"device_name": "pytest", "worker_version": "1.0.0"})
     assert resp2.status_code == 200
-    keys_after = db_session.query(WorkerKey).filter(WorkerKey.organization_id == recruiter_user["organization_id"]).all()
+    keys_after = (
+        db_session.query(WorkerKey).filter(WorkerKey.organization_id == recruiter_user["organization_id"]).all()
+    )
     assert len(keys_after) == 1
     assert keys_after[0].id == keys[0].id
+
+
+def test_free_recruiter_can_login_and_sync_local_results(client, db_session, recruiter_user, test_job):
+    """Website Sync is included for free organizations; tenant and role
+    checks still apply, but the old zero-limit paid gate must not."""
+    recruiter_user["org"].plan_type = "free"
+    db_user = db_session.query(User).filter(User.id == recruiter_user["user_id"]).one()
+    db_user.plan_type = "free"
+    db_session.commit()
+
+    login = client.post("/api/worker/login", json={"device_name": "pytest", "worker_version": "test"})
+    assert login.status_code == 200, login.text
+    login_data = login.json()
+    assert login_data["quota_remaining"] == 4000
+    headers = {"Authorization": f"Bearer {login_data['access_token']}"}
+
+    response = client.post(
+        "/api/worker/offline-sync",
+        headers=headers,
+        json={
+            "job_id": test_job.id,
+            "results": [
+                {
+                    "file_name": "candidate.txt",
+                    "file_type": "txt",
+                    "score": 88,
+                    "decision": "recommended_accept",
+                    "confidence": "high",
+                    "summary": "Strong match",
+                    "matched_skills": ["Python"],
+                    "missing_skills": [],
+                    "risk_flags": [],
+                    "explanation": "Matched the role requirements.",
+                    "cv_text": "Candidate with Python experience",
+                    "candidate_name": "Free Candidate",
+                    "candidate_email": "free-candidate@example.com",
+                    "worker_version": "test",
+                    "engine_version": "test",
+                }
+            ],
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["synced_count"] == 1
+
+
+def test_offline_sync_rejects_more_than_100_results(client, recruiter_user, test_job):
+    login = client.post("/api/worker/login", json={})
+    assert login.status_code == 200, login.text
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    item = {
+        "file_name": "candidate.txt",
+        "file_type": "txt",
+        "score": 80,
+        "decision": "manual_review",
+        "confidence": "medium",
+        "summary": "Review",
+        "explanation": "Review required.",
+        "candidate_name": "Candidate",
+    }
+    response = client.post(
+        "/api/worker/offline-sync",
+        headers=headers,
+        json={"job_id": test_job.id, "results": [item] * 101},
+    )
+    assert response.status_code == 422
 
 
 def test_worker_login_rejects_non_recruiter(client, db_session):

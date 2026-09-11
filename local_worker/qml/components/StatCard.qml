@@ -17,6 +17,7 @@ AppCard {
     property color tint: Theme.primary
 
     hoverable: true
+    elevation: "card"
     pad: Theme.space4
     implicitWidth: 200
     implicitHeight: 116
@@ -54,6 +55,7 @@ AppCard {
         Text {
             text: root.displayText.length > 0 ? root.displayText : Math.round(root.animatedValue) + root.suffix
             color: Theme.textPrimary
+            font.family: Typography.displayFamily
             font.pixelSize: Typography.displaySize
             font.weight: Typography.weightBlack
             elide: Text.ElideRight

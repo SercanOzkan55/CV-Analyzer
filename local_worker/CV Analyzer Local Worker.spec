@@ -15,6 +15,9 @@ ICNS_PATH = SPEC_DIR / "assets" / "logo.icns"
 datas = [
     ("assets/cv_analyzer_worker.ico", "assets"),
     ("assets/logo.png", "assets"),
+    ("assets/fonts/IBMPlexSans-Variable.ttf", "assets/fonts"),
+    ("assets/fonts/Sora-Variable.ttf", "assets/fonts"),
+    ("assets/fonts/LICENSES.txt", "assets/fonts"),
     ("qml", "qml"),
     ("ats_config.yaml", "."),
 ]
@@ -44,6 +47,9 @@ a = Analysis(
         "PySide6.QtQml",
         "PySide6.QtQuick",
         "PySide6.QtQuickControls2",
+        "keyring.backends.Windows",
+        "keyring.backends.macOS",
+        "keyring.backends.SecretService",
     ],
     hookspath=[],
     hooksconfig={},

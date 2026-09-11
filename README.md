@@ -93,7 +93,7 @@ flowchart LR
 | ATS analizi | PDF/DOCX/TXT yükle → genel ve bölüm bazlı ATS puanları, tespit edilen/eksik yetkinlikler, öneriler |
 | Puan kırılımı | Yapı, anahtar kelimeler, deneyim, eğitim, diller, ATS uyumluluğu, uzunluk |
 | Yapay zekâ ile onarım | Önce deterministik onarım; dil modeliyle yeniden yazım yalnızca ayrıştırma kalitesi düşükse veya yeniden inşa istenirse |
-| CV Builder | Şablon tabanlı üretim (DOCX / PDF / HTML / Typst), plana göre kilitlenen şablon ve yazı tipleri |
+| CV Builder | Şablon tabanlı üretim (DOCX / PDF / HTML / Typst), ücretsiz şablon ve yazı tipleri |
 | Ön yazı ve mülakat hazırlığı | Dil modeli destekli ön yazı, mülakat sorusu ve cevap değerlendirme araçları |
 | Geçmiş ve paylaşım | Kalıcı analizler, notlar, favoriler, paylaşılabilir bağlantı belirteçleri |
 

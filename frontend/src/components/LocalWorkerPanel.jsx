@@ -313,20 +313,36 @@ export default function LocalWorkerPanel() {
       filename: 'CV Analyzer Local Worker.exe',
     },
     {
-      platform: 'macos',
-      label: 'macOS',
-      detail: '.zip -- Apple Silicon & Intel',
+      platform: 'macos-arm64',
+      label: 'macOS Apple Silicon',
+      detail: '.zip -- M1, M2, M3, M4 and newer',
       icon: Laptop,
-      fetcher: downloadWorkerMacos,
-      filename: 'CV Analyzer Local Worker-macOS.zip',
+      fetcher: (authToken) => downloadWorkerMacos(authToken, 'arm64'),
+      filename: 'CV Analyzer Local Worker-macOS-arm64.zip',
     },
     {
-      platform: 'linux',
-      label: 'Linux',
-      detail: 'binary -- most x86_64 distros',
+      platform: 'macos-x64',
+      label: 'macOS Intel',
+      detail: '.zip -- Intel x86_64 Macs',
+      icon: Laptop,
+      fetcher: (authToken) => downloadWorkerMacos(authToken, 'x64'),
+      filename: 'CV Analyzer Local Worker-macOS-x64.zip',
+    },
+    {
+      platform: 'linux-x64',
+      label: 'Linux x64',
+      detail: 'binary -- Ubuntu 22.04+ compatible',
       icon: Terminal,
-      fetcher: downloadWorkerLinux,
-      filename: 'CV Analyzer Local Worker-linux',
+      fetcher: (authToken) => downloadWorkerLinux(authToken, 'x64'),
+      filename: 'CV Analyzer Local Worker-linux-x64',
+    },
+    {
+      platform: 'linux-arm64',
+      label: 'Linux ARM64',
+      detail: 'binary -- Ubuntu 22.04+ ARM64',
+      icon: Terminal,
+      fetcher: (authToken) => downloadWorkerLinux(authToken, 'arm64'),
+      filename: 'CV Analyzer Local Worker-linux-arm64',
     },
   ]
 
@@ -342,20 +358,36 @@ export default function LocalWorkerPanel() {
       command: null,
     },
     {
-      platform: 'macos',
-      label: 'macOS',
+      platform: 'macos-arm64',
+      label: 'macOS Apple Silicon',
       icon: Laptop,
       steps: [
         'Unzip the download, then run these from Terminal in that folder -- the app is unsigned, so macOS blocks it until the quarantine flag is cleared:',
       ],
-      command: 'unzip "CV Analyzer Local Worker-macOS.zip"\nxattr -cr "CV Analyzer Local Worker.app"\nopen "CV Analyzer Local Worker.app"',
+      command: 'unzip "CV Analyzer Local Worker-macOS-arm64.zip"\nxattr -cr "CV Analyzer Local Worker.app"\nopen "CV Analyzer Local Worker.app"',
     },
     {
-      platform: 'linux',
-      label: 'Linux',
+      platform: 'macos-x64',
+      label: 'macOS Intel',
+      icon: Laptop,
+      steps: [
+        'Unzip the Intel download, then run these commands from Terminal in that folder:',
+      ],
+      command: 'unzip "CV Analyzer Local Worker-macOS-x64.zip"\nxattr -cr "CV Analyzer Local Worker.app"\nopen "CV Analyzer Local Worker.app"',
+    },
+    {
+      platform: 'linux-x64',
+      label: 'Linux x64',
       icon: Terminal,
-      steps: ['Make the binary executable, then run it from Terminal:'],
-      command: 'chmod +x "CV Analyzer Local Worker"\n./"CV Analyzer Local Worker"',
+      steps: ['Make the x64 binary executable, then run it from Terminal:'],
+      command: 'chmod +x "CV Analyzer Local Worker-linux-x64"\n./"CV Analyzer Local Worker-linux-x64"',
+    },
+    {
+      platform: 'linux-arm64',
+      label: 'Linux ARM64',
+      icon: Terminal,
+      steps: ['Make the ARM64 binary executable, then run it from Terminal:'],
+      command: 'chmod +x "CV Analyzer Local Worker-linux-arm64"\n./"CV Analyzer Local Worker-linux-arm64"',
     },
   ]
 
@@ -415,7 +447,7 @@ export default function LocalWorkerPanel() {
           <span className="product-page-kicker">Local Worker</span>
           <h2>Local Worker</h2>
           <p>
-            Run CV processing on your own machine and keep sensitive files local -- no account key or quota required.
+            Run CV processing on your own machine and keep sensitive files local -- offline processing needs no account key or quota.
           </p>
         </div>
         <div className="worker-download-grid">

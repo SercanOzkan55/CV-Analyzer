@@ -30,6 +30,7 @@ ScrollView {
         // ── Appearance ──
         AppCard {
             id: appearanceCard
+            elevation: "card"
             Layout.fillWidth: true
             Layout.preferredHeight: appearanceCol.implicitHeight + appearanceCard.pad * 2
             ColumnLayout {
@@ -113,6 +114,7 @@ ScrollView {
         // ── Runtime & privacy ──
         AppCard {
             id: privacyCard
+            elevation: "card"
             Layout.fillWidth: true
             Layout.preferredHeight: privacyCol.implicitHeight + privacyCard.pad * 2
             ColumnLayout {
@@ -167,6 +169,7 @@ ScrollView {
         // ── Website sync ──
         AppCard {
             id: syncCard
+            elevation: "card"
             Layout.fillWidth: true
             Layout.preferredHeight: syncCol.implicitHeight + syncCard.pad * 2
             ColumnLayout {
@@ -221,6 +224,7 @@ ScrollView {
         // ── Email sending ──
         AppCard {
             id: smtpCard
+            elevation: "card"
             Layout.fillWidth: true
             Layout.preferredHeight: smtpCol.implicitHeight + smtpCard.pad * 2
             ColumnLayout {

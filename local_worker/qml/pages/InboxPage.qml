@@ -80,6 +80,7 @@ ScrollView {
         }
 
         AppCard {
+            elevation: "card"
             Layout.fillWidth: true
             visible: backend.notificationCount === 0
             Layout.preferredHeight: 88
@@ -180,12 +181,12 @@ ScrollView {
                         border.color: delArea.containsMouse ? Theme.danger : Theme.border
                         Behavior on color { ColorAnimation { duration: Theme.durHover } }
                         Behavior on border.color { ColorAnimation { duration: Theme.durHover } }
-                        Text {
+                        Icon {
                             anchors.centerIn: parent
-                            text: "✕"
-                            color: delArea.containsMouse ? Theme.danger : Theme.textMuted
-                            font.pixelSize: 13
-                            font.weight: Typography.weightBold
+                            name: "close"
+                            size: 12
+                            tint: delArea.containsMouse ? Theme.danger : Theme.textMuted
+                            Behavior on tint { ColorAnimation { duration: Theme.durHover } }
                         }
                         MouseArea {
                             id: delArea
@@ -209,6 +210,7 @@ ScrollView {
         }
 
         AppCard {
+            elevation: "card"
             Layout.fillWidth: true
             visible: backend.auditCount === 0
             Layout.preferredHeight: 88

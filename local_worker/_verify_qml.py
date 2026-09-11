@@ -48,4 +48,7 @@ print("total qml messages:", len(_messages))
 print("error-like messages:", len(errors))
 for m in errors[:30]:
     print("  !", m)
+if not ok and not errors:
+    for m in _messages[:30]:
+        print("  ?", m)
 sys.exit(0 if ok and not errors else 2)

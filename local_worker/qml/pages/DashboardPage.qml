@@ -38,6 +38,7 @@ ScrollView {
                 Text {
                     text: "Welcome back, Sercan"
                     color: Theme.textPrimary
+                    font.family: Typography.displayFamily
                     font.pixelSize: Typography.displaySize
                     font.weight: Typography.weightBlack
                 }
@@ -68,6 +69,7 @@ ScrollView {
 
             // Folder / privacy card
             AppCard {
+                elevation: "card"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.preferredWidth: 2
@@ -136,6 +138,7 @@ ScrollView {
 
             // Overall match score
             AppCard {
+                elevation: "card"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.minimumHeight: 280
@@ -192,6 +195,7 @@ ScrollView {
 
             // Score distribution
             AppCard {
+                elevation: "card"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.minimumHeight: 230
@@ -225,6 +229,7 @@ ScrollView {
 
             // Recent analyses
             AppCard {
+                elevation: "card"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.minimumHeight: 230

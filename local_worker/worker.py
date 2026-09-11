@@ -4,6 +4,7 @@ import difflib
 import hashlib
 import html
 import json
+import logging
 import os
 import re
 import sys
@@ -21,6 +22,8 @@ from workspace import WorkspaceStore
 from scoring import criteria as scoring_criteria
 from scoring import stuffing_guard
 
+
+logger = logging.getLogger("cv_analyzer.local_worker")
 
 API_BASE_URL = os.environ.get("CV_ANALYZER_API_URL", "http://127.0.0.1:8001/api/worker")
 LOCAL_API_HOSTS = {"127.0.0.1", "localhost", "::1"}
@@ -1110,7 +1113,14 @@ def score_cv(cv_text: str, config: dict, cv_model=None) -> dict:
     # criterion's weight is 0 — its contribution is 0 regardless of the raw
     # score, and most configs will leave most of these at 0 by default.
     _BACKGROUND_KEYS = ("education", "language", "recruiter_score")
-    _PORTED_KEYS = ("skills_coverage", "experience_match", "role_title_match", "keyword_match", "ats_format", "soft_skills")
+    _PORTED_KEYS = (
+        "skills_coverage",
+        "experience_match",
+        "role_title_match",
+        "keyword_match",
+        "ats_format",
+        "soft_skills",
+    )
 
     # Structural CVModel parsing is comparatively expensive (a full section
     # classification + entry-parsing pass), so build it at most once per
@@ -2449,7 +2459,8 @@ class LocalWorker:
         supabase_token = session["access_token"]
         self.account_refresh_token = session.get("refresh_token") or self.account_refresh_token
         if self.account_refresh_token:
-            save_website_refresh_token(self.account_refresh_token)
+            if not save_website_refresh_token(self.account_refresh_token):
+                logger.warning("Secure credential storage is unavailable; Website Sync login will not be remembered")
 
         resp = self._request(
             "POST",
@@ -2479,13 +2490,8 @@ class LocalWorker:
         output_folder: str | None = None,
     ):
         if self.processing_mode == "local_folder":
-            # Local-folder mode is free/unlimited with no account needed —
-            # only authenticate (and so only enforce quota, see
-            # _run_local_folder) when the caller actually supplied a key.
-            # This matches qml_gui.py's AnalysisWorker, which never touches
-            # login()/quota at all for the same mode.
-            if self.api_key and not self.access_token:
-                self.login()
+            # Local-folder mode is always offline, free, and unlimited. An API
+            # key left in the environment must not silently enable metering.
             self._run_local_folder(job_id, local_folder, local_config, output_folder)
             return
 
@@ -2612,13 +2618,6 @@ class LocalWorker:
         output.mkdir(parents=True, exist_ok=True)
         files = iter_supported_local_files(folder, output)
         print(f"Found {len(files)} local file(s).")
-        if self.api_key:
-            if self.quota_remaining <= 0:
-                raise LocalWorkerError("No remaining CV scan quota. Renew your worker key or wait for quota reset.")
-            if len(files) > self.quota_remaining:
-                raise LocalWorkerError(
-                    f"Folder has {len(files)} CV file(s), but this worker key has {self.quota_remaining} scan(s) left."
-                )
         ai_review_limit = int(config.get("ai_max_reviews") or os.environ.get("CV_WORKER_AI_MAX_REVIEWS", "25") or "25")
 
         def _print_row(row: dict):
@@ -2764,9 +2763,6 @@ class LocalWorker:
         print(f"HTML Report saved: {html_path}")
         print(f"Local workspace saved: {workspace_path}")
         print(f"Owner notifications created: {notification_count}")
-        if self.api_key:
-            self.quota_remaining = max(0, self.quota_remaining - len(files))
-            print(f"Quota remaining locally: {self.quota_remaining}")
 
     def _heartbeat(self):
         try:

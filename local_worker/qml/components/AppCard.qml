@@ -9,6 +9,11 @@ Rectangle {
     property bool hoverable: false
     property bool elevated: false
     property int pad: Theme.space5
+    // Static depth level: "flat" (default — quiet, matches the previous
+    // always-flat-unless-hovered look), "card", "raised", "modal". A
+    // hoverable card lifts one level further while hovered, on top of
+    // whatever static level it's already at.
+    property string elevation: "flat"
     // Opt-in subtle 3D perspective tilt toward the cursor on hover. Pure
     // QtQuick transforms (no QtQuick3D / GPU scene) so it stays light and
     // verifiable; disabled under reduced motion.
@@ -57,16 +62,50 @@ Rectangle {
     Behavior on tiltY { NumberAnimation { duration: Theme.durHover; easing.type: Easing.OutCubic } }
 
     // Ledger direction: quiet, flat surfaces by default (a 1px border does
-    // the separating), with a shadow appearing only as hover-lift feedback
-    // on cards that are actually interactive — not as permanent ambient
-    // weight under every static panel.
-    layer.enabled: hoverable && hovered && !Theme.reducedMotion
+    // the separating); explicit `elevation` levels give static panels
+    // intentional depth, and hoverable cards lift one level further on
+    // hover on top of that — not permanent ambient weight under every panel.
+    function _levelIndex(name) {
+        return name === "modal" ? 3 : name === "raised" ? 2 : name === "card" ? 1 : 0
+    }
+    function _levelName(idx) {
+        return idx >= 3 ? "modal" : idx === 2 ? "raised" : idx === 1 ? "card" : "flat"
+    }
+    readonly property string _effectiveLevel: (hoverable && hovered && !Theme.reducedMotion)
+        ? _levelName(_levelIndex(elevation) + 1)
+        : elevation
+    function _shadowOpacity(level) {
+        switch (level) {
+        case "modal": return Theme.elevModalOpacity
+        case "raised": return Theme.elevRaisedOpacity
+        case "card": return Theme.elevCardOpacity
+        default: return Theme.elevFlatOpacity
+        }
+    }
+    function _shadowBlur(level) {
+        switch (level) {
+        case "modal": return Theme.elevModalBlur
+        case "raised": return Theme.elevRaisedBlur
+        case "card": return Theme.elevCardBlur
+        default: return Theme.elevFlatBlur
+        }
+    }
+    function _shadowYOffset(level) {
+        switch (level) {
+        case "modal": return Theme.elevModalYOffset
+        case "raised": return Theme.elevRaisedYOffset
+        case "card": return Theme.elevCardYOffset
+        default: return Theme.elevFlatYOffset
+        }
+    }
+
+    layer.enabled: !Theme.reducedMotion && card._shadowOpacity(card._effectiveLevel) > 0
     layer.effect: MultiEffect {
         shadowEnabled: true
         shadowColor: Theme.shadowColor
-        shadowOpacity: Theme.shadowOpacity
-        shadowBlur: 0.7
-        shadowVerticalOffset: 4
+        shadowOpacity: card._shadowOpacity(card._effectiveLevel)
+        shadowBlur: card._shadowBlur(card._effectiveLevel)
+        shadowVerticalOffset: card._shadowYOffset(card._effectiveLevel)
     }
 
     Item {

@@ -138,6 +138,7 @@ ScrollView {
         // ── Candidate picker ──
         AppCard {
             id: pickerCard
+            elevation: "card"
             Layout.fillWidth: true
             visible: page.allRows.length >= 2
             Layout.preferredHeight: pickerCol.implicitHeight + pickerCard.pad * 2
@@ -174,7 +175,7 @@ ScrollView {
                                     color: chip.on ? Theme.primary : "transparent"
                                     border.width: 1
                                     border.color: chip.on ? Theme.primary : Theme.borderStrong
-                                    Text { anchors.centerIn: parent; visible: chip.on; text: "✓"; color: "#ffffff"; font.pixelSize: 11; font.weight: Typography.weightBold }
+                                    Icon { anchors.centerIn: parent; visible: chip.on; name: "check"; size: 11; tint: "#ffffff" }
                                 }
                                 Text { text: chip.modelData.name; color: Theme.textPrimary; font.pixelSize: Typography.labelSize; font.weight: Typography.weightMedium }
                                 Text { text: chip.modelData.score + "%"; color: Theme.textMuted; font.pixelSize: Typography.captionSize; font.weight: Typography.weightSemiBold }
@@ -223,6 +224,7 @@ ScrollView {
                         // Only badge a single, unambiguous top scorer — if two
                         // candidates tie for the max, neither is marked "Top".
                         readonly property bool isTop: modelData.score === page.maxScore && page.maxScore >= 0 && page.topCount === 1
+                        elevation: "card"
                         Layout.alignment: Qt.AlignTop
                         implicitWidth: 280
                         Layout.preferredHeight: colCol.implicitHeight + col.pad * 2

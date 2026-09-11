@@ -99,19 +99,22 @@ ApplicationWindow {
         id: control
 
         property string glyph: ""
+        property string accessibleName: ""
 
-        width: Math.max(40, contentItem.implicitWidth + 18)
+        width: 40
         height: 40
         hoverEnabled: true
         text: ""
+        Accessible.name: accessibleName
+        Accessible.role: Accessible.Button
+        ToolTip.visible: hovered && accessibleName.length > 0
+        ToolTip.text: accessibleName
 
-        contentItem: Text {
-            text: control.glyph
-            color: control.hovered ? Theme.textPrimary : Theme.textSecondary
-            font.pixelSize: control.glyph.length > 2 ? 11 : 15
-            font.weight: Font.DemiBold
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
+        contentItem: Icon {
+            name: control.glyph
+            size: 18
+            tint: control.hovered ? Theme.textPrimary : Theme.textSecondary
+            Behavior on tint { ColorAnimation { duration: Theme.durHover } }
         }
 
         background: Rectangle {
@@ -159,10 +162,8 @@ ApplicationWindow {
             : toastType === "warning" ? Theme.warning
             : toastType === "success" ? Theme.success
             : Theme.primary
-        readonly property string glyph: toastType === "error" ? "✕"
-            : toastType === "warning" ? "!"
-            : toastType === "success" ? "✓"
-            : "i"
+        readonly property string glyph: toastType === "warning" ? "!" : "i"
+        readonly property string iconName: toastType === "error" ? "close" : toastType === "success" ? "check" : ""
         x: root.width - width - 28
         y: root.height - height - 28
         width: Math.min(460, root.width - 56)
@@ -181,9 +182,9 @@ ApplicationWindow {
             layer.effect: MultiEffect {
                 shadowEnabled: true
                 shadowColor: Theme.shadowColor
-                shadowOpacity: Theme.darkMode ? 0.5 : 0.18
-                shadowBlur: 0.8
-                shadowVerticalOffset: 8
+                shadowOpacity: Theme.elevRaisedOpacity
+                shadowBlur: Theme.elevRaisedBlur
+                shadowVerticalOffset: Theme.elevRaisedYOffset
             }
         }
 
@@ -196,8 +197,16 @@ ApplicationWindow {
                 Layout.alignment: Qt.AlignTop
                 radius: 14
                 color: Qt.rgba(toastBox.accent.r, toastBox.accent.g, toastBox.accent.b, Theme.darkMode ? 0.22 : 0.14)
+                Icon {
+                    anchors.centerIn: parent
+                    visible: toastBox.iconName.length > 0
+                    name: toastBox.iconName
+                    size: 14
+                    tint: toastBox.accent
+                }
                 Text {
                     anchors.centerIn: parent
+                    visible: toastBox.iconName.length === 0
                     text: toastBox.glyph
                     color: toastBox.accent
                     font.pixelSize: 13
@@ -245,11 +254,14 @@ ApplicationWindow {
             Behavior on color { ColorAnimation { duration: 180 } }
             Behavior on Layout.preferredWidth { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
 
+            // Softened acrylic-lite edge (translucent, not a hard ruled
+            // line) — the sidebar itself stays flush/opaque; only the seam
+            // reads as a lighter, layered boundary.
             Rectangle {
                 anchors.right: parent.right
                 width: 1
                 height: parent.height
-                color: Theme.border
+                color: Theme.chromeBorder
             }
 
             ColumnLayout {
@@ -278,6 +290,7 @@ ApplicationWindow {
                         Text {
                             text: "CV Analyzer"
                             color: Theme.textPrimary
+                            font.family: Typography.displayFamily
                             font.pixelSize: 17
                             font.weight: Font.Black
                         }
@@ -443,24 +456,36 @@ ApplicationWindow {
             Layout.fillHeight: true
             spacing: 0
 
+            // Floating "command bar" header — inset from the top/sides and
+            // fully rounded (Win11 Settings-app style) instead of a flush,
+            // flat bar. Acrylic-lite fill + a "raised" shadow give it depth
+            // over the page content instead of a ruled separator line.
             Rectangle {
+                id: headerBar
                 Layout.fillWidth: true
-                Layout.preferredHeight: 78
-                color: Theme.sidebar
-                border.width: 0
+                Layout.preferredHeight: 64
+                Layout.topMargin: Theme.space3
+                Layout.leftMargin: Theme.space3
+                Layout.rightMargin: Theme.space3
+                radius: Theme.radiusLg
+                color: Theme.chromeFill
+                border.width: 1
+                border.color: Theme.chromeBorder
                 Behavior on color { ColorAnimation { duration: 180 } }
 
-                Rectangle {
-                    anchors.bottom: parent.bottom
-                    width: parent.width
-                    height: 1
-                    color: Theme.border
+                layer.enabled: !Theme.reducedMotion
+                layer.effect: MultiEffect {
+                    shadowEnabled: true
+                    shadowColor: Theme.shadowColor
+                    shadowOpacity: Theme.elevRaisedOpacity
+                    shadowBlur: Theme.elevRaisedBlur
+                    shadowVerticalOffset: Theme.elevRaisedYOffset
                 }
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 22
-                    anchors.rightMargin: 22
+                    anchors.leftMargin: 20
+                    anchors.rightMargin: 20
                     spacing: 14
 
                     // Sidebar collapse toggle (hamburger). Pages fill more of the
@@ -474,6 +499,12 @@ ApplicationWindow {
                         color: toggleArea.containsMouse ? Theme.surfaceMuted : "transparent"
                         border.width: 1
                         border.color: toggleArea.containsMouse ? Theme.border : "transparent"
+                        activeFocusOnTab: true
+                        Accessible.name: root.sidebarCollapsed ? "Expand navigation" : "Collapse navigation"
+                        Accessible.role: Accessible.Button
+                        Keys.onEnterPressed: root.sidebarCollapsed = !root.sidebarCollapsed
+                        Keys.onReturnPressed: root.sidebarCollapsed = !root.sidebarCollapsed
+                        Keys.onSpacePressed: root.sidebarCollapsed = !root.sidebarCollapsed
                         Behavior on color { ColorAnimation { duration: 140 } }
                         Behavior on border.color { ColorAnimation { duration: 140 } }
 
@@ -504,7 +535,8 @@ ApplicationWindow {
                         Text {
                             text: root.pageTitle()
                             color: Theme.textPrimary
-                            font.pixelSize: 25
+                            font.family: Typography.displayFamily
+                            font.pixelSize: 22
                             font.weight: Font.Black
                             elide: Text.ElideRight
                         }
@@ -532,7 +564,8 @@ ApplicationWindow {
                     }
 
                     TopIconButton {
-                        glyph: Theme.darkMode ? "Sun" : "Moon"
+                        glyph: Theme.darkMode ? "sun" : "moon"
+                        accessibleName: Theme.darkMode ? "Use light theme" : "Use dark theme"
                         onClicked: Theme.toggle()
                     }
 
@@ -540,14 +573,15 @@ ApplicationWindow {
                         Layout.preferredWidth: 40
                         Layout.preferredHeight: 40
                         radius: 20
-                        color: Theme.surfaceElevated
-                        border.width: 1
-                        border.color: Theme.border
+                        gradient: Gradient {
+                            GradientStop { position: 0; color: Theme.primaryGradientStart }
+                            GradientStop { position: 1; color: Theme.primaryGradientEnd }
+                        }
 
                         Text {
                             anchors.centerIn: parent
                             text: "S"
-                            color: Theme.textPrimary
+                            color: "#ffffff"
                             font.pixelSize: 15
                             font.weight: Font.Black
                         }
@@ -559,6 +593,10 @@ ApplicationWindow {
                 id: pageStack
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.topMargin: Theme.space3
+                Layout.leftMargin: Theme.space3
+                Layout.rightMargin: Theme.space3
+                Layout.bottomMargin: Theme.space3
                 currentIndex: root.pageIndex
 
                 // Animated page transition (fade + slide-up). opacity/transform

@@ -68,6 +68,7 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             text: Math.round(root.animatedValue) + "%"
             color: Theme.textPrimary
+            font.family: Typography.displayFamily
             font.pixelSize: root.valueFontSize
             font.weight: Typography.weightBlack
         }

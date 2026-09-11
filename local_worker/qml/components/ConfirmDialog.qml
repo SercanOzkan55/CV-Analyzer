@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Effects
 import "../theme"
 
 // Generic reusable confirm/cancel modal. No confirm/modal component existed
@@ -28,9 +29,18 @@ Popup {
 
     background: Rectangle {
         radius: 18
-        color: Theme.darkMode ? Qt.rgba(18 / 255, 24 / 255, 43 / 255, 0.97) : Qt.rgba(1, 1, 1, 0.98)
+        color: Theme.surfaceElevated
         border.width: 1
         border.color: Theme.border
+
+        layer.enabled: !Theme.reducedMotion
+        layer.effect: MultiEffect {
+            shadowEnabled: true
+            shadowColor: Theme.shadowColor
+            shadowOpacity: Theme.elevModalOpacity
+            shadowBlur: Theme.elevModalBlur
+            shadowVerticalOffset: Theme.elevModalYOffset
+        }
     }
 
     contentItem: ColumnLayout {

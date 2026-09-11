@@ -10,8 +10,8 @@ import re
 import zipfile
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
-from pydantic import BaseModel
+from typing import List, Optional
+from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
@@ -55,7 +55,9 @@ security = HTTPBearer()
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _LOCAL_WORKER_DIR = _PROJECT_ROOT / "local_worker"
 LOCAL_WORKER_PLAN_LIMITS = {
-    "free": int(os.getenv("LOCAL_WORKER_MONTHLY_LIMIT_FREE", "0")),
+    # Website Sync is included in the free product. This remains a generous
+    # abuse/capacity guard; fully offline folder analysis consumes no quota.
+    "free": int(os.getenv("LOCAL_WORKER_MONTHLY_LIMIT_FREE", "4000")),
     "pro": int(os.getenv("LOCAL_WORKER_MONTHLY_LIMIT_PRO", "4000")),
     "enterprise": int(os.getenv("LOCAL_WORKER_MONTHLY_LIMIT_ENTERPRISE", "4000")),
 }
@@ -312,14 +314,18 @@ def _worker_quota_snapshot(
         key for key in all_keys if key.revoked_at is None and (key.expires_at is None or key.expires_at > now)
     ]
     active_key_ids = {key.id for key in active_keys}
-    inactive_key_ids = {key.id for key in all_keys if key.id not in active_key_ids}
+    all_key_ids = {key.id for key in all_keys}
+    inactive_key_ids = all_key_ids - active_key_ids
 
     active_quota_limit = sum(int(key.quota_limit or 0) for key in active_keys)
-    active_used_reserved = sum(int(key.quota_used or 0) + int(key.quota_reserved or 0) for key in active_keys)
+    active_reserved = sum(int(key.quota_reserved or 0) for key in active_keys)
     inactive_completed_this_month = _completed_this_month_for_keys(db, organization_id, inactive_key_ids, now)
+    completed_this_month = _completed_this_month_for_keys(db, organization_id, all_key_ids, now)
 
     allocated = active_quota_limit + inactive_completed_this_month
-    used_reserved = active_used_reserved + inactive_completed_this_month
+    # WorkerKey.quota_used is lifetime usage. Monthly limits must use this
+    # month's completion events so a new month really starts at zero.
+    used_reserved = completed_this_month + active_reserved
     quota_remaining = max(0, monthly_limit - allocated)
     runtime_remaining = max(0, monthly_limit - used_reserved)
 
@@ -343,22 +349,28 @@ def _worker_exe_path() -> Path:
     return _LOCAL_WORKER_DIR / "dist" / "CV Analyzer Local Worker.exe"
 
 
-def _worker_macos_path() -> Path:
-    configured = os.getenv("WORKER_MACOS_PATH")
+def _worker_macos_path(arch: str = "arm64") -> Path:
+    normalized = (arch or "arm64").strip().lower()
+    if normalized not in {"arm64", "x64"}:
+        raise HTTPException(status_code=400, detail="Unsupported macOS architecture")
+    configured = os.getenv(f"WORKER_MACOS_{normalized.upper()}_PATH")
     if configured:
         return Path(configured)
-    # The .app is a directory tree, not a single file -- it's published as
-    # a zip (built by re-zipping the GitHub Actions macOS artifact, see
-    # .github/workflows/build-local-worker.yml) rather than zipped on every
-    # request.
-    return _LOCAL_WORKER_DIR / "dist" / "CV Analyzer Local Worker-macOS.zip"
+    architecture_path = _LOCAL_WORKER_DIR / "dist" / f"CV Analyzer Local Worker-macOS-{normalized}.zip"
+    legacy_path = _LOCAL_WORKER_DIR / "dist" / "CV Analyzer Local Worker-macOS.zip"
+    return architecture_path if architecture_path.exists() or not legacy_path.exists() else legacy_path
 
 
-def _worker_linux_path() -> Path:
-    configured = os.getenv("WORKER_LINUX_PATH")
+def _worker_linux_path(arch: str = "x64") -> Path:
+    normalized = (arch or "x64").strip().lower()
+    if normalized not in {"arm64", "x64"}:
+        raise HTTPException(status_code=400, detail="Unsupported Linux architecture")
+    configured = os.getenv(f"WORKER_LINUX_{normalized.upper()}_PATH")
     if configured:
         return Path(configured)
-    return _LOCAL_WORKER_DIR / "dist" / "CV Analyzer Local Worker-linux"
+    architecture_path = _LOCAL_WORKER_DIR / "dist" / f"CV Analyzer Local Worker-linux-{normalized}"
+    legacy_path = _LOCAL_WORKER_DIR / "dist" / "CV Analyzer Local Worker-linux"
+    return architecture_path if architecture_path.exists() or not legacy_path.exists() else legacy_path
 
 
 def _worker_package_readme(api_base_url: str) -> str:
@@ -602,7 +614,7 @@ def create_worker_key(
     plan = _resolve_worker_plan(db, org_id, recruiter)
     quota = _worker_quota_snapshot(db, org_id, plan=plan)
     if quota["monthly_limit"] <= 0:
-        raise HTTPException(status_code=403, detail="Local Worker is available for premium plans only")
+        raise HTTPException(status_code=403, detail="Local Worker Website Sync is disabled for this organization")
     if req.quota_limit > quota["quota_remaining"]:
         raise HTTPException(
             status_code=403,
@@ -771,6 +783,7 @@ def download_worker_exe(
 @limiter.limit("10/minute")
 def download_worker_macos(
     request: Request,
+    arch: str = "arm64",
     user=Depends(verify_supabase_jwt),
 ):
     """Return the prebuilt macOS Local Worker .app, zipped.
@@ -778,14 +791,14 @@ def download_worker_macos(
     Gated by login only (not recruiter_required) -- Local Worker is a free
     download for any account, not just organizations.
     """
-    macos_path = _worker_macos_path()
+    macos_path = _worker_macos_path(arch)
     if not macos_path.exists():
         raise HTTPException(
             status_code=503,
             detail=(
                 "The macOS Local Worker build has not been published on this server yet. "
                 "Run the 'Build Local Worker' GitHub Actions workflow, download the "
-                "local-worker-macos artifact, zip it, and publish it, or set WORKER_MACOS_PATH."
+                "matching local-worker-macos artifact and publish it, or set the architecture-specific worker path."
             ),
         )
 
@@ -797,7 +810,7 @@ def download_worker_macos(
     return FileResponse(
         macos_path,
         media_type="application/zip",
-        filename="CV Analyzer Local Worker-macOS.zip",
+        filename=f"CV Analyzer Local Worker-macOS-{arch}.zip",
         headers={
             "Cache-Control": "no-store",
             "X-Content-Type-Options": "nosniff",
@@ -809,6 +822,7 @@ def download_worker_macos(
 @limiter.limit("10/minute")
 def download_worker_linux(
     request: Request,
+    arch: str = "x64",
     user=Depends(verify_supabase_jwt),
 ):
     """Return the prebuilt Linux Local Worker binary.
@@ -816,14 +830,14 @@ def download_worker_linux(
     Gated by login only (not recruiter_required) -- Local Worker is a free
     download for any account, not just organizations.
     """
-    linux_path = _worker_linux_path()
+    linux_path = _worker_linux_path(arch)
     if not linux_path.exists():
         raise HTTPException(
             status_code=503,
             detail=(
                 "The Linux Local Worker build has not been published on this server yet. "
                 "Run the 'Build Local Worker' GitHub Actions workflow, download the "
-                "local-worker-linux artifact, and publish it, or set WORKER_LINUX_PATH."
+                "matching local-worker-linux artifact and publish it, or set the architecture-specific worker path."
             ),
         )
 
@@ -835,11 +849,11 @@ def download_worker_linux(
     return FileResponse(
         linux_path,
         media_type="application/octet-stream",
-        filename="CV Analyzer Local Worker",
+        filename=f"CV Analyzer Local Worker-linux-{arch}",
         headers={
             "Cache-Control": "no-store",
             "X-Content-Type-Options": "nosniff",
-            "Content-Disposition": 'attachment; filename="CV Analyzer Local Worker"',
+            "Content-Disposition": f'attachment; filename="CV Analyzer Local Worker-linux-{arch}"',
         },
     )
 
@@ -937,7 +951,10 @@ def _create_worker_session_response(
             .all()
         ]
     )
-    quota_remaining = max(0, int(wk.quota_limit or 0) - int(wk.quota_used or 0) - int(wk.quota_reserved or 0))
+    key_remaining = max(0, int(wk.quota_limit or 0) - int(wk.quota_used or 0) - int(wk.quota_reserved or 0))
+    organization_plan = _resolve_worker_plan(db, wk.organization_id)
+    organization_quota = _worker_quota_snapshot(db, wk.organization_id, plan=organization_plan)
+    quota_remaining = min(key_remaining, int(organization_quota["runtime_quota_remaining"]))
 
     return WorkerAuthResponse(
         access_token=session_token,
@@ -1650,10 +1667,6 @@ def worker_dashboard_progress(job_id: int, db: Session = Depends(get_db), recrui
     }
 
 
-from pydantic import BaseModel
-from typing import List, Optional
-
-
 class OfflineSyncResultItem(BaseModel):
     file_name: str
     file_type: str
@@ -1676,7 +1689,7 @@ class OfflineSyncResultItem(BaseModel):
 
 class OfflineSyncRequest(BaseModel):
     job_id: int
-    results: List[OfflineSyncResultItem]
+    results: List[OfflineSyncResultItem] = Field(default_factory=list, max_length=100)
 
 
 @router.post("/worker/offline-sync")

@@ -56,6 +56,7 @@ ScrollView {
 
             AppCard {
                 id: curCard
+                elevation: "card"
                 Layout.fillWidth: true
                 Layout.preferredHeight: curCol.implicitHeight + curCard.pad * 2
                 ColumnLayout {
@@ -66,6 +67,7 @@ ScrollView {
             }
             AppCard {
                 id: prevCard
+                elevation: "card"
                 Layout.fillWidth: true
                 visible: backend.previousRunSummary.length > 0
                 Layout.preferredHeight: prevCol.implicitHeight + prevCard.pad * 2
@@ -77,6 +79,7 @@ ScrollView {
             }
             AppCard {
                 id: deltaCard
+                elevation: "card"
                 Layout.fillWidth: true
                 visible: backend.runDeltaSummary.length > 0
                 Layout.preferredHeight: deltaCol.implicitHeight + deltaCard.pad * 2

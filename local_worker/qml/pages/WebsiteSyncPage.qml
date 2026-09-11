@@ -56,6 +56,7 @@ ScrollView {
         // ── Privacy banner ──
         AppCard {
             id: bannerCard
+            elevation: "card"
             Layout.fillWidth: true
             Layout.preferredHeight: bannerRow.implicitHeight + bannerCard.pad * 2
             RowLayout {
@@ -66,7 +67,7 @@ ScrollView {
                     Layout.alignment: Qt.AlignVCenter
                     width: 44; height: 44; radius: Theme.radiusMd
                     color: Qt.rgba(Theme.success.r, Theme.success.g, Theme.success.b, 0.14)
-                    Text { anchors.centerIn: parent; text: "✓"; color: Theme.success; font.pixelSize: 22; font.weight: Typography.weightBold }
+                    Icon { anchors.centerIn: parent; name: "check"; size: 20; tint: Theme.success }
                 }
                 ColumnLayout {
                     Layout.fillWidth: true
@@ -123,6 +124,7 @@ ScrollView {
             // Connection
             AppCard {
                 id: connCard
+                elevation: "card"
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignTop
                 Layout.preferredHeight: connCol.implicitHeight + connCard.pad * 2
@@ -239,6 +241,7 @@ ScrollView {
             // Sync queue
             AppCard {
                 id: queueCard
+                elevation: "card"
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignTop
                 Layout.preferredHeight: queueCol.implicitHeight + queueCard.pad * 2

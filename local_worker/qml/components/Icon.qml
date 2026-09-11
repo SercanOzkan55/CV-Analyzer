@@ -1,11 +1,15 @@
 import QtQuick
+import QtQuick.Shapes
 import "../theme"
 
-// Centralized icon renderer: takes a semantic `name` and paints a small,
-// consistent vector glyph via Canvas. Single reusable component instead of
-// hand-painted Canvas cases duplicated per call site (was embedded directly
-// in NavButton.qml). Add a new `case` here to support another icon name.
-Canvas {
+// Vector icon set on QtQuick.Shapes — crisp, GPU-rasterized outlines instead
+// of the old Canvas-rasterized bitmap glyphs (ProgressRing/SearchField
+// already use Shapes successfully in this codebase; this follows the same
+// proven pattern). Same name/tint/size public API as before, so existing
+// call sites (NavButton, and the new ones added alongside this rewrite)
+// don't need to change. All coordinates are fractions of width/height so
+// icons stay crisp at any requested size, not just the original 20px grid.
+Item {
     id: root
 
     property string name: ""
@@ -14,83 +18,331 @@ Canvas {
 
     width: size
     height: size
-    antialiasing: true
 
-    onPaint: {
-        var ctx = getContext("2d")
-        ctx.clearRect(0, 0, width, height)
-        ctx.strokeStyle = root.tint
-        ctx.fillStyle = root.tint
-        ctx.lineWidth = 1.7
-        ctx.lineCap = "round"
-        ctx.lineJoin = "round"
+    readonly property real sw: Math.max(1.3, size * 0.09)
+    readonly property real cx: width / 2
+    readonly property real cy: height / 2
 
-        function rect(x, y, w, h, r) {
-            ctx.beginPath()
-            ctx.moveTo(x + r, y)
-            ctx.lineTo(x + w - r, y)
-            ctx.quadraticCurveTo(x + w, y, x + w, y + r)
-            ctx.lineTo(x + w, y + h - r)
-            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
-            ctx.lineTo(x + r, y + h)
-            ctx.quadraticCurveTo(x, y + h, x, y + h - r)
-            ctx.lineTo(x, y + r)
-            ctx.quadraticCurveTo(x, y, x + r, y)
-            ctx.stroke()
-        }
-
-        switch (root.name) {
-        case "dashboard":
-            rect(3, 3, 5, 5, 1.5); rect(12, 3, 5, 5, 1.5); rect(3, 12, 5, 5, 1.5); rect(12, 12, 5, 5, 1.5)
-            break
-        case "analyze":
-            ctx.beginPath(); ctx.arc(9, 9, 5.5, 0, Math.PI * 2); ctx.stroke()
-            ctx.beginPath(); ctx.moveTo(13.5, 13.5); ctx.lineTo(17, 17); ctx.stroke()
-            break
-        case "results":
-            rect(4, 3, 12, 14, 2)
-            ctx.beginPath(); ctx.moveTo(7, 7); ctx.lineTo(13, 7); ctx.moveTo(7, 10.5); ctx.lineTo(14, 10.5); ctx.moveTo(7, 14); ctx.lineTo(11, 14); ctx.stroke()
-            break
-        case "compare":
-            ctx.beginPath(); ctx.moveTo(3, 16.5); ctx.lineTo(17, 16.5); ctx.stroke()
-            ctx.beginPath(); ctx.moveTo(6, 16.5); ctx.lineTo(6, 9); ctx.stroke()
-            ctx.beginPath(); ctx.moveTo(10, 16.5); ctx.lineTo(10, 4); ctx.stroke()
-            ctx.beginPath(); ctx.moveTo(14, 16.5); ctx.lineTo(14, 11); ctx.stroke()
-            break
-        case "history":
-            ctx.beginPath(); ctx.arc(10, 10, 7, 0.15, Math.PI * 1.85); ctx.stroke()
-            ctx.beginPath(); ctx.moveTo(4, 5); ctx.lineTo(4, 1.8); ctx.moveTo(10, 6); ctx.lineTo(10, 10); ctx.lineTo(13.5, 12); ctx.stroke()
-            break
-        case "templates":
-            rect(3, 5, 14, 10, 2)
-            ctx.beginPath(); ctx.moveTo(4, 6); ctx.lineTo(10, 11); ctx.lineTo(16, 6); ctx.stroke()
-            break
-        case "sync":
-            ctx.beginPath(); ctx.arc(10, 10, 6.5, 0.25, Math.PI * 1.15); ctx.stroke()
-            ctx.beginPath(); ctx.moveTo(4, 12); ctx.lineTo(2, 12); ctx.lineTo(2, 15); ctx.moveTo(16, 8); ctx.lineTo(18, 8); ctx.lineTo(18, 5); ctx.stroke()
-            break
-        case "inbox":
-            ctx.beginPath()
-            ctx.moveTo(3, 11); ctx.lineTo(7, 11); ctx.lineTo(8.5, 14); ctx.lineTo(11.5, 14); ctx.lineTo(13, 11); ctx.lineTo(17, 11)
-            ctx.lineTo(15, 4); ctx.lineTo(5, 4); ctx.closePath(); ctx.stroke()
-            break
-        case "settings":
-            ctx.beginPath(); ctx.arc(10, 10, 3, 0, Math.PI * 2); ctx.stroke()
-            for (var i = 0; i < 8; i++) {
-                var a = i * Math.PI / 4
-                ctx.beginPath()
-                ctx.moveTo(10 + Math.cos(a) * 6, 10 + Math.sin(a) * 6)
-                ctx.lineTo(10 + Math.cos(a) * 8, 10 + Math.sin(a) * 8)
-                ctx.stroke()
+    // ── dashboard: 2x2 rounded squares ──
+    Item {
+        anchors.fill: parent
+        visible: root.name === "dashboard"
+        Repeater {
+            model: [[3, 3], [12, 3], [3, 12], [12, 12]]
+            Rectangle {
+                required property var modelData
+                x: (modelData[0] / 20) * root.width
+                y: (modelData[1] / 20) * root.height
+                width: (5 / 20) * root.width
+                height: (5 / 20) * root.height
+                radius: (1.5 / 20) * root.width
+                color: "transparent"
+                border.width: root.sw
+                border.color: root.tint
             }
-            break
-        default:
-            ctx.beginPath(); ctx.arc(10, 10, 5, 0, Math.PI * 2); ctx.stroke()
         }
     }
 
-    onTintChanged: requestPaint()
-    onNameChanged: requestPaint()
-    onWidthChanged: requestPaint()
-    Component.onCompleted: requestPaint()
+    // ── analyze: magnifying glass ──
+    Shape {
+        anchors.fill: parent
+        visible: root.name === "analyze"
+        preferredRendererType: Shape.CurveRenderer
+        ShapePath {
+            strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            PathAngleArc { centerX: (9 / 20) * root.width; centerY: (9 / 20) * root.height; radiusX: (5.5 / 20) * root.width; radiusY: (5.5 / 20) * root.height; startAngle: 0; sweepAngle: 360 }
+        }
+        ShapePath {
+            strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: (13.5 / 20) * root.width; startY: (13.5 / 20) * root.height
+            PathLine { x: (17 / 20) * root.width; y: (17 / 20) * root.height }
+        }
+    }
+
+    // ── results: document + 3 lines ──
+    Item {
+        anchors.fill: parent
+        visible: root.name === "results"
+        Rectangle {
+            x: (4 / 20) * root.width; y: (3 / 20) * root.height
+            width: (12 / 20) * root.width; height: (14 / 20) * root.height
+            radius: (2 / 20) * root.width
+            color: "transparent"; border.width: root.sw; border.color: root.tint
+        }
+        Shape {
+            anchors.fill: parent
+            preferredRendererType: Shape.CurveRenderer
+            ShapePath {
+                strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+                startX: (7 / 20) * root.width; startY: (7 / 20) * root.height
+                PathLine { x: (13 / 20) * root.width; y: (7 / 20) * root.height }
+            }
+            ShapePath {
+                strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+                startX: (7 / 20) * root.width; startY: (10.5 / 20) * root.height
+                PathLine { x: (14 / 20) * root.width; y: (10.5 / 20) * root.height }
+            }
+            ShapePath {
+                strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+                startX: (7 / 20) * root.width; startY: (14 / 20) * root.height
+                PathLine { x: (11 / 20) * root.width; y: (14 / 20) * root.height }
+            }
+        }
+    }
+
+    // ── compare: baseline + 3 bars ──
+    Shape {
+        anchors.fill: parent
+        visible: root.name === "compare"
+        preferredRendererType: Shape.CurveRenderer
+        ShapePath {
+            strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: (3 / 20) * root.width; startY: (16.5 / 20) * root.height
+            PathLine { x: (17 / 20) * root.width; y: (16.5 / 20) * root.height }
+        }
+        ShapePath {
+            strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: (6 / 20) * root.width; startY: (16.5 / 20) * root.height
+            PathLine { x: (6 / 20) * root.width; y: (9 / 20) * root.height }
+        }
+        ShapePath {
+            strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: (10 / 20) * root.width; startY: (16.5 / 20) * root.height
+            PathLine { x: (10 / 20) * root.width; y: (4 / 20) * root.height }
+        }
+        ShapePath {
+            strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: (14 / 20) * root.width; startY: (16.5 / 20) * root.height
+            PathLine { x: (14 / 20) * root.width; y: (11 / 20) * root.height }
+        }
+    }
+
+    // ── history: clock face + hands ──
+    Shape {
+        anchors.fill: parent
+        visible: root.name === "history"
+        preferredRendererType: Shape.CurveRenderer
+        ShapePath {
+            strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            PathAngleArc { centerX: root.cx; centerY: root.cy; radiusX: root.width * 0.35; radiusY: root.width * 0.35; startAngle: 0; sweepAngle: 360 }
+        }
+        ShapePath {
+            strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: root.cx; startY: root.cy
+            PathLine { x: (10 / 20) * root.width; y: (6 / 20) * root.height }
+        }
+        ShapePath {
+            strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: root.cx; startY: root.cy
+            PathLine { x: (13.5 / 20) * root.width; y: (12 / 20) * root.height }
+        }
+    }
+
+    // ── templates: envelope ──
+    Item {
+        anchors.fill: parent
+        visible: root.name === "templates"
+        Rectangle {
+            x: (3 / 20) * root.width; y: (5 / 20) * root.height
+            width: (14 / 20) * root.width; height: (10 / 20) * root.height
+            radius: (2 / 20) * root.width
+            color: "transparent"; border.width: root.sw; border.color: root.tint
+        }
+        Shape {
+            anchors.fill: parent
+            preferredRendererType: Shape.CurveRenderer
+            ShapePath {
+                strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"
+                capStyle: ShapePath.RoundCap; joinStyle: ShapePath.RoundJoin
+                startX: (4 / 20) * root.width; startY: (6 / 20) * root.height
+                PathLine { x: (10 / 20) * root.width; y: (11 / 20) * root.height }
+                PathLine { x: (16 / 20) * root.width; y: (6 / 20) * root.height }
+            }
+        }
+    }
+
+    // ── sync: partial-circle refresh arrows with arrowhead ticks ──
+    Shape {
+        anchors.fill: parent
+        visible: root.name === "sync"
+        preferredRendererType: Shape.CurveRenderer
+        ShapePath {
+            strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            PathAngleArc { centerX: root.cx; centerY: root.cy; radiusX: root.width * 0.325; radiusY: root.width * 0.325; startAngle: 14.3; sweepAngle: 192.7 }
+        }
+        ShapePath {
+            strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"
+            capStyle: ShapePath.RoundCap; joinStyle: ShapePath.RoundJoin
+            startX: (4 / 20) * root.width; startY: (12 / 20) * root.height
+            PathLine { x: (2 / 20) * root.width; y: (12 / 20) * root.height }
+            PathLine { x: (2 / 20) * root.width; y: (15 / 20) * root.height }
+        }
+        ShapePath {
+            strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"
+            capStyle: ShapePath.RoundCap; joinStyle: ShapePath.RoundJoin
+            startX: (16 / 20) * root.width; startY: (8 / 20) * root.height
+            PathLine { x: (18 / 20) * root.width; y: (8 / 20) * root.height }
+            PathLine { x: (18 / 20) * root.width; y: (5 / 20) * root.height }
+        }
+    }
+
+    // ── inbox: tray outline ──
+    Shape {
+        anchors.fill: parent
+        visible: root.name === "inbox"
+        preferredRendererType: Shape.CurveRenderer
+        ShapePath {
+            strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"
+            capStyle: ShapePath.RoundCap; joinStyle: ShapePath.RoundJoin
+            startX: (3 / 20) * root.width; startY: (11 / 20) * root.height
+            PathLine { x: (7 / 20) * root.width; y: (11 / 20) * root.height }
+            PathLine { x: (8.5 / 20) * root.width; y: (14 / 20) * root.height }
+            PathLine { x: (11.5 / 20) * root.width; y: (14 / 20) * root.height }
+            PathLine { x: (13 / 20) * root.width; y: (11 / 20) * root.height }
+            PathLine { x: (17 / 20) * root.width; y: (11 / 20) * root.height }
+            PathLine { x: (15 / 20) * root.width; y: (4 / 20) * root.height }
+            PathLine { x: (5 / 20) * root.width; y: (4 / 20) * root.height }
+            PathLine { x: (3 / 20) * root.width; y: (11 / 20) * root.height }
+        }
+    }
+
+    // ── settings: gear (circle + 8 spokes) ──
+    Shape {
+        anchors.fill: parent
+        visible: root.name === "settings"
+        preferredRendererType: Shape.CurveRenderer
+        ShapePath {
+            strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            PathAngleArc { centerX: root.cx; centerY: root.cy; radiusX: root.width * 0.15; radiusY: root.width * 0.15; startAngle: 0; sweepAngle: 360 }
+        }
+        // 8 spokes at 45° increments. Repeater can't delegate ShapePath (it
+        // requires Item-derived delegates), so these are written out plainly
+        // using the 8 unit-circle directions at multiples of 45°.
+        ShapePath { strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: root.cx + 1 * root.width * 0.30; startY: root.cy + 0 * root.width * 0.30
+            PathLine { x: root.cx + 1 * root.width * 0.40; y: root.cy + 0 * root.width * 0.40 } }
+        ShapePath { strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: root.cx + 0.7071 * root.width * 0.30; startY: root.cy + 0.7071 * root.width * 0.30
+            PathLine { x: root.cx + 0.7071 * root.width * 0.40; y: root.cy + 0.7071 * root.width * 0.40 } }
+        ShapePath { strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: root.cx + 0 * root.width * 0.30; startY: root.cy + 1 * root.width * 0.30
+            PathLine { x: root.cx + 0 * root.width * 0.40; y: root.cy + 1 * root.width * 0.40 } }
+        ShapePath { strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: root.cx - 0.7071 * root.width * 0.30; startY: root.cy + 0.7071 * root.width * 0.30
+            PathLine { x: root.cx - 0.7071 * root.width * 0.40; y: root.cy + 0.7071 * root.width * 0.40 } }
+        ShapePath { strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: root.cx - 1 * root.width * 0.30; startY: root.cy + 0 * root.width * 0.30
+            PathLine { x: root.cx - 1 * root.width * 0.40; y: root.cy + 0 * root.width * 0.40 } }
+        ShapePath { strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: root.cx - 0.7071 * root.width * 0.30; startY: root.cy - 0.7071 * root.width * 0.30
+            PathLine { x: root.cx - 0.7071 * root.width * 0.40; y: root.cy - 0.7071 * root.width * 0.40 } }
+        ShapePath { strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: root.cx + 0 * root.width * 0.30; startY: root.cy - 1 * root.width * 0.30
+            PathLine { x: root.cx + 0 * root.width * 0.40; y: root.cy - 1 * root.width * 0.40 } }
+        ShapePath { strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: root.cx + 0.7071 * root.width * 0.30; startY: root.cy - 0.7071 * root.width * 0.30
+            PathLine { x: root.cx + 0.7071 * root.width * 0.40; y: root.cy - 0.7071 * root.width * 0.40 } }
+    }
+
+    // ── sun ──
+    Shape {
+        anchors.fill: parent
+        visible: root.name === "sun"
+        preferredRendererType: Shape.CurveRenderer
+        ShapePath {
+            strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            PathAngleArc { centerX: root.cx; centerY: root.cy; radiusX: root.width * 0.22; radiusY: root.width * 0.22; startAngle: 0; sweepAngle: 360 }
+        }
+        ShapePath { strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: root.cx + 1 * root.width * 0.34; startY: root.cy + 0 * root.width * 0.34
+            PathLine { x: root.cx + 1 * root.width * 0.46; y: root.cy + 0 * root.width * 0.46 } }
+        ShapePath { strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: root.cx + 0.7071 * root.width * 0.34; startY: root.cy + 0.7071 * root.width * 0.34
+            PathLine { x: root.cx + 0.7071 * root.width * 0.46; y: root.cy + 0.7071 * root.width * 0.46 } }
+        ShapePath { strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: root.cx + 0 * root.width * 0.34; startY: root.cy + 1 * root.width * 0.34
+            PathLine { x: root.cx + 0 * root.width * 0.46; y: root.cy + 1 * root.width * 0.46 } }
+        ShapePath { strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: root.cx - 0.7071 * root.width * 0.34; startY: root.cy + 0.7071 * root.width * 0.34
+            PathLine { x: root.cx - 0.7071 * root.width * 0.46; y: root.cy + 0.7071 * root.width * 0.46 } }
+        ShapePath { strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: root.cx - 1 * root.width * 0.34; startY: root.cy + 0 * root.width * 0.34
+            PathLine { x: root.cx - 1 * root.width * 0.46; y: root.cy + 0 * root.width * 0.46 } }
+        ShapePath { strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: root.cx - 0.7071 * root.width * 0.34; startY: root.cy - 0.7071 * root.width * 0.34
+            PathLine { x: root.cx - 0.7071 * root.width * 0.46; y: root.cy - 0.7071 * root.width * 0.46 } }
+        ShapePath { strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: root.cx + 0 * root.width * 0.34; startY: root.cy - 1 * root.width * 0.34
+            PathLine { x: root.cx + 0 * root.width * 0.46; y: root.cy - 1 * root.width * 0.46 } }
+        ShapePath { strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: root.cx + 0.7071 * root.width * 0.34; startY: root.cy - 0.7071 * root.width * 0.34
+            PathLine { x: root.cx + 0.7071 * root.width * 0.46; y: root.cy - 0.7071 * root.width * 0.46 } }
+    }
+
+    // ── moon: crescent outline (two arcs — outer disc bite, inner cut) ──
+    Shape {
+        anchors.fill: parent
+        visible: root.name === "moon"
+        preferredRendererType: Shape.CurveRenderer
+        ShapePath {
+            strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"
+            capStyle: ShapePath.RoundCap; joinStyle: ShapePath.RoundJoin
+            startX: root.cx; startY: root.cy - root.width * 0.34
+            PathArc {
+                x: root.cx; y: root.cy + root.width * 0.34
+                radiusX: root.width * 0.34; radiusY: root.width * 0.34
+                useLargeArc: true; direction: PathArc.Clockwise
+            }
+            PathArc {
+                x: root.cx; y: root.cy - root.width * 0.34
+                radiusX: root.width * 0.27; radiusY: root.width * 0.27
+                useLargeArc: true; direction: PathArc.Clockwise
+            }
+        }
+    }
+
+    // ── check ──
+    Shape {
+        anchors.fill: parent
+        visible: root.name === "check"
+        preferredRendererType: Shape.CurveRenderer
+        ShapePath {
+            strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"
+            capStyle: ShapePath.RoundCap; joinStyle: ShapePath.RoundJoin
+            startX: root.width * 0.20; startY: root.height * 0.55
+            PathLine { x: root.width * 0.42; y: root.height * 0.75 }
+            PathLine { x: root.width * 0.80; y: root.height * 0.30 }
+        }
+    }
+
+    // ── close (X) ──
+    Shape {
+        anchors.fill: parent
+        visible: root.name === "close"
+        preferredRendererType: Shape.CurveRenderer
+        ShapePath {
+            strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: root.width * 0.25; startY: root.height * 0.25
+            PathLine { x: root.width * 0.75; y: root.height * 0.75 }
+        }
+        ShapePath {
+            strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+            startX: root.width * 0.75; startY: root.height * 0.25
+            PathLine { x: root.width * 0.25; y: root.height * 0.75 }
+        }
+    }
+
+    // ── fallback: plain circle ──
+    Shape {
+        anchors.fill: parent
+        visible: root.name !== "" && ![
+            "dashboard", "analyze", "results", "compare", "history",
+            "templates", "sync", "inbox", "settings", "sun", "moon", "check", "close"
+        ].includes(root.name)
+        preferredRendererType: Shape.CurveRenderer
+        ShapePath {
+            strokeColor: root.tint; strokeWidth: root.sw; fillColor: "transparent"
+            PathAngleArc { centerX: root.cx; centerY: root.cy; radiusX: root.width * 0.25; radiusY: root.width * 0.25; startAngle: 0; sweepAngle: 360 }
+        }
+    }
 }

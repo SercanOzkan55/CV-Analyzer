@@ -9,13 +9,13 @@ _PLAN_DEFAULTS = {
         # ``ai_daily_limit`` to keep model spend bounded.
         "ai_rewrite": True,
         "ai_daily_limit": int(os.getenv("ENTITLE_FREE_DAILY_AI", "2")),
-        "recruiter_dashboard": False,
+        "recruiter_dashboard": True,
     },
     "pro": {
         "daily_cv_limit": int(os.getenv("ENTITLE_PRO_DAILY_CV", "50")),
         "ai_rewrite": True,
         "ai_daily_limit": int(os.getenv("ENTITLE_PRO_DAILY_AI", "50")),
-        "recruiter_dashboard": False,
+        "recruiter_dashboard": True,
     },
     "enterprise": {
         "daily_cv_limit": int(os.getenv("ENTITLE_ENTERPRISE_DAILY_CV", "200")),
