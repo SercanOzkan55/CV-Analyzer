@@ -38,10 +38,14 @@ else:
 
 a = Analysis(
     ["qml_gui.py"],
-    pathex=[],
+    # Windows resolves this implicitly from the working directory, while
+    # macOS/Linux PyInstaller builds need the application source directory in
+    # the analysis path to discover sibling modules such as worker.py.
+    pathex=[str(SPEC_DIR)],
     binaries=[],
     datas=datas,
     hiddenimports=[
+        "worker",
         "PySide6.QtCore",
         "PySide6.QtGui",
         "PySide6.QtQml",
