@@ -28,6 +28,7 @@ try:
         Qt,
         Signal,
         Slot,
+        qInstallMessageHandler,
     )
     from PySide6.QtGui import QFont, QFontDatabase, QGuiApplication, QIcon
     from PySide6.QtQml import QQmlApplicationEngine
@@ -2325,6 +2326,23 @@ class LocalWorkerBackend(QObject):
 
 
 def main() -> int:
+    smoke_test = "--smoke-test" in sys.argv
+    smoke_report = os.environ.get("CV_WORKER_SMOKE_REPORT", "").strip()
+    smoke_messages: list[str] = []
+
+    if smoke_test and smoke_report:
+
+        def _capture_smoke_message(_mode, _context, message):
+            smoke_messages.append(str(message))
+
+        qInstallMessageHandler(_capture_smoke_message)
+
+    def _write_smoke_report(status: str):
+        if not smoke_report:
+            return
+        details = "\n".join(smoke_messages[-100:])
+        Path(smoke_report).write_text(f"{status}\n{details}\n", encoding="utf-8")
+
     os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
     QCoreApplication.setOrganizationName("CV Analyzer")
     QCoreApplication.setOrganizationDomain("cvanalyzer.local")
@@ -2352,8 +2370,10 @@ def main() -> int:
     engine.rootContext().setContextProperty("backend", backend)
     engine.load(QUrl.fromLocalFile(str(resource_path("qml/Main.qml"))))
     if not engine.rootObjects():
+        _write_smoke_report("FAILED: QML root object did not load")
         return 1
-    if "--smoke-test" in sys.argv:
+    if smoke_test:
+        _write_smoke_report("OK: QML root object loaded")
         QTimer.singleShot(0, app.quit)
     return app.exec()
 

@@ -112,9 +112,22 @@ jobs:
           APP_EXECUTABLE: ${{ matrix.app_executable }}
         run: |
           import os, subprocess
+          from pathlib import Path
+
           app = os.environ["APP_EXECUTABLE"]
-          result = subprocess.run([app, "--smoke-test"], check=False, timeout=60)
+          report = Path("worker-smoke-report.txt").resolve()
+          child_env = os.environ.copy()
+          child_env["CV_WORKER_SMOKE_REPORT"] = str(report)
+          try:
+              result = subprocess.run([app, "--smoke-test"], check=False, timeout=60, env=child_env)
+          except subprocess.TimeoutExpired:
+              print("::error title=Packaged smoke test timed out::Application did not exit within 60 seconds")
+              raise
+          details = report.read_text(encoding="utf-8", errors="replace") if report.exists() else "No smoke report was created"
+          print(details)
           if result.returncode != 0:
+              annotation = details.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")[:4000]
+              print(f"::error title=Packaged smoke test failed::{annotation}")
               raise SystemExit(f"Packaged smoke test failed with exit code {result.returncode}")
 
       - name: Verify architecture and package application (macOS)
