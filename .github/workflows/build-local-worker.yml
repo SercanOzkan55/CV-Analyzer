@@ -21,37 +21,44 @@ jobs:
             platform: windows
             arch: x64
             artifact_name: local-worker-windows-x64
+            app_executable: "local_worker/dist/CV Analyzer Local Worker.exe"
             artifact_path: "local_worker/dist/CV Analyzer Local Worker.exe"
           - os: macos-15
             platform: macos
             arch: arm64
             artifact_name: local-worker-macos-arm64
+            app_executable: "local_worker/dist/CV Analyzer Local Worker.app/Contents/MacOS/CV Analyzer Local Worker"
             artifact_path: "local_worker/dist/CV Analyzer Local Worker-macOS-arm64.zip"
           - os: macos-15-intel
             platform: macos
             arch: x64
             artifact_name: local-worker-macos-x64
+            app_executable: "local_worker/dist/CV Analyzer Local Worker.app/Contents/MacOS/CV Analyzer Local Worker"
             artifact_path: "local_worker/dist/CV Analyzer Local Worker-macOS-x64.zip"
           - os: ubuntu-22.04
             platform: linux
             arch: x64
             artifact_name: local-worker-linux-x64
+            app_executable: "local_worker/dist/CV Analyzer Local Worker"
             artifact_path: "local_worker/dist/CV Analyzer Local Worker-linux-x64"
           - os: ubuntu-22.04-arm
             platform: linux
             arch: arm64
             artifact_name: local-worker-linux-arm64
+            app_executable: "local_worker/dist/CV Analyzer Local Worker"
             artifact_path: "local_worker/dist/CV Analyzer Local Worker-linux-arm64"
 
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     env:
       QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
       MACOSX_DEPLOYMENT_TARGET: "13.0"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -99,29 +106,30 @@ jobs:
         working-directory: local_worker
         run: pyinstaller --noconfirm --clean "CV Analyzer Local Worker.spec"
 
-      - name: Smoke-test packaged application (Windows)
-        if: matrix.platform == 'windows'
-        working-directory: local_worker
-        shell: pwsh
+      - name: Smoke-test packaged application
+        shell: python
+        env:
+          APP_EXECUTABLE: ${{ matrix.app_executable }}
         run: |
-          $process = Start-Process -FilePath (Resolve-Path "dist/CV Analyzer Local Worker.exe") -ArgumentList "--smoke-test" -Wait -PassThru
-          if ($process.ExitCode -ne 0) { throw "Packaged smoke test failed with exit code $($process.ExitCode)" }
+          import os, subprocess
+          app = os.environ["APP_EXECUTABLE"]
+          result = subprocess.run([app, "--smoke-test"], check=False, timeout=60)
+          if result.returncode != 0:
+              raise SystemExit(f"Packaged smoke test failed with exit code {result.returncode}")
 
-      - name: Smoke-test and package application (macOS)
+      - name: Verify architecture and package application (macOS)
         if: matrix.platform == 'macos'
         working-directory: local_worker
         run: |
-          "dist/CV Analyzer Local Worker.app/Contents/MacOS/CV Analyzer Local Worker" --smoke-test
           file "dist/CV Analyzer Local Worker.app/Contents/MacOS/CV Analyzer Local Worker" | grep -q "${{ matrix.arch == 'arm64' && 'arm64' || 'x86_64' }}"
           ditto -c -k --sequesterRsrc --keepParent \
             "dist/CV Analyzer Local Worker.app" \
             "dist/CV Analyzer Local Worker-macOS-${{ matrix.arch }}.zip"
 
-      - name: Smoke-test and name application (Linux)
+      - name: Verify architecture and name application (Linux)
         if: matrix.platform == 'linux'
         working-directory: local_worker
         run: |
-          "dist/CV Analyzer Local Worker" --smoke-test
           file "dist/CV Analyzer Local Worker" | grep -q "${{ matrix.arch == 'arm64' && 'aarch64' || 'x86-64' }}"
           mv "dist/CV Analyzer Local Worker" "dist/CV Analyzer Local Worker-linux-${{ matrix.arch }}"
           chmod +x "dist/CV Analyzer Local Worker-linux-${{ matrix.arch }}"

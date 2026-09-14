@@ -2354,7 +2354,6 @@ def main() -> int:
     if not engine.rootObjects():
         return 1
     if "--smoke-test" in sys.argv:
-        print("LOCAL_WORKER_SMOKE_OK", flush=True)
         QTimer.singleShot(0, app.quit)
     return app.exec()
 
