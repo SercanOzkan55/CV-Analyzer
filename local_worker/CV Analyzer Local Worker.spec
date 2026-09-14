@@ -53,7 +53,7 @@ a = Analysis(
     ],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=["smoke_runtime_hook.py"],
     excludes=[],
     noarchive=False,
     optimize=0,

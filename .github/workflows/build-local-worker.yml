@@ -119,11 +119,22 @@ jobs:
           child_env = os.environ.copy()
           child_env["CV_WORKER_SMOKE_REPORT"] = str(report)
           try:
-              result = subprocess.run([app, "--smoke-test"], check=False, timeout=60, env=child_env)
+              result = subprocess.run(
+                  [app, "--smoke-test"],
+                  check=False,
+                  timeout=60,
+                  env=child_env,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.STDOUT,
+                  text=True,
+              )
           except subprocess.TimeoutExpired:
               print("::error title=Packaged smoke test timed out::Application did not exit within 60 seconds")
               raise
+          process_output = result.stdout or ""
           details = report.read_text(encoding="utf-8", errors="replace") if report.exists() else "No smoke report was created"
+          if process_output:
+              details = f"{details}\nProcess output:\n{process_output}"
           print(details)
           if result.returncode != 0:
               annotation = details.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")[:4000]

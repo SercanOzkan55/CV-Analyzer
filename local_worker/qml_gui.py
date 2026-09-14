@@ -38,6 +38,12 @@ except ImportError:
         "PySide6 with Qt Quick is required for the Local Worker app.\n\n"
         "Reinstall dependencies from local_worker/requirements.txt and try again."
     )
+    smoke_report = os.environ.get("CV_WORKER_SMOKE_REPORT", "").strip()
+    if smoke_report:
+        Path(smoke_report).write_text(
+            f"FAILED: PySide6 import error\n{traceback.format_exc()}\n",
+            encoding="utf-8",
+        )
     # A native message box is a Windows-only nicety (ctypes.windll doesn't
     # exist on macOS/Linux -- importing it there would itself raise
     # ImportError, masking the real "PySide6 missing" message with an
@@ -49,7 +55,8 @@ except ImportError:
             windll.user32.MessageBoxW(None, message, "CV Analyzer Local Worker", 0x10)
         except Exception:
             pass
-    print(message, file=sys.stderr)
+    if sys.stderr is not None:
+        print(message, file=sys.stderr)
     sys.exit(1)
 
 import worker as worker_module
