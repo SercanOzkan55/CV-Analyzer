@@ -5,6 +5,7 @@ import hashlib
 from typing import List, Optional
 
 from dotenv import load_dotenv
+from core.cost_policy import require_paid_ai
 
 load_dotenv(encoding="utf-8-sig")
 
@@ -421,6 +422,7 @@ def _cover_letter_cache_set(payload: dict, value: str) -> None:
 
 
 def _generate(prompt: str, max_tokens: int = 512) -> str:
+    require_paid_ai()
     from services.ai_client_factory import get_ai_client_and_model
 
     client, model = get_ai_client_and_model()

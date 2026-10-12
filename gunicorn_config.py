@@ -8,7 +8,7 @@ import multiprocessing
 import os
 
 # ── Bind ────────────────────────────────────────────────────────────
-bind = os.getenv("GUNICORN_BIND", "0.0.0.0:8001")
+bind = os.getenv("GUNICORN_BIND", f"0.0.0.0:{os.getenv("PORT", "8001")}")
 
 # ── Workers ─────────────────────────────────────────────────────────
 workers = int(os.getenv("GUNICORN_WORKERS", min(multiprocessing.cpu_count() * 2 + 1, 8)))

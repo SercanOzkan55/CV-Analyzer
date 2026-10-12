@@ -175,6 +175,7 @@ def analyze(
     """
     _ensure_not_expired(user)
     _metric_request("analyze")
+    _check_cost_guard("analyze", COST_ANALYZE_PER_DAY)
 
     # In MOCK_SERVICES mode skip DB user creation and quota checks
     if _main_module().MOCK_SERVICES_ON:
@@ -670,6 +671,7 @@ def analyze_async(
 
     _ensure_not_expired(user)
     _metric_request("analyze-async")
+    _check_cost_guard("analyze", COST_ANALYZE_PER_DAY)
 
     # For async we still enforce the same per-user quotas as analyze
     supabase_id = user.get("user_id")
@@ -819,6 +821,7 @@ async def analyze_pdf(
     except Exception:
         pass
     _check_cost_guard("upload", COST_UPLOAD_PER_DAY)
+    _check_cost_guard("analyze", COST_ANALYZE_PER_DAY)
     _check_disk_safety()
 
     # Repeated request guard — reject identical uploads within dedup window

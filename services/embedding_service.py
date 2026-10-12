@@ -7,6 +7,7 @@ import time
 
 from dotenv import load_dotenv
 from openai import OpenAI
+from core.cost_policy import paid_ai_enabled
 
 try:
     from loguru import logger
@@ -49,7 +50,7 @@ if hasattr(logger, "remove") and hasattr(logger, "add"):
 
 _OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 _OPENAI_BASE = os.getenv("OPENAI_API_BASE")
-client = OpenAI(api_key=_OPENAI_KEY, base_url=_OPENAI_BASE) if _OPENAI_KEY else None
+client = OpenAI(api_key=_OPENAI_KEY, base_url=_OPENAI_BASE) if _OPENAI_KEY and paid_ai_enabled() else None
 
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
@@ -94,6 +95,9 @@ def get_embedding(text: str, max_length: int = 20000):
 
     Returns a list of floats or None.
     """
+    # Check at call time too, including clients created before the switch changed.
+    if not paid_ai_enabled():
+        return None
     # Allow mocking for testing without OpenAI API
     if os.getenv("MOCK_SERVICES", "").lower() in ("1", "true", "yes"):
         return [0.01] * 1536  # mock embedding vector

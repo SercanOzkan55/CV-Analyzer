@@ -55,6 +55,7 @@ debug_*.py
 *.sqlite3
 *.zip
 *.pkl
+!resume_model.pkl
 *.onnx
 .pytest_test.db
 *.pytest_test.db

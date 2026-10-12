@@ -4,10 +4,11 @@ services:
     restart: unless-stopped
     env_file:
       - .env.production
+    # Quota keys must never disappear to make room for cache entries.
     command: >-
       redis-server
       --maxmemory 256mb
-      --maxmemory-policy allkeys-lru
+      --maxmemory-policy noeviction
       --requirepass ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env.production}
       --appendonly yes
       --bind 0.0.0.0

@@ -8,6 +8,7 @@ import unicodedata
 from dataclasses import dataclass
 
 from loguru import logger
+from core.cost_policy import paid_ai_enabled
 
 
 @dataclass(frozen=True)
@@ -70,7 +71,7 @@ def moderate_text(text: str) -> ModerationDecision:
         return local
 
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
-    if not api_key:
+    if not api_key or not paid_ai_enabled():
         if os.getenv("BLOG_REQUIRE_AI_MODERATION", "").lower() in ("1", "true", "yes"):
             return ModerationDecision(False, "moderation_unavailable")
         return local

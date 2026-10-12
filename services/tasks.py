@@ -109,6 +109,9 @@ def persist_analysis_result(
 
 
 try:
+    # Free single-service deployments run the supported LocalTask path.
+    if os.getenv("CELERY_ENABLED", "1").strip().lower() not in ("1", "true", "yes", "on"):
+        raise RuntimeError("Celery explicitly disabled; use LocalTask")
     from celery import Celery, Task
 
     # Prefer Celery only if Redis broker/backend are reachable. If Redis is

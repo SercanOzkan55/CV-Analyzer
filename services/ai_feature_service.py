@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import HTTPException
 
 from core.runtime_bridge import main_value
+from core.cost_policy import require_paid_ai
 from services.billing_service import is_feature_enabled
 
 
@@ -16,6 +17,7 @@ def ensure_ai_rewrite_allowed(db, db_user) -> str:
     2. ``ai_daily_limit`` — a per-day counter kept apart from the CV-analysis
        quota, so trying an AI tool never eats a user's analysis allowance.
     """
+    require_paid_ai()
     override = main_value("_ensure_ai_rewrite_allowed")
     if override is not None and override is not ensure_ai_rewrite_allowed:
         return override(db, db_user)

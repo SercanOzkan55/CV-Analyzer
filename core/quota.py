@@ -503,7 +503,7 @@ def _check_cost_guard(scope: str, limit: int) -> None:
     from shared import _alert
 
     _cost_logger = logging.getLogger("app.cost")
-    today = datetime.now().strftime("%Y%m%d")
+    today = _quota_now().strftime("%Y%m%d")
     key = f"cost:{scope}:{today}"
 
     def _warn_and_block(count: int, source: str) -> None:
@@ -533,17 +533,21 @@ def _check_cost_guard(scope: str, limit: int) -> None:
             )
 
     redis_rate = _get_redis_rate()
+    require_redis = os.getenv("COST_GUARD_REQUIRE_REDIS", "0").strip().lower() in ("1", "true", "yes", "on")
     if redis_rate:
         try:
             count = int(redis_rate.incr(key))
             if count == 1:
-                redis_rate.expire(key, 86400)
+                redis_rate.expire(key, _seconds_until_next_quota_day())
             _warn_and_block(count, "redis")
             return
         except HTTPException:
             raise
         except Exception:
             pass
+
+    if require_redis:
+        raise HTTPException(status_code=503, detail="Spending protection unavailable; please try again later.")
 
     count = int(_LOCAL_DAILY_QUOTA.get(key, 0)) + 1
     _LOCAL_DAILY_QUOTA[key] = count

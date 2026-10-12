@@ -1,5 +1,6 @@
 import os
 from loguru import logger
+from core.cost_policy import paid_ai_enabled
 
 
 def get_ai_client_and_model():
@@ -9,6 +10,8 @@ def get_ai_client_and_model():
     Returns:
         (client, model) or (None, None) if mock or unconfigured.
     """
+    if not paid_ai_enabled():
+        return None, None
     try:
         from openai import OpenAI
     except ImportError:
@@ -69,6 +72,8 @@ def get_embedding_client_and_model():
     Returns:
         (client, model) or (None, None)
     """
+    if not paid_ai_enabled():
+        return None, None
     try:
         from openai import OpenAI
     except ImportError:
@@ -77,6 +82,9 @@ def get_embedding_client_and_model():
     provider = os.getenv("REWRITE_PROVIDER", "").strip().lower()
     gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     openai_key = os.getenv("OPENAI_API_KEY")
+
+    if provider == "mock":
+        return None, None
 
     if not provider:
         if gemini_key:
