@@ -8,7 +8,10 @@
   disks, IP addresses and outstanding charges have not been verified.
 - The old runbook describes an `e2-standard-2` VM in Frankfurt. This is a
   deployment example, not proof of the current inventory or a 500 TL quote.
-- No cloud service has been reactivated, no DNS changed, and no deployment made.
+- Google remains closed. DNS has not been changed. Free Render services were created.
+- Supabase restoration completed; read-only SELECT 1 succeeds. Organization is
+  Free with spend cap enabled.
+- Existing AWS credentials return InvalidAccessKeyId; old AWS objects were not changed.
 
 ## Application changes prepared locally
 
@@ -32,8 +35,8 @@ end-to-end operation still requires validation on the chosen host.
 The shared analysis cap covers text, asynchronous and uploaded CV analyses;
 uploads also have their own cap. Redis failure rejects guarded operations.
 Daily resets use Europe/Istanbul. Production Redis uses `noeviction` so caches
-cannot evict quota counters. Keep its persistent volume: deleting or restoring
-old Redis data can reset counts. These are operation counts, not currency limits.
+cannot evict quota counters. On the existing Docker profile keep its persistent volume: deleting or restoring
+old Redis data can reset counts. The free Render profile is volatile (see below). These are operation counts, not currency limits.
 
 These local changes take effect remotely only after deployment and restart of
 both the API and any workers. The AI switch does not cancel historical bills,
@@ -51,11 +54,16 @@ AWS storage charges, Supabase subscriptions, email plans or domain renewals.
 - Do not create Render Free Postgres as permanent storage: it expires after
   30 days. Check the existing Supabase project's plan, quotas and availability
   before keeping it. Do not replace or erase the existing database.
-- No account session or deployment credential for a replacement host is
-  available in this workspace. The user installed the Render integration and
-  installation was verified, but Render service-management tools have not
-  become available in the active tool session. Its account connection and
-  workspace access still require verification.
+- Render access is available through the official CLI. Workspace is Hobby, no
+  card on file. Free API: `srv-db6mvbks728c73cksmfg`; static frontend:
+  `srv-db6mu6favr4c73cs8obg`. API branch: `codex/budget-recovery`.
+- Quotas use free Frankfurt Key Value `red-db6mqlpsrm7s73c4tcmg`, noeviction.
+  Free Key Value is volatile: restarts can reset daily counters. AI keys are
+  omitted and paid AI disabled independently of those counters.
+- One Gunicorn worker, explicit CELERY_ENABLED=0 uses existing synchronous
+  LocalTask execution. No paid worker or paid database was provisioned.
+- Frontend is published at https://cv-analyzer-site.onrender.com. API build
+  and file storage verification are still in progress.
 
 Before publishing, verify the replacement account cannot charge for overages
 or automatic upgrades, verify all external plans, and reserve domain/tax costs
