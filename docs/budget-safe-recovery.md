@@ -8,7 +8,9 @@
   disks, IP addresses and outstanding charges have not been verified.
 - The old runbook describes an `e2-standard-2` VM in Frankfurt. This is a
   deployment example, not proof of the current inventory or a 500 TL quote.
-- Google remains closed. DNS has not been changed. Free Render services were created.
+- Google remains closed. Apex DNS now points to the free Render static site;
+  Cloudflare proxy remains enabled. Apex and www Render domains are verified.
+  HTTPS root returns 200 and www returns 301 to the root.
 - Supabase restoration completed; read-only SELECT 1 succeeds. Organization is
   Free with spend cap enabled.
 - Existing AWS credentials return InvalidAccessKeyId; old AWS objects were not changed.
@@ -62,8 +64,25 @@ AWS storage charges, Supabase subscriptions, email plans or domain renewals.
   omitted and paid AI disabled independently of those counters.
 - One Gunicorn worker, explicit CELERY_ENABLED=0 uses existing synchronous
   LocalTask execution. No paid worker or paid database was provisioned.
-- Frontend is published at https://cv-analyzer-site.onrender.com. API build
-  and file storage verification are still in progress.
+- Main frontend: https://cvanalyzer.dev (fallback https://cv-analyzer-site.onrender.com).
+  API: https://cv-analyzer-api-lb46.onrender.com. Health and readiness return 200.
+- Supabase private bucket `cv-analyzer-storage`: max 5 MB, PDF/DOCX only.
+  The user explicitly approved the S3 credential's full-bucket/RLS-bypass scope.
+  Credentials are stored only as Render server environment variables. Old AWS
+  objects were neither accessed nor deleted; historical files remain inaccessible
+  until valid AWS access is recovered.
+- Live authenticated synthetic PDF analysis completed, history and original-file
+  reference persisted, private presigned download returned a valid PDF (200).
+  Database, Redis, S3, model worker all report healthy. RSS before/after this
+  single small analysis: 296.6/387.9 MB (web process, not full container peak).
+  This is not proof that every large PDF or OCR workload fits 512 MB.
+- Final resource profile: global/path/parse concurrency 1, memory admission
+  threshold 400 MB, PDF page maximum 10, one Gunicorn worker recycling after
+  150 requests plus jitter. These limit admission; they are not OS memory caps.
+- 50 focused quota/AI/rewrite/ownership tests passed in the isolated checkout.
+  Explicit CELERY_ENABLED=0 LocalTask execution and Python syntax checks passed.
+- Render no-card/free plans, Supabase Free spend cap, Cloudflare Free verified.
+  Domain registration renewals and past invoices have not been verified or cancelled.
 
 Before publishing, verify the replacement account cannot charge for overages
 or automatic upgrades, verify all external plans, and reserve domain/tax costs
